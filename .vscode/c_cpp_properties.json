@@ -1,0 +1,33 @@
+{
+  "configurations": [
+    {
+      "name": "MSYS2-Qt6",
+      "compilerPath": "C:/msys64/mingw64/bin/g++.exe",
+      "intelliSenseMode": "windows-gcc-x64",
+      "includePath": [
+        "${workspaceFolder}/src",
+        "${workspaceFolder}/src/UI",
+        "${workspaceFolder}/src/Engine",
+        "${workspaceFolder}/src/ThirdParty",
+        "${workspaceFolder}/src/ThirdParty/imgui",
+        "${workspaceFolder}/src/ThirdParty/ImGuizmo",
+        "C:/msys64/mingw64/include",
+        "C:/msys64/mingw64/include/SDL2"
+      ],
+      "defines": [],
+      "cppStandard": "c++17",
+      "cStandard": "c11",
+      "compileCommands": "${workspaceFolder}/build/compile_commands.json",
+      "browse": {
+        "path": [
+          "${workspaceFolder}/src",
+          "${workspaceFolder}/src/ThirdParty",
+          "${workspaceFolder}/src/ThirdParty/imgui",
+          "${workspaceFolder}/src/ThirdParty/ImGuizmo"
+        ],
+        "limitSymbolsToIncludedHeaders": true
+      }
+    }
+  ],
+  "version": 4
+}
