@@ -1,0 +1,30 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+      "major": 3,
+      "minor": 16
+    },
+    "configurePresets": [
+      {
+        "name": "msys2-mingw64-debug",
+        "displayName": "MSYS2 MinGW64 (Debug)",
+        "generator": "MinGW Makefiles",
+        "description": "Utilise le toolchain MSYS2 mingw64",
+        "binaryDir": "${sourceDir}/build",
+        "cacheVariables": {
+          "CMAKE_BUILD_TYPE": "Debug",
+          "CMAKE_C_COMPILER": "C:/msys64/mingw64/bin/gcc.exe",
+          "CMAKE_CXX_COMPILER": "C:/msys64/mingw64/bin/g++.exe",
+          "CMAKE_PREFIX_PATH": "C:/msys64/mingw64/lib/cmake",
+          "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+        }
+      }
+    ],
+    "buildPresets": [
+      {
+        "name": "msys2-mingw64-build",
+        "configurePreset": "msys2-mingw64-debug"
+      }
+    ]
+  }
+  

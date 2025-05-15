@@ -1,0 +1,17 @@
+/build/
+/CMakeFiles/
+/CMakeCache.txt
+/cmake_install.cmake
+/Makefile
+/compile_commands.json
+*.autosave
+*.moc
+*.qrc
+*.ui.autosave
+*.log
+*.tmp
+*.bak
+*.swp
+
+.DS_Store
+Thumbs.db

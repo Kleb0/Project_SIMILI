@@ -1,0 +1,31 @@
+# 1. Outils de développement de base (make, sed, etc.)
+pacman -S base-devel
+
+# 2. Utilitaire de texte requis par certains scripts (affichait une erreur sinon)
+pacman -S sed
+
+# 3. Compilateur C/C++
+pacman -S mingw-w64-x86_64-gcc
+pacman -S mingw-w64-x86_64-gcc-libs
+
+# 4. Système de build compatible CMake (MinGW Makefiles)
+pacman -S mingw-w64-x86_64-make
+
+# 5. Qt6 (framework principal pour GUI + OpenGL)
+pacman -S mingw-w64-x86_64-qt6
+pacman -S mingw-w64-x86_64-qt6-base
+pacman -S mingw-w64-x86_64-qt6-tools
+pacman -S mingw-w64-x86_64-qt6-opengl
+
+# 6. OpenGL (librairies de base, au cas où)
+pacman -S mingw-w64-x86_64-opengl
+
+# 7. Librairies système classiques utilisées par GCC ou Qt
+pacman -S mingw-w64-x86_64-zlib
+pacman -S mingw-w64-x86_64-libiconv
+
+# 8. Débogueur pour VSCode (launch.json avec GDB)
+pacman -S mingw-w64-x86_64-gdb
+
+# 9. ImGUI pour le Gizmo et autres sélecteurs (Msys64 / Clang64)
+pacman -S mingw-w64-i686-imgui
