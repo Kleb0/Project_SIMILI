@@ -83,14 +83,6 @@ bool ThreeDObjectSelector::rayIntersectsCube(const glm::vec3 &rayOrigin, const g
         return true;
     };
 
-    // std::cout << "[DEBUG] Intersection result: "
-    //           << (testAxis(xAxis, halfScale.x) &&
-    //                       testAxis(yAxis, halfScale.y) &&
-    //                       testAxis(zAxis, halfScale.z)
-    //                   ? "HIT"
-    //                   : "MISS")
-    //           << std::endl;
-
     return testAxis(xAxis, halfScale.x) &&
            testAxis(yAxis, halfScale.y) &&
            testAxis(zAxis, halfScale.z);

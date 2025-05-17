@@ -3,11 +3,17 @@
 #include <imgui_internal.h>
 #include <ImGuizmo.h>
 #include "UI/ThreeDWindow.hpp"
+#include "UI/HierarchyInspector.hpp"
 #include "WorldObjects/ThreeDObject.hpp"
 #include <SDL2/SDL.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
+
+void ThreeDWindow::setHierarchy(HierarchyInspector *inspector)
+{
+    hierarchy = inspector;
+}
 
 ThreeDWindow::ThreeDWindow() {}
 
@@ -68,6 +74,7 @@ void ThreeDWindow::handleClick()
             ThreeDObject *target = Similigizmo.getTarget();
             if (target)
             {
+
                 selector.select(target);
                 // std::cout << "[SIMILI_GIZMO] Reactivated manually on click." << std::endl;
             }
@@ -82,11 +89,23 @@ void ThreeDWindow::handleClick()
 
             selected->setSelected(true);
             Similigizmo.setTarget(selected);
+
+            if (hierarchy)
+                hierarchy->selectFromThreeDWindow();
         }
         else
         {
+
+            std::cout << "[DEBUG] No object selected ! clear Gizmo !" << std::endl;
+            if (hierarchy)
+            {
+                ThreeDObject *previouslySelected = hierarchy->getSelectedObject();
+                hierarchy->unselectobject(previouslySelected);
+            }
+
             if (!ImGuizmo::IsUsing() && !wasUsingGizmoLastFrame)
             {
+
                 for (auto *obj : ThreeDObjectsList)
                     obj->setSelected(false);
 
@@ -139,6 +158,29 @@ void ThreeDWindow::manipulateThreeDObject()
         // std::cout << "[DEBUG] New position: " << translation.x << ", " << translation.y << ", " << translation.z << std::endl;
         wasUsingGizmoLastFrame = ImGuizmo::IsUsing();
     }
+}
+
+void ThreeDWindow::externalSelect(ThreeDObject *object)
+{
+    for (auto *obj : ThreeDObjectsList)
+        obj->setSelected(false);
+
+    if (object)
+    {
+        selector.select(object);
+        object->setSelected(true);
+        Similigizmo.setTarget(object);
+        view = openGLContext->getViewMatrix();
+        proj = openGLContext->getProjectionMatrix();
+    }
+    else
+    {
+        Similigizmo.disable();
+        selector.clearTarget();
+    }
+
+    if (hierarchy)
+        hierarchy->selectFromThreeDWindow();
 }
 
 void ThreeDWindow::threeDRendering()

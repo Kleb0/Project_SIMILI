@@ -71,6 +71,7 @@ int main()
     renderer.setCamera(&mainCamera);
     myHierarchy.setContext(&renderer);
     myHierarchy.setThreeDWindow(&myThreeDWindow);
+    myThreeDWindow.setHierarchy(&myHierarchy);
     add(gui, myHierarchy);
     gui.run();
 }
