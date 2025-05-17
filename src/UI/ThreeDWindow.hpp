@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 
+class HierarchyInspector;
+
 class ThreeDObject;
 
 class ThreeDWindow : public GUIWindow
@@ -45,12 +47,20 @@ public:
     {
         ThreeDObjectsList = list;
     }
+    void externalSelect(ThreeDObject *object);
+    void setHierarchy(HierarchyInspector *inspector);
+
+    ThreeDObject *getSelectedObject() const
+    {
+        return selector.getSelectedObject();
+    }
 
 private:
     glm::mat4 view = glm::mat4(1.0f);
     glm::mat4 proj = glm::mat4(1.0f);
 
     OpenGLContext *openGLContext = nullptr;
+    HierarchyInspector *hierarchy = nullptr;
     ThreeDObjectSelector selector;
     std::vector<ThreeDObject *> ThreeDObjectsList;
 

@@ -100,7 +100,8 @@
     "cinttypes": "cpp",
     "typeinfo": "cpp",
     "variant": "cpp",
-    "fstream": "cpp"
+    "fstream": "cpp",
+    "ranges": "cpp"
   },
   "C_Cpp.errorSquiggles": "disabled"
 }
