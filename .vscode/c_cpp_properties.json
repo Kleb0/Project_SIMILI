@@ -9,6 +9,7 @@
         "${workspaceFolder}/src/UI",
         "${workspaceFolder}/src/Engine",
         "${workspaceFolder}/src/ThirdParty",
+        "${workspaceFolder}/src/resources",
         "${workspaceFolder}/src/ThirdParty/imgui",
         "${workspaceFolder}/src/ThirdParty/ImGuizmo",
         "C:/msys64/mingw64/include",

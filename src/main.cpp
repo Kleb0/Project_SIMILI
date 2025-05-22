@@ -4,6 +4,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#include <filesystem>
 #include <glm/gtc/matrix_transform.hpp>
 #include <SDL2/SDL.h>
 #include "UI/MainSoftwareGUI.hpp"
@@ -16,9 +17,11 @@
 #include "Engine/ThreeDObjectSelector.hpp"
 #include "WorldObjects/Camera.hpp"
 #include "WorldObjects/Cube.hpp"
+#include "UI/UiCreator.hpp"
 
 int main()
 {
+
     MainSoftwareGUI gui(1280, 720, "Main GUI");
     InfoWindow myInfoWindow;
     ThreeDWindow myThreeDWindow;
@@ -36,29 +39,13 @@ int main()
     myThreeDWindow.text = "Bienvenue dans la deuxième fenêtre ! Celle-ci contient un contexte OpenGL !";
 
     myCube.setName("MonCube");
-    std::cout << "Nom du cube : " << myCube.getName() << std::endl;
     mainCamera.setName("MainCamera");
-    std::cout << "Nom de la camera : " << mainCamera.getName() << std::endl;
 
     myThreeDWindow.addThreeDObjectToList(&myCube);
     myThreeDWindow.addThreeDObjectToList(&mainCamera);
 
     renderer.addThreeDObjectToList(&myCube);
     renderer.addThreeDObjectToList(&mainCamera);
-
-    std::cout << "\n[MAIN DEBUG] List of objects in the OpenGL context:" << std::endl;
-    for (ThreeDObject *obj : myThreeDWindow.getObjects())
-    {
-        if (obj)
-            std::cout << " - " << obj->getName() << std::endl;
-    }
-
-    std::cout << "\n[MAIN DEBUG] List of objects in the ThreeDWindow :" << std::endl;
-    for (ThreeDObject *obj : renderer.getObjects())
-    {
-        if (obj)
-            std::cout << " - " << obj->getName() << std::endl;
-    }
 
     add(gui, myInfoWindow);
     add(gui, myThreeDWindow);
@@ -69,9 +56,13 @@ int main()
     add(renderer, myCube);
     add(renderer, mainCamera);
     renderer.setCamera(&mainCamera);
+    myHierarchy.setTitle("Hierarchy");
     myHierarchy.setContext(&renderer);
     myHierarchy.setThreeDWindow(&myThreeDWindow);
     myThreeDWindow.setHierarchy(&myHierarchy);
     add(gui, myHierarchy);
+
+    UiCreator::loadLayoutFromFile(UiCreator::getLayoutFilePath("my_custom_ui.ini"));
     gui.run();
+    UiCreator::saveCurrentLayoutToDefault();
 }

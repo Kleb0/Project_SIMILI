@@ -1,11 +1,18 @@
+#include "my_imgui_config.h"
 #include <glad/glad.h>
-#include "UI/MainSoftwareGUI.hpp"
-#include <UI/GUIWindow.hpp>
-#include "imgui.h"
+#include <GLFW/glfw3.h>
+
+#define IMGUI_IMPL_OPENGL_LOADER_GLAD
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
-// #include "Engine/SceneWidgetLinker.hpp"
+
+#include "UI/MainSoftwareGUI.hpp"
+#include <UI/GUIWindow.hpp>
+#include "imgui_internal.h"
+
+#include <fstream>
 #include <iostream>
+#include <sstream>
 
 GLFWwindow *MainSoftwareGUI::getWindow()
 {
@@ -32,7 +39,7 @@ void MainSoftwareGUI::initGLFW(int width, int height, const char *title)
 {
     if (!glfwInit())
     {
-        std::cerr << "Erreur lors de l'initialisation de GLFW" << std::endl;
+        std::cerr << "Error during GLFW init" << std::endl;
         std::exit(EXIT_FAILURE);
     }
 
@@ -43,14 +50,14 @@ void MainSoftwareGUI::initGLFW(int width, int height, const char *title)
     window = glfwCreateWindow(width, height, title, nullptr, nullptr);
     if (window == nullptr)
     {
-        std::cerr << "Erreur lors de la création de la fenêtre GLFW" << std::endl;
+        std::cerr << "Error during GLFW creation" << std::endl;
         glfwTerminate();
         std::exit(EXIT_FAILURE);
     }
     glfwMakeContextCurrent(window);
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
-        std::cerr << "Erreur lors du chargement de GLAD !" << std::endl;
+        std::cerr << "Error during Glad Creation" << std::endl;
         std::exit(EXIT_FAILURE);
     }
     glfwSwapInterval(1);
@@ -60,8 +67,26 @@ void MainSoftwareGUI::initImGui()
 {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGui::StyleColorsDark();
 
+    ImGuiIO &io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+    io.IniFilename = nullptr;
+
+    std::ifstream file("../src/resources/default_imgui_layout.ini");
+    if (!file)
+    {
+        std::cerr << "[ERROR] Cannot open default_imgui_layout.ini" << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    const std::string ini_content = buffer.str();
+
+    ImGui::LoadIniSettingsFromMemory(ini_content.c_str(), ini_content.size());
+
+    ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
 }
@@ -75,12 +100,28 @@ void MainSoftwareGUI::run()
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // RENDRE TOUTES LES FENÊTRES AJOUTÉES
+        ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
+        const ImGuiViewport *viewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(viewport->WorkPos);
+        ImGui::SetNextWindowSize(viewport->WorkSize);
+        ImGui::SetNextWindowViewport(viewport->ID);
+        window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+                        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                        ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+
+        ImGui::Begin("MainDockSpaceWindow", nullptr, window_flags);
+        ImGui::PopStyleVar(2);
+
+        ImGuiID dockspace_id = ImGui::GetID("MyMainDockspace");
+        ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None);
+        ImGui::End();
+
         for (auto *win : windows)
-        {
             if (win)
                 win->render();
-        }
 
         ImGui::Render();
         int display_w, display_h;
@@ -88,7 +129,6 @@ void MainSoftwareGUI::run()
         glViewport(0, 0, display_w, display_h);
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
-
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         glfwSwapBuffers(window);
     }
