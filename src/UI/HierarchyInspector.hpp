@@ -2,6 +2,7 @@
 #include "UI/GUIWindow.hpp"
 #include "Engine/OpenGLContext.hpp"
 #include "WorldObjects/ThreeDObject.hpp"
+#include <string>
 
 class ThreeDWindow;
 
@@ -19,6 +20,9 @@ public:
     void selectFromThreeDWindow();
     void unselectobject(ThreeDObject *obj);
     ThreeDObject *getSelectedObject() const;
+
+    std::string title;
+    void setTitle(const std::string &newTitle) { this->title = newTitle; }
 
 private:
     OpenGLContext *context = nullptr;

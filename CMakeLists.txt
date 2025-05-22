@@ -13,6 +13,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/images
     ${CMAKE_CURRENT_SOURCE_DIR}/src/InternalLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Resources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/example
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glad
@@ -22,6 +23,7 @@ include_directories(
 
 # Source files
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp)
+list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/ImGuizmo/vcpkg-example/main.cpp")
 list(FILTER SOURCES EXCLUDE REGEX "src/ThirdParty/imgui/backends/.*\\.cpp$")
 list(FILTER SOURCES EXCLUDE REGEX "src/ThirdParty/imgui/examples/.*\\.cpp$")
 list(FILTER SOURCES EXCLUDE REGEX "src/ThirdParty/imgui/misc/.*\\.cpp$")
@@ -37,7 +39,20 @@ file(GLOB IMGUI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/imgui_widgets.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/backends/imgui_impl_glfw.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/backends/imgui_impl_opengl3.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/imgui_demo.cpp
 )
+
+add_library(imgui STATIC
+    ${IMGUI_SOURCES}
+)
+
+target_include_directories(imgui PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/backends
+)
+
+target_compile_definitions(imgui PRIVATE IMGUI_USER_CONFIG="my_imgui_config.h")
+
 
 # ImGuizmo sources
 file(GLOB IMGUIZMO_SOURCES
@@ -75,7 +90,6 @@ add_executable(${PROJECT_NAME}
     ${SOURCES}
     ${HEADERS}
     ${UIS}
-    ${IMGUI_SOURCES}
     ${GLAD_SOURCES}
 )
 
@@ -87,6 +101,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/images
     ${CMAKE_CURRENT_SOURCE_DIR}/src/InternalLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Resources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/backends
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/example
@@ -103,6 +118,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     OpenGL::GL
     ${GLU_LIBRARY}
     glfw
+    imgui               
 )
-
 set_target_properties(${PROJECT_NAME} PROPERTIES AUTOMOC_MACRO_NAMES "Q_OBJECT")
