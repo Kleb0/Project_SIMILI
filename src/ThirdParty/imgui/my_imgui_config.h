@@ -1,0 +1,3 @@
+#pragma once
+#define IMGUI_ENABLE_DOCKING
+#define IMGUI_DEFINE_MATH_OPERATORS

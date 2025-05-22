@@ -30,17 +30,17 @@
 namespace ImGradient
 {
 #ifndef IMGUI_DEFINE_MATH_OPERATORS
-   static inline ImVec2 operator*(const ImVec2& lhs, const float rhs) { return ImVec2(lhs.x * rhs, lhs.y * rhs); }
-   static inline ImVec2 operator/(const ImVec2& lhs, const float rhs) { return ImVec2(lhs.x / rhs, lhs.y / rhs); }
-   static inline ImVec2 operator+(const ImVec2& lhs, const ImVec2& rhs) { return ImVec2(lhs.x + rhs.x, lhs.y + rhs.y); }
-   static inline ImVec2 operator-(const ImVec2& lhs, const ImVec2& rhs) { return ImVec2(lhs.x - rhs.x, lhs.y - rhs.y); }
-   static inline ImVec2 operator*(const ImVec2& lhs, const ImVec2& rhs) { return ImVec2(lhs.x * rhs.x, lhs.y * rhs.y); }
-   static inline ImVec2 operator/(const ImVec2& lhs, const ImVec2& rhs) { return ImVec2(lhs.x / rhs.x, lhs.y / rhs.y); }
+   static inline ImVec2 operator*(const ImVec2 &lhs, const float rhs) { return ImVec2(lhs.x * rhs, lhs.y * rhs); }
+   static inline ImVec2 operator/(const ImVec2 &lhs, const float rhs) { return ImVec2(lhs.x / rhs, lhs.y / rhs); }
+   static inline ImVec2 operator+(const ImVec2 &lhs, const ImVec2 &rhs) { return ImVec2(lhs.x + rhs.x, lhs.y + rhs.y); }
+   static inline ImVec2 operator-(const ImVec2 &lhs, const ImVec2 &rhs) { return ImVec2(lhs.x - rhs.x, lhs.y - rhs.y); }
+   static inline ImVec2 operator*(const ImVec2 &lhs, const ImVec2 &rhs) { return ImVec2(lhs.x * rhs.x, lhs.y * rhs.y); }
+   static inline ImVec2 operator/(const ImVec2 &lhs, const ImVec2 &rhs) { return ImVec2(lhs.x / rhs.x, lhs.y / rhs.y); }
 #endif
 
-   static int DrawPoint(ImDrawList* draw_list, ImVec4 color, const ImVec2 size, bool editing, ImVec2 pos)
+   static int DrawPoint(ImDrawList *draw_list, ImVec4 color, const ImVec2 size, bool editing, ImVec2 pos)
    {
-      ImGuiIO& io = ImGui::GetIO();
+      ImGuiIO &io = ImGui::GetIO();
 
       ImVec2 p1 = ImLerp(pos, ImVec2(pos + ImVec2(size.x - size.y, 0.f)), color.w) + ImVec2(3, 3);
       ImVec2 p2 = ImLerp(pos + ImVec2(size.y, size.y), ImVec2(pos + size), color.w) - ImVec2(3, 3);
@@ -62,17 +62,17 @@ namespace ImGradient
       return 0;
    }
 
-   bool Edit(Delegate& delegate, const ImVec2& size, int& selection)
+   bool Edit(Delegate &delegate, const ImVec2 &size, int &selection)
    {
       bool ret = false;
-      ImGuiIO& io = ImGui::GetIO();
+      ImGuiIO &io = ImGui::GetIO();
       ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-      ImGui::BeginChild(137, size, ImGuiChildFlags_FrameStyle);
+      ImGui::BeginChild(137, size, true);
 
-      ImDrawList* draw_list = ImGui::GetWindowDrawList();
+      ImDrawList *draw_list = ImGui::GetWindowDrawList();
       const ImVec2 offset = ImGui::GetCursorScreenPos();
 
-      const ImVec4* pts = delegate.GetPoints();
+      const ImVec4 *pts = delegate.GetPoints();
       static int currentSelection = -1;
       static int movingPt = -1;
       if (currentSelection >= int(delegate.GetPointCount()))
