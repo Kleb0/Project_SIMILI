@@ -1,7 +1,16 @@
 cmake_minimum_required(VERSION 3.16)
 project("Project_SIMILI")
+add_definitions(-DUNICODE -D_UNICODE)
 
 set(CMAKE_CXX_STANDARD 17)
+
+#set SDl3
+set(SDL3_INCLUDE_DIR "C:/libs/SDL3/include")
+set(SDL3_LIBRARY "C:/libs/SDL3/lib/x64/SDL3.lib")
+
+if(NOT EXISTS ${SDL3_LIBRARY})
+    message(FATAL_ERROR "SDL3 library not found at ${SDL3_LIBRARY}")
+endif()
 
 # Include dirs
 include_directories(
@@ -17,8 +26,8 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/example
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glad
-    ${SDL2_INCLUDE_DIRS}
-    ${SDL2_IMAGE_INCLUDE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glm
+    ${SDL3_INCLUDE_DIR}
 )
 
 # Source files
@@ -27,6 +36,9 @@ list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/ImGuizmo/vc
 list(FILTER SOURCES EXCLUDE REGEX "src/ThirdParty/imgui/backends/.*\\.cpp$")
 list(FILTER SOURCES EXCLUDE REGEX "src/ThirdParty/imgui/examples/.*\\.cpp$")
 list(FILTER SOURCES EXCLUDE REGEX "src/ThirdParty/imgui/misc/.*\\.cpp$")
+list(FILTER SOURCES EXCLUDE REGEX "src/ThirdParty/glm/.*\\.cpp$")
+list(FILTER SOURCES EXCLUDE REGEX "src/ThirdParty/glm/test/.*\\.cpp$")
+
 
 file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS src/*.hpp)
 file(GLOB_RECURSE UIS CONFIGURE_DEPENDS src/UI/*.ui)
@@ -70,20 +82,47 @@ set(GLFW_BUILD_DOCS OFF CACHE INTERNAL "GLFW: Build the docs" FORCE)
 set(GLFW_INSTALL OFF CACHE INTERNAL "GLFW: Disable install" FORCE)
 add_subdirectory(src/ThirdParty/GLFW)
 
-# SDL2
-find_path(SDL2_INCLUDE_DIR SDL.h PATH_SUFFIXES SDL2)
-find_library(SDL2_LIBRARY NAMES SDL2)
 
-if(NOT SDL2_INCLUDE_DIR OR NOT SDL2_LIBRARY)
-    message(FATAL_ERROR "SDL2 not found")
-endif()
-
-find_path(SDL2_IMAGE_INCLUDE_DIR SDL_image.h PATH_SUFFIXES SDL2)
-find_library(SDL2_IMAGE_LIBRARY NAMES SDL2_image)
 
 # OpenGL
 find_package(OpenGL REQUIRED)
 find_library(GLU_LIBRARY NAMES GLU glu32)
+
+#find DirectX 12
+
+
+list(APPEND SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/DirectX12/DirectX12Renderer.cpp
+)
+list(APPEND HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/DirectX12/DirectX12Renderer.hpp
+)
+
+list(APPEND SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/DirectX12TestWindow.cpp
+)
+list(APPEND HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/DirectX12TestWindow.hpp
+)
+
+set(WINDOWS_SDK_VERSION "10.0.22000.0")
+set(WINDOWS_SDK_INCLUDE_DIR "C:/Program Files (x86)/Windows Kits/10/Include/${WINDOWS_SDK_VERSION}")
+set(WINDOWS_SDK_LIB_DIR "C:/Program Files (x86)/Windows Kits/10/Lib/${WINDOWS_SDK_VERSION}/um/x64")
+
+include_directories(
+    ${WINDOWS_SDK_INCLUDE_DIR}/um
+    ${WINDOWS_SDK_INCLUDE_DIR}/shared
+    ${WINDOWS_SDK_INCLUDE_DIR}/winrt
+)
+
+find_library(D3D12_LIBRARY d3d12 PATHS "${WINDOWS_SDK_LIB_DIR}")
+find_library(DXGI_LIBRARY dxgi PATHS "${WINDOWS_SDK_LIB_DIR}")
+find_library(D3DCOMPILER_LIBRARY d3dcompiler PATHS "${WINDOWS_SDK_LIB_DIR}")
+
+if(NOT D3D12_LIBRARY OR NOT DXGI_LIBRARY OR NOT D3DCOMPILER_LIBRARY)
+    message(FATAL_ERROR "DirectX 12 libraries not found")
+endif()
+
 
 # Executable
 add_executable(${PROJECT_NAME}
@@ -107,17 +146,23 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/example
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glad/include  
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/ImGuizmo
-    ${SDL2_INCLUDE_DIRS}
-    ${SDL2_IMAGE_INCLUDE_DIR}
+    ${SDL3_DIR}/include
+)
+
+target_include_directories(imgui PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/backends
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/GLFW/include
 )
 
 # Link libraries
 target_link_libraries(${PROJECT_NAME} PRIVATE
-    ${SDL2_LIBRARY}
-    ${SDL2_IMAGE_LIBRARY}
     OpenGL::GL
     ${GLU_LIBRARY}
     glfw
-    imgui               
+    imgui
+    ${D3D12_LIBRARY}
+    ${DXGI_LIBRARY}
+    ${D3DCOMPILER_LIBRARY}
+    ${SDL3_LIBRARY}
 )
-set_target_properties(${PROJECT_NAME} PROPERTIES AUTOMOC_MACRO_NAMES "Q_OBJECT")

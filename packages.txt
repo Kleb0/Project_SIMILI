@@ -29,3 +29,6 @@ pacman -S mingw-w64-x86_64-gdb
 
 # 9. ImGUI pour le Gizmo et autres sélecteurs (Msys64 / Clang64)
 pacman -S mingw-w64-i686-imgui
+
+#direct X12
+pacman -S mingw-w64-x86_64-directx-headers
