@@ -12,8 +12,10 @@
         "${workspaceFolder}/src/resources",
         "${workspaceFolder}/src/ThirdParty/imgui",
         "${workspaceFolder}/src/ThirdParty/ImGuizmo",
+        "C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/um",
+        "C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/shared",
+        "C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/winrt",      
         "C:/msys64/mingw64/include",
-        "C:/msys64/mingw64/include/SDL2"
       ],
       "defines": [],
       "cppStandard": "c++17",

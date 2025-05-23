@@ -2,22 +2,22 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "CMake Configure & Build",
+      "label": "Native Build SIMILI x64 (Release)",
       "type": "shell",
-      "command": "cmake",
-      "args": [
-        "-S", ".",
-        "-B", "build",
-        "&&",
-        "cmake",
-        "--build", "build",
-        "--config", "Debug"
-      ],
+      "command": "${workspaceFolder}\\build_simili.bat",
       "options": {
-        "cwd": "${workspaceFolder}"
+        "cwd": "${workspaceFolder}",
+        "shell": {
+          "executable": "cmd.exe",
+          "args": ["/d", "/c"]
+        }
       },
-      "problemMatcher": ["$gcc"],
-      "detail": "Configure and create the build directory, then build SIMILI Project"
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "detail": "Initialise vcvars64 et build le projet SIMILI en Release"
     }
   ]
 }

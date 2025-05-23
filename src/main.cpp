@@ -4,9 +4,10 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#include <windows.h>
 #include <filesystem>
 #include <glm/gtc/matrix_transform.hpp>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include "UI/MainSoftwareGUI.hpp"
 #include "UI/InfoWindow.hpp"
 #include "UI/ThreeDWindow.hpp"
@@ -18,9 +19,11 @@
 #include "WorldObjects/Camera.hpp"
 #include "WorldObjects/Cube.hpp"
 #include "UI/UiCreator.hpp"
+#include "UI/DirectX12Window.hpp"
 
 int main()
 {
+    MessageBoxA(nullptr, "Démarrage de Project_SIMILI.exe", "Debug", MB_OK);
 
     MainSoftwareGUI gui(1280, 720, "Main GUI");
     InfoWindow myInfoWindow;
@@ -30,6 +33,10 @@ int main()
     ThreeDObjectSelector selector;
     Camera mainCamera;
     HierarchyInspector myHierarchy;
+    DirectX12Window dx12Window;
+
+    dx12Window.title = "DirectX 12 Preview";
+    dx12Window.text = "DirectX 12 is active !";
 
     myThreeDWindow.glfwWindow = gui.getWindow();
 
@@ -61,6 +68,7 @@ int main()
     myHierarchy.setThreeDWindow(&myThreeDWindow);
     myThreeDWindow.setHierarchy(&myHierarchy);
     add(gui, myHierarchy);
+    add(gui, dx12Window);
 
     UiCreator::loadLayoutFromFile(UiCreator::getLayoutFilePath("my_custom_ui.ini"));
     gui.run();
