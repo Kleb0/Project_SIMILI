@@ -29,14 +29,42 @@ namespace UiCreator
         std::ifstream file(path);
         if (!file)
         {
-            std::cerr << "[ERROR] Failed to load layout file: " << path << std::endl;
-            return;
+            std::cerr << "[UI_CREATOR_WARNING] Layout file not found at: " << path << std::endl;
+            std::cout << "[UI_CREATOR_INFO] Attempting to copy layout file from source folder..." << std::endl;
+            fs::path fallbackPath = fs::current_path().parent_path().parent_path() / "src" / "resources" / fs::path(path).filename();
+
+            if (fs::exists(fallbackPath))
+            {
+                fs::create_directories(fs::path(path).parent_path());
+                try
+                {
+                    fs::copy_file(fallbackPath, path, fs::copy_options::overwrite_existing);
+                    std::cout << "[UI_CREATOR_INFO] Successfully copied layout file from: " << fallbackPath << " to: " << path << std::endl;
+                }
+                catch (const fs::filesystem_error &e)
+                {
+                    std::cerr << "[ERROR] Failed to copy layout file: " << e.what() << std::endl;
+                    return;
+                }
+
+                file.open(path);
+                if (!file)
+                {
+                    std::cerr << "[ERROR] Failed to open copied layout file: " << path << std::endl;
+                    return;
+                }
+            }
+
+            else
+            {
+                std::cerr << "[ERROR] Layout not found in source folder either: " << fallbackPath << std::endl;
+                return;
+            }
         }
 
         std::stringstream buffer;
         buffer << file.rdbuf();
         const std::string content = buffer.str();
-
         ImGui::LoadIniSettingsFromMemory(content.c_str(), content.size());
     }
 }

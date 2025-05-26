@@ -11,6 +11,11 @@ DirectX12TestWindow::~DirectX12TestWindow()
     DestroyWindow(hwnd);
 }
 
+std::unique_ptr<DirectX12Renderer> &DirectX12TestWindow::getRenderer()
+{
+    return renderer;
+}
+
 void DirectX12TestWindow::InitWindow()
 {
     const wchar_t CLASS_NAME[] = L"DirectX12WindowClass";
@@ -53,4 +58,9 @@ LRESULT CALLBACK DirectX12TestWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wP
     default:
         return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
+}
+
+void DirectX12TestWindow::render()
+{
+    Render();
 }

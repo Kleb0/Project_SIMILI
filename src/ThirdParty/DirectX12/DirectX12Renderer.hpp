@@ -9,12 +9,13 @@
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
+
 class DirectX12Renderer
 {
 public:
     DirectX12Renderer(HWND hwnd);
     ~DirectX12Renderer();
-
+    void DetectGPU();
     void Render();
 
 private:

@@ -19,12 +19,10 @@
 #include "WorldObjects/Camera.hpp"
 #include "WorldObjects/Cube.hpp"
 #include "UI/UiCreator.hpp"
-#include "UI/DirectX12Window.hpp"
+#include "UI/DirectX12TestWindow.hpp"
 
 int main()
 {
-    MessageBoxA(nullptr, "Démarrage de Project_SIMILI.exe", "Debug", MB_OK);
-
     MainSoftwareGUI gui(1280, 720, "Main GUI");
     InfoWindow myInfoWindow;
     ThreeDWindow myThreeDWindow;
@@ -33,7 +31,8 @@ int main()
     ThreeDObjectSelector selector;
     Camera mainCamera;
     HierarchyInspector myHierarchy;
-    DirectX12Window dx12Window;
+    DirectX12TestWindow dx12Window;
+    dx12Window.getRenderer()->DetectGPU();
 
     dx12Window.title = "DirectX 12 Preview";
     dx12Window.text = "DirectX 12 is active !";
