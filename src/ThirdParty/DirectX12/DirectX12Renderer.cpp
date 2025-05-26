@@ -2,6 +2,8 @@
 #include <stdexcept>
 #include <d3dcompiler.h>
 #include <vector>
+#include <iostream>
+#include <string>
 
 using Microsoft::WRL::ComPtr;
 
@@ -14,6 +16,52 @@ DirectX12Renderer::~DirectX12Renderer()
 {
     WaitForPreviousFrame();
     CloseHandle(fenceEvent);
+}
+
+void DirectX12Renderer::DetectGPU()
+{
+    using Microsoft::WRL::ComPtr;
+
+    ComPtr<IDXGIFactory6> factory;
+    if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))))
+    {
+        std::cerr << "Failed to create DXGI Factory" << std::endl;
+        return;
+    }
+
+    ComPtr<IDXGIAdapter1> adapter;
+    for (UINT i = 0;
+         factory->EnumAdapters1(i, &adapter) != DXGI_ERROR_NOT_FOUND;
+         ++i)
+    {
+        DXGI_ADAPTER_DESC1 desc;
+        adapter->GetDesc1(&desc);
+
+        // Skip software adapters
+        if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+            continue;
+
+        std::wcout << L"[GPU Detected] " << desc.Description << std::endl;
+
+        if (wcsstr(desc.Description, L"NVIDIA"))
+        {
+            std::wcout << L" NVIDIA GPU is being used." << std::endl;
+        }
+        else if (wcsstr(desc.Description, L"AMD"))
+        {
+            std::wcout << L" AMD GPU is being used." << std::endl;
+        }
+        else if (wcsstr(desc.Description, L"Intel"))
+        {
+            std::wcout << L" Intel GPU is being used." << std::endl;
+        }
+        else
+        {
+            std::wcout << L" Unknown GPU Vendor: " << desc.Description << std::endl;
+        }
+
+        break;
+    }
 }
 
 void DirectX12Renderer::InitD3D12(HWND hwnd)
