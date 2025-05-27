@@ -1,10 +1,16 @@
 #include "UI/HierarchyInspector.hpp"
+#include "UI/ObjectInspector.hpp"
 #include "UI/ThreeDWindow.hpp"
 #include <imgui.h>
 #include <iostream>
 #include <algorithm>
 
 HierarchyInspector::HierarchyInspector() {}
+
+void HierarchyInspector::setObjectInspector(ObjectInspector *inspector)
+{
+    objectInspector = inspector;
+}
 
 void HierarchyInspector::setContext(OpenGLContext *ctxt)
 {
@@ -19,6 +25,10 @@ void HierarchyInspector::setThreeDWindow(ThreeDWindow *win)
 void HierarchyInspector::selectObject(ThreeDObject *obj)
 {
     selectedObjectInHierarchy = obj;
+
+    if (objectInspector)
+        objectInspector->setInspectedObject(obj);
+
     if (window)
         window->externalSelect(obj);
 }
@@ -56,6 +66,9 @@ void HierarchyInspector::render()
             {
                 selectedObjectInHierarchy = obj;
                 clickedOnItem = true;
+
+                if (objectInspector)
+                    objectInspector->setInspectedObject(obj);
 
                 if (window)
                     window->externalSelect(obj);
@@ -119,6 +132,9 @@ void HierarchyInspector::render()
 
     if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !clickedOnItem)
     {
+        if (objectInspector)
+            objectInspector->clearInspectedObject();
+
         if (selectedObjectInHierarchy)
             unselectobject(selectedObjectInHierarchy);
 
@@ -132,7 +148,7 @@ void HierarchyInspector::render()
 void HierarchyInspector::selectFromThreeDWindow()
 {
 
-    std::cout << "[HierarchyInspector] call from ThreeD Window" << std::endl;
+    // std::cout << "[HierarchyInspector] call from ThreeD Window" << std::endl;
     if (!window)
         return;
 
@@ -154,7 +170,7 @@ void HierarchyInspector::selectFromThreeDWindow()
     if (it != contextList.end())
     {
         selectedObjectInHierarchy = *it;
-        std::cout << "[HierarchyInspector] TEST A - Selected object from 3D window: " << selected->getName() << std::endl;
+        // std::cout << "[HierarchyInspector] TEST A - Selected object from 3D window: " << selected->getName() << std::endl;
         return;
     }
 
@@ -162,7 +178,7 @@ void HierarchyInspector::selectFromThreeDWindow()
     if (it != windowList.end())
     {
         selectedObjectInHierarchy = *it;
-        std::cout << "[HierarchyInspector]  TEST B - Selected object from 3D window: " << selected->getName() << std::endl;
+        // std::cout << "[HierarchyInspector]  TEST B - Selected object from 3D window: " << selected->getName() << std::endl;
     }
 }
 
@@ -174,7 +190,7 @@ void HierarchyInspector::unselectobject(ThreeDObject *obj)
     if (selectedObjectInHierarchy == obj)
     {
         selectedObjectInHierarchy = nullptr;
-        std::cout << "[HierarchyInspector] Unselected object: " << obj->getName() << std::endl;
+        // std::cout << "[HierarchyInspector] Unselected object: " << obj->getName() << std::endl;
     }
 }
 
