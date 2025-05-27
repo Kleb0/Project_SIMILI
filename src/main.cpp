@@ -19,7 +19,8 @@
 #include "WorldObjects/Camera.hpp"
 #include "WorldObjects/Cube.hpp"
 #include "UI/UiCreator.hpp"
-#include "UI/DirectX12TestWindow.hpp"
+#include "UI/ObjectInspector.hpp"
+// #include "UI/DirectX12TestWindow.hpp"
 
 int main()
 {
@@ -31,11 +32,18 @@ int main()
     ThreeDObjectSelector selector;
     Camera mainCamera;
     HierarchyInspector myHierarchy;
-    DirectX12TestWindow dx12Window;
-    dx12Window.getRenderer()->DetectGPU();
+    ObjectInspector objectInspector;
 
-    dx12Window.title = "DirectX 12 Preview";
-    dx12Window.text = "DirectX 12 is active !";
+    // ------- DirectX 12 has been implemented, so comment it for now as i don't need it actually ------- //
+    // If you want to use DirectX 12, uncomment the following lines and make sure to include the necessary headers.
+
+    // DirectX12TestWindow dx12Window;
+    // dx12Window.getRenderer()->DetectGPU();
+
+    // dx12Window.title = "DirectX 12 Preview";
+    // dx12Window.text = "DirectX 12 is active !";
+
+    // ----------------------------------------- //
 
     myThreeDWindow.glfwWindow = gui.getWindow();
 
@@ -65,9 +73,13 @@ int main()
     myHierarchy.setTitle("Hierarchy");
     myHierarchy.setContext(&renderer);
     myHierarchy.setThreeDWindow(&myThreeDWindow);
+    myHierarchy.setObjectInspector(&objectInspector);
     myThreeDWindow.setHierarchy(&myHierarchy);
+    myThreeDWindow.setObjectInspector(&objectInspector);
+    objectInspector.setTitle("Object Inspector");
+    add(gui, objectInspector);
     add(gui, myHierarchy);
-    add(gui, dx12Window);
+    // add(gui, dx12Window);
 
     UiCreator::loadLayoutFromFile(UiCreator::getLayoutFilePath("my_custom_ui.ini"));
     gui.run();

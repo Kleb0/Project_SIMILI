@@ -4,6 +4,7 @@
 #include <ImGuizmo.h>
 #include "UI/ThreeDWindow.hpp"
 #include "UI/HierarchyInspector.hpp"
+#include "UI/ObjectInspector.hpp"
 #include "WorldObjects/ThreeDObject.hpp"
 #include <SDL3/SDL.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -38,6 +39,11 @@ void ThreeDWindow::addThreeDObjectToList(ThreeDObject *object)
 {
     if (object)
         ThreeDObjectsList.push_back(object);
+}
+
+void ThreeDWindow::setObjectInspector(ObjectInspector *inspector)
+{
+    objectInspector = inspector;
 }
 
 ThreeDWindow &ThreeDWindow::add(ThreeDObject &object)
@@ -92,16 +98,22 @@ void ThreeDWindow::handleClick()
 
             if (hierarchy)
                 hierarchy->selectFromThreeDWindow();
+
+            if (objectInspector)
+                objectInspector->setInspectedObject(selected);
         }
         else
         {
 
-            std::cout << "[DEBUG] No object selected ! clear Gizmo !" << std::endl;
+            // std::cout << "[DEBUG] No object selected ! clear Gizmo !" << std::endl;
             if (hierarchy)
             {
                 ThreeDObject *previouslySelected = hierarchy->getSelectedObject();
                 hierarchy->unselectobject(previouslySelected);
             }
+
+            if (objectInspector)
+                objectInspector->clearInspectedObject();
 
             if (!ImGuizmo::IsUsing() && !wasUsingGizmoLastFrame)
             {

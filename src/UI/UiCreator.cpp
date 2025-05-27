@@ -13,7 +13,6 @@ namespace UiCreator
 {
     std::string getLayoutFilePath(const std::string &filename)
     {
-
         return (fs::current_path().parent_path() / "src" / "resources" / filename).string();
     }
 
@@ -36,16 +35,8 @@ namespace UiCreator
             if (fs::exists(fallbackPath))
             {
                 fs::create_directories(fs::path(path).parent_path());
-                try
-                {
-                    fs::copy_file(fallbackPath, path, fs::copy_options::overwrite_existing);
-                    std::cout << "[UI_CREATOR_INFO] Successfully copied layout file from: " << fallbackPath << " to: " << path << std::endl;
-                }
-                catch (const fs::filesystem_error &e)
-                {
-                    std::cerr << "[ERROR] Failed to copy layout file: " << e.what() << std::endl;
-                    return;
-                }
+                fs::copy_file(fallbackPath, path, fs::copy_options::overwrite_existing);
+                std::cout << "[UI_CREATOR_INFO] Successfully copied layout file from: " << fallbackPath << " to: " << path << std::endl;
 
                 file.open(path);
                 if (!file)

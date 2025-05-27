@@ -13,6 +13,8 @@ class HierarchyInspector;
 
 class ThreeDObject;
 
+class ObjectInspector;
+
 class ThreeDWindow : public GUIWindow
 {
 public:
@@ -55,11 +57,14 @@ public:
         return selector.getSelectedObject();
     }
 
+    void setObjectInspector(ObjectInspector *inspector);
+
 private:
     glm::mat4 view = glm::mat4(1.0f);
     glm::mat4 proj = glm::mat4(1.0f);
 
     OpenGLContext *openGLContext = nullptr;
+    ObjectInspector *objectInspector = nullptr;
     HierarchyInspector *hierarchy = nullptr;
     ThreeDObjectSelector selector;
     std::vector<ThreeDObject *> ThreeDObjectsList;
