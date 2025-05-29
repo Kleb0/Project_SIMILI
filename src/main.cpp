@@ -1,11 +1,22 @@
 #define SDL_MAIN_HANDLED
 #define IMGUI_IMPL_OPENGL_LOADER_GLAD
 
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#undef APIENTRY
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-#include <windows.h>
 #include <filesystem>
+namespace fs = std::filesystem;
+fs::path gExecutableDir;
+
+#include <sstream>
+#include <fstream>
+#include <iostream>
+
 #include <glm/gtc/matrix_transform.hpp>
 #include <SDL3/SDL.h>
 #include "UI/MainSoftwareGUI.hpp"
@@ -22,8 +33,10 @@
 #include "UI/ObjectInspector.hpp"
 // #include "UI/DirectX12TestWindow.hpp"
 
-int main()
+int main(int argc, char **argv)
 {
+    gExecutableDir = fs::path(argv[0]).parent_path();
+
     MainSoftwareGUI gui(1280, 720, "Main GUI");
     InfoWindow myInfoWindow;
     ThreeDWindow myThreeDWindow;
@@ -81,7 +94,6 @@ int main()
     add(gui, myHierarchy);
     // add(gui, dx12Window);
 
-    UiCreator::loadLayoutFromFile(UiCreator::getLayoutFilePath("my_custom_ui.ini"));
     gui.run();
     UiCreator::saveCurrentLayoutToDefault();
 }
