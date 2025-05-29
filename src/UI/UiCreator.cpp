@@ -58,4 +58,22 @@ namespace UiCreator
         const std::string content = buffer.str();
         ImGui::LoadIniSettingsFromMemory(content.c_str(), content.size());
     }
+
+    void UiCreator::saveLastLayoutPath(const std::string &path)
+    {
+        std::ofstream out("src/resources/last_layout_path.txt", std::ios::trunc);
+        if (out)
+            out << path;
+    }
+
+    std::string UiCreator::loadLastLayoutPath()
+    {
+        std::ifstream in("src/resources/last_layout_path.txt");
+        if (!in)
+            return ""; // if the file doesn't exist, return an empty string
+        std::string path;
+        std::getline(in, path);
+        return path;
+    }
+
 }

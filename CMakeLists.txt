@@ -58,6 +58,8 @@ add_library(imgui STATIC
     ${IMGUI_SOURCES}
 )
 
+
+
 target_include_directories(imgui PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/backends
@@ -82,6 +84,14 @@ set(GLFW_BUILD_DOCS OFF CACHE INTERNAL "GLFW: Build the docs" FORCE)
 set(GLFW_INSTALL OFF CACHE INTERNAL "GLFW: Disable install" FORCE)
 add_subdirectory(src/ThirdParty/GLFW)
 
+# tinyfiledialogs
+add_library(tinyfiledialogs STATIC
+    src/ThirdParty/tinyfiledialogs/tinyfiledialogs.c
+)
+
+target_include_directories(tinyfiledialogs PUBLIC
+    src/ThirdParty/tinyfiledialogs
+)
 
 
 # OpenGL
@@ -161,6 +171,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     ${GLU_LIBRARY}
     glfw
     imgui
+    tinyfiledialogs
     ${D3D12_LIBRARY}
     ${DXGI_LIBRARY}
     ${D3DCOMPILER_LIBRARY}
