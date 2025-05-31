@@ -22,5 +22,10 @@ private:
 
     void initGLFW(int width, int height, const char *title);
     void initImGui();
+    void tryLoadLayout();
+    void autoSaveLayout();
+    void mainWindowOptions();
+    void popUpModal();
     void shutdown();
+    void multiScreenSupport();
 };

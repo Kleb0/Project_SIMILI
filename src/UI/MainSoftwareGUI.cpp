@@ -42,6 +42,148 @@ MainSoftwareGUI::~MainSoftwareGUI()
 {
     shutdown();
 }
+
+void MainSoftwareGUI::tryLoadLayout()
+{
+    std::ifstream autosaveFile((gExecutableDir / "autosave_layout.ini").string());
+    if (autosaveFile)
+    {
+        std::stringstream autosaveBuffer;
+        autosaveBuffer << autosaveFile.rdbuf();
+        const std::string autosaveIniContent = autosaveBuffer.str();
+        ImGui::LoadIniSettingsFromMemory(autosaveIniContent.c_str(), autosaveIniContent.size());
+        std::cout << "[INFO] UI layout loaded from autosave_layout.ini" << std::endl;
+        return;
+    }
+
+    std::ifstream defaultFile("../src/resources/default_imgui_layout.ini");
+    if (defaultFile)
+    {
+        std::stringstream defaultBuffer;
+        defaultBuffer << defaultFile.rdbuf();
+        const std::string defaultIniContent = defaultBuffer.str();
+        ImGui::LoadIniSettingsFromMemory(defaultIniContent.c_str(), defaultIniContent.size());
+        std::cerr << "[WARN] Loaded default_imgui_layout.ini as fallback." << std::endl;
+    }
+    else
+    {
+        std::cerr << "[ERROR] Failed to load both autosave_layout.ini and default_imgui_layout.ini" << std::endl;
+    }
+}
+
+void MainSoftwareGUI::autoSaveLayout()
+{
+    const char *currentIniData = ImGui::SaveIniSettingsToMemory();
+    fs::path autosavePath = gExecutableDir / "autosave_layout.ini";
+    std::ofstream out(autosavePath, std::ios::binary | std::ios::trunc);
+    if (out)
+    {
+        out.write(currentIniData, std::strlen(currentIniData));
+        std::cout << "[UI_CREATOR_INFO] Layout autosaved to: " << autosavePath << std::endl;
+    }
+    else
+    {
+        std::cerr << "[ERROR] Failed to autosave layout to: " << autosavePath << std::endl;
+    }
+}
+
+void MainSoftwareGUI::mainWindowOptions()
+{
+    if (ImGui::BeginMenu("Options"))
+    {
+        if (ImGui::MenuItem("Save current UI as..."))
+        {
+            const char *filterPatterns[1] = {"*.ini"};
+            const char *savePath = tinyfd_saveFileDialog(
+                "Save UI Layout",
+                "custom_layout.ini",
+                1,
+                filterPatterns,
+                "INI Layout Files");
+
+            if (savePath)
+            {
+                const char *ini_data = ImGui::SaveIniSettingsToMemory();
+                std::ofstream out(savePath, std::ios::binary | std::ios::trunc);
+                if (out)
+                {
+                    out.write(ini_data, std::strlen(ini_data));
+                    std::cout << "[UI_CREATOR_INFO] Layout saved to: " << savePath << std::endl;
+                }
+                else
+                {
+                    std::cerr << "[ERROR] Failed to save layout to: " << savePath << std::endl;
+                }
+            }
+        }
+
+        if (ImGui::MenuItem("Load UI layout..."))
+        {
+            const char *filterPatterns[1] = {"*.ini"};
+            const char *loadPath = tinyfd_openFileDialog(
+                "Load UI Layout",
+                "",
+                1,
+                filterPatterns,
+                "INI Layout Files",
+                0);
+
+            if (loadPath)
+            {
+                UiCreator::loadLayoutFromFile(loadPath);
+                UiCreator::saveLastLayoutPath(loadPath);
+            }
+        }
+
+        ImGui::EndMenu();
+    }
+}
+
+void MainSoftwareGUI::popUpModal()
+{
+    if (ImGui::BeginPopupModal("SaveLayoutPopup", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        static char filenameBuffer[128] = "custom_layout.ini";
+        static std::string saveDirectory = (fs::current_path().parent_path() / "src" / "resources").string();
+        static char directoryBuffer[256];
+        static bool initialized = false;
+
+        if (!initialized)
+        {
+            std::strncpy(directoryBuffer, saveDirectory.c_str(), sizeof(directoryBuffer));
+            initialized = true;
+        }
+
+        ImGui::InputText("Filename", filenameBuffer, IM_ARRAYSIZE(filenameBuffer));
+        ImGui::InputText("Directory", directoryBuffer, IM_ARRAYSIZE(directoryBuffer));
+
+        if (ImGui::Button("Save"))
+        {
+            std::string fullPath = std::string(directoryBuffer) + "/" + std::string(filenameBuffer);
+            const char *ini_data = ImGui::SaveIniSettingsToMemory();
+            std::ofstream out(fullPath, std::ios::binary | std::ios::trunc);
+            if (out)
+            {
+                out.write(ini_data, std::strlen(ini_data));
+                std::cout << "[UI_CREATOR_INFO] Layout saved to: " << fullPath << std::endl;
+            }
+            else
+            {
+                std::cerr << "[ERROR] Failed to save layout to: " << fullPath << std::endl;
+            }
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel"))
+        {
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+}
+
 void MainSoftwareGUI::initGLFW(int width, int height, const char *title)
 {
     if (!glfwInit())
@@ -79,36 +221,13 @@ void MainSoftwareGUI::initImGui()
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.IniFilename = nullptr;
 
-    std::ifstream defaultFile("../src/resources/default_imgui_layout.ini");
-    if (!defaultFile)
-    {
-        std::cerr << "[ERROR] Cannot open default_imgui_layout.ini" << std::endl;
-        std::exit(EXIT_FAILURE);
-    }
-
-    std::stringstream defaultBuffer;
-    defaultBuffer << defaultFile.rdbuf();
-    const std::string defaultIniContent = defaultBuffer.str();
-    ImGui::LoadIniSettingsFromMemory(defaultIniContent.c_str(), defaultIniContent.size());
-
     ImGui::StyleColorsDark();
+    multiScreenSupport();
+
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
 
-    std::ifstream autosaveFile((gExecutableDir / "autosave_layout.ini").string());
-
-    if (autosaveFile)
-    {
-        std::stringstream autosaveBuffer;
-        autosaveBuffer << autosaveFile.rdbuf();
-        const std::string autosaveIniContent = autosaveBuffer.str();
-        ImGui::LoadIniSettingsFromMemory(autosaveIniContent.c_str(), autosaveIniContent.size());
-        std::cout << "[INFO] UI layout loaded from autosave_layout.ini" << std::endl;
-    }
-    else
-    {
-        std::cerr << "[WARN] Failed to load autosave_layout.ini, loading default layout." << std::endl;
-    }
+    tryLoadLayout();
 }
 
 void MainSoftwareGUI::run()
@@ -136,55 +255,7 @@ void MainSoftwareGUI::run()
 
         ImGui::Begin("MainDockSpaceWindow", nullptr, window_flags);
 
-        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - 150);
-        if (ImGui::BeginMenu("Options"))
-        {
-            if (ImGui::MenuItem("Save current UI as..."))
-            {
-                const char *filterPatterns[1] = {"*.ini"};
-                const char *savePath = tinyfd_saveFileDialog(
-                    "Save UI Layout",
-                    "custom_layout.ini",
-                    1,
-                    filterPatterns,
-                    "INI Layout Files");
-
-                if (savePath)
-                {
-                    const char *ini_data = ImGui::SaveIniSettingsToMemory();
-                    std::ofstream out(savePath, std::ios::binary | std::ios::trunc);
-                    if (out)
-                    {
-                        out.write(ini_data, std::strlen(ini_data));
-                        std::cout << "[UI_CREATOR_INFO] Layout saved to: " << savePath << std::endl;
-                    }
-                    else
-                    {
-                        std::cerr << "[ERROR] Failed to save layout to: " << savePath << std::endl;
-                    }
-                }
-            }
-
-            if (ImGui::MenuItem("Load UI layout..."))
-            {
-                const char *filterPatterns[1] = {"*.ini"};
-                const char *loadPath = tinyfd_openFileDialog(
-                    "Load UI Layout",
-                    "",
-                    1,
-                    filterPatterns,
-                    "INI Layout Files",
-                    0);
-
-                if (loadPath)
-                {
-                    UiCreator::loadLayoutFromFile(loadPath);
-                    UiCreator::saveLastLayoutPath(loadPath);
-                }
-            }
-
-            ImGui::EndMenu();
-        }
+        mainWindowOptions();
 
         ImGui::PopStyleVar(2);
 
@@ -192,52 +263,7 @@ void MainSoftwareGUI::run()
         ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None);
         ImGui::End();
 
-        // ---------- Popup for saving layout -----------
-
-        if (ImGui::BeginPopupModal("SaveLayoutPopup", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-        {
-            static char filenameBuffer[128] = "custom_layout.ini";
-            static std::string saveDirectory = (fs::current_path().parent_path() / "src" / "resources").string();
-            static char directoryBuffer[256];
-            static bool initialized = false;
-
-            if (!initialized)
-            {
-                std::strncpy(directoryBuffer, saveDirectory.c_str(), sizeof(directoryBuffer));
-                initialized = true;
-            }
-
-            ImGui::InputText("Filename", filenameBuffer, IM_ARRAYSIZE(filenameBuffer));
-            ImGui::InputText("Directory", directoryBuffer, IM_ARRAYSIZE(directoryBuffer));
-
-            if (ImGui::Button("Save"))
-            {
-                std::string fullPath = std::string(directoryBuffer) + "/" + std::string(filenameBuffer);
-                const char *ini_data = ImGui::SaveIniSettingsToMemory();
-                std::ofstream out(fullPath, std::ios::binary | std::ios::trunc);
-                if (out)
-                {
-                    out.write(ini_data, std::strlen(ini_data));
-                    std::cout << "[UI_CREATOR_INFO] Layout saved to: " << fullPath << std::endl;
-                }
-                else
-                {
-                    std::cerr << "[ERROR] Failed to save layout to: " << fullPath << std::endl;
-                }
-                ImGui::CloseCurrentPopup();
-                showSaveLayoutPopup = false;
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Cancel"))
-            {
-                ImGui::CloseCurrentPopup();
-                showSaveLayoutPopup = false;
-            }
-
-            ImGui::EndPopup();
-        }
-
-        // ---------- End of Popup ----------- ///
+        popUpModal();
 
         for (auto *win : windows)
             if (win)
@@ -250,6 +276,9 @@ void MainSoftwareGUI::run()
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        ImGui::UpdatePlatformWindows();
+        ImGui::RenderPlatformWindowsDefault();
+        glfwMakeContextCurrent(window);
         glfwSwapBuffers(window);
     }
 }
@@ -257,22 +286,25 @@ void MainSoftwareGUI::run()
 void MainSoftwareGUI::shutdown()
 {
 
-    const char *currentIniData = ImGui::SaveIniSettingsToMemory();
-    fs::path autosavePath = gExecutableDir / "autosave_layout.ini";
-    std::ofstream out(autosavePath, std::ios::binary | std::ios::trunc);
-    if (out)
-    {
-        out.write(currentIniData, std::strlen(currentIniData));
-        std::cout << "[UI_CREATOR_INFO] Layout autosaved to: " << autosavePath << std::endl;
-    }
-    else
-    {
-        std::cerr << "[ERROR] Failed to autosave layout to: " << autosavePath << std::endl;
-    }
+    autoSaveLayout();
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
 
     glfwDestroyWindow(window);
     glfwTerminate();
+}
+
+void MainSoftwareGUI::multiScreenSupport()
+{
+    ImGuiIO &io = ImGui::GetIO();
+
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+
+    ImGuiStyle &style = ImGui::GetStyle();
+    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+    {
+        style.WindowRounding = 0.0f;
+        style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+    }
 }
