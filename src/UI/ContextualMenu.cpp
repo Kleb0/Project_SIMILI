@@ -1,5 +1,14 @@
+#include <imgui_internal.h>
+
 #include "UI/ContextualMenu.hpp"
+#include "Engine/OpenGLContext.hpp"
+#include "WorldObjects/Cube.hpp"
 #include <iostream>
+
+void ContextualMenu::setHierarchyInspector(HierarchyInspector *inspector)
+{
+    hierarchyInspector = inspector;
+}
 
 void ContextualMenu::show()
 {
@@ -18,6 +27,11 @@ void ContextualMenu::hide()
     std::cout << "[ContextualMenu] Contextual menu closed." << std::endl;
 }
 
+void ContextualMenu::setThreeDWindow(ThreeDWindow *window)
+{
+    threeDWindow = window;
+}
+
 void ContextualMenu::render()
 {
     if (isOpen)
@@ -30,8 +44,29 @@ void ContextualMenu::render()
                          ImGuiWindowFlags_NoMove |
                          ImGuiWindowFlags_NoSavedSettings);
 
-        ImGui::Text("Hello Contextual Menu");
+        ImGui::Text("Contextual Menu");
+
+        if (ImGui::MenuItem("Create Cube") && threeDWindow)
+        {
+            Cube *newCube = new Cube();
+            newCube->setName("newCube");
+            newCube->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+            threeDWindow->add(*newCube);
+            threeDWindow->getOpenGLContext()->add(*newCube);
+
+            std::cout << "[ContextualMenu] Created a new Cube object with name: " << newCube->getName() << std::endl;
+
+            if (hierarchyInspector)
+                hierarchyInspector->selectObject(newCube);
+
+            hide();
+        }
 
         ImGui::End();
+
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
+        {
+            hide();
+        }
     }
 }

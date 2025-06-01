@@ -21,7 +21,6 @@ void HierarchyInspector::setThreeDWindow(ThreeDWindow *win)
 {
     window = win;
 }
-
 void HierarchyInspector::selectObject(ThreeDObject *obj)
 {
     selectedObjectInHierarchy = obj;
@@ -150,6 +149,9 @@ void HierarchyInspector::render()
 
                 if (window)
                     window->externalSelect(obj);
+
+                if (objectInspector)
+                    objectInspector->setInspectedObject(obj);
             }
 
             ImDrawList *draw_list = ImGui::GetWindowDrawList();
