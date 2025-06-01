@@ -15,9 +15,9 @@ void Uidocking::SetupDefaultDockspace(ImGuiID dockspace_id)
     ImGuiID dock_id_center = dock_main_id;
 
     ImGui::DockBuilderDockWindow("Hierarchy Inspector", dock_id_left);
-    ImGui::DockBuilderDockWindow("Hello Window 2", dock_id_center);
+    ImGui::DockBuilderDockWindow("3D Viewport", dock_id_center);
     ImGui::DockBuilderDockWindow("Object Inspector", dock_id_right);
-    ImGui::DockBuilderDockWindow("Hello Window 1", dock_id_bottom);
+    ImGui::DockBuilderDockWindow("Project Viewer", dock_id_bottom);
 
     ImGui::DockBuilderFinish(dockspace_id);
 }

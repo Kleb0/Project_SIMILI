@@ -32,4 +32,6 @@ private:
     ThreeDWindow *window = nullptr;
     ThreeDObject *selectedObjectInHierarchy = nullptr;
     ObjectInspector *objectInspector = nullptr;
+    ThreeDObject *objectBeingRenamed = nullptr;
+    char editingBuffer[128] = {0};
 };

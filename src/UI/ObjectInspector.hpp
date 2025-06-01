@@ -15,7 +15,13 @@ public:
 
     std::string title;
     void setTitle(const std::string &newTitle) { this->title = newTitle; }
+    void renameObject();
+    void setPosition();
+    void setRotation();
+    void setScale();
 
 private:
     ThreeDObject *inspectedObject = nullptr;
+    char nameEditBuffer[128] = {0};
+    bool isRenaming = false;
 };
