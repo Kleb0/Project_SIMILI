@@ -26,6 +26,7 @@ public:
     void setTitle(const std::string &newTitle) { this->title = newTitle; }
 
     void setObjectInspector(ObjectInspector *inspector);
+    void renameObject();
 
 private:
     OpenGLContext *context = nullptr;

@@ -38,6 +38,23 @@ void HierarchyInspector::selectInList(ThreeDObject *obj)
     selectedObjectInHierarchy = obj;
 }
 
+void HierarchyInspector::renameObject()
+{
+    if (!objectBeingRenamed)
+        return;
+
+    ImGui::SetNextItemWidth(150.0f);
+    if (ImGui::InputText("##edit", editingBuffer, sizeof(editingBuffer), ImGuiInputTextFlags_EnterReturnsTrue))
+    {
+        objectBeingRenamed->setName(editingBuffer);
+        objectBeingRenamed = nullptr;
+    }
+    if (!ImGui::IsItemActive() && !ImGui::IsItemHovered())
+    {
+        objectBeingRenamed = nullptr;
+    }
+}
+
 void HierarchyInspector::render()
 {
 
@@ -58,16 +75,7 @@ void HierarchyInspector::render()
 
             if (objectBeingRenamed == obj)
             {
-                ImGui::SetNextItemWidth(150.0f);
-                if (ImGui::InputText("##edit", editingBuffer, sizeof(editingBuffer), ImGuiInputTextFlags_EnterReturnsTrue))
-                {
-                    obj->setName(editingBuffer);
-                    objectBeingRenamed = nullptr;
-                }
-                if (!ImGui::IsItemActive() && !ImGui::IsItemHovered())
-                {
-                    objectBeingRenamed = nullptr;
-                }
+                renameObject();
             }
             else
             {
