@@ -90,6 +90,7 @@ int main(int argc, char **argv)
     objectInspector.setTitle("Object Inspector");
     add(gui, objectInspector);
     add(gui, myHierarchy);
+    gui.setThreeDWindow(&myThreeDWindow);
     // add(gui, dx12Window);
 
     gui.run();

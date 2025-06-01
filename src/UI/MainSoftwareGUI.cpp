@@ -224,6 +224,15 @@ void MainSoftwareGUI::initImGui()
 void MainSoftwareGUI::run()
 {
     ContextualMenu contextualMenu;
+    contextualMenu.setThreeDWindow(threeDWindow);
+
+    for (auto *win : windows)
+    {
+        auto *hierarchy = dynamic_cast<HierarchyInspector *>(win);
+        if (hierarchy)
+            contextualMenu.setHierarchyInspector(hierarchy);
+    }
+
     static bool showSaveLayoutPopup = false;
 
     while (!glfwWindowShouldClose(window))
@@ -239,7 +248,12 @@ void MainSoftwareGUI::run()
         }
         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
         {
-            contextualMenu.hide();
+            ImGuiWindow *hoveredWindow = GImGui->HoveredWindow;
+
+            if (!hoveredWindow || std::string(hoveredWindow->Name) != "##ContextualMenu")
+            {
+                contextualMenu.hide();
+            }
         }
 
         ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;

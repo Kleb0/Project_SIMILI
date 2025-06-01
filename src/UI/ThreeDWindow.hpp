@@ -59,6 +59,8 @@ public:
 
     void setObjectInspector(ObjectInspector *inspector);
 
+    OpenGLContext *getOpenGLContext() const { return openGLContext; }
+
 private:
     glm::mat4 view = glm::mat4(1.0f);
     glm::mat4 proj = glm::mat4(1.0f);
