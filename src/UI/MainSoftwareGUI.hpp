@@ -19,6 +19,7 @@ public:
 private:
     GLFWwindow *window = nullptr;
     std::vector<GUIWindow *> windows;
+    bool mustBuildDefaultLayout = false;
 
     void initGLFW(int width, int height, const char *title);
     void initImGui();
