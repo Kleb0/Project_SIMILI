@@ -60,10 +60,8 @@ int main(int argc, char **argv)
 
     myThreeDWindow.glfwWindow = gui.getWindow();
 
-    myInfoWindow.title = "Hello Window 1";
-    myInfoWindow.text = "Bienvenue dans la première fenêtre ! C'est une belle fenêtre !";
-    myThreeDWindow.title = "Hello Window 2";
-    myThreeDWindow.text = "Bienvenue dans la deuxième fenêtre ! Celle-ci contient un contexte OpenGL !";
+    myInfoWindow.title = "Project Viewer";
+    myThreeDWindow.title = "3D Viewport";
 
     myCube.setName("MonCube");
     mainCamera.setName("MainCamera");

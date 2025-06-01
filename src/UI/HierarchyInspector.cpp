@@ -55,7 +55,32 @@ void HierarchyInspector::render()
 
             ImGui::PushID(obj);
             ImVec2 start = ImGui::GetCursorScreenPos();
-            ImGui::BulletText("%s", obj->getName().c_str());
+
+            if (objectBeingRenamed == obj)
+            {
+                ImGui::SetNextItemWidth(150.0f);
+                if (ImGui::InputText("##edit", editingBuffer, sizeof(editingBuffer), ImGuiInputTextFlags_EnterReturnsTrue))
+                {
+                    obj->setName(editingBuffer);
+                    objectBeingRenamed = nullptr;
+                }
+                if (!ImGui::IsItemActive() && !ImGui::IsItemHovered())
+                {
+                    objectBeingRenamed = nullptr;
+                }
+            }
+            else
+            {
+                ImGui::BulletText("%s", obj->getName().c_str());
+
+                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+                {
+                    objectBeingRenamed = obj;
+                    strncpy(editingBuffer, obj->getName().c_str(), sizeof(editingBuffer));
+                    editingBuffer[sizeof(editingBuffer) - 1] = '\0';
+                }
+            }
+
             ImVec2 end = ImGui::GetCursorScreenPos();
             float height = ImGui::GetTextLineHeightWithSpacing();
             float width = ImGui::GetContentRegionAvail().x;
