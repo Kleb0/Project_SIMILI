@@ -10,6 +10,7 @@
 #include <UI/GUIWindow.hpp>
 #include "imgui_internal.h"
 #include "UI/UiCreator.hpp"
+#include "UI/Uidocking.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -56,19 +57,8 @@ void MainSoftwareGUI::tryLoadLayout()
         return;
     }
 
-    std::ifstream defaultFile("../src/resources/default_imgui_layout.ini");
-    if (defaultFile)
-    {
-        std::stringstream defaultBuffer;
-        defaultBuffer << defaultFile.rdbuf();
-        const std::string defaultIniContent = defaultBuffer.str();
-        ImGui::LoadIniSettingsFromMemory(defaultIniContent.c_str(), defaultIniContent.size());
-        std::cerr << "[WARN] Loaded default_imgui_layout.ini as fallback." << std::endl;
-    }
-    else
-    {
-        std::cerr << "[ERROR] Failed to load both autosave_layout.ini and default_imgui_layout.ini" << std::endl;
-    }
+    ImGui::LoadIniSettingsFromMemory("", 0);
+    mustBuildDefaultLayout = true;
 }
 
 void MainSoftwareGUI::autoSaveLayout()
@@ -261,6 +251,13 @@ void MainSoftwareGUI::run()
 
         ImGuiID dockspace_id = ImGui::GetID("MyMainDockspace");
         ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None);
+
+        if (mustBuildDefaultLayout)
+        {
+            Uidocking::SetupDefaultDockspace(dockspace_id);
+            mustBuildDefaultLayout = false;
+        }
+
         ImGui::End();
 
         popUpModal();
