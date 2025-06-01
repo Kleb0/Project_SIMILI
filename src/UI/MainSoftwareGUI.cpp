@@ -11,6 +11,7 @@
 #include "imgui_internal.h"
 #include "UI/UiCreator.hpp"
 #include "UI/Uidocking.hpp"
+#include "UI/ContextualMenu.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -222,6 +223,7 @@ void MainSoftwareGUI::initImGui()
 
 void MainSoftwareGUI::run()
 {
+    ContextualMenu contextualMenu;
     static bool showSaveLayoutPopup = false;
 
     while (!glfwWindowShouldClose(window))
@@ -230,6 +232,15 @@ void MainSoftwareGUI::run()
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
+
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+        {
+            contextualMenu.show();
+        }
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+        {
+            contextualMenu.hide();
+        }
 
         ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
         const ImGuiViewport *viewport = ImGui::GetMainViewport();
@@ -265,6 +276,8 @@ void MainSoftwareGUI::run()
         for (auto *win : windows)
             if (win)
                 win->render();
+
+        contextualMenu.render();
 
         ImGui::Render();
         int display_w, display_h;
