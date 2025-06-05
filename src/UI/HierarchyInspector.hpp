@@ -19,7 +19,7 @@ public:
     void selectInList(ThreeDObject *obj);
     void selectObject(ThreeDObject *obj);
     void selectFromThreeDWindow();
-    void unselectobject(ThreeDObject *obj);
+    void unselectObject(ThreeDObject *obj);
     ThreeDObject *getSelectedObject() const;
 
     std::string title;
@@ -27,6 +27,7 @@ public:
 
     void setObjectInspector(ObjectInspector *inspector);
     void renameObject();
+    void notifyObjectDeleted(ThreeDObject *obj);
 
 private:
     OpenGLContext *context = nullptr;

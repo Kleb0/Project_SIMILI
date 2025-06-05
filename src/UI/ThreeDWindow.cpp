@@ -10,11 +10,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
-
-void ThreeDWindow::setHierarchy(HierarchyInspector *inspector)
-{
-    hierarchy = inspector;
-}
+#include <algorithm>
 
 ThreeDWindow::ThreeDWindow() {}
 
@@ -29,16 +25,26 @@ ThreeDWindow &ThreeDWindow::add(OpenGLContext &context)
     return *this;
 }
 
+ThreeDWindow &ThreeDWindow::add(ThreeDObject &object)
+{
+    return addObject(object);
+}
+
 ThreeDWindow &ThreeDWindow::addObject(ThreeDObject &object)
 {
     ThreeDObjectsList.push_back(&object);
     return *this;
 }
 
-void ThreeDWindow::addThreeDObjectToList(ThreeDObject *object)
+const std::vector<ThreeDObject *> &ThreeDWindow::getObjects() const
 {
-    if (object)
-        ThreeDObjectsList.push_back(object);
+    return ThreeDObjectsList;
+}
+
+// the threeDWindow use external components, we set them in the main script
+void ThreeDWindow::setHierarchy(HierarchyInspector *inspector)
+{
+    hierarchy = inspector;
 }
 
 void ThreeDWindow::setObjectInspector(ObjectInspector *inspector)
@@ -46,153 +52,20 @@ void ThreeDWindow::setObjectInspector(ObjectInspector *inspector)
     objectInspector = inspector;
 }
 
-ThreeDWindow &ThreeDWindow::add(ThreeDObject &object)
+void ThreeDWindow::render()
 {
-    return addObject(object);
-}
+    ImGuiWindowFlags flags = ImGuiWindowFlags_None;
+    ImGui::Begin(title.c_str(), nullptr, flags);
 
-void ThreeDWindow::handleClick()
-{
-    ImVec2 mouse = ImGui::GetMousePos();
-    float relativeMouseX = mouse.x - oglChildPos.x;
-    float relativeMouseY = mouse.y - oglChildPos.y;
+    ImGui::Text("%s", text.c_str());
 
-    relativeMouseY = oglChildSize.y - relativeMouseY;
-
-    if (relativeMouseX >= 0 && relativeMouseX <= oglChildSize.x &&
-        relativeMouseY >= 0 && relativeMouseY <= oglChildSize.y)
+    if (openGLContext)
     {
-        int windowWidth = static_cast<int>(oglChildSize.x);
-        int windowHeight = static_cast<int>(oglChildSize.y);
-
-        view = openGLContext->getViewMatrix();
-        proj = openGLContext->getProjectionMatrix();
-
-        bool preventSelection = Similigizmo.hasTarget() && ImGuizmo::IsOver();
-
-        if (!preventSelection)
-        {
-            selector.pickUpTarget((int)relativeMouseX, (int)relativeMouseY, windowWidth, windowHeight, view, proj, ThreeDObjectsList);
-        }
-
-        else
-        {
-            ThreeDObject *target = Similigizmo.getTarget();
-            if (target)
-            {
-
-                selector.select(target);
-                // std::cout << "[SIMILI_GIZMO] Reactivated manually on click." << std::endl;
-            }
-        }
-
-        ThreeDObject *selected = selector.getSelectedObject();
-
-        if (selected)
-        {
-            for (auto *obj : ThreeDObjectsList)
-                obj->setSelected(false);
-
-            selected->setSelected(true);
-            Similigizmo.setTarget(selected);
-
-            if (hierarchy)
-                hierarchy->selectFromThreeDWindow();
-
-            if (objectInspector)
-                objectInspector->setInspectedObject(selected);
-        }
-        else
-        {
-
-            // std::cout << "[DEBUG] No object selected ! clear Gizmo !" << std::endl;
-            if (hierarchy)
-            {
-                ThreeDObject *previouslySelected = hierarchy->getSelectedObject();
-                hierarchy->unselectobject(previouslySelected);
-            }
-
-            if (objectInspector)
-                objectInspector->clearInspectedObject();
-
-            if (!ImGuizmo::IsUsing() && !wasUsingGizmoLastFrame)
-            {
-
-                for (auto *obj : ThreeDObjectsList)
-                    obj->setSelected(false);
-
-                Similigizmo.disable();
-                selector.clearTarget();
-            }
-        }
-    }
-}
-
-void ThreeDWindow::manipulateThreeDObject()
-{
-    // std::cout << "[DEBUG] UpdateGizmo called!" << std::endl;
-    ThreeDObject *selected = selector.getSelectedObject();
-
-    if (!selected)
-        return;
-
-    // here is were set the Gizmo when the object is selected
-    ImGuizmo::BeginFrame();
-    ImGuizmo::Enable(true);
-    ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
-    ImGuizmo::SetDrawlist();
-    ImGuizmo::SetRect(oglChildPos.x, oglChildPos.y, oglChildSize.x, oglChildSize.y);
-    ImGuizmo::SetGizmoSizeClipSpace(0.2f);
-
-    glm::mat4 model = selected->getModelMatrix();
-
-    static ImGuizmo::OPERATION currentGizmoOperation = ImGuizmo::TRANSLATE;
-
-    if (ImGui::IsKeyPressed(ImGuiKey_W))
-        currentGizmoOperation = ImGuizmo::TRANSLATE;
-    if (ImGui::IsKeyPressed(ImGuiKey_R))
-        currentGizmoOperation = ImGuizmo::ROTATE;
-    if (ImGui::IsKeyPressed(ImGuiKey_S))
-        currentGizmoOperation = ImGuizmo::SCALE;
-
-    bool isManipulating = ImGuizmo::Manipulate(
-        glm::value_ptr(view),
-        glm::value_ptr(proj),
-        currentGizmoOperation,
-        ImGuizmo::WORLD,
-        glm::value_ptr(model));
-
-    if (ImGuizmo::IsUsing())
-    {
-        // std::cout << "[DEBUG] Manipulation in progress!" << std::endl;
-        // check rotation
-        selected->setModelMatrix(model);
-        // std::cout << "[DEBUG] New position: " << translation.x << ", " << translation.y << ", " << translation.z << std::endl;
-        wasUsingGizmoLastFrame = ImGuizmo::IsUsing();
-    }
-}
-
-void ThreeDWindow::externalSelect(ThreeDObject *object)
-{
-    for (auto *obj : ThreeDObjectsList)
-        obj->setSelected(false);
-
-    if (object)
-    {
-        selector.select(object);
-        object->setSelected(true);
-        Similigizmo.setTarget(object);
-        view = openGLContext->getViewMatrix();
-        proj = openGLContext->getProjectionMatrix();
-    }
-    else
-    {
-        Similigizmo.disable();
-        selector.clearTarget();
+        ImGui::Text("Attached OpenGL content :");
+        threeDRendering();
     }
 
-    if (hierarchy)
-        hierarchy->selectFromThreeDWindow();
+    ImGui::End();
 }
 
 void ThreeDWindow::threeDRendering()
@@ -205,11 +78,11 @@ void ThreeDWindow::threeDRendering()
     int newWidth = static_cast<int>(oglChildSize.x);
     int newHeight = static_cast<int>(oglChildSize.y);
 
-    if (newWidth > 0 && newHeight > 0 &&
-        (newWidth != openGLContext->getWidth() || newHeight != openGLContext->getHeight()))
-    {
-        openGLContext->resize(newWidth, newHeight);
-    }
+    // if (newWidth > 0 && newHeight > 0 &&
+    //     (newWidth != openGLContext->getWidth() || newHeight != openGLContext->getHeight()))
+    // {
+    //     openGLContext->resize(newWidth, newHeight);
+    // }
 
     openGLContext->render();
 
@@ -284,18 +157,132 @@ void ThreeDWindow::threeDRendering()
     ImGui::EndChild();
 }
 
-void ThreeDWindow::render()
+// --------- Object Manipulation ----------- //
+void ThreeDWindow::manipulateThreeDObject()
 {
-    ImGuiWindowFlags flags = ImGuiWindowFlags_None;
-    ImGui::Begin(title.c_str(), nullptr, flags);
+    // std::cout << "[DEBUG] UpdateGizmo called!" << std::endl;
+    ThreeDObject *selected = selector.getSelectedObject();
 
-    ImGui::Text("%s", text.c_str());
+    if (!selected)
+        return;
 
-    if (openGLContext)
+    // here is were set the Gizmo when the object is selected
+    ImGuizmo::BeginFrame();
+    ImGuizmo::Enable(true);
+    ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
+    ImGuizmo::SetDrawlist();
+    ImGuizmo::SetRect(oglChildPos.x, oglChildPos.y, oglChildSize.x, oglChildSize.y);
+    ImGuizmo::SetGizmoSizeClipSpace(0.2f);
+
+    glm::mat4 model = selected->getModelMatrix();
+
+    static ImGuizmo::OPERATION currentGizmoOperation = ImGuizmo::TRANSLATE;
+
+    if (ImGui::IsKeyPressed(ImGuiKey_W))
+        currentGizmoOperation = ImGuizmo::TRANSLATE;
+    if (ImGui::IsKeyPressed(ImGuiKey_R))
+        currentGizmoOperation = ImGuizmo::ROTATE;
+    if (ImGui::IsKeyPressed(ImGuiKey_S))
+        currentGizmoOperation = ImGuizmo::SCALE;
+
+    bool isManipulating = ImGuizmo::Manipulate(
+        glm::value_ptr(view),
+        glm::value_ptr(proj),
+        currentGizmoOperation,
+        ImGuizmo::WORLD,
+        glm::value_ptr(model));
+
+    if (ImGuizmo::IsUsing())
     {
-        ImGui::Text("Attached OpenGL content :");
-        threeDRendering();
+        // std::cout << "[DEBUG] Manipulation in progress!" << std::endl;
+        // check rotation
+        selected->setModelMatrix(model);
+        // std::cout << "[DEBUG] New position: " << translation.x << ", " << translation.y << ", " << translation.z << std::endl;
+        wasUsingGizmoLastFrame = ImGuizmo::IsUsing();
+    }
+}
+
+// --------- Object Selection ----------- //
+void ThreeDWindow::handleClick()
+{
+    ImVec2 mouse = ImGui::GetMousePos();
+    float relativeMouseX = mouse.x - oglChildPos.x;
+    float relativeMouseY = mouse.y - oglChildPos.y;
+
+    relativeMouseY = oglChildSize.y - relativeMouseY;
+
+    if (relativeMouseX >= 0 && relativeMouseX <= oglChildSize.x &&
+        relativeMouseY >= 0 && relativeMouseY <= oglChildSize.y)
+    {
+        int windowWidth = static_cast<int>(oglChildSize.x);
+        int windowHeight = static_cast<int>(oglChildSize.y);
+
+        view = openGLContext->getViewMatrix();
+        proj = openGLContext->getProjectionMatrix();
+
+        bool preventSelection = ImGuizmo::IsOver();
+
+        if (!preventSelection)
+        {
+            selector.pickUpTarget((int)relativeMouseX, (int)relativeMouseY, windowWidth, windowHeight, view, proj, ThreeDObjectsList);
+        }
+
+        ThreeDObject *selected = selector.getSelectedObject();
+
+        if (selected)
+        {
+            for (auto *obj : ThreeDObjectsList)
+                obj->setSelected(false);
+
+            selected->setSelected(true);
+
+            if (hierarchy)
+                hierarchy->selectFromThreeDWindow();
+
+            if (objectInspector)
+                objectInspector->setInspectedObject(selected);
+        }
+        else
+        {
+
+            // std::cout << "[DEBUG] No object selected ! clear Gizmo !" << std::endl;
+            if (hierarchy)
+            {
+                ThreeDObject *previouslySelected = hierarchy->getSelectedObject();
+                hierarchy->unselectObject(previouslySelected);
+            }
+
+            if (objectInspector)
+                objectInspector->clearInspectedObject();
+
+            if (!ImGuizmo::IsUsing() && !wasUsingGizmoLastFrame)
+            {
+
+                for (auto *obj : ThreeDObjectsList)
+                    obj->setSelected(false);
+                selector.clearTarget();
+            }
+        }
+    }
+}
+
+void ThreeDWindow::externalSelect(ThreeDObject *object)
+{
+    for (auto *obj : ThreeDObjectsList)
+        obj->setSelected(false);
+
+    if (object)
+    {
+        selector.select(object);
+        object->setSelected(true);
+        view = openGLContext->getViewMatrix();
+        proj = openGLContext->getProjectionMatrix();
+    }
+    else
+    {
+        selector.clearTarget();
     }
 
-    ImGui::End();
+    if (hierarchy)
+        hierarchy->selectFromThreeDWindow();
 }

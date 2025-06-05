@@ -35,28 +35,16 @@ OpenGLContext::OpenGLContext()
     scene.initialization();
 }
 
-void OpenGLContext::resize(int w, int h)
-{
-    width = w;
-    height = h;
-
-    glBindTexture(GL_TEXTURE_2D, fboTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-
-    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
-}
-
 void OpenGLContext::addThreeDObjectToList(ThreeDObject *object)
 {
     if (object)
         objects.push_back(object);
 }
 
-void OpenGLContext::add(ThreeDObject &object)
+void OpenGLContext::remove(ThreeDObject &object)
 {
-    object.initialize();
-    scene.add(object);
+    auto it = std::remove(objects.begin(), objects.end(), &object);
+    objects.erase(it, objects.end());
 }
 
 void OpenGLContext::render()

@@ -54,6 +54,18 @@ void HierarchyInspector::renameObject()
     }
 }
 
+void HierarchyInspector::notifyObjectDeleted(ThreeDObject *obj)
+{
+    if (!obj)
+        return;
+
+    if (selectedObjectInHierarchy == obj)
+        selectedObjectInHierarchy = nullptr;
+
+    if (objectBeingRenamed == obj)
+        objectBeingRenamed = nullptr;
+}
+
 void HierarchyInspector::render()
 {
 
@@ -171,7 +183,7 @@ void HierarchyInspector::render()
             objectInspector->clearInspectedObject();
 
         if (selectedObjectInHierarchy)
-            unselectobject(selectedObjectInHierarchy);
+            unselectObject(selectedObjectInHierarchy);
 
         if (window)
             window->externalSelect(nullptr);
@@ -217,7 +229,7 @@ void HierarchyInspector::selectFromThreeDWindow()
     }
 }
 
-void HierarchyInspector::unselectobject(ThreeDObject *obj)
+void HierarchyInspector::unselectObject(ThreeDObject *obj)
 {
     if (!obj)
         return;

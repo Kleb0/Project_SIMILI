@@ -1,12 +1,11 @@
 #pragma once
 #include <iostream>
 
-#define Add add
+#define Add associate
 
 template <typename LeftType, typename RightType>
-LeftType &add(LeftType &left, RightType &right)
+LeftType &associate(LeftType &left, RightType &right)
 {
-    left.add(right);
+    left.associate(right);
     return left;
-    std::cout << "[DEBUG] add() call" << std::endl;
 }
