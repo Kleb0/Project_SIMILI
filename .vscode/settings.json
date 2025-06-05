@@ -11,11 +11,16 @@
   "cmake.configureOnOpen": true,
   "cmake.buildDirectory": "${workspaceFolder}/build",
   "cmake.cmakePath": "C:/msys64/mingw64/bin/cmake.exe",
-  "C_Cpp.default.compilerPath": "C:/msys64/mingw64/bin/g++.exe",
-  "C_Cpp.default.intelliSenseMode": "linux-gcc-x64",
+  "cmake.configureSettings": {
+    "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+  },
+    "C_Cpp.default.compilerPath": "C:/msys64/mingw64/bin/g++.exe",
+  "C_Cpp.default.intelliSenseMode": "windows-msvc-x64",
   "C_Cpp.default.cppStandard": "c++17",
   "C_Cpp.default.cStandard": "c11",
   "C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json",
+  "C_Cpp.errorSquiggles": "enabled",
+  "editor.codeLens": true,
   "terminal.integrated.defaultProfile.windows": "MSYS2",
   "terminal.integrated.profiles.windows": {
     "MSYS2": {
@@ -121,7 +126,5 @@
     "xtree": "cpp",
     "xutility": "cpp"
   },
-  "C_Cpp.errorSquiggles": "disabled",
-
 }
 

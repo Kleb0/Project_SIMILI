@@ -18,7 +18,6 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/AbstractClass
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/images
     ${CMAKE_CURRENT_SOURCE_DIR}/src/InternalLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects
@@ -146,7 +145,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/AbstractClass
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/images
     ${CMAKE_CURRENT_SOURCE_DIR}/src/InternalLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects
@@ -157,6 +155,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glad/include  
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/ImGuizmo
     ${SDL3_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/tinyfiledialogs
 )
 
 target_include_directories(imgui PRIVATE
