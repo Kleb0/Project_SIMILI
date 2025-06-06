@@ -19,6 +19,12 @@ ThreeDWindow::ThreeDWindow(const std::string &title, const std::string &text)
 {
 }
 
+ThreeDWindow &ThreeDWindow::setRenderer(OpenGLContext &context)
+{
+    openGLContext = &context;
+    return *this;
+}
+
 ThreeDWindow &ThreeDWindow::add(OpenGLContext &context)
 {
     openGLContext = &context;
@@ -34,6 +40,42 @@ ThreeDWindow &ThreeDWindow::addObject(ThreeDObject &object)
 {
     ThreeDObjectsList.push_back(&object);
     return *this;
+}
+
+void ThreeDWindow::addThreeDObjectsToScene(const std::vector<ThreeDObject *> &objects)
+{
+    for (auto *object : objects)
+    {
+        if (object)
+        {
+            ThreeDObjectsList.push_back(object);
+            if (openGLContext)
+            {
+                openGLContext->addThreeDObjectToList(object);
+            }
+        }
+    }
+}
+
+void ThreeDWindow::removeThreeDObjectsFromScene(const std::vector<ThreeDObject *> &objects)
+{
+    for (auto *object : objects)
+    {
+        if (!object)
+            continue;
+
+        ThreeDObjectsList.erase(std::remove(ThreeDObjectsList.begin(), ThreeDObjectsList.end(), object), ThreeDObjectsList.end());
+
+        if (openGLContext)
+        {
+            openGLContext->remove(*object);
+        }
+    }
+}
+
+ThreeDObject *ThreeDWindow::getSelectedObject() const
+{
+    return selector.getSelectedObject();
 }
 
 const std::vector<ThreeDObject *> &ThreeDWindow::getObjects() const

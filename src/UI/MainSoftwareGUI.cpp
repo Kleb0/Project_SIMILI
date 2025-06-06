@@ -30,7 +30,7 @@ inline MainSoftwareGUI &associate(MainSoftwareGUI &gui, GUIWindow &win)
 
 inline ThreeDWindow &associate(ThreeDWindow &win, ThreeDObject &obj)
 {
-    win.addThreeDObjectToList(&obj);
+    win.addThreeDObjectsToScene({&obj});
     return win;
 }
 

@@ -87,7 +87,7 @@ void ThreeDSceneDrawer::add(ThreeDObject &object)
     objects.push_back(&object);
 }
 
-void ThreeDSceneDrawer::render(const glm::mat4 &viewProj)
+void ThreeDSceneDrawer::render(const std::vector<ThreeDObject *> &objects, const glm::mat4 &viewProj)
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -105,7 +105,15 @@ void ThreeDSceneDrawer::render(const glm::mat4 &viewProj)
 
     for (auto *obj : objects)
     {
-        obj->render(viewProj);
+        if (obj)
+        {
+            std::cout << " objects being rendered : " << obj->getName() << std::endl;
+            obj->render(viewProj);
+        }
+        else
+        {
+            std::cout << " No object to render." << std::endl;
+        }
     }
 }
 

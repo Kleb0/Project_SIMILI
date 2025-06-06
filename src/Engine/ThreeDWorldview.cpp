@@ -61,7 +61,7 @@ void ThreeDWorldView::render()
     glm::mat4 proj = camera.getProjectionMatrix((float)width / (float)height);
     glm::mat4 viewProj = proj * view;
 
-    scene.render(viewProj);
+    scene.render(objects, viewProj);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }

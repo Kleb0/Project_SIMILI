@@ -21,6 +21,7 @@ void HierarchyInspector::setThreeDWindow(ThreeDWindow *win)
 {
     window = win;
 }
+
 void HierarchyInspector::selectObject(ThreeDObject *obj)
 {
     selectedObjectInHierarchy = obj;

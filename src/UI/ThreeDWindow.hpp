@@ -34,6 +34,8 @@ public:
     ThreeDWindow &add(OpenGLContext &context);
     ThreeDWindow &add(ThreeDObject &object);
     ThreeDWindow &addObject(ThreeDObject &object);
+    //------> when we add an object to the ThreeDWindow, we add it to the OpenGLContext too
+
     const std::vector<ThreeDObject *> &getObjects() const;
 
     void addThreeDObjectsToScene(const std::vector<ThreeDObject *> &objects);
@@ -44,7 +46,7 @@ public:
     void setHierarchy(HierarchyInspector *inspector);
     void setObjectInspector(ObjectInspector *inspector);
 
-    OpenGLContext *getOpenGLContext() const;
+    ThreeDWindow &setRenderer(OpenGLContext &context);
 
 private:
     glm::mat4 view = glm::mat4(1.0f);

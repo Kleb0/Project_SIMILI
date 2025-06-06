@@ -7,7 +7,7 @@ class ThreeDSceneDrawer
 {
 public:
     ThreeDSceneDrawer();
-    void render(const glm::mat4 &viewProj);
+    void render(const std::vector<ThreeDObject *> &objects, const glm::mat4 &viewProj);
     void initialization();
     void drawBackgroundGradient();
     void add(ThreeDObject &object);

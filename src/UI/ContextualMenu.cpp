@@ -108,7 +108,7 @@ void ContextualMenu::render()
 
         if (pendingDeletion)
         {
-            threeDWindow->removeObject(pendingDeletion);
+            threeDWindow->removeThreeDObjectsFromScene({pendingDeletion});
             pendingDeletion = nullptr;
         }
     }

@@ -65,7 +65,7 @@ void OpenGLContext::render()
     viewMatrix = camera->getViewMatrix();
     projMatrix = camera->getProjectionMatrix((float)width / (float)height);
 
-    scene.render(projMatrix * viewMatrix);
+    scene.render(objects, projMatrix * viewMatrix);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
