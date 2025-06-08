@@ -62,6 +62,7 @@ int main(int argc, char **argv)
 
     myInfoWindow.title = "Project Viewer";
     myThreeDWindow.title = "3D Viewport";
+    myThreeDWindow.setRenderer(renderer);
 
     myCube.setName("SuperGigaCubeTest");
     mainCamera.setName("MainCamera");
@@ -69,13 +70,12 @@ int main(int argc, char **argv)
     myThreeDWindow.addThreeDObjectsToScene({&myCube});
     myThreeDWindow.addThreeDObjectsToScene({&mainCamera});
 
-    associate(gui, myInfoWindow);
-    associate(gui, myThreeDWindow);
-    myThreeDWindow.setRenderer(renderer);
-
+    renderer.setCamera(&mainCamera);
     myCube.setPosition(glm::vec3(2.5f, 0.5f, 2.5f));
 
-    renderer.setCamera(&mainCamera);
+    associate(gui, myInfoWindow);
+    associate(gui, myThreeDWindow);
+
     myHierarchy.setTitle("Hierarchy");
     myHierarchy.setContext(&renderer);
     myHierarchy.setThreeDWindow(&myThreeDWindow);

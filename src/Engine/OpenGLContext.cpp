@@ -4,6 +4,7 @@
 #include <glm/gtx/string_cast.hpp>
 #include <iostream>
 #include "Engine/OpenGLContext.hpp"
+#include <iostream>
 
 OpenGLContext::OpenGLContext()
 {
@@ -32,13 +33,14 @@ OpenGLContext::OpenGLContext()
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-    scene.initialization();
+    scene.initizalize();
 }
 
 void OpenGLContext::addThreeDObjectToList(ThreeDObject *object)
 {
     if (object)
-        objects.push_back(object);
+        std::cout << "[OpenGLContext] Adding object: " << object->getName() << std::endl;
+    objects.push_back(object);
 }
 
 void OpenGLContext::remove(ThreeDObject &object)

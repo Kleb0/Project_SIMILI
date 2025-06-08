@@ -89,7 +89,7 @@ void ContextualMenu::render()
             Cube *newCube = new Cube();
             newCube->setName("newCube");
             newCube->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
-            threeDWindow->add(*newCube);
+            threeDWindow->addThreeDObjectsToScene({newCube});
 
             std::cout << "[ContextualMenu] Created a new Cube object with name: " << newCube->getName() << std::endl;
 

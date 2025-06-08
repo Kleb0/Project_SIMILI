@@ -12,7 +12,6 @@ public:
 
     void initialize();
     void render();
-    void setGizmoTarget(ThreeDObject *object);
     GLuint getTexture() const { return fboTexture; }
 
     int getWidth() const { return width; }

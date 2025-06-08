@@ -136,4 +136,5 @@ void Cube::render(const glm::mat4 &viewProj)
     glBindVertexArray(0);
 
     glDepthMask(GL_TRUE);
+    // std::cout << "[DEBUG] rendering cube with name " << getName() << std::endl;
 }

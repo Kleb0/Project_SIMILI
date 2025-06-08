@@ -48,10 +48,17 @@ void ThreeDWindow::addThreeDObjectsToScene(const std::vector<ThreeDObject *> &ob
     {
         if (object)
         {
+            std::cout << "[ThreeDWindow] Adding object: " << object->getName() << std::endl;
+            object->initialize();
             ThreeDObjectsList.push_back(object);
             if (openGLContext)
             {
+                std::cout << "[ThreeDWindow] openGLContext is not null, adding object to OpenGL context." << std::endl;
                 openGLContext->addThreeDObjectToList(object);
+            }
+            else
+            {
+                std::cout << "[ThreeDWindow] openGLContext is null, cannot add object to OpenGL context." << std::endl;
             }
         }
     }
