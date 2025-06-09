@@ -66,18 +66,6 @@ void ThreeDWindow::addThreeDObjectsToScene(const std::vector<ThreeDObject *> &ob
 
 void ThreeDWindow::removeThreeDObjectsFromScene(const std::vector<ThreeDObject *> &objects)
 {
-    for (auto *object : objects)
-    {
-        if (!object)
-            continue;
-
-        ThreeDObjectsList.erase(std::remove(ThreeDObjectsList.begin(), ThreeDObjectsList.end(), object), ThreeDObjectsList.end());
-
-        if (openGLContext)
-        {
-            openGLContext->remove(*object);
-        }
-    }
 }
 
 ThreeDObject *ThreeDWindow::getSelectedObject() const

@@ -10,6 +10,7 @@ public:
 
     void initialize() override;
     void render(const glm::mat4 &viewProj) override;
+    void destroy();
 
 private:
     unsigned int vao = 0;

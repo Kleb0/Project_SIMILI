@@ -35,7 +35,7 @@ public:
         objects = list;
     }
 
-    void remove(ThreeDObject &object);
+    void removeThreeDobjectFromList(ThreeDObject *object);
 
 private:
     std::vector<ThreeDObject *> objects;

@@ -38,15 +38,22 @@ OpenGLContext::OpenGLContext()
 
 void OpenGLContext::addThreeDObjectToList(ThreeDObject *object)
 {
-    if (object)
-        std::cout << "[OpenGLContext] Adding object: " << object->getName() << std::endl;
     objects.push_back(object);
 }
 
-void OpenGLContext::remove(ThreeDObject &object)
+void OpenGLContext::removeThreeDobjectFromList(ThreeDObject *object)
 {
-    auto it = std::remove(objects.begin(), objects.end(), &object);
-    objects.erase(it, objects.end());
+
+    auto it = std::remove(objects.begin(), objects.end(), object);
+    if (it != objects.end())
+    {
+        std::cout << "[OpenGLContext] Removing object: " << object->getName() << std::endl;
+        objects.erase(it, objects.end());
+    }
+    else
+    {
+        std::cerr << "[OpenGLContext] ERROR : Object not found in the list." << std::endl;
+    }
 }
 
 void OpenGLContext::render()
