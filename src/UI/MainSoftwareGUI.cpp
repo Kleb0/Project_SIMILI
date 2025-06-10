@@ -23,6 +23,23 @@ namespace fs = std::filesystem;
 
 extern std::filesystem::path gExecutableDir;
 
+inline MainSoftwareGUI &associate(MainSoftwareGUI &gui, GUIWindow &win)
+{
+    return gui.add(win);
+}
+
+inline ThreeDWindow &associate(ThreeDWindow &win, ThreeDObject &obj)
+{
+    win.addThreeDObjectsToScene({&obj});
+    return win;
+}
+
+inline OpenGLContext &associate(OpenGLContext &ctx, ThreeDObject &obj)
+{
+    ctx.addThreeDObjectToList(&obj);
+    return ctx;
+}
+
 GLFWwindow *MainSoftwareGUI::getWindow()
 {
     return window;
@@ -225,6 +242,7 @@ void MainSoftwareGUI::run()
 {
     ContextualMenu contextualMenu;
     contextualMenu.setThreeDWindow(threeDWindow);
+    contextualMenu.setObjectInspector(objectInspector);
 
     for (auto *win : windows)
     {

@@ -4,6 +4,8 @@
 #include <vector>
 #include <UI/GUIWindow.hpp>
 #include <UI/ThreeDWindow.hpp>
+#include <UI/ObjectInspector.hpp>
+#include <WorldObjects/ThreeDObject.hpp>
 
 class MainSoftwareGUI
 {
@@ -16,6 +18,13 @@ public:
     GLFWwindow *getWindow();
     MainSoftwareGUI &add(GUIWindow &window);
     void setThreeDWindow(ThreeDWindow *window) { this->threeDWindow = window; }
+    void setObjectInspector(ObjectInspector *inspector) { this->objectInspector = inspector; }
+
+    template <typename T>
+    void associate(T &window)
+    {
+        this->add(window);
+    }
 
 private:
     GLFWwindow *window = nullptr;
@@ -31,5 +40,7 @@ private:
     void shutdown();
 
     void multiScreenSupport();
+    ThreeDObject *threedObject = nullptr;
     ThreeDWindow *threeDWindow = nullptr;
+    ObjectInspector *objectInspector = nullptr;
 };

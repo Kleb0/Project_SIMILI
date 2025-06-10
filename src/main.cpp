@@ -19,12 +19,12 @@ fs::path gExecutableDir;
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <SDL3/SDL.h>
+#include "InternalLogic/AssemblerLogic.hpp"
 #include "UI/MainSoftwareGUI.hpp"
 #include "UI/InfoWindow.hpp"
 #include "UI/ThreeDWindow.hpp"
 #include "UI/HierarchyInspector.hpp"
 #include "WorldObjects/ThreedObject.hpp"
-#include "InternalLogic/AssemblerLogic.hpp"
 #include "Engine/OpenGLContext.hpp"
 #include "Engine/ThreeDObjectSelector.hpp"
 #include "WorldObjects/Camera.hpp"
@@ -42,6 +42,7 @@ int main(int argc, char **argv)
     ThreeDWindow myThreeDWindow;
     OpenGLContext renderer;
     Cube myCube;
+    Cube myCube2;
     ThreeDObjectSelector selector;
     Camera mainCamera;
     HierarchyInspector myHierarchy;
@@ -62,25 +63,25 @@ int main(int argc, char **argv)
 
     myInfoWindow.title = "Project Viewer";
     myThreeDWindow.title = "3D Viewport";
+    myThreeDWindow.setRenderer(renderer);
 
-    myCube.setName("MonCube");
+    myCube.setName("SuperGigaCubeTest");
+    myCube2.setName("SuperGigaCubeTest2");
+
     mainCamera.setName("MainCamera");
 
-    myThreeDWindow.addThreeDObjectToList(&myCube);
-    myThreeDWindow.addThreeDObjectToList(&mainCamera);
+    myThreeDWindow.addThreeDObjectsToScene({&myCube});
+    myThreeDWindow.addThreeDObjectsToScene({&myCube2});
+    // myThreeDWindow.removeThreeDObjectsFromScene(&myCube2); // Remove the second cube to test the removal functionality
+    myThreeDWindow.addThreeDObjectsToScene({&mainCamera});
 
-    renderer.addThreeDObjectToList(&myCube);
-    renderer.addThreeDObjectToList(&mainCamera);
-
-    add(gui, myInfoWindow);
-    add(gui, myThreeDWindow);
-    myCube.setPosition(glm::vec3(2.5f, 0.5f, 2.5f));
-    add(myThreeDWindow, myCube);
-    add(myThreeDWindow, mainCamera);
-    add(myThreeDWindow, renderer);
-    add(renderer, myCube);
-    add(renderer, mainCamera);
     renderer.setCamera(&mainCamera);
+    myCube.setPosition(glm::vec3(2.5f, 0.5f, 2.5f));
+    myCube2.setPosition(glm::vec3(0.5f, 0.5f, 0.5f));
+
+    associate(gui, myInfoWindow);
+    associate(gui, myThreeDWindow);
+
     myHierarchy.setTitle("Hierarchy");
     myHierarchy.setContext(&renderer);
     myHierarchy.setThreeDWindow(&myThreeDWindow);
@@ -88,9 +89,10 @@ int main(int argc, char **argv)
     myThreeDWindow.setHierarchy(&myHierarchy);
     myThreeDWindow.setObjectInspector(&objectInspector);
     objectInspector.setTitle("Object Inspector");
-    add(gui, objectInspector);
-    add(gui, myHierarchy);
+    associate(gui, objectInspector);
+    associate(gui, myHierarchy);
     gui.setThreeDWindow(&myThreeDWindow);
+    gui.setObjectInspector(&objectInspector);
     // add(gui, dx12Window);
 
     gui.run();

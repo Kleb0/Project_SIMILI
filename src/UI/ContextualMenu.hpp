@@ -5,6 +5,9 @@
 #include <imgui.h>
 #include "UI/ThreeDWindow.hpp"
 #include "UI/HierarchyInspector.hpp"
+#include "WorldObjects/ThreeDObject.hpp"
+
+class ObjectInspector;
 
 class ContextualMenu
 {
@@ -15,10 +18,14 @@ public:
 
     void setThreeDWindow(ThreeDWindow *window);
     void setHierarchyInspector(HierarchyInspector *inspector);
+    void setObjectInspector(ObjectInspector *inspector);
 
 private:
     bool isOpen = false;
     ImVec2 popupPos = ImVec2(0, 0);
     ThreeDWindow *threeDWindow = nullptr;
     HierarchyInspector *hierarchyInspector = nullptr;
+    ThreeDObject *selectedObject = nullptr;
+    ObjectInspector *objectInspector = nullptr;
+    ThreeDObject *pendingDeletion = nullptr;
 };

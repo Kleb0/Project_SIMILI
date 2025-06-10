@@ -2,7 +2,6 @@
 
 #include <GLFW/glfw3.h>
 #include "UI/GUIWindow.hpp"
-#include "UI/SimiliGizmo.hpp"
 #include "Engine/OpenGLContext.hpp"
 #include "Engine/ThreeDObjectSelector.hpp"
 #include <imgui.h>
@@ -18,18 +17,13 @@ class ObjectInspector;
 class ThreeDWindow : public GUIWindow
 {
 public:
-    SimiliGizmo Similigizmo;
-    ImVec2 oglChildPos;
-    ImVec2 oglChildSize;
-    std::string title = "Hello Window";
-    std::string text = "Bienvenue dans la fenêtre 3D !";
-
     ThreeDWindow();
     ThreeDWindow(const std::string &title, const std::string &text);
 
-    ThreeDWindow &add(OpenGLContext &context);
-    ThreeDWindow &add(ThreeDObject &object);
-    ThreeDWindow &addObject(ThreeDObject &object);
+    ImVec2 oglChildPos;
+    ImVec2 oglChildSize;
+    std::string title = "Hello 3D Window";
+    std::string text = "This is a 3D window with OpenGL content.";
 
     GLFWwindow *glfwWindow = nullptr;
 
@@ -37,29 +31,22 @@ public:
     void threeDRendering();
     bool wasUsingGizmoLastFrame = false;
 
-    // make a list of all the objects in the window
-    std::vector<ThreeDObject *> getObjects() const
-    {
-        return ThreeDObjectsList;
-    }
+    ThreeDWindow &add(OpenGLContext &context);
+    ThreeDWindow &add(ThreeDObject &object);
+    ThreeDWindow &addObject(ThreeDObject &object);
+    //------> when we add an object to the ThreeDWindow, we add it to the OpenGLContext too
 
-    void addThreeDObjectToList(ThreeDObject *object);
+    const std::vector<ThreeDObject *> &getObjects() const;
 
-    void setListOfObjects(std::vector<ThreeDObject *> &list)
-    {
-        ThreeDObjectsList = list;
-    }
+    void addThreeDObjectsToScene(const std::vector<ThreeDObject *> &objects);
+    void removeThreeDObjectsFromScene(ThreeDObject *object);
+
     void externalSelect(ThreeDObject *object);
+    ThreeDObject *getSelectedObject() const;
     void setHierarchy(HierarchyInspector *inspector);
-
-    ThreeDObject *getSelectedObject() const
-    {
-        return selector.getSelectedObject();
-    }
-
     void setObjectInspector(ObjectInspector *inspector);
 
-    OpenGLContext *getOpenGLContext() const { return openGLContext; }
+    ThreeDWindow &setRenderer(OpenGLContext &context);
 
 private:
     glm::mat4 view = glm::mat4(1.0f);

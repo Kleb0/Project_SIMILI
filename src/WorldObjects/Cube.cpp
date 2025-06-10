@@ -136,4 +136,28 @@ void Cube::render(const glm::mat4 &viewProj)
     glBindVertexArray(0);
 
     glDepthMask(GL_TRUE);
+    // std::cout << "[DEBUG] rendering cube with name " << getName() << std::endl;
+}
+
+void Cube::destroy()
+{
+    if (vao != 0)
+    {
+        glDeleteVertexArrays(1, &vao);
+        vao = 0;
+    }
+
+    if (vbo != 0)
+    {
+        glDeleteBuffers(1, &vbo);
+        vbo = 0;
+    }
+
+    if (shaderProgram != 0)
+    {
+        glDeleteProgram(shaderProgram);
+        shaderProgram = 0;
+    }
+
+    std::cout << "[Cube] Resources destroyed manually." << std::endl;
 }
