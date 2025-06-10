@@ -8,8 +8,7 @@
 #include <filesystem>
 #include <vector>
 
-unsigned int gridVAO = 0, gridVBO = 0;
-unsigned int shaderProgram = 0;
+// === SHADERS ===
 
 const char *vertexShaderSource = R"(
 #version 330 core
@@ -30,9 +29,10 @@ void main()
 }
 )";
 
+// === CLASS ===
 ThreeDSceneDrawer::ThreeDSceneDrawer() {}
 
-void compileShaders()
+void ThreeDSceneDrawer::compileShaders()
 {
     unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, &vertexShaderSource, nullptr);
@@ -51,14 +51,8 @@ void compileShaders()
     glDeleteShader(fragmentShader);
 }
 
-void ThreeDSceneDrawer::initialization()
+void ThreeDSceneDrawer::initizalize()
 {
-    std::filesystem::path rootPath = std::filesystem::current_path().parent_path();
-    std::string imagePath = (rootPath / "assets/images/cat.png").string();
-
-    std::cout << "[DEBUG] Répertoire courant : " << std::filesystem::current_path() << std::endl;
-    std::cout << "[DEBUG] Chemin construit : " << imagePath << std::endl;
-
     compileShaders();
 
     std::vector<float> gridVertices;
@@ -70,24 +64,52 @@ void ThreeDSceneDrawer::initialization()
 
     glGenVertexArrays(1, &gridVAO);
     glGenBuffers(1, &gridVBO);
-
     glBindVertexArray(gridVAO);
     glBindBuffer(GL_ARRAY_BUFFER, gridVBO);
     glBufferData(GL_ARRAY_BUFFER, gridVertices.size() * sizeof(float), gridVertices.data(), GL_STATIC_DRAW);
-
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
     glEnableVertexAttribArray(0);
-
     glBindVertexArray(0);
+
+    glGenFramebuffers(1, &fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+    glGenTextures(1, &fboTexture);
+    glBindTexture(GL_TEXTURE_2D, fboTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fboTexture, 0);
+
+    glGenRenderbuffers(1, &rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cerr << "Error : Uncomplete framebuffer !" << std::endl;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_DEPTH_TEST);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 }
 
-void ThreeDSceneDrawer::add(ThreeDObject &object)
+void ThreeDSceneDrawer::resize(int w, int h)
 {
-    object.initialize();
-    objects.push_back(&object);
+    width = w;
+    height = h;
+
+    glBindTexture(GL_TEXTURE_2D, fboTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+
+    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
 }
 
-void ThreeDSceneDrawer::render(const glm::mat4 &viewProj)
+void ThreeDSceneDrawer::render(const std::vector<ThreeDObject *> &objects, const glm::mat4 &viewProj)
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -105,8 +127,18 @@ void ThreeDSceneDrawer::render(const glm::mat4 &viewProj)
 
     for (auto *obj : objects)
     {
-        obj->render(viewProj);
+        if (obj)
+        {
+            // std::cout << " Rendering object with name : - " << obj->getName() << std::endl;
+            obj->render(viewProj);
+        }
     }
+}
+
+void ThreeDSceneDrawer::add(ThreeDObject *object)
+{
+    if (object)
+        objects.push_back(object);
 }
 
 void ThreeDSceneDrawer::drawBackgroundGradient()

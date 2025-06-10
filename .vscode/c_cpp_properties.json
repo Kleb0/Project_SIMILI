@@ -4,28 +4,34 @@
       "name": "MSVC config",
       "compilerPath": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.36.32532/bin/Hostx64/x64/cl.exe",
       "intelliSenseMode": "windows-msvc-x64",
-      "includePath": [
+         "includePath": [
         "${workspaceFolder}/src",
         "${workspaceFolder}/src/UI",
         "${workspaceFolder}/src/Engine",
+        "${workspaceFolder}/src/InternalLogic",
+        "${workspaceFolder}/src/AbstractClass",
+        "${workspaceFolder}/src/WorldObjects",
+        "${workspaceFolder}/src/Resources",
         "${workspaceFolder}/src/ThirdParty",
-        "${workspaceFolder}/src/resources",
         "${workspaceFolder}/src/ThirdParty/imgui",
+        "${workspaceFolder}/src/ThirdParty/imgui/backends",
         "${workspaceFolder}/src/ThirdParty/ImGuizmo",
+        "${workspaceFolder}/src/ThirdParty/glad/include",
+        "${workspaceFolder}/src/ThirdParty/glm",
+        "${workspaceFolder}/src/ThirdParty/GLFW/include",
+        "C:/libs/SDL3/include",
         "C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/um",
         "C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/shared",
-        "C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/winrt",      
-        "C:/msys64/mingw64/include"
+        "C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/winrt"
       ],
       "defines": [],
       "cppStandard": "c++17",
       "cStandard": "c11",
+      "compileCommands": "${workspaceFolder}/build/compile_commands.json",
       "browse": {
         "path": [
           "${workspaceFolder}/src",
-          "${workspaceFolder}/src/ThirdParty",
-          "${workspaceFolder}/src/ThirdParty/imgui",
-          "${workspaceFolder}/src/ThirdParty/ImGuizmo"
+          "${workspaceFolder}/src/ThirdParty"
         ],
         "limitSymbolsToIncludedHeaders": true
       }

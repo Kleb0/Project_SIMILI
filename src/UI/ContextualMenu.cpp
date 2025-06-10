@@ -1,5 +1,8 @@
+#include <windows.h>
+
 #include <imgui_internal.h>
 
+#include "UI/ObjectInspector.hpp"
 #include "UI/ContextualMenu.hpp"
 #include "Engine/OpenGLContext.hpp"
 #include "WorldObjects/Cube.hpp"
@@ -10,12 +13,17 @@ void ContextualMenu::setHierarchyInspector(HierarchyInspector *inspector)
     hierarchyInspector = inspector;
 }
 
+void ContextualMenu::setObjectInspector(ObjectInspector *inspector)
+{
+    objectInspector = inspector;
+}
+
 void ContextualMenu::show()
 {
 
     popupPos = ImGui::GetMousePos();
     isOpen = true;
-    std::cout << "[ContextualMenu] Contextual menu opened at position: " << popupPos.x << ", " << popupPos.y << std::endl;
+    // std::cout << "[ContextualMenu] Contextual menu opened at position: " << popupPos.x << ", " << popupPos.y << std::endl;
 }
 
 void ContextualMenu::hide()
@@ -46,13 +54,38 @@ void ContextualMenu::render()
 
         ImGui::Text("Contextual Menu");
 
+        if (hierarchyInspector)
+        {
+            ThreeDObject *selected = hierarchyInspector->getSelectedObject();
+            if (selected)
+            {
+                ImGui::Separator();
+                ImGui::Text("Current Selected object : %s", selected->getName().c_str());
+
+                if (ImGui::MenuItem("Delete selected object"))
+                {
+                    if (threeDWindow && hierarchyInspector)
+                    {
+
+                        if (objectInspector)
+                            objectInspector->clearInspectedObject();
+
+                        ThreeDObject *toDelete = selected;
+                        threeDWindow->removeThreeDObjectsFromScene({toDelete});
+                        pendingDeletion = toDelete;
+                    }
+                    hide();
+                    return;
+                }
+            }
+        }
+
         if (ImGui::MenuItem("Create Cube") && threeDWindow)
         {
             Cube *newCube = new Cube();
             newCube->setName("newCube");
             newCube->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
-            threeDWindow->add(*newCube);
-            threeDWindow->getOpenGLContext()->add(*newCube);
+            threeDWindow->addThreeDObjectsToScene({newCube});
 
             std::cout << "[ContextualMenu] Created a new Cube object with name: " << newCube->getName() << std::endl;
 
@@ -67,6 +100,12 @@ void ContextualMenu::render()
         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
         {
             hide();
+        }
+
+        if (pendingDeletion)
+        {
+            threeDWindow->removeThreeDObjectsFromScene({pendingDeletion});
+            pendingDeletion = nullptr;
         }
     }
 }

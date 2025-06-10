@@ -4,6 +4,8 @@ add_definitions(-DUNICODE -D_UNICODE)
 
 set(CMAKE_CXX_STANDARD 17)
 
+
+#please download the SDL3-devel-3.2.14-VC.zip from its official github page and create on your C drive the following folder configuration:
 #set SDl3
 set(SDL3_INCLUDE_DIR "C:/libs/SDL3/include")
 set(SDL3_LIBRARY "C:/libs/SDL3/lib/x64/SDL3.lib")
@@ -12,13 +14,19 @@ if(NOT EXISTS ${SDL3_LIBRARY})
     message(FATAL_ERROR "SDL3 library not found at ${SDL3_LIBRARY}")
 endif()
 
+
+#then save save this file to create the build folder.
+#This project has been made and tested with VS code. So please use CTRL + Shift + P and choose : C/C++: Select Configuration
+#and then choose : MSVC configuration
+#Use CTRL + Shift + B to build the project thanks to file .vscode/tasks.json
+#The C_Cpp_properties.json file, indeed, configure the intellisense for this project and the path to the compiler.
+
 # Include dirs
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/AbstractClass
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/images
     ${CMAKE_CURRENT_SOURCE_DIR}/src/InternalLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects
@@ -146,7 +154,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/AbstractClass
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/images
     ${CMAKE_CURRENT_SOURCE_DIR}/src/InternalLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects
@@ -157,6 +164,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glad/include  
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/ImGuizmo
     ${SDL3_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/tinyfiledialogs
 )
 
 target_include_directories(imgui PRIVATE

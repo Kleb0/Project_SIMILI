@@ -11,15 +11,12 @@ public:
     ~OpenGLContext() = default;
 
     void initialize();
-    void resize(int w, int h);
     void render();
-    void setGizmoTarget(ThreeDObject *object);
     GLuint getTexture() const { return fboTexture; }
 
     int getWidth() const { return width; }
     int getHeight() const { return height; }
 
-    void add(ThreeDObject &object);
     void setCamera(Camera *cam) { camera = cam; }
     Camera *getCamera() const { return camera; }
 
@@ -37,6 +34,8 @@ public:
     {
         objects = list;
     }
+
+    void removeThreeDobjectFromList(ThreeDObject *object);
 
 private:
     std::vector<ThreeDObject *> objects;

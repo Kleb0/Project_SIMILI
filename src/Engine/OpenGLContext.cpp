@@ -4,6 +4,8 @@
 #include <glm/gtx/string_cast.hpp>
 #include <iostream>
 #include "Engine/OpenGLContext.hpp"
+#include <iostream>
+// #include <windows.h>
 
 OpenGLContext::OpenGLContext()
 {
@@ -32,31 +34,29 @@ OpenGLContext::OpenGLContext()
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-    scene.initialization();
-}
-
-void OpenGLContext::resize(int w, int h)
-{
-    width = w;
-    height = h;
-
-    glBindTexture(GL_TEXTURE_2D, fboTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-
-    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
+    scene.initizalize();
 }
 
 void OpenGLContext::addThreeDObjectToList(ThreeDObject *object)
 {
-    if (object)
-        objects.push_back(object);
+    objects.push_back(object);
 }
 
-void OpenGLContext::add(ThreeDObject &object)
+void OpenGLContext::removeThreeDobjectFromList(ThreeDObject *object)
 {
-    object.initialize();
-    scene.add(object);
+
+    auto it = std::remove(objects.begin(), objects.end(), object);
+    if (it != objects.end())
+    {
+        // message box
+
+        std::cout << "[OpenGLContext] Removing object: " << object->getName() << std::endl;
+        objects.erase(it, objects.end());
+    }
+    else
+    {
+        std::cerr << "[OpenGLContext] ERROR : Object not found in the list." << std::endl;
+    }
 }
 
 void OpenGLContext::render()
@@ -77,7 +77,7 @@ void OpenGLContext::render()
     viewMatrix = camera->getViewMatrix();
     projMatrix = camera->getProjectionMatrix((float)width / (float)height);
 
-    scene.render(projMatrix * viewMatrix);
+    scene.render(objects, projMatrix * viewMatrix);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
