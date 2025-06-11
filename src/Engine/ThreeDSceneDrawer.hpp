@@ -5,6 +5,8 @@
 #include <glm/glm.hpp>
 #include <WorldObjects/ThreeDObject.hpp>
 #include "WorldObjects/Camera.hpp"
+#include <iostream>
+#include <list>
 
 class ThreeDSceneDrawer
 {
@@ -14,14 +16,14 @@ public:
 
     void initizalize();
     void resize(int w, int h);
-    void render(const std::vector<ThreeDObject *> &objects, const glm::mat4 &viewProj);
+    void render(const std::list<ThreeDObject *> &objects, const glm::mat4 &viewProj);
     void drawBackgroundGradient();
 
     void add(ThreeDObject *object);
     GLuint getTexture() const { return fboTexture; }
 
 private:
-    std::vector<ThreeDObject *> objects;
+    std::list<ThreeDObject *> objects;
     Camera camera;
 
     GLuint fbo = 0;

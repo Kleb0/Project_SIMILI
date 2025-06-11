@@ -109,7 +109,7 @@ void ThreeDSceneDrawer::resize(int w, int h)
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
 }
 
-void ThreeDSceneDrawer::render(const std::vector<ThreeDObject *> &objects, const glm::mat4 &viewProj)
+void ThreeDSceneDrawer::render(const std::list<ThreeDObject *> &objects, const glm::mat4 &viewProj)
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 

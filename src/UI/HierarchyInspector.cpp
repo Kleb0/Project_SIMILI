@@ -75,7 +75,7 @@ void HierarchyInspector::render()
 
     bool clickedOnItem = false;
 
-    auto drawList = [&](const std::vector<ThreeDObject *> &list)
+    auto drawList = [&](const std::list<ThreeDObject *> &list)
     {
         for (ThreeDObject *obj : list)
         {
@@ -130,13 +130,14 @@ void HierarchyInspector::render()
         }
     };
 
-    if (context)
-        drawList(context->getObjects());
+    drawList(context->getObjects());
 
     if (window)
     {
         const std::vector<ThreeDObject *> &windowList = window->getObjects();
-        const std::vector<ThreeDObject *> &contextList = context ? context->getObjects() : std::vector<ThreeDObject *>();
+
+        std::list<ThreeDObject *> contextList;
+        contextList = context->getObjects();
 
         for (ThreeDObject *obj : windowList)
         {
@@ -210,23 +211,21 @@ void HierarchyInspector::selectFromThreeDWindow()
         selectedObjectInHierarchy = nullptr;
         return;
     }
-
-    const auto &contextList = context ? context->getObjects() : std::vector<ThreeDObject *>();
+    const std::list<ThreeDObject *> emptyList;
+    const std::list<ThreeDObject *> &contextList = context ? context->getObjects() : emptyList;
     const auto &windowList = window->getObjects();
 
     auto it = std::find(contextList.begin(), contextList.end(), selected);
     if (it != contextList.end())
     {
         selectedObjectInHierarchy = *it;
-        // std::cout << "[HierarchyInspector] TEST A - Selected object from 3D window: " << selected->getName() << std::endl;
         return;
     }
 
-    it = std::find(windowList.begin(), windowList.end(), selected);
-    if (it != windowList.end())
+    auto it2 = std::find(windowList.begin(), windowList.end(), selected);
+    if (it2 != windowList.end())
     {
-        selectedObjectInHierarchy = *it;
-        // std::cout << "[HierarchyInspector]  TEST B - Selected object from 3D window: " << selected->getName() << std::endl;
+        selectedObjectInHierarchy = *it2;
     }
 }
 

@@ -75,6 +75,7 @@ void ContextualMenu::render()
                         pendingDeletion = toDelete;
                     }
                     hide();
+                    ImGui::End();
                     return;
                 }
             }

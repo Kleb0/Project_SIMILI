@@ -3,6 +3,7 @@
 #include "Engine/OpenGLContext.hpp"
 #include "WorldObjects/ThreeDObject.hpp"
 #include <string>
+#include <list>
 
 class ThreeDWindow;
 class ObjectInspector;
@@ -28,6 +29,7 @@ public:
     void setObjectInspector(ObjectInspector *inspector);
     void renameObject();
     void notifyObjectDeleted(ThreeDObject *obj);
+    void multipleSelection(ThreeDObject *obj);
 
 private:
     OpenGLContext *context = nullptr;
@@ -35,5 +37,7 @@ private:
     ThreeDObject *selectedObjectInHierarchy = nullptr;
     ObjectInspector *objectInspector = nullptr;
     ThreeDObject *objectBeingRenamed = nullptr;
+    // list of multiple selected objects
+    std::list<ThreeDObject *> multipleSelectedObjects;
     char editingBuffer[128] = {0};
 };

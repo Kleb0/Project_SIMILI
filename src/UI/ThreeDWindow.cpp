@@ -236,6 +236,9 @@ void ThreeDWindow::manipulateThreeDObject()
     if (ImGui::IsKeyPressed(ImGuiKey_S))
         currentGizmoOperation = ImGuizmo::SCALE;
 
+    view = openGLContext->getViewMatrix();
+    proj = openGLContext->getProjectionMatrix();
+
     bool isManipulating = ImGuizmo::Manipulate(
         glm::value_ptr(view),
         glm::value_ptr(proj),
