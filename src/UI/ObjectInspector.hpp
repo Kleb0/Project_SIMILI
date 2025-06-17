@@ -3,6 +3,8 @@
 #include "UI/GUIWindow.hpp"
 #include "WorldObjects/ThreeDObject.hpp"
 #include <string>
+#include <iostream>
+#include <list>
 
 class ObjectInspector : public GUIWindow
 {
@@ -12,6 +14,8 @@ public:
     void render() override;
     void setInspectedObject(ThreeDObject *object);
     void clearInspectedObject();
+    void setMultipleInspectedObjects(const std::list<ThreeDObject *> &objects);
+    void clearMultipleInspectedObjects();
 
     std::string title;
     void setTitle(const std::string &newTitle) { this->title = newTitle; }
@@ -22,6 +26,7 @@ public:
 
 private:
     ThreeDObject *inspectedObject = nullptr;
+    std::list<ThreeDObject *> multipleInspectedObjects;
     char nameEditBuffer[128] = {0};
     bool isRenaming = false;
 };

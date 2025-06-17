@@ -4,6 +4,12 @@
 #include <imgui.h>
 #include <iostream>
 #include <algorithm>
+#include <Windows.h>
+
+// void showErrorBox(const std::string &message, const std::string &title = "Error")
+// {
+//     MessageBoxA(nullptr, message.c_str(), title.c_str(), MB_ICONERROR | MB_OK);
+// }
 
 HierarchyInspector::HierarchyInspector() {}
 
@@ -36,6 +42,23 @@ void HierarchyInspector::selectObject(ThreeDObject *obj)
 void HierarchyInspector::selectInList(ThreeDObject *obj)
 {
     selectedObjectInHierarchy = obj;
+}
+
+void HierarchyInspector::multipleSelection(ThreeDObject *obj)
+{
+
+    auto it = std::find(multipleSelectedObjects.begin(), multipleSelectedObjects.end(), obj);
+    if (it == multipleSelectedObjects.end())
+    {
+        multipleSelectedObjects.push_back(obj);
+        std::cout << "[HierarchyInspector] Add object to multiple selection list: " << obj->getName() << std::endl;
+    }
+
+    else
+    {
+        multipleSelectedObjects.erase(it);
+    }
+    window->selectMultipleObjects(multipleSelectedObjects);
 }
 
 void HierarchyInspector::renameObject()
@@ -106,25 +129,62 @@ void HierarchyInspector::render()
             float width = ImGui::GetContentRegionAvail().x;
             ImVec2 fullEnd = ImVec2(start.x + width, start.y + height);
 
+            //------------
             if (ImGui::IsItemClicked(ImGuiMouseButton_Left) ||
                 (ImGui::IsMouseHoveringRect(start, fullEnd) && ImGui::IsMouseClicked(ImGuiMouseButton_Left)))
             {
-                selectedObjectInHierarchy = obj;
                 clickedOnItem = true;
 
-                if (objectInspector)
-                    objectInspector->setInspectedObject(obj);
+                if (ImGui::GetIO().KeyShift)
+                {
+                    // Add to multiple selection
+                    if (std::find(multipleSelectedObjects.begin(), multipleSelectedObjects.end(), obj) == multipleSelectedObjects.end())
+                    {
+                        multipleSelectedObjects.push_back(obj);
+                        obj->setSelected(true);
+                    }
 
-                if (window)
+                    objectInspector->clearInspectedObject();
+                    objectInspector->setMultipleInspectedObjects(multipleSelectedObjects);
+                    window->setMultipleSelectedObjects(multipleSelectedObjects);
+                }
+                else
+                {
+                    // Single selection
+                    for (auto *o : window->getObjects())
+                        o->setSelected(false);
+
+                    obj->setSelected(true);
+                    multipleSelectedObjects.clear();
+                    multipleSelectedObjects.push_back(obj);
+
+                    objectInspector->clearMultipleInspectedObjects();
+                    objectInspector->setInspectedObject(obj);
+                    window->setMultipleSelectedObjects(multipleSelectedObjects);
+                }
+
+                selectedObjectInHierarchy = obj;
+
+                // Notify the window to select this object
+                if (!ImGui::GetIO().KeyShift)
                     window->externalSelect(obj);
             }
 
+            //-----
             ImDrawList *draw_list = ImGui::GetWindowDrawList();
 
-            if (selectedObjectInHierarchy == obj)
+            if (obj->getSelected())
+            {
+                draw_list->AddRectFilled(start, fullEnd, IM_COL32(100, 255, 100, 100));
+            }
+            else if (selectedObjectInHierarchy == obj)
+            {
                 draw_list->AddRectFilled(start, fullEnd, IM_COL32(255, 100, 100, 100));
+            }
             else if (ImGui::IsMouseHoveringRect(start, fullEnd))
+            {
                 draw_list->AddRectFilled(start, fullEnd, IM_COL32(255, 255, 100, 60));
+            }
 
             ImGui::PopID();
         }
@@ -185,7 +245,11 @@ void HierarchyInspector::render()
             objectInspector->clearInspectedObject();
 
         if (selectedObjectInHierarchy)
+        {
             unselectObject(selectedObjectInHierarchy);
+            multipleSelectedObjects.clear();
+            objectInspector->clearMultipleInspectedObjects();
+        }
 
         if (window)
             window->externalSelect(nullptr);
@@ -239,6 +303,11 @@ void HierarchyInspector::unselectObject(ThreeDObject *obj)
         selectedObjectInHierarchy = nullptr;
         // std::cout << "[HierarchyInspector] Unselected object: " << obj->getName() << std::endl;
     }
+}
+
+void HierarchyInspector::clearMultipleSelection()
+{
+    multipleSelectedObjects.clear();
 }
 
 ThreeDObject *HierarchyInspector::getSelectedObject() const

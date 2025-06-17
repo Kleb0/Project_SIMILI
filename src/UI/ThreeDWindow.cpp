@@ -11,6 +11,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 #include <algorithm>
+#include <glm/gtx/string_cast.hpp>
 // #include <windows.h>
 
 ThreeDWindow::ThreeDWindow() {}
@@ -23,23 +24,6 @@ ThreeDWindow::ThreeDWindow(const std::string &title, const std::string &text)
 ThreeDWindow &ThreeDWindow::setRenderer(OpenGLContext &context)
 {
     openGLContext = &context;
-    return *this;
-}
-
-ThreeDWindow &ThreeDWindow::add(OpenGLContext &context)
-{
-    openGLContext = &context;
-    return *this;
-}
-
-ThreeDWindow &ThreeDWindow::add(ThreeDObject &object)
-{
-    return addObject(object);
-}
-
-ThreeDWindow &ThreeDWindow::addObject(ThreeDObject &object)
-{
-    ThreeDObjectsList.push_back(&object);
     return *this;
 }
 
@@ -70,6 +54,7 @@ void ThreeDWindow::removeThreeDObjectsFromScene(ThreeDObject *object)
 
     std::cout << "[ThreeDWindow] Removing object: " << object->getName() << std::endl;
     auto it = std::remove(ThreeDObjectsList.begin(), ThreeDObjectsList.end(), object);
+
     if (it != ThreeDObjectsList.end())
     {
 
@@ -129,17 +114,13 @@ void ThreeDWindow::threeDRendering()
     int newWidth = static_cast<int>(oglChildSize.x);
     int newHeight = static_cast<int>(oglChildSize.y);
 
-    // if (newWidth > 0 && newHeight > 0 &&
-    //     (newWidth != openGLContext->getWidth() || newHeight != openGLContext->getHeight()))
-    // {
-    //     openGLContext->resize(newWidth, newHeight);
-    // }
-
     openGLContext->render();
 
     ImTextureID textureID = (ImTextureID)(intptr_t)openGLContext->getTexture();
 
     ImGui::Image(textureID, oglChildSize, ImVec2(0, 1), ImVec2(1, 0));
+
+    manipulateThreeDObjects();
 
     if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
     {
@@ -162,6 +143,7 @@ void ThreeDWindow::threeDRendering()
             }
         }
 
+        // ------- Camera controls ---------- //
         if (ImGui::IsMouseDown(ImGuiMouseButton_Middle))
         {
             ImVec2 currentMousePos = ImGui::GetMousePos();
@@ -198,34 +180,21 @@ void ThreeDWindow::threeDRendering()
         }
     }
 
-    if (selector.getSelectedObject() != nullptr)
-    {
-        // the object manipulation is made during the the rendering,
-        // and we ensure it is done only if the selector as one or several selected objetcs
-        manipulateThreeDObject();
-    }
-
     ImGui::EndChild();
 }
 
 // --------- Object Manipulation ----------- //
-void ThreeDWindow::manipulateThreeDObject()
+void ThreeDWindow::manipulateThreeDObjects()
 {
-    // std::cout << "[DEBUG] UpdateGizmo called!" << std::endl;
-    ThreeDObject *selected = selector.getSelectedObject();
-
-    if (!selected)
+    if (multipleSelectedObjects.empty())
         return;
 
-    // here is were set the Gizmo when the object is selected
     ImGuizmo::BeginFrame();
     ImGuizmo::Enable(true);
     ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
     ImGuizmo::SetDrawlist();
     ImGuizmo::SetRect(oglChildPos.x, oglChildPos.y, oglChildSize.x, oglChildSize.y);
     ImGuizmo::SetGizmoSizeClipSpace(0.2f);
-
-    glm::mat4 model = selected->getModelMatrix();
 
     static ImGuizmo::OPERATION currentGizmoOperation = ImGuizmo::TRANSLATE;
 
@@ -239,30 +208,56 @@ void ThreeDWindow::manipulateThreeDObject()
     view = openGLContext->getViewMatrix();
     proj = openGLContext->getProjectionMatrix();
 
-    bool isManipulating = ImGuizmo::Manipulate(
+    // Calcul du centre
+    glm::vec3 center(0.0f);
+    for (ThreeDObject *obj : multipleSelectedObjects)
+        center += obj->getPosition();
+    center /= static_cast<float>(multipleSelectedObjects.size());
+
+    static glm::mat4 prevDummyMatrix = glm::mat4(1.0f); // conserve la delta précédente
+    glm::mat4 dummyMatrix = glm::translate(glm::mat4(1.0f), center);
+
+    bool manipulated = ImGuizmo::Manipulate(
         glm::value_ptr(view),
         glm::value_ptr(proj),
         currentGizmoOperation,
         ImGuizmo::WORLD,
-        glm::value_ptr(model));
+        glm::value_ptr(dummyMatrix));
 
-    if (ImGuizmo::IsUsing())
+    if (manipulated)
     {
-        // std::cout << "[DEBUG] Manipulation in progress!" << std::endl;
-        // check rotation
-        selected->setModelMatrix(model);
-        // std::cout << "[DEBUG] New position: " << translation.x << ", " << translation.y << ", " << translation.z << std::endl;
-        wasUsingGizmoLastFrame = ImGuizmo::IsUsing();
+        glm::mat4 delta = dummyMatrix * glm::inverse(prevDummyMatrix);
+
+        for (ThreeDObject *obj : multipleSelectedObjects)
+        {
+            glm::mat4 model = obj->getModelMatrix();
+
+            glm::mat4 toOrigin = glm::translate(glm::mat4(1.0f), -center);
+            glm::mat4 back = glm::translate(glm::mat4(1.0f), center);
+
+            glm::mat4 newModel = back * delta * toOrigin * model;
+            obj->setModelMatrix(newModel);
+        }
+
+        wasUsingGizmoLastFrame = true;
     }
+
+    prevDummyMatrix = dummyMatrix;
+    wasUsingGizmoLastFrame = false;
 }
 
 // --------- Object Selection ----------- //
 void ThreeDWindow::handleClick()
 {
+    if (selectionLocked)
+    {
+        selectionLocked = false; // Unlock selection for next click
+        return;
+    }
+
     ImVec2 mouse = ImGui::GetMousePos();
     float relativeMouseX = mouse.x - oglChildPos.x;
     float relativeMouseY = mouse.y - oglChildPos.y;
-
     relativeMouseY = oglChildSize.y - relativeMouseY;
 
     if (relativeMouseX >= 0 && relativeMouseX <= oglChildSize.x &&
@@ -275,49 +270,144 @@ void ThreeDWindow::handleClick()
         proj = openGLContext->getProjectionMatrix();
 
         bool preventSelection = ImGuizmo::IsOver();
-
         if (!preventSelection)
         {
-            selector.pickUpTarget((int)relativeMouseX, (int)relativeMouseY, windowWidth, windowHeight, view, proj, ThreeDObjectsList);
+            selector.pickUpTarget((int)relativeMouseX, (int)relativeMouseY,
+                                  windowWidth, windowHeight, view, proj, ThreeDObjectsList);
         }
 
         ThreeDObject *selected = selector.getSelectedObject();
+        bool shiftPressed = ImGui::GetIO().KeyShift;
 
         if (selected)
         {
-            for (auto *obj : ThreeDObjectsList)
-                obj->setSelected(false);
+            // ======= OBJET CLIQUÉ =======
+            if (!shiftPressed)
+            {
+                for (auto *obj : ThreeDObjectsList)
+                    obj->setSelected(false);
+                multipleSelectedObjects.clear();
+            }
 
-            selected->setSelected(true);
+            auto it = std::find(multipleSelectedObjects.begin(), multipleSelectedObjects.end(), selected);
+            if (it == multipleSelectedObjects.end())
+            {
+                multipleSelectedObjects.push_back(selected);
+                selected->setSelected(true);
+            }
+            else if (shiftPressed)
+            {
+                multipleSelectedObjects.erase(it);
+                selected->setSelected(false);
+            }
+
+            if (objectInspector)
+            {
+                if (multipleSelectedObjects.size() > 1)
+                {
+                    objectInspector->clearInspectedObject();
+                    objectInspector->setMultipleInspectedObjects(multipleSelectedObjects);
+                }
+                else
+                {
+                    objectInspector->setInspectedObject(selected);
+                }
+            }
 
             if (hierarchy)
                 hierarchy->selectFromThreeDWindow();
 
-            if (objectInspector)
-                objectInspector->setInspectedObject(selected);
+            selector.clearTarget();
         }
-        else
+        else if (!ImGuizmo::IsUsing() && !wasUsingGizmoLastFrame)
         {
+            // ======= CLIC DANS LE VIDE =======
+            std::cout << "[DEBUG] No object hit — clearing selection." << std::endl;
 
-            // std::cout << "[DEBUG] No object selected ! clear Gizmo !" << std::endl;
+            for (auto *obj : ThreeDObjectsList)
+                obj->setSelected(false);
+
+            multipleSelectedObjects.clear();
+            selector.clearTarget();
+
+            if (objectInspector)
+            {
+                objectInspector->clearInspectedObject();
+                objectInspector->clearMultipleInspectedObjects();
+            }
+
             if (hierarchy)
             {
-                ThreeDObject *previouslySelected = hierarchy->getSelectedObject();
-                hierarchy->unselectObject(previouslySelected);
+                hierarchy->clearMultipleSelection();
+                hierarchy->unselectObject(hierarchy->getSelectedObject());
             }
 
-            if (objectInspector)
-                objectInspector->clearInspectedObject();
-
-            if (!ImGuizmo::IsUsing() && !wasUsingGizmoLastFrame)
-            {
-
-                for (auto *obj : ThreeDObjectsList)
-                    obj->setSelected(false);
-                selector.clearTarget();
-            }
+            wasUsingGizmoLastFrame = false;
         }
     }
+}
+
+void ThreeDWindow::setMultipleSelectedObjects(const std::list<ThreeDObject *> &objects)
+{
+    multipleSelectedObjects = objects;
+
+    for (ThreeDObject *obj : ThreeDObjectsList)
+        obj->setSelected(false);
+
+    for (ThreeDObject *obj : multipleSelectedObjects)
+        obj->setSelected(true);
+
+    selector.clearTarget();
+    calculatecenterOfSelection(multipleSelectedObjects);
+    // We locked the selection to prevent further clicks
+    selectionLocked = true;
+}
+
+void ThreeDWindow::calculatecenterOfSelection(const std::list<ThreeDObject *> &objects)
+{
+    if (objects.empty())
+    {
+        centerOfSelection = glm::vec3(0.0f); // ou garder la dernière valeur, selon ton usage
+        return;
+    }
+
+    glm::vec3 sum(0.0f);
+
+    for (const ThreeDObject *obj : objects)
+    {
+        sum += obj->getPosition();
+    }
+
+    centerOfSelection = sum / static_cast<float>(objects.size());
+}
+
+void ThreeDWindow::toggleMultipleSelection(ThreeDObject *object)
+{
+    auto it = std::find(multipleSelectedObjects.begin(), multipleSelectedObjects.end(), object);
+    if (it != multipleSelectedObjects.end())
+    {
+        multipleSelectedObjects.erase(it);
+        object->setSelected(false);
+    }
+    else
+    {
+        multipleSelectedObjects.push_back(object);
+        object->setSelected(true);
+    }
+}
+
+void ThreeDWindow::selectMultipleObjects(const std::list<ThreeDObject *> &objects)
+{
+    multipleSelectedObjects = objects;
+
+    for (ThreeDObject *obj : ThreeDObjectsList)
+        obj->setSelected(false);
+
+    for (ThreeDObject *obj : multipleSelectedObjects)
+        obj->setSelected(true);
+
+    // En sélection multiple, on efface la sélection simple
+    selector.clearTarget();
 }
 
 void ThreeDWindow::externalSelect(ThreeDObject *object)

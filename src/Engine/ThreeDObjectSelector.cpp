@@ -97,3 +97,32 @@ void ThreeDObjectSelector::select(ThreeDObject *object)
 {
     selectedObject = object;
 }
+
+void ThreeDObjectSelector::pickupMultipleTargets(int mouseX, int mouseY, int screenWidth, int screenHeight, const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObject *> &objects)
+{
+    glm::vec3 rayStart = glm::unProject(glm::vec3(mouseX, mouseY, 0.0f), view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
+    glm::vec3 rayEnd = glm::unProject(glm::vec3(mouseX, mouseY, 1.0f), view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
+
+    glm::vec3 rayDir = glm::normalize(rayEnd - rayStart);
+    glm::vec3 rayOrigin = rayStart;
+
+    for (auto *obj : objects)
+    {
+        if (!obj->isSelectable())
+            continue;
+
+        if (rayIntersectsCube(rayOrigin, rayDir, *obj))
+        {
+            // avoid adding the same object multiple times
+            if (std::find(multipleSelectedObjects.begin(), multipleSelectedObjects.end(), obj) == multipleSelectedObjects.end())
+            {
+                multipleSelectedObjects.push_back(obj);
+            }
+        }
+    }
+}
+
+void ThreeDObjectSelector::clearMultipleSelection()
+{
+    multipleSelectedObjects.clear();
+}

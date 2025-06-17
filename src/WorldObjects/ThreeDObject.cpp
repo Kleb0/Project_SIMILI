@@ -2,6 +2,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
 #include <ImGuizmo.h>
+#include <glm/gtx/matrix_decompose.hpp>
 
 ThreeDObject::ThreeDObject() {}
 ThreeDObject::~ThreeDObject() {}
@@ -14,15 +15,9 @@ glm::vec3 ThreeDObject::getCenter() const { return position; }
 
 void ThreeDObject::setModelMatrix(const glm::mat4 &matrix)
 {
-    glm::vec3 pos, rotEuler, scl;
-    ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(matrix),
-                                          glm::value_ptr(pos),
-                                          glm::value_ptr(rotEuler),
-                                          glm::value_ptr(scl));
-
-    position = pos;
-    _scale = scl;
-    rotation = glm::quat(glm::radians(rotEuler));
+    glm::vec3 skew;
+    glm::vec4 perspective;
+    glm::decompose(matrix, _scale, rotation, position, skew, perspective);
 }
 
 glm::mat4 ThreeDObject::getModelMatrix() const

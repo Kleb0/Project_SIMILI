@@ -30,6 +30,7 @@ public:
     void renameObject();
     void notifyObjectDeleted(ThreeDObject *obj);
     void multipleSelection(ThreeDObject *obj);
+    void clearMultipleSelection();
 
 private:
     OpenGLContext *context = nullptr;
@@ -37,7 +38,6 @@ private:
     ThreeDObject *selectedObjectInHierarchy = nullptr;
     ObjectInspector *objectInspector = nullptr;
     ThreeDObject *objectBeingRenamed = nullptr;
-    // list of multiple selected objects
     std::list<ThreeDObject *> multipleSelectedObjects;
     char editingBuffer[128] = {0};
 };
