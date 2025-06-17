@@ -16,9 +16,20 @@ void ObjectInspector::setInspectedObject(ThreeDObject *object)
     }
 }
 
+void ObjectInspector::setMultipleInspectedObjects(const std::list<ThreeDObject *> &objects)
+{
+    multipleInspectedObjects = objects;
+    inspectedObject = nullptr;
+}
+
 void ObjectInspector::clearInspectedObject()
 {
     inspectedObject = nullptr;
+}
+
+void ObjectInspector::clearMultipleInspectedObjects()
+{
+    multipleInspectedObjects.clear();
 }
 
 void ObjectInspector::renameObject()
@@ -51,7 +62,21 @@ void ObjectInspector::renameObject()
 
 void ObjectInspector::setPosition()
 {
-    glm::vec3 pos = inspectedObject->getPosition();
+    bool isMultiple = !multipleInspectedObjects.empty();
+    glm::vec3 pos(0.0f);
+
+    if (isMultiple)
+    {
+        for (ThreeDObject *obj : multipleInspectedObjects)
+            pos += obj->getPosition();
+        pos /= (float)multipleInspectedObjects.size();
+    }
+    else
+    {
+        pos = inspectedObject->getPosition();
+    }
+
+    glm::vec3 newPos = pos;
     bool modified = false;
 
     ImGui::Text("Position:");
@@ -60,18 +85,43 @@ void ObjectInspector::setPosition()
     modified |= ImGui::InputFloat("X", &pos.x, 0.1f, 1.0f);
     modified |= ImGui::InputFloat("Y", &pos.y, 0.1f, 1.0f);
     modified |= ImGui::InputFloat("Z", &pos.z, 0.1f, 1.0f);
-
     ImGui::PopItemWidth();
 
     if (modified)
     {
-        inspectedObject->setPosition(pos);
+        glm::vec3 delta = newPos - pos;
+
+        if (isMultiple)
+        {
+            for (ThreeDObject *obj : multipleInspectedObjects)
+            {
+                obj->setPosition(obj->getPosition() + delta);
+            }
+        }
+        else
+        {
+            inspectedObject->setPosition(newPos);
+        }
     }
 }
 
 void ObjectInspector::setRotation()
 {
-    glm::vec3 rot = inspectedObject->getRotation();
+    bool isMultiple = !multipleInspectedObjects.empty();
+    glm::vec3 rot(0.0f);
+
+    if (isMultiple)
+    {
+        for (ThreeDObject *obj : multipleInspectedObjects)
+            rot += obj->getRotation();
+        rot /= (float)multipleInspectedObjects.size();
+    }
+    else
+    {
+        rot = inspectedObject->getRotation();
+    }
+
+    glm::vec3 newRot = rot;
     bool modified = false;
 
     ImGui::Text("Rotation:");
@@ -85,13 +135,39 @@ void ObjectInspector::setRotation()
 
     if (modified)
     {
-        inspectedObject->setRotation(rot);
+        glm::vec3 delta = newRot - rot;
+
+        if (isMultiple)
+        {
+            for (ThreeDObject *obj : multipleInspectedObjects)
+            {
+                obj->setRotation(obj->getRotation() + delta);
+            }
+        }
+        else
+        {
+            inspectedObject->setRotation(newRot);
+        }
     }
 }
 
 void ObjectInspector::setScale()
 {
-    glm::vec3 scale = inspectedObject->getScale();
+    bool isMultiple = !multipleInspectedObjects.empty();
+    glm::vec3 scale(0.0f);
+
+    if (isMultiple)
+    {
+        for (ThreeDObject *obj : multipleInspectedObjects)
+            scale += obj->getScale();
+        scale /= (float)multipleInspectedObjects.size();
+    }
+    else
+    {
+        scale = inspectedObject->getScale();
+    }
+
+    glm::vec3 newScale = scale;
     bool modified = false;
 
     ImGui::Text("Scale:");
@@ -102,10 +178,19 @@ void ObjectInspector::setScale()
     modified |= ImGui::InputFloat("Z##scale", &scale.z, 0.1f, 0.5f);
 
     ImGui::PopItemWidth();
-
     if (modified)
     {
-        inspectedObject->setScale(scale);
+        if (isMultiple)
+        {
+            for (ThreeDObject *obj : multipleInspectedObjects)
+            {
+                obj->setScale(newScale);
+            }
+        }
+        else
+        {
+            inspectedObject->setScale(newScale);
+        }
     }
 }
 
@@ -113,22 +198,61 @@ void ObjectInspector::render()
 {
     ImGui::Begin("Object Inspector");
 
-    if (!inspectedObject)
+    // case one : multiple objects selected
+    if (!multipleInspectedObjects.empty())
     {
-        ImGui::Text("No object selected");
+        ImGui::Text("Selected Objects (%d)", (int)multipleInspectedObjects.size());
+        ImGui::Separator();
+
+        int index = 1;
+        int maxDisplay = 3;
+        int count = 0;
+
+        for (ThreeDObject *obj : multipleInspectedObjects)
+        {
+            if (!obj)
+                continue;
+
+            if (count < maxDisplay)
+            {
+                ImGui::BulletText("%s", obj->getName().c_str());
+            }
+            else if (count == maxDisplay)
+            {
+                ImGui::BulletText("...");
+                break;
+            }
+
+            count++;
+        }
+
+        ImGui::Separator();
+        setPosition();
+        ImGui::Separator();
+        setRotation();
+        ImGui::Separator();
+        setScale();
+
         ImGui::End();
         return;
     }
 
-    renameObject();
+    // case two : single object selected
+    if (inspectedObject)
+    {
+        renameObject();
 
-    glm::vec3 pos = inspectedObject->getPosition();
+        ImGui::Separator();
+        setPosition();
+        ImGui::Separator();
+        setRotation();
+        ImGui::Separator();
+        setScale();
+    }
+    else
+    {
+        ImGui::Text("No object selected");
+    }
 
-    ImGui::Separator();
-    setPosition();
-    ImGui::Separator();
-    setRotation();
-    ImGui::Separator();
-    setScale();
     ImGui::End();
 }

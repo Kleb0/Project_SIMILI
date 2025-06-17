@@ -1,63 +1,72 @@
 #pragma once
 
+//=== Includes ===//
 #include <GLFW/glfw3.h>
+#include <imgui.h>
+#include <ImGuizmo.h>
+
+#include <string>
+#include <vector>
+#include <list>
+#include <set>
+#include <iostream>
+
 #include "UI/GUIWindow.hpp"
 #include "Engine/OpenGLContext.hpp"
 #include "Engine/ThreeDObjectSelector.hpp"
-#include <imgui.h>
-#include <string>
-#include <vector>
 
+//=== Forward declarations ===//
 class HierarchyInspector;
-
+class ObjectInspector;
 class ThreeDObject;
 
-class ObjectInspector;
-
+//=== Class ===//
 class ThreeDWindow : public GUIWindow
 {
 public:
     ThreeDWindow();
     ThreeDWindow(const std::string &title, const std::string &text);
 
+    void render() override;
+    void threeDRendering();
+
+    ThreeDWindow &setRenderer(OpenGLContext &context);
+
+    void addThreeDObjectsToScene(const std::vector<ThreeDObject *> &objects);
+    void removeThreeDObjectsFromScene(ThreeDObject *object);
+    const std::vector<ThreeDObject *> &getObjects() const;
+
+    void externalSelect(ThreeDObject *object);
+    ThreeDObject *getSelectedObject() const;
+    void selectMultipleObjects(const std::list<ThreeDObject *> &objects);
+    void setMultipleSelectedObjects(const std::list<ThreeDObject *> &objects);
+    void calculatecenterOfSelection(const std::list<ThreeDObject *> &objects);
+
+    void setHierarchy(HierarchyInspector *inspector);
+    void setObjectInspector(ObjectInspector *inspector);
+
     ImVec2 oglChildPos;
     ImVec2 oglChildSize;
     std::string title = "Hello 3D Window";
     std::string text = "This is a 3D window with OpenGL content.";
-
+    glm::vec3 centerOfSelection = glm::vec3(0.0f);
     GLFWwindow *glfwWindow = nullptr;
-
-    void render() override;
-    void threeDRendering();
+    std::list<ThreeDObject *> multipleSelectedObjects;
     bool wasUsingGizmoLastFrame = false;
-
-    ThreeDWindow &add(OpenGLContext &context);
-    ThreeDWindow &add(ThreeDObject &object);
-    ThreeDWindow &addObject(ThreeDObject &object);
-    //------> when we add an object to the ThreeDWindow, we add it to the OpenGLContext too
-
-    const std::vector<ThreeDObject *> &getObjects() const;
-
-    void addThreeDObjectsToScene(const std::vector<ThreeDObject *> &objects);
-    void removeThreeDObjectsFromScene(ThreeDObject *object);
-
-    void externalSelect(ThreeDObject *object);
-    ThreeDObject *getSelectedObject() const;
-    void setHierarchy(HierarchyInspector *inspector);
-    void setObjectInspector(ObjectInspector *inspector);
-
-    ThreeDWindow &setRenderer(OpenGLContext &context);
+    bool selectionLocked = false;
 
 private:
+    void handleClick();
+    void toggleMultipleSelection(ThreeDObject *object);
+    void manipulateThreeDObjects();
+
     glm::mat4 view = glm::mat4(1.0f);
     glm::mat4 proj = glm::mat4(1.0f);
-
     OpenGLContext *openGLContext = nullptr;
     ObjectInspector *objectInspector = nullptr;
     HierarchyInspector *hierarchy = nullptr;
     ThreeDObjectSelector selector;
     std::vector<ThreeDObject *> ThreeDObjectsList;
-
-    void handleClick();
-    void manipulateThreeDObject();
+    std::set<ThreeDObject *> lastSelection;
+    ImGuizmo::OPERATION currentGizmoOperation = ImGuizmo::TRANSLATE;
 };
