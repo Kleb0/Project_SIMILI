@@ -46,10 +46,11 @@ public:
     bool canBeParented = true;
     ThreeDObject *parent = nullptr;
 
-protected:
     glm::vec3 position = glm::vec3(0.0f);
     glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
     glm::vec3 _scale = glm::vec3(1.0f);
+
+protected:
     bool isCurrentlySelected = false;
     std::string name = "Unnamed";
 };

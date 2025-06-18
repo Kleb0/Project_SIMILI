@@ -1,3 +1,4 @@
+#define GLM_ENABLE_EXPERIMENTAL
 
 #include <glad/glad.h>
 #include <imgui_internal.h>
@@ -9,6 +10,7 @@
 #include <SDL3/SDL.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/matrix_decompose.hpp>
 #include <iostream>
 #include <algorithm>
 #include <glm/gtx/string_cast.hpp>
@@ -208,14 +210,36 @@ void ThreeDWindow::manipulateThreeDObjects()
     view = openGLContext->getViewMatrix();
     proj = openGLContext->getProjectionMatrix();
 
-    // Calcul du centre
     glm::vec3 center(0.0f);
-    for (ThreeDObject *obj : multipleSelectedObjects)
-        center += obj->getPosition();
-    center /= static_cast<float>(multipleSelectedObjects.size());
+    std::vector<glm::quat> allRotations;
+    glm::vec3 averageScale(0.0f);
 
-    static glm::mat4 prevDummyMatrix = glm::mat4(1.0f); // conserve la delta précédente
+    for (ThreeDObject *obj : multipleSelectedObjects)
+    {
+        center += obj->getPosition();
+        allRotations.push_back(obj->rotation);
+        averageScale += obj->getScale();
+    }
+
+    center /= static_cast<float>(multipleSelectedObjects.size());
+    averageScale /= static_cast<float>(multipleSelectedObjects.size());
+
+    glm::vec4 cumulative(0.0f);
+    for (const glm::quat &q : allRotations)
+    {
+        glm::quat qn = q;
+        if (glm::dot(qn, allRotations[0]) < 0.0f)
+            qn = -qn;
+        cumulative += glm::vec4(qn.x, qn.y, qn.z, qn.w);
+    }
+    cumulative = glm::normalize(cumulative);
+    glm::quat averageRotation = glm::quat(cumulative.w, cumulative.x, cumulative.y, cumulative.z);
+
     glm::mat4 dummyMatrix = glm::translate(glm::mat4(1.0f), center);
+    dummyMatrix *= glm::toMat4(glm::normalize(averageRotation));
+    dummyMatrix = glm::scale(dummyMatrix, averageScale);
+
+    static glm::mat4 prevDummyMatrix = glm::mat4(1.0f);
 
     bool manipulated = ImGuizmo::Manipulate(
         glm::value_ptr(view),
@@ -231,12 +255,8 @@ void ThreeDWindow::manipulateThreeDObjects()
         for (ThreeDObject *obj : multipleSelectedObjects)
         {
             glm::mat4 model = obj->getModelMatrix();
-
-            glm::mat4 toOrigin = glm::translate(glm::mat4(1.0f), -center);
-            glm::mat4 back = glm::translate(glm::mat4(1.0f), center);
-
-            glm::mat4 newModel = back * delta * toOrigin * model;
-            obj->setModelMatrix(newModel);
+            glm::mat4 transformed = delta * model;
+            obj->setModelMatrix(transformed);
         }
 
         wasUsingGizmoLastFrame = true;
@@ -245,7 +265,6 @@ void ThreeDWindow::manipulateThreeDObjects()
     prevDummyMatrix = dummyMatrix;
     wasUsingGizmoLastFrame = false;
 }
-
 // --------- Object Selection ----------- //
 void ThreeDWindow::handleClick()
 {
@@ -281,7 +300,7 @@ void ThreeDWindow::handleClick()
 
         if (selected)
         {
-            // ======= OBJET CLIQUÉ =======
+            // -------- Clicked Object --------
             if (!shiftPressed)
             {
                 for (auto *obj : ThreeDObjectsList)
@@ -321,7 +340,7 @@ void ThreeDWindow::handleClick()
         }
         else if (!ImGuizmo::IsUsing() && !wasUsingGizmoLastFrame)
         {
-            // ======= CLIC DANS LE VIDE =======
+            // --------- Click without object hit ---------
             std::cout << "[DEBUG] No object hit — clearing selection." << std::endl;
 
             for (auto *obj : ThreeDObjectsList)

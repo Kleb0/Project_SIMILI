@@ -17,9 +17,17 @@ void ThreeDObject::setModelMatrix(const glm::mat4 &matrix)
 {
     glm::vec3 skew;
     glm::vec4 perspective;
-    glm::decompose(matrix, _scale, rotation, position, skew, perspective);
-}
+    glm::vec3 positionTmp;
+    glm::quat rotationTmp;
+    glm::vec3 scaleTmp;
 
+    if (glm::decompose(matrix, scaleTmp, rotationTmp, positionTmp, skew, perspective))
+    {
+        _scale = scaleTmp;
+        rotation = glm::normalize(rotationTmp);
+        position = positionTmp;
+    }
+}
 glm::mat4 ThreeDObject::getModelMatrix() const
 {
     glm::mat4 model = glm::mat4(1.0f);
