@@ -32,6 +32,8 @@ public:
     void multipleSelection(ThreeDObject *obj);
     void clearMultipleSelection();
 
+    void SetParentByDragAndDrop(ThreeDObject *child, ThreeDObject *newParent);
+
 private:
     OpenGLContext *context = nullptr;
     ThreeDWindow *window = nullptr;
@@ -39,5 +41,6 @@ private:
     ObjectInspector *objectInspector = nullptr;
     ThreeDObject *objectBeingRenamed = nullptr;
     std::list<ThreeDObject *> multipleSelectedObjects;
+    ThreeDObject *currentlyDraggedObject = nullptr;
     char editingBuffer[128] = {0};
 };

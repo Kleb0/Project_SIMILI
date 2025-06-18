@@ -265,6 +265,7 @@ void ThreeDWindow::manipulateThreeDObjects()
     prevDummyMatrix = dummyMatrix;
     wasUsingGizmoLastFrame = false;
 }
+
 // --------- Object Selection ----------- //
 void ThreeDWindow::handleClick()
 {

@@ -46,6 +46,18 @@ public:
     bool canBeParented = true;
     ThreeDObject *parent = nullptr;
 
+    bool canHaveChildren = true;
+    std::list<ThreeDObject *> children;
+
+    void addChild(ThreeDObject *child);
+    void removeChild(ThreeDObject *child);
+    const std::list<ThreeDObject *> &getChildren() const;
+
+    void setParent(ThreeDObject *newParent);
+    ThreeDObject *getParent() const { return parent; }
+
+    bool isDescendantOf(ThreeDObject *potentialAncestor) const;
+
     glm::vec3 position = glm::vec3(0.0f);
     glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
     glm::vec3 _scale = glm::vec3(1.0f);
