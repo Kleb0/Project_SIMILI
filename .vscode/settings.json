@@ -30,7 +30,9 @@
   
   "terminal.integrated.cwd": "${workspaceFolder}",
   "[cpp]": {
-    "editor.formatOnSave": true
+    "editor.formatOnSave": false,
+    "editor.formatOnType": false,
+    "editor.autoIndent": "none"
   },
   "files.associations": {
     "*.embeddedhtml": "html",

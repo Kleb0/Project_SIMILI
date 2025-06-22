@@ -55,14 +55,23 @@ void ThreeDWindow::removeThreeDObjectsFromScene(ThreeDObject *object)
 {
 
     std::cout << "[ThreeDWindow] Removing object: " << object->getName() << std::endl;
-    auto it = std::remove(ThreeDObjectsList.begin(), ThreeDObjectsList.end(), object);
 
+    for (ThreeDObject *child : object->getChildren())
+    {
+        std::cout << "[ThreeDWindow] Recursively removing child object: " << child->getName() << std::endl;
+        removeThreeDObjectsFromScene(child);
+    }
+
+    if (ThreeDObject *parent = object->getParent())
+    {
+        parent->removeChild(object);
+    }
+
+    auto it = std::remove(ThreeDObjectsList.begin(), ThreeDObjectsList.end(), object);
     if (it != ThreeDObjectsList.end())
     {
 
         openGLContext->removeThreeDobjectFromList(object);
-        // objectInspector->clearInspectedObject();
-        // hierarchy->unselectObject(object);
         ThreeDObjectsList.erase(it, ThreeDObjectsList.end());
         std::cout << "[ThreeDWindow] Object removed from ThreeDObjectsList." << std::endl;
         object->destroy();
@@ -387,7 +396,7 @@ void ThreeDWindow::calculatecenterOfSelection(const std::list<ThreeDObject *> &o
 {
     if (objects.empty())
     {
-        centerOfSelection = glm::vec3(0.0f); // ou garder la dernière valeur, selon ton usage
+        centerOfSelection = glm::vec3(0.0f);
         return;
     }
 
@@ -425,8 +434,6 @@ void ThreeDWindow::selectMultipleObjects(const std::list<ThreeDObject *> &object
 
     for (ThreeDObject *obj : multipleSelectedObjects)
         obj->setSelected(true);
-
-    // En sélection multiple, on efface la sélection simple
     selector.clearTarget();
 }
 
