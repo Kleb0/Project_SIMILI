@@ -77,7 +77,7 @@ int main(int argc, char **argv)
 
     renderer.setCamera(&mainCamera);
     myCube.setPosition(glm::vec3(2.5f, 0.5f, 2.5f));
-    myCube2.setPosition(glm::vec3(0.5f, 0.5f, 0.5f));
+    myCube2.setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
 
     associate(gui, myInfoWindow);
     associate(gui, myThreeDWindow);

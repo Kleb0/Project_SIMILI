@@ -492,6 +492,7 @@ void HierarchyInspector::SetParentByDragAndDrop(ThreeDObject *child, ThreeDObjec
     child->setParent(newParent);
 }
 
+
 ThreeDObject *HierarchyInspector::getSelectedObject() const
 {
     return selectedObjectInHierarchy;
