@@ -5,6 +5,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/quaternion.hpp>
 #include <string>
+#include <iostream>
+#include <list>
 
 class ThreeDObject
 {
@@ -14,7 +16,7 @@ public:
 
     virtual void initialize() = 0;
     virtual void render(const glm::mat4 &viewProj) = 0;
-    virtual void destroy() {};
+    virtual void destroy() {}
 
     glm::vec3 getPosition() const { return position; }
     glm::vec3 getRotation() const { return glm::degrees(glm::eulerAngles(rotation)); }
@@ -28,41 +30,67 @@ public:
     void rotate(const glm::vec3 &newEulerRotationDegrees);
     void scale(const glm::vec3 &newScale);
 
-    glm::vec3 getCenter() const;
-    void setModelMatrix(const glm::mat4 &matrix);
     glm::mat4 getModelMatrix() const;
+    void setModelMatrix(const glm::mat4 &matrix);
+    glm::vec3 getCenter() const;
+
+
+    glm::vec3 getGlobalPosition() const;
+    glm::vec3 getGlobalRotation() const;
+    glm::vec3 getGlobalScale() const;
+
+    void setGlobalPosition(const glm::vec3& worldPos);
+    void setGlobalRotation(const glm::vec3& worldEulerDegrees);
+    void setGlobalScale(const glm::vec3& worldScale);
+
+    glm::mat4 getGlobalModelMatrix() const;
+
+
 
     void setSelected(bool selected) { isCurrentlySelected = selected; }
     bool getSelected() const { return isCurrentlySelected; }
     virtual bool isSelectable() const { return true; }
 
     void setName(const std::string &newName) { name = newName; }
-
-    std::string getName() const
-    {
-        return name;
-    }
-
-    bool canBeParented = true;
-    ThreeDObject *parent = nullptr;
-
-    bool canHaveChildren = true;
-    std::list<ThreeDObject *> children;
-
-    void addChild(ThreeDObject *child);
-    void removeChild(ThreeDObject *child);
-    const std::list<ThreeDObject *> &getChildren() const;
+    virtual std::string getName() const { return name; }
 
     void setParent(ThreeDObject *newParent);
     ThreeDObject *getParent() const { return parent; }
 
+    void addChild(ThreeDObject *child);
+    void removeChild(ThreeDObject *child);
+    const std::list<ThreeDObject *> &getChildren() const;
+    std::list<ThreeDObject*>& getChildren() { return children; }
+
     bool isDescendantOf(ThreeDObject *potentialAncestor) const;
+    bool isParented = false;
+    bool canBeParented = true;
+    bool canHaveChildren = true;
+    virtual bool isDummy() const { return false; }
+    virtual bool isInspectable() const { return true; }
+
 
     glm::vec3 position = glm::vec3(0.0f);
     glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
     glm::vec3 _scale = glm::vec3(1.0f);
 
+    ThreeDObject *parent = nullptr;
+    std::list<ThreeDObject *> children;
+
+    
+    bool expanded = true;
+
+    void setSlot(int index) { slotIndex = index; }
+    int getSlot() const { return slotIndex; }
+
+    void setMovedSlotIndex(int index) { movedSlotIndex = index; }
+    int getMovedSlotIndex() const { return movedSlotIndex; }
+    
+
 protected:
+
+    int movedSlotIndex = -1;
+    int slotIndex  = -1;
     bool isCurrentlySelected = false;
     std::string name = "Unnamed";
 };

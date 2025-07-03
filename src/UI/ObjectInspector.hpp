@@ -17,6 +17,8 @@ public:
     void setMultipleInspectedObjects(const std::list<ThreeDObject *> &objects);
     void clearMultipleInspectedObjects();
 
+    void dipslayGlobaleCoordinates(ThreeDObject* object);
+
     std::string title;
     void setTitle(const std::string &newTitle) { this->title = newTitle; }
     void renameObject();

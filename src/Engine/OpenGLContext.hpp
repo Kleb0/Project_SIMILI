@@ -29,10 +29,12 @@ public:
 
     void addThreeDObjectToList(ThreeDObject *object);
 
-    std::list<ThreeDObject *> getObjects() const
-    {
-        return objects;
-    }
+    // std::list<ThreeDObject *> getObjects() const
+    // {
+    //     return objects;
+    // }
+    const std::list<ThreeDObject *> &getObjects() const { return objects; } 
+    std::list<ThreeDObject *> &getObjects() { return objects; } 
 
     void setListOfObjects(std::list<ThreeDObject *> &list)
     {
