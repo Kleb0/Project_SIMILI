@@ -1,17 +1,54 @@
+#define IMGUI_ENABLE_ASSERTS
 #include "UI/HierarchyInspector.hpp"
 #include "UI/ObjectInspector.hpp"
 #include "UI/ThreeDWindow.hpp"
 #include <imgui.h>
 #include <iostream>
 #include <algorithm>
+#include <typeinfo>
+#define NOMINMAX
 #include <Windows.h>
+#include <filesystem> 
+#include "WorldObjects/ThreeDObject.hpp"
 
-// void showErrorBox(const std::string &message, const std::string &title = "Error")
-// {
-//     MessageBoxA(nullptr, message.c_str(), title.c_str(), MB_ICONERROR | MB_OK);
-// }
+void showErrorBox(const std::string &message, const std::string &title = "Error")
+{
+    MessageBoxA(nullptr, message.c_str(), title.c_str(), MB_ICONERROR | MB_OK);
+}
 
-HierarchyInspector::HierarchyInspector() {}
+HierarchyInspector::HierarchyInspector()
+{
+    // for (int i = 0; i < 50; i++)
+    // {
+    //     SlotsList.push_back(nullptr);
+    // }
+
+    ImGuiIO& io = ImGui::GetIO();
+    ImFontConfig font_cfg;
+    font_cfg.OversampleH = 3;
+    font_cfg.OversampleV = 3;
+    font_cfg.PixelSnapH = false;
+
+    static const ImWchar glyph_ranges[] = {
+        0x0020, 0x00FF,
+        0x2190, 0x21FF,
+        0x25A0, 0x25FF, 
+        0,
+    };
+
+    std::filesystem::path exePath = std::filesystem::current_path();
+    std::filesystem::path projectRoot = exePath.parent_path().parent_path(); 
+
+    std::filesystem::path fontPath = projectRoot / "assets/fonts/DejaVuSans.ttf";
+    unicodeFont = io.Fonts->AddFontFromFileTTF(fontPath.string().c_str(), 16.0f, &font_cfg, glyph_ranges);
+
+    // if (!unicodeFont)
+    // {
+    //     showErrorBox("Font not loaded correctly! Path: " + fontPath.string(), "Font Error");
+    // }
+        io.Fonts->Build();
+}
+
 
 void HierarchyInspector::setObjectInspector(ObjectInspector *inspector)
 {
@@ -31,6 +68,12 @@ void HierarchyInspector::setThreeDWindow(ThreeDWindow *win)
 void HierarchyInspector::selectObject(ThreeDObject *obj)
 {
     selectedObjectInHierarchy = obj;
+
+    if (obj && !obj->isInspectable()) {
+        if (objectInspector)
+            objectInspector->clearInspectedObject();
+        return;
+    }
 
     if (objectInspector)
         objectInspector->setInspectedObject(obj);
@@ -90,299 +133,17 @@ void HierarchyInspector::notifyObjectDeleted(ThreeDObject *obj)
         objectBeingRenamed = nullptr;
 }
 
-// ----------
+// ---------- List rendering ----------
 
 void HierarchyInspector::render()
 {
-
     ImGui::Begin("Hierarchy Inspector");
     ImGui::Text("List of objects in the current 3D scene :");
 
     bool clickedOnItem = false;
+    slotsList(clickedOnItem);
 
-    auto drawList = [&](const std::list<ThreeDObject *> &list)
-    {
-        if (!selectedObjectInHierarchy && !multipleSelectedObjects.empty())
-        {
-            selectedObjectInHierarchy = multipleSelectedObjects.back();
-        }
-
-        for (ThreeDObject *obj : list)
-        {
-            if (!obj)
-                continue;
-
-            ImGui::PushID(obj);
-            ImVec2 start = ImGui::GetCursorScreenPos();
-
-            if (objectBeingRenamed == obj)
-            {
-                renameObject();
-            }
-            else
-            {
-                ImGui::Bullet();
-                ImGui::SameLine();
-                bool isSelected = (selectedObjectInHierarchy == obj);
-                ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0));
-                ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));
-                ImGui::Selectable(obj->getName().c_str(), isSelected);
-                ImGui::PopStyleColor(2);
-
-                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-                {
-                    objectBeingRenamed = obj;
-                    strncpy(editingBuffer, obj->getName().c_str(), sizeof(editingBuffer));
-                    editingBuffer[sizeof(editingBuffer) - 1] = '\0';
-                }
-
-                // ------ Drag source for parenting ------
-                if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
-                {
-                    currentlyDraggedObject = obj;
-                    ImGui::SetDragDropPayload("HIERARCHY_OBJECT", &currentlyDraggedObject, sizeof(ThreeDObject *));
-                    ImGui::Text("%s", obj->getName().c_str());
-                    ImGui::EndDragDropSource();
-                }
-
-                if (ImGui::BeginDragDropTarget())
-                {
-                    if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("HIERARCHY_OBJECT"))
-                    {
-                        ThreeDObject *dragged = *(ThreeDObject **)payload->Data;
-                        if (dragged && dragged != obj)
-                        {
-                            if (!dragged->isDescendantOf(obj))
-                            {
-                                SetParentByDragAndDrop(dragged, obj);
-                                std::string message = "Objet \"" + obj->getName() + "\" est devenu le parent de l'objet \"" + dragged->getName() + "\".";
-                                MessageBoxA(nullptr, message.c_str(), "Hiérarchie modifiée", MB_ICONINFORMATION | MB_OK);
-                            }
-                            else
-                            {
-                                MessageBoxA(nullptr, "Opération interdite : un objet ne peut pas devenir parent d'un de ses descendants.", "Erreur de hiérarchie", MB_ICONWARNING | MB_OK);
-                            }
-                        }
-                    }
-                    ImGui::EndDragDropTarget();
-                }
-            }
-
-            ImVec2 end = ImGui::GetCursorScreenPos();
-            float height = ImGui::GetTextLineHeightWithSpacing();
-            float width = ImGui::GetContentRegionAvail().x;
-            ImVec2 fullEnd = ImVec2(start.x + width, start.y + height);
-
-            //------------
-            if (ImGui::IsItemClicked(ImGuiMouseButton_Left) ||
-                (ImGui::IsMouseHoveringRect(start, fullEnd) && ImGui::IsMouseClicked(ImGuiMouseButton_Left)))
-            {
-                clickedOnItem = true;
-
-                if (ImGui::GetIO().KeyShift)
-                {
-                    // Add to multiple selection
-                    if (std::find(multipleSelectedObjects.begin(), multipleSelectedObjects.end(), obj) == multipleSelectedObjects.end())
-                    {
-                        multipleSelectedObjects.push_back(obj);
-                        obj->setSelected(true);
-                    }
-
-                    objectInspector->clearInspectedObject();
-                    objectInspector->setMultipleInspectedObjects(multipleSelectedObjects);
-                    window->setMultipleSelectedObjects(multipleSelectedObjects);
-                }
-                else
-                {
-                    // Single selection
-                    for (auto *o : window->getObjects())
-                        o->setSelected(false);
-
-                    obj->setSelected(true);
-                    multipleSelectedObjects.clear();
-                    multipleSelectedObjects.push_back(obj);
-
-                    objectInspector->clearMultipleInspectedObjects();
-                    objectInspector->setInspectedObject(obj);
-                    window->setMultipleSelectedObjects(multipleSelectedObjects);
-                }
-
-                selectedObjectInHierarchy = obj;
-
-                // Notify the window to select this object
-                if (!ImGui::GetIO().KeyShift)
-                    window->externalSelect(obj);
-            }
-
-            //-----
-            ImDrawList *draw_list = ImGui::GetWindowDrawList();
-
-            if (obj->getSelected())
-            {
-                draw_list->AddRectFilled(start, fullEnd, IM_COL32(100, 255, 100, 100));
-            }
-            else if (selectedObjectInHierarchy == obj)
-            {
-                draw_list->AddRectFilled(start, fullEnd, IM_COL32(255, 100, 100, 100));
-            }
-            else if (ImGui::IsMouseHoveringRect(start, fullEnd))
-            {
-                draw_list->AddRectFilled(start, fullEnd, IM_COL32(255, 255, 100, 60));
-            }
-
-            ImGui::PopID();
-        }
-    };
-
-    std::list<ThreeDObject *> totalList = context ? context->getObjects() : std::list<ThreeDObject *>();
-
-    if (window)
-    {
-        const std::vector<ThreeDObject *> &windowList = window->getObjects();
-        for (ThreeDObject *obj : windowList)
-        {
-            if (obj && std::find(totalList.begin(), totalList.end(), obj) == totalList.end())
-                totalList.push_back(obj);
-        }
-    }
-
-    // ------- Draw the total list of objects avec indentation hiérarchique -------
-    std::function<void(ThreeDObject *)> drawObjectRecursive;
-
-    drawObjectRecursive = [&](ThreeDObject *obj)
-    {
-        if (!obj)
-            return;
-
-        ImGui::PushID(obj);
-        ImVec2 start = ImGui::GetCursorScreenPos();
-
-        bool isSelected = (selectedObjectInHierarchy == obj);
-        bool hasChildren = !obj->getChildren().empty();
-
-        bool nodeOpen = false;
-        if (hasChildren)
-        {
-            nodeOpen = ImGui::TreeNodeEx(obj->getName().c_str(),
-                                         ImGuiTreeNodeFlags_OpenOnArrow |
-                                             (isSelected ? ImGuiTreeNodeFlags_Selected : 0));
-        }
-        else
-        {
-            ImGui::Bullet();
-            ImGui::SameLine();
-            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0));
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));
-            ImGui::Selectable(obj->getName().c_str(), isSelected);
-            ImGui::PopStyleColor(2);
-        }
-
-        // ----------- Double clic and rename ------------
-        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-        {
-            objectBeingRenamed = obj;
-            strncpy(editingBuffer, obj->getName().c_str(), sizeof(editingBuffer));
-            editingBuffer[sizeof(editingBuffer) - 1] = '\0';
-        }
-
-        // -------------- Drag -------------
-        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
-        {
-            currentlyDraggedObject = obj;
-            ImGui::SetDragDropPayload("HIERARCHY_OBJECT", &currentlyDraggedObject, sizeof(ThreeDObject *));
-            ImGui::Text("%s", obj->getName().c_str());
-            ImGui::EndDragDropSource();
-        }
-
-        // ---------------- Drop ---------------------
-        if (ImGui::BeginDragDropTarget())
-        {
-            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("HIERARCHY_OBJECT"))
-            {
-                ThreeDObject *dragged = *(ThreeDObject **)payload->Data;
-                if (dragged && dragged != obj)
-                {
-                    SetParentByDragAndDrop(dragged, obj);
-                    std::string message = "Objet \"" + obj->getName() + "\" est devenu le parent de l'objet \"" + dragged->getName() + "\".";
-                    MessageBoxA(nullptr, message.c_str(), "Hiérarchie modifiée", MB_ICONINFORMATION | MB_OK);
-                }
-            }
-            ImGui::EndDragDropTarget();
-        }
-
-        // ---------------- Selection ------------------------
-        ImVec2 end = ImGui::GetCursorScreenPos();
-        float height = ImGui::GetTextLineHeightWithSpacing();
-        float width = ImGui::GetContentRegionAvail().x;
-        ImVec2 fullEnd = ImVec2(start.x + width, start.y + height);
-
-        if (ImGui::IsItemClicked(ImGuiMouseButton_Left) ||
-            (ImGui::IsMouseHoveringRect(start, fullEnd) && ImGui::IsMouseClicked(ImGuiMouseButton_Left)))
-        {
-            clickedOnItem = true;
-
-            if (ImGui::GetIO().KeyShift)
-            {
-                if (std::find(multipleSelectedObjects.begin(), multipleSelectedObjects.end(), obj) == multipleSelectedObjects.end())
-                {
-                    multipleSelectedObjects.push_back(obj);
-                    obj->setSelected(true);
-                }
-
-                objectInspector->clearInspectedObject();
-                objectInspector->setMultipleInspectedObjects(multipleSelectedObjects);
-                window->setMultipleSelectedObjects(multipleSelectedObjects);
-            }
-            else
-            {
-                for (auto *o : window->getObjects())
-                    o->setSelected(false);
-
-                obj->setSelected(true);
-                multipleSelectedObjects.clear();
-                multipleSelectedObjects.push_back(obj);
-
-                objectInspector->clearMultipleInspectedObjects();
-                objectInspector->setInspectedObject(obj);
-                window->setMultipleSelectedObjects(multipleSelectedObjects);
-            }
-
-            selectedObjectInHierarchy = obj;
-
-            if (!ImGui::GetIO().KeyShift)
-                window->externalSelect(obj);
-        }
-
-        ImDrawList *draw_list = ImGui::GetWindowDrawList();
-        if (obj->getSelected())
-            draw_list->AddRectFilled(start, fullEnd, IM_COL32(100, 255, 100, 100));
-        else if (selectedObjectInHierarchy == obj)
-            draw_list->AddRectFilled(start, fullEnd, IM_COL32(255, 100, 100, 100));
-        else if (ImGui::IsMouseHoveringRect(start, fullEnd))
-            draw_list->AddRectFilled(start, fullEnd, IM_COL32(255, 255, 100, 60));
-
-        // Recursive drawing of children
-        if (hasChildren && nodeOpen)
-        {
-            for (ThreeDObject *child : obj->getChildren())
-                drawObjectRecursive(child);
-
-            ImGui::TreePop();
-        }
-
-        ImGui::PopID();
-    };
-
-    // -------- Start of List's Drawing --------
-    for (ThreeDObject *obj : totalList)
-    {
-        if (!obj || obj->getParent())
-            continue;
-        drawObjectRecursive(obj);
-    }
-
-    // // ------ End of List's Drawing ------
-
+    // Clear selection if clicking on empty space
     if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !clickedOnItem)
     {
         if (objectInspector)
@@ -399,33 +160,277 @@ void HierarchyInspector::render()
             window->externalSelect(nullptr);
     }
 
-    // Handle the drag of blog
-    if (currentlyDraggedObject)
-    {
-        ImDrawList *draw_list = ImGui::GetForegroundDrawList();
-        ImVec2 mouse_pos = ImGui::GetIO().MousePos;
-
-        std::string nameStr = currentlyDraggedObject->getName();
-        const char *name = nameStr.c_str();
-
-        ImVec2 text_size = ImGui::CalcTextSize(name);
-        ImVec2 padding = ImVec2(6, 4);
-        ImVec2 bg_min = mouse_pos;
-        ImVec2 bg_max = ImVec2(mouse_pos.x + text_size.x + padding.x * 2, mouse_pos.y + text_size.y + padding.y * 2);
-
-        draw_list->AddRectFilled(bg_min, bg_max, IM_COL32(50, 50, 50, 200), 5.0f);
-        draw_list->AddRect(bg_min, bg_max, IM_COL32(200, 200, 200, 255), 5.0f);
-        draw_list->AddText(ImVec2(mouse_pos.x + padding.x, mouse_pos.y + padding.y), IM_COL32(255, 255, 255, 255), name);
-
-        // If the mouse is released, we stop dragging and currentlyDraggedObject is set to nullptr
-        if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
-        {
-            currentlyDraggedObject = nullptr;
-        }
-    }
-
+    // Drag and drop ghost object
     ImGui::End();
 }
+
+void HierarchyInspector::slotsList(bool& clickedOnItem)
+{
+    const int totalSlots = 50;
+
+    // --------- Initialize only once --------- //
+    if (!slotsListInitialized)
+    {
+        emptySlotPlaceholders.clear();
+        mergedHierarchyList.clear();
+
+        for (int i = 0; i < totalSlots; ++i)
+        {
+            auto dummy = std::make_unique<EmptyDummy>();
+            dummy->setSlot(i);
+            dummy->setName("Empty Slot");
+            EmptyDummy* rawPtr = dummy.get();
+            emptySlotPlaceholders.push_back(std::move(dummy));
+            mergedHierarchyList.push_back(static_cast<ThreeDObject*>(rawPtr));
+        }
+
+        slotsListInitialized = true;
+    }
+
+    // --------- Drop operation (drag-and-drop release) --------- //
+    bool isDragging = ImGui::IsMouseDown(ImGuiMouseButton_Left) && currentlyDraggedObject != nullptr;
+    if (!isDragging && currentlyDraggedObject != nullptr && dropToSlotIndex != -1)
+    {
+        dropOnSlot(currentlyDraggedObject, dropToSlotIndex);
+        currentlyDraggedObject = nullptr;
+    }
+
+    if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+        currentlyDraggedObject = nullptr;
+
+    // --------- Assign ThreeDObjects to slots --------- //
+    if (context && !objectsAssignedOnce)
+    {
+        const std::list<ThreeDObject*>& sceneObjects = context->getObjects();
+
+        int nextFreeSlot = 0;
+
+        for (ThreeDObject* obj : sceneObjects)
+        {
+            if (!obj)
+                continue;
+
+            int slot = obj->getSlot();
+
+            if (slot < 0 || slot >= totalSlots)
+            {
+                while (nextFreeSlot < totalSlots && dynamic_cast<EmptyDummy*>(mergedHierarchyList[nextFreeSlot]) == nullptr)
+                    ++nextFreeSlot;
+
+                if (nextFreeSlot >= totalSlots)
+                {
+                    std::cerr << "Warning: no free slot available for object '" << obj->getName() << "'" << std::endl;
+                    continue;
+                }
+
+                obj->setSlot(nextFreeSlot);
+                slot = nextFreeSlot;
+                ++nextFreeSlot;
+            }
+
+            mergedHierarchyList[slot] = obj;
+
+            std::cout << "Inserted object '" << obj->getName() << "' at slot " << slot << std::endl;
+        }
+
+        objectsAssignedOnce = true;
+    }
+
+
+    // --------- Draw all slots --------- //
+    for (int i = 0; i < totalSlots; ++i)
+    {
+        float slotHeight = 26.0f;
+        ImVec2 size = ImVec2(ImGui::GetContentRegionAvail().x, slotHeight);
+
+        bool isEven = (i % 2 == 0);
+        ImVec4 defaultBgColor = isEven ? ImVec4(0.8f, 0.8f, 0.8f, 1.0f)
+                                       : ImVec4(0.1f, 0.2f, 0.5f, 1.0f);
+        ImVec4 selectedBgColor = ImVec4(0.2f, 0.8f, 0.2f, 1.0f);
+
+        ThreeDObject* obj = mergedHierarchyList[i];
+        bool isSlotSelected = obj && obj->getSelected();
+
+        ImVec4 textColor = isSlotSelected
+                           ? ImVec4(0.0f, 0.0f, 0.0f, 1.0f)
+                           : (isEven ? ImVec4(0.0f, 0.0f, 0.0f, 1.0f)
+                                     : ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+
+        ImGui::PushStyleColor(ImGuiCol_Button, isSlotSelected ? selectedBgColor : defaultBgColor);
+        ImGui::PushStyleColor(ImGuiCol_Text, textColor);
+
+        std::string label = " --- " + obj->getName() + " [" + std::to_string(i) + "] --- ";
+        ImGui::Button(label.c_str(), size);
+
+        if (obj && ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f))
+            currentlyDraggedObject = obj;
+
+        if (obj && currentlyDraggedObject != nullptr)
+            dragObject(currentlyDraggedObject, i);
+
+        if (obj)
+            clickOnSlot(clickedOnItem, i, obj);
+
+        ImGui::PopStyleColor(2);
+    }
+}
+
+
+void HierarchyInspector::clickOnSlot(bool& clickedOnItem, int index, ThreeDObject* obj)
+{
+
+    if (!ImGui::IsItemClicked(ImGuiMouseButton_Left))
+        return;
+
+    clickedOnItem = true;
+
+    if (!obj || !obj->isInspectable())
+    {
+        for (auto* o : window->getObjects())
+            o->setSelected(false);
+
+        multipleSelectedObjects.clear();
+        objectInspector->clearMultipleInspectedObjects();
+        objectInspector->clearInspectedObject();
+
+        selectedObjectInHierarchy = nullptr;
+        window->externalSelect(nullptr);    
+
+        std::cout << "[HierarchyInspector] Clicked on slot " << index
+            << " containing: " << (obj ? typeid(*obj).name() : "nullptr")
+            << " (not inspectable)" << std::endl;
+
+        return;
+    }
+
+    std::cout << "[HierarchyInspector] Clicked on slot containing an item : " << index
+            << " (type of content: " << typeid(*obj).name() << ")" << std::endl;
+
+     if (ImGui::GetIO().KeyShift && lastSelectedSlotIndex != -1)
+    {
+        int start = std::min(index, lastSelectedSlotIndex);
+        int end = std::max(index, lastSelectedSlotIndex);
+
+        for (int i = start; i <= end; ++i)
+        {
+            if (i >= 0 && i < static_cast<int>(mergedHierarchyList.size()))
+            {
+                ThreeDObject* rangeObj = static_cast<ThreeDObject*>(mergedHierarchyList[i]);
+
+                if (rangeObj && std::find(multipleSelectedObjects.begin(), multipleSelectedObjects.end(), rangeObj) == multipleSelectedObjects.end())
+                {
+                    multipleSelectedObjects.push_back(rangeObj);
+                    rangeObj->setSelected(true);
+                }
+            }
+        }
+
+        objectInspector->clearInspectedObject();
+        objectInspector->setMultipleInspectedObjects(multipleSelectedObjects);
+        window->setMultipleSelectedObjects(multipleSelectedObjects);
+        selectedObjectInHierarchy = obj;
+    }
+    else
+    {
+        for (auto* o : window->getObjects())
+            o->setSelected(false);
+
+        obj->setSelected(true);
+        multipleSelectedObjects.clear();
+        multipleSelectedObjects.push_back(obj);
+
+        objectInspector->clearMultipleInspectedObjects();
+        objectInspector->setInspectedObject(obj);
+        window->setMultipleSelectedObjects(multipleSelectedObjects);
+
+        lastSelectedSlotIndex = index;
+    }
+
+    selectedObjectInHierarchy = obj;
+
+    if (!ImGui::GetIO().KeyShift)
+        window->externalSelect(obj);
+
+}
+
+
+
+void HierarchyInspector::dragObject(ThreeDObject* draggedObj, int index)
+{
+
+    if (ImGui::IsMouseDown(ImGuiMouseButton_Left))
+    {
+        lastSelectedObject = draggedObj;
+        if(currentlyDraggedObject)
+        {
+             if (ImGui::IsItemHovered(ImGuiHoveredFlags_RectOnly))
+            {
+                // std::cout << "[HierarchyInspector] Mouse over slot: " << index << std::endl;
+
+                ImVec2 rectMin = ImGui::GetItemRectMin();
+                ImVec2 rectMax = ImGui::GetItemRectMax();
+                ImDrawList* draw_list = ImGui::GetForegroundDrawList();
+                draw_list->AddRect(rectMin, rectMax, IM_COL32(255, 255, 0, 255), 0.0f, 0, 2.5f);
+                mouseOveringSlotIndex = index;
+            }       
+        }
+
+        
+        std::string ghostLabel = currentlyDraggedObject->getName();
+
+        if (mouseOveringSlotIndex != -1)
+        {
+            ghostLabel += " → Slot [" + std::to_string(mouseOveringSlotIndex) + "]";
+            dropToSlotIndex = mouseOveringSlotIndex;
+        }
+
+        ImVec2 mousePos = ImGui::GetMousePos();
+        ImVec2 textSize = ImGui::CalcTextSize(ghostLabel.c_str());
+        ImVec2 padding = ImVec2(10.0f, 6.0f);
+        ImVec2 bgMin = ImVec2(mousePos.x + 16.0f, mousePos.y + 16.0f);
+        ImVec2 bgMax = ImVec2(bgMin.x + textSize.x + padding.x * 2, bgMin.y + textSize.y + padding.y * 2);
+
+        ImDrawList* draw_list = ImGui::GetForegroundDrawList();
+        draw_list->AddRectFilled(bgMin, bgMax, IM_COL32(150, 150, 150, 200), 4.0f);
+        draw_list->AddText(ImVec2(bgMin.x + padding.x, bgMin.y + padding.y), IM_COL32(0, 0, 0, 255), ghostLabel.c_str());
+    }
+
+  
+
+    if (index < 0 || index >= static_cast<int>(mergedHierarchyList.size()))
+        return;
+   
+}
+
+void HierarchyInspector::dropOnSlot(ThreeDObject* obj, int index)
+{
+    std::cout << "[HierarchyInspector] dropOnSlot called with index: " << index << std::endl;
+
+    void* ptr = mergedHierarchyList[index];
+    ThreeDObject* base = static_cast<ThreeDObject*>(ptr);
+    std::cout << "RTTI typeid: " << typeid(*base).name() << std::endl;
+    EmptyDummy* dummy = dynamic_cast<EmptyDummy*>(base);
+
+
+    if (dummy && dummy->isDummy())
+    {
+        std::cout << "[dragOnEmptySlot] Slot index (mergedHierarchyList): " << index << std::endl;
+        std::cout << "[dragOnEmptySlot] Dummy slot index (getSlot): " << dummy->getSlot() << std::endl;
+        std::cout << "[dragOnEmptySlot] Dragged object name: " << obj->getName() << std::endl;
+        std::cout << "[dragOnEmptySlot] Dragged object slot: " << obj->getSlot() << std::endl;
+    }
+
+    {
+        std::cout << "[dragOnEmptySlot] dragged obect with name: " << obj->getName() << " and type: "
+                  << typeid(*obj).name() << " dropped on slot index: " << index << std::endl;
+        std::cout << "dropped slot index contains an object with name: " << base->getName() << " with type: " 
+        << typeid(*base).name() <<  " at index: " << index << std::endl;
+
+    }
+    dropToSlotIndex = -1;
+    
+}
+
 
 // ------------
 
@@ -491,7 +496,6 @@ void HierarchyInspector::SetParentByDragAndDrop(ThreeDObject *child, ThreeDObjec
 
     child->setParent(newParent);
 }
-
 
 ThreeDObject *HierarchyInspector::getSelectedObject() const
 {

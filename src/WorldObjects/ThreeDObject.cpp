@@ -53,6 +53,81 @@ glm::mat4 ThreeDObject::getModelMatrix() const
     return model;
 }
 
+
+glm::mat4 ThreeDObject::getGlobalModelMatrix() const
+{
+    if (parent)
+        return parent->getGlobalModelMatrix() * getModelMatrix();
+    else
+        return getModelMatrix();
+}
+
+glm::vec3 ThreeDObject::getGlobalPosition() const
+{
+    return glm::vec3(getGlobalModelMatrix()[3]); 
+}
+
+void ThreeDObject::setGlobalPosition(const glm::vec3& worldPos)
+{
+    if (parent)
+    {
+        glm::mat4 parentGlobal = parent->getGlobalModelMatrix();
+        glm::mat4 parentInverse = glm::inverse(parentGlobal);
+        glm::vec4 localPos = parentInverse * glm::vec4(worldPos, 1.0f);
+        setPosition(glm::vec3(localPos));
+    }
+    else
+    {
+        setPosition(worldPos);
+    }
+}
+
+glm::vec3 ThreeDObject::getGlobalRotation() const
+{
+    glm::quat globalRot = rotation;
+    if (parent)
+        globalRot = parent->rotation * rotation;
+
+    return glm::degrees(glm::eulerAngles(globalRot));
+}
+
+void ThreeDObject::setGlobalRotation(const glm::vec3& worldEulerDegrees)
+{
+    glm::quat worldRot = glm::quat(glm::radians(worldEulerDegrees));
+    if (parent)
+    {
+        glm::quat parentGlobal = parent->rotation;
+        rotation = glm::inverse(parentGlobal) * worldRot;
+    }
+    else
+    {
+        rotation = worldRot;
+    }
+}
+
+glm::vec3 ThreeDObject::getGlobalScale() const
+{
+    if (parent)
+        return parent->getGlobalScale() * _scale;
+    else
+        return _scale;
+}
+
+void ThreeDObject::setGlobalScale(const glm::vec3& worldScale)
+{
+    if (parent)
+    {
+        glm::vec3 parentGlobal = parent->getGlobalScale();
+        _scale = worldScale / parentGlobal;
+    }
+    else
+    {
+        _scale = worldScale;
+    }
+}
+
+
+
 void ThreeDObject::addChild(ThreeDObject *child)
 {
     if (!child || child == this)
