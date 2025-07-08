@@ -201,6 +201,7 @@ void HierarchyInspector::slotsList(bool& clickedOnItem)
     // --------- Assign ThreeDObjects to slots --------- //
     if (context && !objectsAssignedOnce)
     {
+        redrawSlotsList();
         const std::list<ThreeDObject*>& sceneObjects = context->getObjects();
 
         int nextFreeSlot = 0;
@@ -230,7 +231,7 @@ void HierarchyInspector::slotsList(bool& clickedOnItem)
 
             mergedHierarchyList[slot] = obj;
 
-            std::cout << "Inserted object '" << obj->getName() << "' at slot " << slot << std::endl;
+            // std::cout << "Inserted object '" << obj->getName() << "' at slot " << slot << std::endl;
         }
 
         objectsAssignedOnce = true;
@@ -276,6 +277,7 @@ void HierarchyInspector::slotsList(bool& clickedOnItem)
 }
 
 
+// ----- interactions with slots ----- //
 void HierarchyInspector::clickOnSlot(bool& clickedOnItem, int index, ThreeDObject* obj)
 {
 
@@ -353,8 +355,6 @@ void HierarchyInspector::clickOnSlot(bool& clickedOnItem, int index, ThreeDObjec
 
 }
 
-
-
 void HierarchyInspector::dragObject(ThreeDObject* draggedObj, int index)
 {
 
@@ -406,18 +406,22 @@ void HierarchyInspector::dropOnSlot(ThreeDObject* obj, int index)
 {
     std::cout << "[HierarchyInspector] dropOnSlot called with index: " << index << std::endl;
 
-    void* ptr = mergedHierarchyList[index];
-    ThreeDObject* base = static_cast<ThreeDObject*>(ptr);
-    std::cout << "RTTI typeid: " << typeid(*base).name() << std::endl;
+    // void* ptr = mergedHierarchyList[index];
+    // ThreeDObject* base = static_cast<ThreeDObject*>(ptr);
+    // // std::cout << "RTTI typeid: " << typeid(*base).name() << std::endl;
+    // EmptyDummy* dummy = dynamic_cast<EmptyDummy*>(base);
+
+    ThreeDObject* base = mergedHierarchyList[index];
     EmptyDummy* dummy = dynamic_cast<EmptyDummy*>(base);
 
 
     if (dummy && dummy->isDummy())
     {
-        std::cout << "[dragOnEmptySlot] Slot index (mergedHierarchyList): " << index << std::endl;
-        std::cout << "[dragOnEmptySlot] Dummy slot index (getSlot): " << dummy->getSlot() << std::endl;
-        std::cout << "[dragOnEmptySlot] Dragged object name: " << obj->getName() << std::endl;
-        std::cout << "[dragOnEmptySlot] Dragged object slot: " << obj->getSlot() << std::endl;
+        // std::cout << "[dragOnEmptySlot] Slot index (mergedHierarchyList): " << index << std::endl;
+        // std::cout << "[dragOnEmptySlot] Dummy slot index (getSlot): " << dummy->getSlot() << std::endl;
+        // std::cout << "[dragOnEmptySlot] Dragged object name: " << obj->getName() << std::endl;
+        // std::cout << "[dragOnEmptySlot] Dragged object slot: " << obj->getSlot() << std::endl;
+        exchangeSlots(obj, index);
     }
 
     {
@@ -432,7 +436,45 @@ void HierarchyInspector::dropOnSlot(ThreeDObject* obj, int index)
 }
 
 
-// ------------
+// ------------ redrawing and updates ------------- //
+
+void HierarchyInspector::exchangeSlots(ThreeDObject* obj, int targetIndex)
+{
+    if (!obj || targetIndex < 0 || targetIndex >= static_cast<int>(mergedHierarchyList.size()))
+        return;
+
+    ThreeDObject* target = mergedHierarchyList[targetIndex];
+    EmptyDummy* dummy = dynamic_cast<EmptyDummy*>(target);
+    if (!dummy || !dummy->isDummy())
+        return;
+
+    int objSlot = obj->getSlot();
+    int dummySlot = dummy->getSlot(); 
+
+    obj->setSlot(dummySlot);
+    dummy->setSlot(objSlot);
+
+    std::swap(mergedHierarchyList[dummySlot], mergedHierarchyList[objSlot]);
+
+    objectsAssignedOnce = true;
+
+    std::cout << "[exchangeSlots] Swapped object '" << obj->getName()
+              << "' (now at slot " << dummySlot << ") with dummy (now at slot " << objSlot << ")" << std::endl;
+}
+
+
+void HierarchyInspector::redrawSlotsList()
+{
+    objectsAssignedOnce = false;
+    mergedHierarchyList.clear();
+
+    for (auto& dummy : emptySlotPlaceholders)
+        mergedHierarchyList.push_back(dummy.get());
+
+    std::cout << "[HierarchyInspector] redrawSlotsList triggered." << std::endl;
+}
+
+
 
 void HierarchyInspector::selectFromThreeDWindow()
 {
