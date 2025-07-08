@@ -18,13 +18,19 @@ class HierarchyInspector : public GUIWindow
 public:
     HierarchyInspector();
 
-    // === Slots and Rendering ===
+    // === Rendering ===
     void render() override;
+    // -------- Initialization 
     void slotsList(bool& clickedOnItem); 
 
+    // --------- Management and interactions
     void clickOnSlot(bool& clickedOnItem, int index, ThreeDObject* obj);
     void dragObject(ThreeDObject* obj, int index);
     void dropOnSlot(ThreeDObject* obj, int index);
+    
+    // --------- Redrawing and updates
+    void exchangeSlots(ThreeDObject* obj, int index);
+    void redrawSlotsList();
 
     void setContext(OpenGLContext* ctxt);
     void setThreeDWindow(ThreeDWindow* win);
@@ -77,5 +83,6 @@ private:
     bool shouldReorder = false;
     bool slotsListInitialized = false;
     bool objectsAssignedOnce = false;
+    bool hasbeenRedrawn = false;
 
 };
