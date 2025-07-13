@@ -76,6 +76,7 @@ private:
     ThreeDObject* pendingDragTarget = nullptr;
     ThreeDObject* lastRepositionedObject = nullptr;
     ThreeDObject* lastSelectedObject = nullptr;
+    ThreeDObject* childToDropOn = nullptr;
 
     char editingBuffer[128] = {0};
     ImFont* unicodeFont = nullptr;
