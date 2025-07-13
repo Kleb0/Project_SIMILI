@@ -299,11 +299,8 @@ void HierarchyInspector::drawSlotsList(bool& clickedOnItem)
         ImGui::PopStyleColor(2);
     }
     // ----- end of slots drawing ----- //
-        
-
 
 }
-
 
 void HierarchyInspector::drawChildSlots(ThreeDObject* parent,  bool& clickedOnItem)
 {
@@ -312,10 +309,11 @@ void HierarchyInspector::drawChildSlots(ThreeDObject* parent,  bool& clickedOnIt
 
     ImGui::Indent(20.0f); 
 
+
     for (ThreeDObject* child : parent->getChildren())
     {
         if (!child) continue;
-
+        
         float slotHeight = 26.0f;
         ImVec2 size = ImVec2(ImGui::GetContentRegionAvail().x, slotHeight);
 
@@ -332,6 +330,19 @@ void HierarchyInspector::drawChildSlots(ThreeDObject* parent,  bool& clickedOnIt
         ImGui::PushFont(unicodeFont);
         ImGui::Button(label.c_str(), size);
         ImGui::PopFont();
+
+        // ------ After Child Button rendering ------ //
+
+        if (currentlyDraggedObject && ImGui::IsItemHovered(ImGuiHoveredFlags_RectOnly))
+        {
+
+            ImVec2 rectMin = ImGui::GetItemRectMin();
+            ImVec2 rectMax = ImGui::GetItemRectMax();
+            ImDrawList* draw_list = ImGui::GetForegroundDrawList();
+            draw_list->AddRect(rectMin, rectMax, IM_COL32(255, 0, 0, 255), 0.0f, 0, 3.0f);
+
+            pendingDragTarget = child;
+        }
 
         if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
             child->expanded = !child->expanded;
@@ -452,6 +463,11 @@ void HierarchyInspector::dragObject(ThreeDObject* draggedObj, int index)
         
         std::string ghostLabel = currentlyDraggedObject->getName();
 
+        if (pendingDragTarget) {
+            ghostLabel += " → " + pendingDragTarget->getName();
+            dropToSlotIndex = -1;
+        }
+
         if (mouseOveringSlotIndex != -1)
         {
             ghostLabel += " → Slot [" + std::to_string(mouseOveringSlotIndex) + "]";
@@ -539,20 +555,6 @@ void HierarchyInspector::exchangeSlots(ThreeDObject* obj, int targetIndex)
               << "' (now at slot " << dummySlot << ") with dummy (now at slot " << objSlot << ")" << std::endl;
 }
 
-
-void HierarchyInspector::flattenHierarchyList(std::vector<HierarchyEntry>& flatList, ThreeDObject* obj, int depth)
-{
-    if (!obj) return;
-    flatList.push_back({obj, depth});
-
-    if (obj->expanded)
-    {
-        for (ThreeDObject* child : obj->getChildren())
-        {
-            flattenHierarchyList(flatList, child, depth + 1);
-        }
-    }
-}
 
 
 void HierarchyInspector::redrawSlotsList()
