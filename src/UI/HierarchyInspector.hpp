@@ -37,10 +37,7 @@ public:
     // --------- Redrawing and updates
     void exchangeSlots(ThreeDObject* obj, int index);
     void drawChildSlots(ThreeDObject* parent, bool& clickedOnItem);
-    void flattenHierarchyList(std::vector<HierarchyEntry>& flatList, ThreeDObject* obj, int depth);
     void redrawSlotsList();
-
-
 
     void setContext(OpenGLContext* ctxt);
     void setThreeDWindow(ThreeDWindow* win);
