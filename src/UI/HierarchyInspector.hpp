@@ -13,6 +13,11 @@
 class ThreeDWindow;
 class ObjectInspector;
 
+struct HierarchyEntry {
+    ThreeDObject* object;
+    int depth = 0;
+};
+
 class HierarchyInspector : public GUIWindow
 {
 public:
@@ -21,22 +26,29 @@ public:
     // === Rendering ===
     void render() override;
     // -------- Initialization 
-    void slotsList(bool& clickedOnItem); 
+    void drawSlotsList(bool& clickedOnItem); 
 
-    // --------- Management and interactions
+    // --------- Management and interactions with slots ----- //
     void clickOnSlot(bool& clickedOnItem, int index, ThreeDObject* obj);
     void dragObject(ThreeDObject* obj, int index);
     void dropOnSlot(ThreeDObject* obj, int index);
+    void dropOnObject(ThreeDObject* parent, ThreeDObject* child, int index);
     
     // --------- Redrawing and updates
     void exchangeSlots(ThreeDObject* obj, int index);
+    void drawChildSlots(ThreeDObject* parent, bool& clickedOnItem);
+    void flattenHierarchyList(std::vector<HierarchyEntry>& flatList, ThreeDObject* obj, int depth);
     void redrawSlotsList();
+
+
 
     void setContext(OpenGLContext* ctxt);
     void setThreeDWindow(ThreeDWindow* win);
     void setObjectInspector(ObjectInspector* inspector);
     void setTitle(const std::string& newTitle) { this->title = newTitle; }
 
+
+    //---------- Selection inside list -------------//
     void selectInList(ThreeDObject* obj);
     void selectObject(ThreeDObject* obj);
     void unselectObject(ThreeDObject* obj);
@@ -45,7 +57,6 @@ public:
     void clearMultipleSelection();
     ThreeDObject* getSelectedObject() const;
 
-    void SetParentByDragAndDrop(ThreeDObject* child, ThreeDObject* newParent);
     void renameObject();
     void notifyObjectDeleted(ThreeDObject* obj);
 
@@ -79,7 +90,8 @@ private:
     // new lists 
     std::vector<ThreeDObject*> inspectorObjects;
     std::vector<std::unique_ptr<EmptyDummy>> dummyList;
-    std::vector<ThreeDObject*> mergedHierarchyList;              
+    std::vector<ThreeDObject*> mergedHierarchyList; 
+
     bool shouldReorder = false;
     bool slotsListInitialized = false;
     bool objectsAssignedOnce = false;

@@ -126,8 +126,6 @@ void ThreeDObject::setGlobalScale(const glm::vec3& worldScale)
     }
 }
 
-
-
 void ThreeDObject::addChild(ThreeDObject *child)
 {
     if (!child || child == this)

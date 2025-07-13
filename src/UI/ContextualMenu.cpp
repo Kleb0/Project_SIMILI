@@ -72,6 +72,7 @@ void ContextualMenu::render()
 
                         ThreeDObject *toDelete = selected;
                         threeDWindow->removeThreeDObjectsFromScene({toDelete});
+                        hierarchyInspector->redrawSlotsList();
                         pendingDeletion = toDelete;
                     }
                     hide();
@@ -91,7 +92,12 @@ void ContextualMenu::render()
             std::cout << "[ContextualMenu] Created a new Cube object with name: " << newCube->getName() << std::endl;
 
             if (hierarchyInspector)
+            {
                 hierarchyInspector->selectObject(newCube);
+                hierarchyInspector->redrawSlotsList();                            
+            }
+                
+        
 
             hide();
         }
