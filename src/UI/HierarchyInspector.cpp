@@ -18,10 +18,6 @@ void showErrorBox(const std::string &message, const std::string &title = "Error"
 
 HierarchyInspector::HierarchyInspector()
 {
-    // for (int i = 0; i < 50; i++)
-    // {
-    //     SlotsList.push_back(nullptr);
-    // }
 
     ImGuiIO& io = ImGui::GetIO();
     ImFontConfig font_cfg;
@@ -30,9 +26,10 @@ HierarchyInspector::HierarchyInspector()
     font_cfg.PixelSnapH = false;
 
     static const ImWchar glyph_ranges[] = {
-        0x0020, 0x00FF,
-        0x2190, 0x21FF,
-        0x25A0, 0x25FF, 
+        0x0020, 0x00FF,    
+        0x2190, 0x21FF,    
+        0x25A0, 0x25FF,     
+        0x25B0, 0x25BF,     
         0,
     };
 
@@ -40,13 +37,9 @@ HierarchyInspector::HierarchyInspector()
     std::filesystem::path projectRoot = exePath.parent_path().parent_path(); 
 
     std::filesystem::path fontPath = projectRoot / "assets/fonts/DejaVuSans.ttf";
+    io.Fonts->Clear();
     unicodeFont = io.Fonts->AddFontFromFileTTF(fontPath.string().c_str(), 16.0f, &font_cfg, glyph_ranges);
-
-    // if (!unicodeFont)
-    // {
-    //     showErrorBox("Font not loaded correctly! Path: " + fontPath.string(), "Font Error");
-    // }
-        io.Fonts->Build();
+    io.Fonts->Build();
 }
 
 
@@ -141,7 +134,7 @@ void HierarchyInspector::render()
     ImGui::Text("List of objects in the current 3D scene :");
 
     bool clickedOnItem = false;
-    slotsList(clickedOnItem);
+    drawSlotsList(clickedOnItem);
 
     // Clear selection if clicking on empty space
     if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !clickedOnItem)
@@ -164,7 +157,7 @@ void HierarchyInspector::render()
     ImGui::End();
 }
 
-void HierarchyInspector::slotsList(bool& clickedOnItem)
+void HierarchyInspector::drawSlotsList(bool& clickedOnItem)
 {
     const int totalSlots = 50;
 
@@ -211,6 +204,9 @@ void HierarchyInspector::slotsList(bool& clickedOnItem)
             if (!obj)
                 continue;
 
+            if (obj->isParented)
+                continue; 
+
             int slot = obj->getSlot();
 
             if (slot < 0 || slot >= totalSlots)
@@ -241,43 +237,122 @@ void HierarchyInspector::slotsList(bool& clickedOnItem)
     // --------- Draw all slots --------- //
     for (int i = 0; i < totalSlots; ++i)
     {
+        ThreeDObject* obj = mergedHierarchyList[i];
         float slotHeight = 26.0f;
         ImVec2 size = ImVec2(ImGui::GetContentRegionAvail().x, slotHeight);
 
         bool isEven = (i % 2 == 0);
         ImVec4 defaultBgColor = isEven ? ImVec4(0.8f, 0.8f, 0.8f, 1.0f)
-                                       : ImVec4(0.1f, 0.2f, 0.5f, 1.0f);
+                                    : ImVec4(0.1f, 0.2f, 0.5f, 1.0f);
         ImVec4 selectedBgColor = ImVec4(0.2f, 0.8f, 0.2f, 1.0f);
-
-        ThreeDObject* obj = mergedHierarchyList[i];
         bool isSlotSelected = obj && obj->getSelected();
 
         ImVec4 textColor = isSlotSelected
-                           ? ImVec4(0.0f, 0.0f, 0.0f, 1.0f)
-                           : (isEven ? ImVec4(0.0f, 0.0f, 0.0f, 1.0f)
-                                     : ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+                        ? ImVec4(0.0f, 0.0f, 0.0f, 1.0f)
+                        : (isEven ? ImVec4(0.0f, 0.0f, 0.0f, 1.0f)
+                                    : ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
 
         ImGui::PushStyleColor(ImGuiCol_Button, isSlotSelected ? selectedBgColor : defaultBgColor);
         ImGui::PushStyleColor(ImGuiCol_Text, textColor);
 
-        std::string label = " --- " + obj->getName() + " [" + std::to_string(i) + "] --- ";
+        std::string label;
+        if (obj && obj->getName() != "Empty Slot")
+        {
+            std::string toggleIcon = obj->getChildren().empty() ? "  " : (obj->expanded ? u8"\u25BC " : u8"\u25B6 ");
+            label = toggleIcon + "--- [" + obj->getName() + "] ---";
+        }
+        else
+        {
+            label = "--- Empty Slot [" + std::to_string(i) + "] ---";
+        }
+
+        ImGui::PushFont(unicodeFont);
         ImGui::Button(label.c_str(), size);
+        ImGui::PopFont();
 
-        if (obj && ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f))
-            currentlyDraggedObject = obj;
+        // prevent from dragging empty slots
+        if (obj && obj->getName() != "Empty Slot")
+        {
+            // - Toggle open/close
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+                obj->expanded = !obj->expanded;
 
-        if (obj && currentlyDraggedObject != nullptr)
-            dragObject(currentlyDraggedObject, i);
+            if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f))
+                currentlyDraggedObject = obj;
 
-        if (obj)
+            if (currentlyDraggedObject)
+                dragObject(currentlyDraggedObject, i);
+
             clickOnSlot(clickedOnItem, i, obj);
+
+            if (obj->expanded)
+                drawChildSlots(obj, clickedOnItem);
+        }
+        else if (obj) 
+        {
+            if (currentlyDraggedObject)
+                dragObject(currentlyDraggedObject, i);
+
+            clickOnSlot(clickedOnItem, i, obj);
+        }
 
         ImGui::PopStyleColor(2);
     }
+    // ----- end of slots drawing ----- //
+        
+
+
 }
 
 
-// ----- interactions with slots ----- //
+void HierarchyInspector::drawChildSlots(ThreeDObject* parent,  bool& clickedOnItem)
+{
+    if (!parent || parent->getChildren().empty())
+        return;
+
+    ImGui::Indent(20.0f); 
+
+    for (ThreeDObject* child : parent->getChildren())
+    {
+        if (!child) continue;
+
+        float slotHeight = 26.0f;
+        ImVec2 size = ImVec2(ImGui::GetContentRegionAvail().x, slotHeight);
+
+        bool isSelected = child->getSelected();
+        ImVec4 bgColor = isSelected ? ImVec4(0.2f, 0.8f, 0.2f, 1.0f) : ImVec4(0.2f, 0.2f, 0.2f, 1.0f);
+        ImVec4 textColor = isSelected ? ImVec4(0.0f, 0.0f, 0.0f, 1.0f) : ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+
+        ImGui::PushStyleColor(ImGuiCol_Button, bgColor);
+        ImGui::PushStyleColor(ImGuiCol_Text, textColor);
+
+        std::string toggleIcon = child->getChildren().empty() ? "  " : (child->expanded ? u8"\u25BC " : u8"\u25B6 ");
+        std::string label = toggleIcon + child->getName();
+
+        ImGui::PushFont(unicodeFont);
+        ImGui::Button(label.c_str(), size);
+        ImGui::PopFont();
+
+        if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+            child->expanded = !child->expanded;
+
+        if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f))
+            currentlyDraggedObject = child;
+
+        clickOnSlot(clickedOnItem, -1, child); 
+
+        ImGui::PopStyleColor(2);
+
+        if (child->expanded)
+            drawChildSlots(child, clickedOnItem);
+
+    }
+
+    ImGui::Unindent(20.0f);
+}
+
+
+// ----- interactions with List ----- //
 void HierarchyInspector::clickOnSlot(bool& clickedOnItem, int index, ThreeDObject* obj)
 {
 
@@ -305,8 +380,8 @@ void HierarchyInspector::clickOnSlot(bool& clickedOnItem, int index, ThreeDObjec
         return;
     }
 
-    std::cout << "[HierarchyInspector] Clicked on slot containing an item : " << index
-            << " (type of content: " << typeid(*obj).name() << ")" << std::endl;
+    // std::cout << "[HierarchyInspector] Clicked on slot containing an item : " << index
+    //         << " (type of content: " << typeid(*obj).name() << ")" << std::endl;
 
      if (ImGui::GetIO().KeyShift && lastSelectedSlotIndex != -1)
     {
@@ -361,7 +436,6 @@ void HierarchyInspector::dragObject(ThreeDObject* draggedObj, int index)
     if (ImGui::IsMouseDown(ImGuiMouseButton_Left))
     {
         lastSelectedObject = draggedObj;
-        if(currentlyDraggedObject)
         {
              if (ImGui::IsItemHovered(ImGuiHoveredFlags_RectOnly))
             {
@@ -406,33 +480,36 @@ void HierarchyInspector::dropOnSlot(ThreeDObject* obj, int index)
 {
     std::cout << "[HierarchyInspector] dropOnSlot called with index: " << index << std::endl;
 
-    // void* ptr = mergedHierarchyList[index];
-    // ThreeDObject* base = static_cast<ThreeDObject*>(ptr);
-    // // std::cout << "RTTI typeid: " << typeid(*base).name() << std::endl;
-    // EmptyDummy* dummy = dynamic_cast<EmptyDummy*>(base);
-
     ThreeDObject* base = mergedHierarchyList[index];
     EmptyDummy* dummy = dynamic_cast<EmptyDummy*>(base);
 
 
     if (dummy && dummy->isDummy())
     {
-        // std::cout << "[dragOnEmptySlot] Slot index (mergedHierarchyList): " << index << std::endl;
-        // std::cout << "[dragOnEmptySlot] Dummy slot index (getSlot): " << dummy->getSlot() << std::endl;
-        // std::cout << "[dragOnEmptySlot] Dragged object name: " << obj->getName() << std::endl;
-        // std::cout << "[dragOnEmptySlot] Dragged object slot: " << obj->getSlot() << std::endl;
+
         exchangeSlots(obj, index);
     }
-
+    else
     {
-        std::cout << "[dragOnEmptySlot] dragged obect with name: " << obj->getName() << " and type: "
-                  << typeid(*obj).name() << " dropped on slot index: " << index << std::endl;
-        std::cout << "dropped slot index contains an object with name: " << base->getName() << " with type: " 
-        << typeid(*base).name() <<  " at index: " << index << std::endl;
-
+        dropOnObject(base, obj, index);
     }
     dropToSlotIndex = -1;
     
+}
+
+void HierarchyInspector::dropOnObject(ThreeDObject* parent, ThreeDObject* child, int index)
+{
+
+    //This func role is to set the parent of an object when it's being dropped on another object
+    if (child->getParent() == parent)
+    {
+        return;
+    }
+
+    parent->addChild(child);
+    child->setParent(parent);
+    child->isParented = true;
+    redrawSlotsList();
 }
 
 
@@ -460,6 +537,21 @@ void HierarchyInspector::exchangeSlots(ThreeDObject* obj, int targetIndex)
 
     std::cout << "[exchangeSlots] Swapped object '" << obj->getName()
               << "' (now at slot " << dummySlot << ") with dummy (now at slot " << objSlot << ")" << std::endl;
+}
+
+
+void HierarchyInspector::flattenHierarchyList(std::vector<HierarchyEntry>& flatList, ThreeDObject* obj, int depth)
+{
+    if (!obj) return;
+    flatList.push_back({obj, depth});
+
+    if (obj->expanded)
+    {
+        for (ThreeDObject* child : obj->getChildren())
+        {
+            flattenHierarchyList(flatList, child, depth + 1);
+        }
+    }
 }
 
 
@@ -528,17 +620,7 @@ void HierarchyInspector::clearMultipleSelection()
     multipleSelectedObjects.clear();
 }
 
-void HierarchyInspector::SetParentByDragAndDrop(ThreeDObject *child, ThreeDObject *newParent)
-{
-    if (!child || !newParent || child == newParent)
-        return;
-
-    if (child->isDescendantOf(newParent))
-        return;
-
-    child->setParent(newParent);
-}
-
+// this function is called externally 
 ThreeDObject *HierarchyInspector::getSelectedObject() const
 {
     return selectedObjectInHierarchy;

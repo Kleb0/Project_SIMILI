@@ -38,6 +38,7 @@ void ThreeDWindow::addThreeDObjectsToScene(const std::vector<ThreeDObject *> &ob
             std::cout << "[ThreeDWindow] Adding object: " << object->getName() << std::endl;
             object->initialize();
             ThreeDObjectsList.push_back(object);
+            // hierarchy->redrawSlotsList();
             if (openGLContext)
             {
                 std::cout << "[ThreeDWindow] openGLContext is not null, adding object to OpenGL context." << std::endl;
@@ -75,6 +76,7 @@ void ThreeDWindow::removeThreeDObjectsFromScene(ThreeDObject *object)
         ThreeDObjectsList.erase(it, ThreeDObjectsList.end());
         std::cout << "[ThreeDWindow] Object removed from ThreeDObjectsList." << std::endl;
         object->destroy();
+        // hierarchy->redrawSlotsList();
     }
 }
 
