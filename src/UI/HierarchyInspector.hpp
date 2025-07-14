@@ -94,5 +94,6 @@ private:
     bool slotsListInitialized = false;
     bool objectsAssignedOnce = false;
     bool hasbeenRedrawn = false;
+    bool isOverChild = false;
 
 };
