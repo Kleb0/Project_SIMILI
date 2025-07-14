@@ -198,7 +198,6 @@ void HierarchyInspector::drawSlotsList(bool& clickedOnItem)
 
         // Reset state
         currentlyDraggedObject = nullptr;
-        childToDropOn = nullptr;
         dropToSlotIndex = -1;
     }
     // -------- End of drop operation --------- //
@@ -206,7 +205,6 @@ void HierarchyInspector::drawSlotsList(bool& clickedOnItem)
     // --------- STEP 2 Assign ThreeDObjects to slots --------- //
     if (context && !objectsAssignedOnce)
     {
-        redrawSlotsList();
         const std::list<ThreeDObject*>& sceneObjects = context->getObjects();
 
         int nextFreeSlot = 0;
@@ -284,8 +282,12 @@ void HierarchyInspector::drawSlotsList(bool& clickedOnItem)
         if (obj && obj->getName() != "Empty Slot")
         {
             // - Toggle open/close
-            if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+            if (ImGui::IsItemHovered() &&
+                ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
+                !ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f))
+            {
                 obj->expanded = !obj->expanded;
+            }
 
             if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f))
                 currentlyDraggedObject = obj;
@@ -317,7 +319,6 @@ void HierarchyInspector::drawChildSlots(ThreeDObject* parent,  bool& clickedOnIt
         return;
 
     ImGui::Indent(20.0f); 
-
 
     for (ThreeDObject* child : parent->getChildren())
     {
@@ -352,12 +353,14 @@ void HierarchyInspector::drawChildSlots(ThreeDObject* parent,  bool& clickedOnIt
             ImVec2 rectMin = ImGui::GetItemRectMin();
             ImVec2 rectMax = ImGui::GetItemRectMax();
             ImDrawList* draw_list = ImGui::GetForegroundDrawList();
+            // Draw a red rectangle around the hovered child slot
             draw_list->AddRect(rectMin, rectMax, IM_COL32(255, 0, 0, 255), 0.0f, 0, 3.0f);
 
             childToDropOn = child;
             // - set the child as the parent of currently dragged object
             
         }
+
         // ----------------- End of child detection ----------------- //
 
         if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
@@ -376,6 +379,7 @@ void HierarchyInspector::drawChildSlots(ThreeDObject* parent,  bool& clickedOnIt
     }
 
     ImGui::Unindent(20.0f);
+
 }
 
 
@@ -464,13 +468,15 @@ void HierarchyInspector::dragObject(ThreeDObject* draggedObj, int index)
     {
         lastSelectedObject = draggedObj;
         {
-             if (ImGui::IsItemHovered(ImGuiHoveredFlags_RectOnly))
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_RectOnly))
             {
                 ImVec2 rectMin = ImGui::GetItemRectMin();
                 ImVec2 rectMax = ImGui::GetItemRectMax();
                 ImDrawList* draw_list = ImGui::GetForegroundDrawList();
                 draw_list->AddRect(rectMin, rectMax, IM_COL32(255, 255, 0, 255), 0.0f, 0, 2.5f);
                 mouseOveringSlotIndex = index;
+                childToDropOn = nullptr;
+                
             }       
         }
 
@@ -482,10 +488,14 @@ void HierarchyInspector::dragObject(ThreeDObject* draggedObj, int index)
             dropToSlotIndex = -1;
         }
 
-        if (mouseOveringSlotIndex != -1)
+        else if (mouseOveringSlotIndex != -1)
         {
             ghostLabel += " → Slot [" + std::to_string(mouseOveringSlotIndex) + "]";
             dropToSlotIndex = mouseOveringSlotIndex;
+        }
+        else
+        {
+            dropToSlotIndex = -1;
         }
 
         ImVec2 mousePos = ImGui::GetMousePos();
@@ -508,7 +518,7 @@ void HierarchyInspector::dragObject(ThreeDObject* draggedObj, int index)
 
 void HierarchyInspector::dropOnSlot(ThreeDObject* obj, int index)
 {
-    std::cout << "[HierarchyInspector] dropOnSlot called with index: " << index << std::endl;
+    // std::cout << "[HierarchyInspector] dropOnSlot called with index: " << index << std::endl;
 
     ThreeDObject* base = mergedHierarchyList[index];
     EmptyDummy* dummy = dynamic_cast<EmptyDummy*>(base);
@@ -516,21 +526,25 @@ void HierarchyInspector::dropOnSlot(ThreeDObject* obj, int index)
 
     if (dummy && dummy->isDummy())
     {
-
         exchangeSlots(obj, index);
+
     }
-    else
+    else if(base)
     {
         dropOnObject(base, obj, index);
+        dropToSlotIndex = -1;
     }
-    dropToSlotIndex = -1;
+
+
     
 }
 
 void HierarchyInspector::dropOnObject(ThreeDObject* parent, ThreeDObject* child, int index)
 {
 
-    std::cout <<"[HierarchyInspector] dropOnObject called with parent: " << parent->getName() << std::endl;
+    std::cout << "SUPER GIGA TEST DROP ON OBJECT" << std::endl;
+
+    // std::cout <<"[HierarchyInspector] dropOnObject called with parent: " << parent->getName() << std::endl;
     //This func role is to set the parent of an object when it's being dropped on another object
     if (child->getParent() == parent)
     {
@@ -540,7 +554,7 @@ void HierarchyInspector::dropOnObject(ThreeDObject* parent, ThreeDObject* child,
     parent->addChild(child);
     parent->expanded = true;
     child->setParent(parent);
-    child->isParented = true;
+    child->isParented = true;   
     redrawSlotsList();
 }
 
@@ -575,6 +589,7 @@ void HierarchyInspector::redrawSlotsList()
 {
     objectsAssignedOnce = false;
     mergedHierarchyList.clear();
+    childToDropOn = nullptr;
 
     for (auto& dummy : emptySlotPlaceholders)
         mergedHierarchyList.push_back(dummy.get());
