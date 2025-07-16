@@ -56,7 +56,7 @@ public:
 
     void setParent(ThreeDObject *newParent);
     ThreeDObject *getParent() const { return parent; }
-    void removeParent(ThreeDObject *newParent) { parent = nullptr; }
+    void removeParent() { parent = nullptr; }
 
     void addChild(ThreeDObject *child);
     void removeChild(ThreeDObject *child);
