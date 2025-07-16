@@ -43,6 +43,7 @@ HierarchyInspector::HierarchyInspector()
 }
 
 
+// -------- Initalisition and management --------- //
 void HierarchyInspector::setObjectInspector(ObjectInspector *inspector)
 {
     objectInspector = inspector;
@@ -56,45 +57,6 @@ void HierarchyInspector::setContext(OpenGLContext *ctxt)
 void HierarchyInspector::setThreeDWindow(ThreeDWindow *win)
 {
     window = win;
-}
-
-void HierarchyInspector::selectObject(ThreeDObject *obj)
-{
-    selectedObjectInHierarchy = obj;
-
-    if (obj && !obj->isInspectable()) {
-        if (objectInspector)
-            objectInspector->clearInspectedObject();
-        return;
-    }
-
-    if (objectInspector)
-        objectInspector->setInspectedObject(obj);
-
-    if (window)
-        window->externalSelect(obj);
-}
-
-void HierarchyInspector::selectInList(ThreeDObject *obj)
-{
-    selectedObjectInHierarchy = obj;
-}
-
-void HierarchyInspector::multipleSelection(ThreeDObject *obj)
-{
-
-    auto it = std::find(multipleSelectedObjects.begin(), multipleSelectedObjects.end(), obj);
-    if (it == multipleSelectedObjects.end())
-    {
-        multipleSelectedObjects.push_back(obj);
-        std::cout << "[HierarchyInspector] Add object to multiple selection list: " << obj->getName() << std::endl;
-    }
-
-    else
-    {
-        multipleSelectedObjects.erase(it);
-    }
-    window->selectMultipleObjects(multipleSelectedObjects);
 }
 
 void HierarchyInspector::renameObject()
@@ -363,11 +325,23 @@ void HierarchyInspector::drawChildSlots(ThreeDObject* parent,  bool& clickedOnIt
 
         // ----------------- End of child detection ----------------- //
 
-        if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+        // if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+        //     child->expanded = !child->expanded;
+
+        // if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f))
+        //     currentlyDraggedObject = child;
+
+        if (ImGui::IsItemHovered() &&
+            ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
+            !ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f))
+        {
             child->expanded = !child->expanded;
+        }
 
         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f))
+        {
             currentlyDraggedObject = child;
+        }
 
         clickOnSlot(clickedOnItem, -1, child); 
 
@@ -526,6 +500,15 @@ void HierarchyInspector::dropOnSlot(ThreeDObject* obj, int index)
 
     if (dummy && dummy->isDummy())
     {
+
+        if (obj->getParent()) {
+            ThreeDObject* currentParent = obj->getParent();
+            currentParent->removeChild(obj);
+            obj->removeParent();
+            obj->isParented = false;
+
+            // std::cout << " TEST REMOVE PARENT" << std::endl;
+        }
         exchangeSlots(obj, index);
 
     }
@@ -550,7 +533,16 @@ void HierarchyInspector::dropOnObject(ThreeDObject* parent, ThreeDObject* child,
     {
         return;
     }
-    
+
+    //Detach old parent if exists
+    if (ThreeDObject* oldParent = child->getParent())
+    {
+        oldParent->removeChild(child);
+        child->removeParent();  
+        child->isParented = false;
+    }
+
+    // Attach new parent    
     parent->addChild(child);
     parent->expanded = true;
     child->setParent(parent);
@@ -558,6 +550,44 @@ void HierarchyInspector::dropOnObject(ThreeDObject* parent, ThreeDObject* child,
     redrawSlotsList();
 }
 
+void HierarchyInspector::selectObject(ThreeDObject *obj)
+{
+    selectedObjectInHierarchy = obj;
+
+    if (obj && !obj->isInspectable()) {
+        if (objectInspector)
+            objectInspector->clearInspectedObject();
+        return;
+    }
+
+    if (objectInspector)
+        objectInspector->setInspectedObject(obj);
+
+    if (window)
+        window->externalSelect(obj);
+}
+
+void HierarchyInspector::selectInList(ThreeDObject *obj)
+{
+    selectedObjectInHierarchy = obj;
+}
+
+void HierarchyInspector::multipleSelection(ThreeDObject *obj)
+{
+
+    auto it = std::find(multipleSelectedObjects.begin(), multipleSelectedObjects.end(), obj);
+    if (it == multipleSelectedObjects.end())
+    {
+        multipleSelectedObjects.push_back(obj);
+        std::cout << "[HierarchyInspector] Add object to multiple selection list: " << obj->getName() << std::endl;
+    }
+
+    else
+    {
+        multipleSelectedObjects.erase(it);
+    }
+    window->selectMultipleObjects(multipleSelectedObjects);
+}
 
 // ------------ redrawing and updates ------------- //
 
@@ -581,8 +611,9 @@ void HierarchyInspector::exchangeSlots(ThreeDObject* obj, int targetIndex)
 
     objectsAssignedOnce = true;
 
-    std::cout << "[exchangeSlots] Swapped object '" << obj->getName()
-              << "' (now at slot " << dummySlot << ") with dummy (now at slot " << objSlot << ")" << std::endl;
+    // std::cout << "[exchangeSlots] Swapped object '" << obj->getName()
+    //           << "' (now at slot " << dummySlot << ") with dummy (now at slot " << objSlot << ")" << std::endl;
+    redrawSlotsList();
 }
 
 void HierarchyInspector::redrawSlotsList()
@@ -597,6 +628,8 @@ void HierarchyInspector::redrawSlotsList()
     std::cout << "[HierarchyInspector] redrawSlotsList triggered." << std::endl;
 }
 
+
+// ------------ other  ------------- //
 void HierarchyInspector::selectFromThreeDWindow()
 {
 
