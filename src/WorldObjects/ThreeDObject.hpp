@@ -34,14 +34,7 @@ public:
     void setModelMatrix(const glm::mat4 &matrix);
     glm::vec3 getCenter() const;
 
-
-    glm::vec3 getGlobalPosition() const;
-    glm::vec3 getGlobalRotation() const;
-    glm::vec3 getGlobalScale() const;
-
-    void setGlobalPosition(const glm::vec3& worldPos);
-    void setGlobalRotation(const glm::vec3& worldEulerDegrees);
-    void setGlobalScale(const glm::vec3& worldScale);
+    void setGlobalModelMatrix(const glm::mat4 &newGlobalMatrix);
 
     glm::mat4 getGlobalModelMatrix() const;
 

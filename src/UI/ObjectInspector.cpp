@@ -255,7 +255,6 @@ void ObjectInspector::render()
         ImGui::Separator();
         setScale();
         ImGui::Separator();
-        dipslayGlobaleCoordinates(inspectedObject);
     
     }
     else
@@ -264,20 +263,4 @@ void ObjectInspector::render()
     }
 
     ImGui::End();
-}
-
-void ObjectInspector::dipslayGlobaleCoordinates(ThreeDObject* InspectedObject)
-{
-
-    ImGui::Text("Global Coordinates:");
-    ImGui::Separator();
-
-    glm::vec3 globalPosition = InspectedObject->getGlobalPosition();
-    glm::vec3 globalRotation = InspectedObject->getGlobalRotation();
-    glm::vec3 globalScale = InspectedObject->getGlobalScale();
-
-    ImGui::Text("Position : X: %.2f, Y: %.2f, Z: %.2f", globalPosition.x, globalPosition.y, globalPosition.z);
-    ImGui::Text("Rotation : Pitch: %.2f, Yaw: %.2f, Roll: %.2f", globalRotation.x, globalRotation.y, globalRotation.z);
-    ImGui::Text("Scale : X: %.2f, Y: %.2f, Z: %.2f", globalScale.x, globalScale.y, globalScale.z);
-
 }

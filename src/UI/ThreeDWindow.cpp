@@ -264,22 +264,10 @@ void ThreeDWindow::manipulateThreeDObjects()
 
         for (ThreeDObject *obj : multipleSelectedObjects)
         {
-            glm::mat4 model = obj->getModelMatrix();
-            glm::mat4 transformed = delta * model;
-            obj->setModelMatrix(transformed);
-
-            glm::vec3 skew;
-            glm::vec4 perspective;
-            glm::vec3 pos;
-            glm::quat rot;
-            glm::vec3 scl;
-
-            if (glm::decompose(transformed, scl, rot, pos, skew, perspective))
-            {
-                obj->setGlobalPosition(pos);
-                obj->setGlobalRotation(glm::degrees(glm::eulerAngles(glm::normalize(rot))));
-                obj->setGlobalScale(scl);
-            }
+    
+            glm::mat4 globalModel = obj->getGlobalModelMatrix();
+            glm::mat4 newGlobalModel = delta * globalModel;
+            obj->setGlobalModelMatrix(newGlobalModel);
         }
 
         wasUsingGizmoLastFrame = true;
