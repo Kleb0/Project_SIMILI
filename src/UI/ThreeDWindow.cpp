@@ -100,6 +100,8 @@ void ThreeDWindow::setObjectInspector(ObjectInspector *inspector)
     objectInspector = inspector;
 }
 
+
+// ------- Rendering the ThreeDWindow ------- //
 void ThreeDWindow::render()
 {
     ImGuiWindowFlags flags = ImGuiWindowFlags_None;
@@ -265,9 +267,19 @@ void ThreeDWindow::manipulateThreeDObjects()
         for (ThreeDObject *obj : multipleSelectedObjects)
         {
     
-            glm::mat4 globalModel = obj->getGlobalModelMatrix();
-            glm::mat4 newGlobalModel = delta * globalModel;
-            obj->setGlobalModelMatrix(newGlobalModel);
+            if (obj->getParent())
+            {
+                glm::mat4 localModel = obj->getModelMatrix();
+                glm::mat4 newLocalModel = delta * localModel;
+                obj->setModelMatrix(newLocalModel);
+            }
+            else
+            {
+                glm::mat4 globalModel = obj->getGlobalModelMatrix();
+                glm::mat4 newGlobalModel = delta * globalModel;
+                obj->setGlobalModelMatrix(newGlobalModel);
+            }
+
         }
 
         wasUsingGizmoLastFrame = true;
