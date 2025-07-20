@@ -6,15 +6,8 @@
 #include <iostream>
 #include <algorithm>
 #include <typeinfo>
-#define NOMINMAX
-#include <Windows.h>
 #include <filesystem> 
 #include "WorldObjects/ThreeDObject.hpp"
-
-void showErrorBox(const std::string &message, const std::string &title = "Error")
-{
-    MessageBoxA(nullptr, message.c_str(), title.c_str(), MB_ICONERROR | MB_OK);
-}
 
 HierarchyInspector::HierarchyInspector()
 {
