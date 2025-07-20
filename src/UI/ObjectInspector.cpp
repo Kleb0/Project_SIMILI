@@ -201,6 +201,26 @@ void ObjectInspector::setScale()
     }
 }
 
+void ObjectInspector::dipslayGlobaleCoordinates(ThreeDObject* object)
+{
+    if (!object || !object->getParent())
+        return;
+
+    ImGui::Separator();
+    ImGui::Text("Selected Object is a child | Displaying Pivot Point Coordinaters :");
+
+    ThreeDObject* parent = object->getParent();
+    glm::vec3 localOrigin = object->getOrigin();
+    glm::vec3 worldOrigin = glm::vec3(object->getGlobalModelMatrix() * glm::vec4(localOrigin, 1.0f));
+
+    ImGui::Text("Pivot Point Position: X: %.2f, Y: %.2f, Z: %.2f", worldOrigin.x, worldOrigin.y, worldOrigin.z);
+
+    glm::vec3 parentWorldOrigin = glm::vec3(parent->getGlobalModelMatrix() * glm::vec4(parent->getOrigin(), 1.0f));
+    ImGui::Text("Parent World Origin: X: %.2f, Y: %.2f, Z: %.2f", parentWorldOrigin.x, parentWorldOrigin.y, parentWorldOrigin.z);
+}
+
+
+
 void ObjectInspector::render()
 {
     ImGui::Begin("Object Inspector");
@@ -255,6 +275,8 @@ void ObjectInspector::render()
         ImGui::Separator();
         setScale();
         ImGui::Separator();
+
+        dipslayGlobaleCoordinates(inspectedObject);
     
     }
     else
