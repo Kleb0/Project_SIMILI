@@ -41,7 +41,6 @@ glm::mat4 ThreeDObject::getModelMatrix() const
     return model;
 }
 
-
 void ThreeDObject::setModelMatrix(const glm::mat4 &matrix)
 {
     glm::vec3 skew;
@@ -121,4 +120,12 @@ bool ThreeDObject::isDescendantOf(ThreeDObject *potentialAncestor) const
         current = current->parent;
     }
     return false;
+}
+
+void ThreeDObject::setOrigin(const glm::vec3& newOrigin) {
+    origin = newOrigin;
+}
+
+glm::vec3 ThreeDObject::getOrigin() const {
+    return origin;
 }

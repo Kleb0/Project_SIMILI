@@ -35,18 +35,16 @@ void ThreeDWindow::addThreeDObjectsToScene(const std::vector<ThreeDObject *> &ob
     {
         if (object)
         {
-            std::cout << "[ThreeDWindow] Adding object: " << object->getName() << std::endl;
+            // std::cout << "[ThreeDWindow] Adding object: " << object->getName() << std::endl;
             object->initialize();
             ThreeDObjectsList.push_back(object);
-            if (openGLContext)
+            openGLContext->addThreeDObjectToList(object);
+
+            if(!object->getParent())
             {
-                std::cout << "[ThreeDWindow] openGLContext is not null, adding object to OpenGL context." << std::endl;
-                openGLContext->addThreeDObjectToList(object);
+                object->setOrigin(openGLContext->worldCenter);
             }
-            else
-            {
-                std::cout << "[ThreeDWindow] openGLContext is null, cannot add object to OpenGL context." << std::endl;
-            }
+
         }
     }
 }
@@ -99,7 +97,6 @@ void ThreeDWindow::setObjectInspector(ObjectInspector *inspector)
 {
     objectInspector = inspector;
 }
-
 
 // ------- Rendering the ThreeDWindow ------- //
 void ThreeDWindow::render()
@@ -260,33 +257,67 @@ void ThreeDWindow::manipulateThreeDObjects()
         ImGuizmo::WORLD,
         glm::value_ptr(dummyMatrix));
 
-    if (manipulated)
-    {
-        glm::mat4 delta = dummyMatrix * glm::inverse(prevDummyMatrix);
-
-        for (ThreeDObject *obj : multipleSelectedObjects)
+        if (manipulated)
         {
-    
-            if (obj->getParent())
+            glm::mat4 delta = dummyMatrix * glm::inverse(prevDummyMatrix);
+
+            for (ThreeDObject *obj : multipleSelectedObjects)
             {
-                glm::mat4 localModel = obj->getModelMatrix();
-                glm::mat4 newLocalModel = delta * localModel;
-                obj->setModelMatrix(newLocalModel);
-            }
-            else
-            {
-                glm::mat4 globalModel = obj->getGlobalModelMatrix();
-                glm::mat4 newGlobalModel = delta * globalModel;
-                obj->setGlobalModelMatrix(newGlobalModel);
+        
+                if (obj->getParent())
+                {
+                    glm::mat4 localModel = obj->getModelMatrix();
+                    glm::mat4 newLocalModel = delta * localModel;
+                    obj->setModelMatrix(newLocalModel);
+
+                    if (obj->canHaveChildren)
+                        manipulateChildrens(obj, delta);
+                }
+                else
+                {
+                    // Translation around the origin of the object
+                    glm::vec3 origin = obj->getOrigin();
+
+                    // Create translation matrices
+                    glm::mat4 translateToOrigin = glm::translate(glm::mat4(1.0f), origin);
+                    glm::mat4 translateBack = glm::translate(glm::mat4(1.0f), -origin);
+
+                    // Apply the translation around the pivot
+                    glm::mat4 globalModel = obj->getGlobalModelMatrix();
+                    glm::mat4 newGlobalModel = translateToOrigin * delta * translateBack * globalModel;
+
+                    obj->setGlobalModelMatrix(newGlobalModel);
+
+                    if (obj->canHaveChildren)
+                        manipulateChildrens(obj, delta);
+                }
+
             }
 
+            wasUsingGizmoLastFrame = true;
         }
 
-        wasUsingGizmoLastFrame = true;
-    }
+        prevDummyMatrix = dummyMatrix;
+        wasUsingGizmoLastFrame = false;
+}
 
-    prevDummyMatrix = dummyMatrix;
-    wasUsingGizmoLastFrame = false;
+
+void ThreeDWindow::manipulateChildrens(ThreeDObject* parent, const glm::mat4& delta)
+{
+    for (ThreeDObject* child : parent->getChildren())
+    {
+        glm::mat4 localModel = child->getModelMatrix();
+        glm::mat4 newLocalModel = delta * localModel;
+        child->setModelMatrix(newLocalModel);
+
+        glm::vec3 parentWorldOrigin = glm::vec3(parent->getGlobalModelMatrix() * glm::vec4(parent->getOrigin(), 1.0f));
+        glm::mat4 childGlobalAfter = child->getGlobalModelMatrix();
+        glm::vec3 newLocalOrigin = glm::vec3(glm::inverse(childGlobalAfter) * glm::vec4(parentWorldOrigin, 1.0f));
+        child->setOrigin(newLocalOrigin);
+
+        if (child->canHaveChildren)
+            manipulateChildrens(child, delta);
+    }
 }
 
 // --------- Object Selection ----------- //

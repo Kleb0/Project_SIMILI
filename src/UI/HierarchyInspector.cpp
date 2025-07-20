@@ -492,49 +492,44 @@ void HierarchyInspector::dragObject(ThreeDObject* draggedObj, int index)
 
 void HierarchyInspector::dropOnSlot(ThreeDObject* obj, int index)
 {
-    // std::cout << "[HierarchyInspector] dropOnSlot called with index: " << index << std::endl;
-
     ThreeDObject* base = mergedHierarchyList[index];
     EmptyDummy* dummy = dynamic_cast<EmptyDummy*>(base);
 
-
     if (dummy && dummy->isDummy())
     {
+        glm::mat4 objGlobalModel = obj->getGlobalModelMatrix();
+        glm::vec3 objWorldPosition = glm::vec3(objGlobalModel[3]);
 
-        if (obj->getParent()) {
-            ThreeDObject* currentParent = obj->getParent();
+        // Unparent the object
+        if (ThreeDObject* currentParent = obj->getParent())
+        {
             currentParent->removeChild(obj);
             obj->removeParent();
             obj->isParented = false;
-
-            // std::cout << " TEST REMOVE PARENT" << std::endl;
         }
-        exchangeSlots(obj, index);
 
+        obj->setModelMatrix(objGlobalModel); 
+        obj->setOrigin(context->worldCenter); 
+
+        exchangeSlots(obj, index);
     }
-    else if(base)
+    else if (base)
     {
         dropOnObject(base, obj, index);
         dropToSlotIndex = -1;
     }
-
-
-    
 }
 
 void HierarchyInspector::dropOnObject(ThreeDObject* parent, ThreeDObject* child, int index)
 {
-
     std::cout << "SUPER GIGA TEST DROP ON OBJECT" << std::endl;
 
-    // std::cout <<"[HierarchyInspector] dropOnObject called with parent: " << parent->getName() << std::endl;
-    //This func role is to set the parent of an object when it's being dropped on another object
     if (child->getParent() == parent)
-    {
         return;
-    }
 
-    //Detach old parent if exists
+    glm::vec3 parentWorldOrigin = glm::vec3(parent->getGlobalModelMatrix() * glm::vec4(parent->getOrigin(), 1.0f));
+    glm::mat4 childGlobalBefore = child->getGlobalModelMatrix();
+
     if (ThreeDObject* oldParent = child->getParent())
     {
         oldParent->removeChild(child);
@@ -542,11 +537,16 @@ void HierarchyInspector::dropOnObject(ThreeDObject* parent, ThreeDObject* child,
         child->isParented = false;
     }
 
-    // Attach new parent    
     parent->addChild(child);
     parent->expanded = true;
     child->setParent(parent);
-    child->isParented = true;   
+    child->isParented = true;
+
+
+    glm::mat4 childGlobalAfter = child->getGlobalModelMatrix(); 
+    glm::vec3 newLocalOrigin = glm::vec3(glm::inverse(childGlobalAfter) * glm::vec4(parentWorldOrigin, 1.0f));
+    child->setOrigin(newLocalOrigin);
+
     redrawSlotsList();
 }
 

@@ -26,6 +26,9 @@ public:
     void setRotation();
     void setScale();
 
+    bool showGlobalOrigin = false;
+
+
 private:
     ThreeDObject *inspectedObject = nullptr;
     std::list<ThreeDObject *> multipleInspectedObjects;

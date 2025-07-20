@@ -21,6 +21,8 @@ public:
 
     void add(ThreeDObject *object);
     GLuint getTexture() const { return fboTexture; }
+    std::vector<glm::vec3> worldCenter;
+
 
 private:
     std::list<ThreeDObject *> objects;

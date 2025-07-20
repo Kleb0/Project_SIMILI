@@ -38,8 +38,6 @@ public:
 
     glm::mat4 getGlobalModelMatrix() const;
 
-
-
     void setSelected(bool selected) { isCurrentlySelected = selected; }
     bool getSelected() const { return isCurrentlySelected; }
     virtual bool isSelectable() const { return true; }
@@ -63,6 +61,9 @@ public:
     virtual bool isDummy() const { return false; }
     virtual bool isInspectable() const { return true; }
 
+    void setOrigin (const glm::vec3& origin);
+    glm::vec3 getOrigin() const;
+    
 
     glm::vec3 position = glm::vec3(0.0f);
     glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
@@ -87,4 +88,5 @@ protected:
     int slotIndex  = -1;
     bool isCurrentlySelected = false;
     std::string name = "Unnamed";
+    glm::vec3 origin = glm::vec3(0.0f); 
 };

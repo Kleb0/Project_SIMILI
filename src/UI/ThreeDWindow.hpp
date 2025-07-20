@@ -59,6 +59,7 @@ private:
     void handleClick();
     void toggleMultipleSelection(ThreeDObject *object);
     void manipulateThreeDObjects();
+    void manipulateChildrens(ThreeDObject *parent, const glm::mat4 &delta);
 
     glm::mat4 view = glm::mat4(1.0f);
     glm::mat4 proj = glm::mat4(1.0f);

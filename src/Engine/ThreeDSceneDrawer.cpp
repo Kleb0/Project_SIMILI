@@ -51,6 +51,8 @@ void ThreeDSceneDrawer::compileShaders()
 
 	glDeleteShader(vertexShader);
 	glDeleteShader(fragmentShader);
+
+	
 }
 
 void ThreeDSceneDrawer::initizalize()
@@ -107,7 +109,12 @@ void ThreeDSceneDrawer::initizalize()
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_DEPTH_TEST);
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+	worldCenter.clear();
+	worldCenter.push_back(glm::vec3(0.0f, 0.0f, 0.0f));
 }
+
+
 
 void ThreeDSceneDrawer::resize(int w, int h)
 {

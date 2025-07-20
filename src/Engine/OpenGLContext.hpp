@@ -29,10 +29,6 @@ public:
 
     void addThreeDObjectToList(ThreeDObject *object);
 
-    // std::list<ThreeDObject *> getObjects() const
-    // {
-    //     return objects;
-    // }
     const std::list<ThreeDObject *> &getObjects() const { return objects; } 
     std::list<ThreeDObject *> &getObjects() { return objects; } 
 
@@ -42,11 +38,13 @@ public:
     }
 
     void removeThreeDobjectFromList(ThreeDObject *object);
+    glm::vec3 worldCenter = glm::vec3(0.0f);
+    glm::vec3 getWorldCenter() const { return worldCenter; }
 
 private:
     glm::mat4 viewMatrix = glm::mat4(1.0f);
     glm::mat4 projMatrix = glm::mat4(1.0f);
-
+    
     GLuint fbo = 0;
     GLuint fboTexture = 0;
     GLuint rbo = 0;

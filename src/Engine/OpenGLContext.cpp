@@ -35,6 +35,7 @@ OpenGLContext::OpenGLContext()
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
     scene.initizalize();
+    worldCenter = scene.worldCenter[0];
 }
 
 void OpenGLContext::addThreeDObjectToList(ThreeDObject *object)
