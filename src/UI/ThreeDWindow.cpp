@@ -115,6 +115,7 @@ void ThreeDWindow::render()
     ImGui::End();
 }
 
+
 void ThreeDWindow::threeDRendering()
 {
     ImGui::BeginChild("OpenGLChildWindow", ImVec2(0, 0), true, ImGuiWindowFlags_None);
@@ -195,112 +196,6 @@ void ThreeDWindow::threeDRendering()
 }
 
 // --------- Object Manipulation ----------- //
-void ThreeDWindow::manipulateThreeDObjects()
-{
-    if (multipleSelectedObjects.empty())
-        return;
-
-    ImGuizmo::BeginFrame();
-    ImGuizmo::Enable(true);
-    ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
-    ImGuizmo::SetDrawlist();
-    ImGuizmo::SetRect(oglChildPos.x, oglChildPos.y, oglChildSize.x, oglChildSize.y);
-    ImGuizmo::SetGizmoSizeClipSpace(0.2f);
-
-    static ImGuizmo::OPERATION currentGizmoOperation = ImGuizmo::TRANSLATE;
-
-    if (ImGui::IsKeyPressed(ImGuiKey_W))
-        currentGizmoOperation = ImGuizmo::TRANSLATE;
-    if (ImGui::IsKeyPressed(ImGuiKey_R))
-        currentGizmoOperation = ImGuizmo::ROTATE;
-    if (ImGui::IsKeyPressed(ImGuiKey_S))
-        currentGizmoOperation = ImGuizmo::SCALE;
-
-    view = openGLContext->getViewMatrix();
-    proj = openGLContext->getProjectionMatrix();
-
-    glm::vec3 center(0.0f);
-    std::vector<glm::quat> allRotations;
-    glm::vec3 averageScale(0.0f);
-
-    for (ThreeDObject *obj : multipleSelectedObjects)
-    {
-        center += obj->getPosition();
-        allRotations.push_back(obj->rotation);
-        averageScale += obj->getScale();
-    }
-
-    center /= static_cast<float>(multipleSelectedObjects.size());
-    averageScale /= static_cast<float>(multipleSelectedObjects.size());
-
-    glm::vec4 cumulative(0.0f);
-    for (const glm::quat &q : allRotations)
-    {
-        glm::quat qn = q;
-        if (glm::dot(qn, allRotations[0]) < 0.0f)
-            qn = -qn;
-        cumulative += glm::vec4(qn.x, qn.y, qn.z, qn.w);
-    }
-    cumulative = glm::normalize(cumulative);
-    glm::quat averageRotation = glm::quat(cumulative.w, cumulative.x, cumulative.y, cumulative.z);
-
-    glm::mat4 dummyMatrix = glm::translate(glm::mat4(1.0f), center);
-    dummyMatrix *= glm::toMat4(glm::normalize(averageRotation));
-    dummyMatrix = glm::scale(dummyMatrix, averageScale);
-
-    static glm::mat4 prevDummyMatrix = glm::mat4(1.0f);
-
-    bool manipulated = ImGuizmo::Manipulate(
-        glm::value_ptr(view),
-        glm::value_ptr(proj),
-        currentGizmoOperation,
-        ImGuizmo::WORLD,
-        glm::value_ptr(dummyMatrix));
-
-        if (manipulated)
-        {
-            glm::mat4 delta = dummyMatrix * glm::inverse(prevDummyMatrix);
-
-            for (ThreeDObject *obj : multipleSelectedObjects)
-            {
-        
-                if (obj->getParent())
-                {
-                    glm::mat4 localModel = obj->getModelMatrix();
-                    glm::mat4 newLocalModel = delta * localModel;
-                    obj->setModelMatrix(newLocalModel);
-
-                    if (obj->canHaveChildren)
-                        manipulateChildrens(obj, delta);
-                }
-                else
-                {
-                    // Translation around the origin of the object
-                    glm::vec3 origin = obj->getOrigin();
-
-                    // Create translation matrices
-                    glm::mat4 translateToOrigin = glm::translate(glm::mat4(1.0f), origin);
-                    glm::mat4 translateBack = glm::translate(glm::mat4(1.0f), -origin);
-
-                    // Apply the translation around the pivot
-                    glm::mat4 globalModel = obj->getGlobalModelMatrix();
-                    glm::mat4 newGlobalModel = translateToOrigin * delta * translateBack * globalModel;
-
-                    obj->setGlobalModelMatrix(newGlobalModel);
-
-                    if (obj->canHaveChildren)
-                        manipulateChildrens(obj, delta);
-                }
-
-            }
-
-            wasUsingGizmoLastFrame = true;
-        }
-
-        prevDummyMatrix = dummyMatrix;
-        wasUsingGizmoLastFrame = false;
-}
-
 
 void ThreeDWindow::manipulateChildrens(ThreeDObject* parent, const glm::mat4& delta)
 {
@@ -319,6 +214,104 @@ void ThreeDWindow::manipulateChildrens(ThreeDObject* parent, const glm::mat4& de
             manipulateChildrens(child, delta);
     }
 }
+
+void ThreeDWindow::applyGizmoTransformation(const glm::mat4& delta)
+{
+    for (ThreeDObject *obj : multipleSelectedObjects)
+    {
+        if (obj->getParent())
+        {
+            glm::mat4 newLocal = delta * obj->getModelMatrix();
+            obj->setModelMatrix(newLocal);
+        }
+        else
+        {
+            glm::vec3 origin = obj->getOrigin();
+            glm::mat4 toOrigin = glm::translate(glm::mat4(1.0f), origin);
+            glm::mat4 back = glm::translate(glm::mat4(1.0f), -origin);
+
+            glm::mat4 newGlobal = toOrigin * delta * back * obj->getGlobalModelMatrix();
+            obj->setGlobalModelMatrix(newGlobal);
+        }
+
+        if (obj->canHaveChildren)
+            manipulateChildrens(obj, delta);
+    }
+}
+
+glm::mat4 ThreeDWindow::prepareGizmoFrame(ImGuizmo::OPERATION op)
+{
+    ImGuizmo::BeginFrame();
+    ImGuizmo::Enable(true);
+    ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
+    ImGuizmo::SetDrawlist();
+    ImGuizmo::SetRect(oglChildPos.x, oglChildPos.y, oglChildSize.x, oglChildSize.y);
+    ImGuizmo::SetGizmoSizeClipSpace(0.2f);
+
+    view = openGLContext->getViewMatrix();
+    proj = openGLContext->getProjectionMatrix();
+
+    glm::vec3 center(0.0f);
+    glm::vec3 averageScale(0.0f);
+    std::vector<glm::quat> rotations;
+
+    for (ThreeDObject *obj : multipleSelectedObjects)
+    {
+        center += obj->getPosition();
+        rotations.push_back(obj->rotation);
+        averageScale += obj->getScale();
+    }
+
+    center /= multipleSelectedObjects.size();
+    averageScale /= multipleSelectedObjects.size();
+
+    glm::vec4 cumulative(0.0f);
+    for (const auto& q : rotations)
+    {
+        glm::quat aligned = glm::dot(q, rotations[0]) < 0.0f ? -q : q;
+        cumulative += glm::vec4(aligned.x, aligned.y, aligned.z, aligned.w);
+    }
+
+    cumulative = glm::normalize(cumulative);
+    glm::quat avgRotation = glm::quat(cumulative.w, cumulative.x, cumulative.y, cumulative.z);
+
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), center);
+    model *= glm::toMat4(glm::normalize(avgRotation));
+    model = glm::scale(model, averageScale);
+
+    return model;
+}
+
+void ThreeDWindow::manipulateThreeDObjects()
+{
+    if (multipleSelectedObjects.empty()) return;
+
+    static ImGuizmo::OPERATION currentGizmoOperation = ImGuizmo::TRANSLATE;
+
+    if (ImGui::IsKeyPressed(ImGuiKey_W)) currentGizmoOperation = ImGuizmo::TRANSLATE;
+    if (ImGui::IsKeyPressed(ImGuiKey_R)) currentGizmoOperation = ImGuizmo::ROTATE;
+    if (ImGui::IsKeyPressed(ImGuiKey_S)) currentGizmoOperation = ImGuizmo::SCALE;
+
+    glm::mat4 dummyMatrix = prepareGizmoFrame(currentGizmoOperation);
+
+    static glm::mat4 prevDummyMatrix = glm::mat4(1.0f);
+
+    if (ImGuizmo::Manipulate(
+            glm::value_ptr(view),
+            glm::value_ptr(proj),
+            currentGizmoOperation,
+            ImGuizmo::WORLD,
+            glm::value_ptr(dummyMatrix)))
+    {
+        glm::mat4 delta = dummyMatrix * glm::inverse(prevDummyMatrix);
+        applyGizmoTransformation(delta);
+        wasUsingGizmoLastFrame = true;
+    }
+
+    prevDummyMatrix = dummyMatrix;
+    wasUsingGizmoLastFrame = false;
+}
+
 
 // --------- Object Selection ----------- //
 

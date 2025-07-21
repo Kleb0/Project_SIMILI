@@ -1,6 +1,8 @@
 #pragma once
 
 #include "WorldObjects/ThreedObject.hpp"
+#include "WorldObjects/Vertice.hpp"
+#include <vector>
 
 class Cube : public ThreeDObject
 {
@@ -12,10 +14,14 @@ public:
     void render(const glm::mat4 &viewProj) override;
     void destroy() override;
 
+    const std::vector<Vertice*>& getVertices() const;
+
 private:
     unsigned int vao = 0;
     unsigned int vbo = 0;
     unsigned int shaderProgram = 0;
 
+    std::vector<Vertice*> vertices;
     void compileShaders();
+    void createVertices();
 };

@@ -169,7 +169,7 @@ void HierarchyInspector::drawSlotsList(bool& clickedOnItem)
             if (!obj)
                 continue;
 
-            if (obj->isParented)
+            if (obj->isParented || obj->IsVertice())
                 continue; 
 
             int slot = obj->getSlot();
@@ -277,7 +277,7 @@ void HierarchyInspector::drawChildSlots(ThreeDObject* parent,  bool& clickedOnIt
 
     for (ThreeDObject* child : parent->getChildren())
     {
-        if (!child) continue;
+        if (!child || child->IsVertice()) continue;
         
         // ---------- Begin Child Slot Rendering ---------- //
 
@@ -318,11 +318,6 @@ void HierarchyInspector::drawChildSlots(ThreeDObject* parent,  bool& clickedOnIt
 
         // ----------------- End of child detection ----------------- //
 
-        // if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
-        //     child->expanded = !child->expanded;
-
-        // if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f))
-        //     currentlyDraggedObject = child;
 
         if (ImGui::IsItemHovered() &&
             ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&

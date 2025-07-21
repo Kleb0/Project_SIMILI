@@ -81,6 +81,7 @@ public:
     void setMovedSlotIndex(int index) { movedSlotIndex = index; }
     int getMovedSlotIndex() const { return movedSlotIndex; }
     
+    virtual bool IsVertice() const { return false; }
 
 protected:
 

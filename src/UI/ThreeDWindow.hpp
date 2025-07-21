@@ -58,7 +58,10 @@ public:
 private:
     void handleClick();
     void toggleMultipleSelection(ThreeDObject *object);
+    glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION operation);
+    void applyGizmoTransformation(const glm::mat4 &delta);
     void manipulateThreeDObjects();
+    
     void manipulateChildrens(ThreeDObject *parent, const glm::mat4 &delta);
 
     glm::mat4 view = glm::mat4(1.0f);
