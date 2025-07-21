@@ -78,11 +78,29 @@ void Cube::createVertices()
     }
 }
 
+
+void Cube::createEdges()
+{
+    const int edgeIndices[][2] = {
+        {0, 1}, {1, 2}, {2, 3}, {3, 0},
+        {4, 5}, {5, 6}, {6, 7}, {7, 4},
+        {0, 4}, {1, 5}, {2, 6}, {3, 7}
+    };
+
+    for (const auto& pair : edgeIndices)
+    {
+        Edge* edge = new Edge(vertices[pair[0]], vertices[pair[1]]);
+        edge->initialize();
+        edges.push_back(edge);
+    }
+}
+
 void Cube::initialize()
 {
     compileShaders();
 
     createVertices();
+    createEdges();
 
     glm::mat4 modelMatrix = getModelMatrix();
 
@@ -166,6 +184,11 @@ void Cube::render(const glm::mat4& viewProj)
 
         vertices[i]->render(viewProj, modelMatrix);
     }
+
+    for (Edge* edge : edges)
+    {
+        edge->render(viewProj, modelMatrix);
+    }
 }
 
 const std::vector<Vertice*>& Cube::getVertices() const
@@ -173,6 +196,10 @@ const std::vector<Vertice*>& Cube::getVertices() const
     return vertices;
 }
 
+const std::vector<Edge*>& Cube::getEdges() const
+{
+    return edges;
+}
 
 void Cube::destroy()
 {
@@ -186,6 +213,16 @@ void Cube::destroy()
         }
     }
     vertices.clear();
+
+    for (Edge* edge : edges)
+    {
+        if (edge)
+        {
+            edge->destroy();
+            delete edge;
+        }
+    }
+    edges.clear();
 
     if (vao != 0)
     {

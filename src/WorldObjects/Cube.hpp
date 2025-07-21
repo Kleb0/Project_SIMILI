@@ -2,6 +2,7 @@
 
 #include "WorldObjects/ThreedObject.hpp"
 #include "WorldObjects/Vertice.hpp"
+#include "WorldObjects/Edge.hpp"
 #include <vector>
 
 class Cube : public ThreeDObject
@@ -15,6 +16,7 @@ public:
     void destroy() override;
 
     const std::vector<Vertice*>& getVertices() const;
+    const std::vector<Edge*>& getEdges() const;
 
 private:
     unsigned int vao = 0;
@@ -22,6 +24,8 @@ private:
     unsigned int shaderProgram = 0;
 
     std::vector<Vertice*> vertices;
+    std::vector<Edge*> edges;
     void compileShaders();
     void createVertices();
+    void createEdges();
 };
