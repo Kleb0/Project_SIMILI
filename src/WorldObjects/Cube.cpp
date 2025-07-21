@@ -3,52 +3,15 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 
-const char *cubeVertexShaderSource = R"(
-#version 330 core
-layout(location = 0) in vec3 aPos;
-uniform mat4 model;
-uniform mat4 viewProj;
-void main()
-{
-    gl_Position = viewProj * model * vec4(aPos, 1.0);
-}
-)";
-
-const char *cubeFragmentShaderSource = R"(
-#version 330 core
-layout(location = 0) out vec4 FragColor;
-uniform vec4 color;
-void main()
-{
-    FragColor = color;
-}
-)";
-
 Cube::Cube() {}
 Cube::~Cube()
 {
-    glDeleteVertexArrays(1, &vao);
-    glDeleteBuffers(1, &vbo);
-    glDeleteProgram(shaderProgram);
+
 }
 
 void Cube::compileShaders()
 {
-    unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &cubeVertexShaderSource, nullptr);
-    glCompileShader(vertexShader);
 
-    unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &cubeFragmentShaderSource, nullptr);
-    glCompileShader(fragmentShader);
-
-    shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
-
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
 }
 
 void Cube::createVertices()
@@ -95,12 +58,51 @@ void Cube::createEdges()
     }
 }
 
+void Cube::createFaces()
+{
+
+    const int faceVertIndices[6][4] = {
+        {0, 1, 2, 3},
+        {4, 5, 6, 7},
+        {0, 4, 5, 1}, 
+        {3, 2, 6, 7}, 
+        {0, 3, 7, 4}, 
+        {1, 5, 6, 2}  
+    };
+
+    const int faceEdgeIndices[6][4] = {
+        {0, 1, 2, 3},
+        {4, 5, 6, 7},
+        {8, 4, 9, 0},
+        {2, 10, 6, 11},
+        {3, 11, 7, 8},
+        {1, 9, 5, 10}
+    };
+
+    for (int i = 0; i < 6; ++i)
+    {
+        Face* face = new Face(
+            vertices[faceVertIndices[i][0]],
+            vertices[faceVertIndices[i][1]],
+            vertices[faceVertIndices[i][2]],
+            vertices[faceVertIndices[i][3]],
+            edges[faceEdgeIndices[i][0]],
+            edges[faceEdgeIndices[i][1]],
+            edges[faceEdgeIndices[i][2]],
+            edges[faceEdgeIndices[i][3]]
+        );
+        face->initialize();
+        faces.push_back(face);
+    }
+
+
+}
+
 void Cube::initialize()
 {
-    compileShaders();
-
     createVertices();
     createEdges();
+    createFaces();
 
     glm::mat4 modelMatrix = getModelMatrix();
 
@@ -132,18 +134,6 @@ void Cube::initialize()
         finalVertexData.push_back(worldPos.y);
         finalVertexData.push_back(worldPos.z);
     }
-
-    glGenVertexArrays(1, &vao);
-    glGenBuffers(1, &vbo);
-
-    glBindVertexArray(vao);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, finalVertexData.size() * sizeof(float), finalVertexData.data(), GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    glBindVertexArray(0);
 }
 
 
@@ -152,21 +142,11 @@ void Cube::render(const glm::mat4& viewProj)
     glm::mat4 modelMatrix = getModelMatrix();
 
     // --- Render Cube
-    glUseProgram(shaderProgram);
 
-    glUniform4f(glGetUniformLocation(shaderProgram, "color"), 0.3f, 0.7f, 0.9f, 0.3f);
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(modelMatrix));
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDepthMask(GL_FALSE);
-
-    glBindVertexArray(vao);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-    glBindVertexArray(0);
-
-    glDepthMask(GL_TRUE);
+    for (Face* face : faces)
+    {
+        face->render(viewProj, modelMatrix);
+    }
 
     glm::vec3 localPositions[] = {
         {-0.5f, -0.5f, -0.5f},
@@ -178,6 +158,7 @@ void Cube::render(const glm::mat4& viewProj)
         { 0.5f,  0.5f,  0.5f},
         {-0.5f,  0.5f,  0.5f}
     };
+
 
     for (int i = 0; i < vertices.size(); ++i)
     {
@@ -201,6 +182,11 @@ const std::vector<Edge*>& Cube::getEdges() const
     return edges;
 }
 
+const std::vector<Face*>& Cube::getFaces() const
+{
+    return faces;
+}
+
 void Cube::destroy()
 {
 
@@ -222,27 +208,19 @@ void Cube::destroy()
             delete edge;
         }
     }
+
     edges.clear();
-
-    if (vao != 0)
-    {
-        glDeleteVertexArrays(1, &vao);
-        vao = 0;
-    }
-
-    if (vbo != 0)
-    {
-        glDeleteBuffers(1, &vbo);
-        vbo = 0;
-    }
-
-    if (shaderProgram != 0)
-    {
-        glDeleteProgram(shaderProgram);
-        shaderProgram = 0;
-    }
-
     
+
+    for (Face* face : faces)
+    {
+        if (face)
+        {
+            face->destroy();
+            delete face;
+        }
+    }
+    faces.clear();
 
     std::cout << "[Cube] Resources destroyed manually." << std::endl;
 }

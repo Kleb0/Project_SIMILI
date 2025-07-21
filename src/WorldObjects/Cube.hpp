@@ -3,6 +3,7 @@
 #include "WorldObjects/ThreedObject.hpp"
 #include "WorldObjects/Vertice.hpp"
 #include "WorldObjects/Edge.hpp"
+#include "WorldObjects/Face.hpp"
 #include <vector>
 
 class Cube : public ThreeDObject
@@ -17,15 +18,16 @@ public:
 
     const std::vector<Vertice*>& getVertices() const;
     const std::vector<Edge*>& getEdges() const;
+    const std::vector<Face*>& getFaces() const;
+
 
 private:
-    unsigned int vao = 0;
-    unsigned int vbo = 0;
-    unsigned int shaderProgram = 0;
-
     std::vector<Vertice*> vertices;
     std::vector<Edge*> edges;
+    std::vector<Face*> faces;
+
     void compileShaders();
     void createVertices();
     void createEdges();
+    void createFaces();
 };
