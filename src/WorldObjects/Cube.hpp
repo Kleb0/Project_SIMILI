@@ -26,7 +26,6 @@ private:
     std::vector<Edge*> edges;
     std::vector<Face*> faces;
 
-    void compileShaders();
     void createVertices();
     void createEdges();
     void createFaces();
