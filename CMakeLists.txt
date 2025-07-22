@@ -25,7 +25,8 @@ endif()
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI    
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ThreeDModes  
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/images
     ${CMAKE_CURRENT_SOURCE_DIR}/src/InternalLogic
@@ -35,6 +36,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/example
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glad
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glm
+
     ${SDL3_INCLUDE_DIR}
 )
 
@@ -153,6 +155,7 @@ add_executable(${PROJECT_NAME}
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ThreeDModes    
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/images
     ${CMAKE_CURRENT_SOURCE_DIR}/src/InternalLogic

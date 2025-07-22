@@ -30,6 +30,8 @@ public:
     void render() override;
     void threeDRendering();
 
+    void renderModeIcons();
+
     ThreeDWindow &setRenderer(OpenGLContext &context);
 
     void addThreeDObjectsToScene(const std::vector<ThreeDObject *> &objects);

@@ -118,6 +118,7 @@ void ThreeDWindow::render()
 
 void ThreeDWindow::threeDRendering()
 {
+
     ImGui::BeginChild("OpenGLChildWindow", ImVec2(0, 0), true, ImGuiWindowFlags_None);
 
     oglChildPos = ImGui::GetCursorScreenPos();
@@ -129,7 +130,6 @@ void ThreeDWindow::threeDRendering()
     openGLContext->render();
 
     ImTextureID textureID = (ImTextureID)(intptr_t)openGLContext->getTexture();
-
     ImGui::Image(textureID, oglChildSize, ImVec2(0, 1), ImVec2(1, 0));
 
     manipulateThreeDObjects();
@@ -192,7 +192,39 @@ void ThreeDWindow::threeDRendering()
         }
     }
 
+    // ---- Mode Display ---- //
+
+    ImGui::SetCursorScreenPos(ImVec2(oglChildPos.x + 10, oglChildPos.y + 10));
+    ImGui::BeginGroup();
+
+    ImVec2 iconSize = ImVec2(32, 32);
+    ImVec2 iconPos0 = ImGui::GetCursorScreenPos();
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+
+    // Icon 0
+    ImVec2 min0 = iconPos0;
+    ImVec2 max0 = ImVec2(min0.x + iconSize.x, min0.y + iconSize.y);
+    draw_list->AddRectFilled(min0, max0, IM_COL32(0, 0, 0, 0));
+    draw_list->AddRect(min0, max0, IM_COL32(255, 255, 255, 255));
+    draw_list->AddText(ImVec2(min0.x + 10, min0.y + 6), IM_COL32(255, 255, 255, 255), "0");
+
+    ImGui::SetCursorScreenPos(ImVec2(min0.x + iconSize.x + 5, min0.y));
+
+    // Icon 1
+    ImVec2 iconPos1 = ImGui::GetCursorScreenPos();
+    ImVec2 min1 = iconPos1;
+    ImVec2 max1 = ImVec2(min1.x + iconSize.x, min1.y + iconSize.y);
+    draw_list->AddRectFilled(min1, max1, IM_COL32(0, 0, 0, 0));
+    draw_list->AddRect(min1, max1, IM_COL32(255, 255, 255, 255));
+    draw_list->AddText(ImVec2(min1.x + 10, min1.y + 6), IM_COL32(255, 255, 255, 255), "1");
+
+    ImGui::EndGroup();
+
+    // --------- End of Mode Display ----------- //
+
+
     ImGui::EndChild();
+
 }
 
 // --------- Object Manipulation ----------- //

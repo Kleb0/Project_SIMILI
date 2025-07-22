@@ -9,10 +9,6 @@ Cube::~Cube()
 
 }
 
-void Cube::compileShaders()
-{
-
-}
 
 void Cube::createVertices()
 {
@@ -143,11 +139,6 @@ void Cube::render(const glm::mat4& viewProj)
 
     // --- Render Cube
 
-    for (Face* face : faces)
-    {
-        face->render(viewProj, modelMatrix);
-    }
-
     glm::vec3 localPositions[] = {
         {-0.5f, -0.5f, -0.5f},
         { 0.5f, -0.5f, -0.5f},
@@ -158,6 +149,11 @@ void Cube::render(const glm::mat4& viewProj)
         { 0.5f,  0.5f,  0.5f},
         {-0.5f,  0.5f,  0.5f}
     };
+
+    for (Face* face : faces)
+    {
+        face->render(viewProj, modelMatrix);
+    }
 
 
     for (int i = 0; i < vertices.size(); ++i)
