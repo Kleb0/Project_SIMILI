@@ -29,6 +29,18 @@ ThreeDWindow &ThreeDWindow::setRenderer(OpenGLContext &context)
     return *this;
 }
 
+void ThreeDWindow::setModelingMode(ThreeDMode* mode)
+{
+    std::cout << "[ThreeDWindow] Setting modeling mode to: " << (mode ? mode->getName() : "None") << std::endl;
+    if (mode)
+    {
+        currentMode = mode;
+        ThreeDMode::setMode(std::unique_ptr<ThreeDMode>(mode));
+    }
+}
+
+
+
 void ThreeDWindow::addThreeDObjectsToScene(const std::vector<ThreeDObject *> &objects)
 {
     for (auto *object : objects)
@@ -192,8 +204,14 @@ void ThreeDWindow::threeDRendering()
         }
     }
 
-    // ---- Mode Display ---- //
+    renderModelingModes();
 
+    ImGui::EndChild();
+
+}
+
+void ThreeDWindow::renderModelingModes()
+{
     ImGui::SetCursorScreenPos(ImVec2(oglChildPos.x + 10, oglChildPos.y + 10));
     ImGui::BeginGroup();
 
@@ -201,16 +219,26 @@ void ThreeDWindow::threeDRendering()
     ImVec2 iconPos0 = ImGui::GetCursorScreenPos();
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
-    // Icon 0
+    // Icon 0 : Normal Mode
+    // === Mode Normal ===
     ImVec2 min0 = iconPos0;
     ImVec2 max0 = ImVec2(min0.x + iconSize.x, min0.y + iconSize.y);
+
+    ImU32 normalBorderColor = (currentMode == &normalMode)
+        ? IM_COL32(255, 165, 0, 255)   
+        : IM_COL32(255, 255, 255, 255); 
+
+    ImU32 normalTextColor = (currentMode == &normalMode)
+        ? IM_COL32(255, 200, 100, 255) 
+        : IM_COL32(255, 255, 255, 255);
+
     draw_list->AddRectFilled(min0, max0, IM_COL32(0, 0, 0, 0));
-    draw_list->AddRect(min0, max0, IM_COL32(255, 255, 255, 255));
-    draw_list->AddText(ImVec2(min0.x + 10, min0.y + 6), IM_COL32(255, 255, 255, 255), "0");
+    draw_list->AddRect(min0, max0, normalBorderColor, 0.0f, 0, 2.0f);
+    draw_list->AddText(ImVec2(min0.x + 10, min0.y + 6), normalTextColor, "0");
 
     ImGui::SetCursorScreenPos(ImVec2(min0.x + iconSize.x + 5, min0.y));
 
-    // Icon 1
+    // Icon 1 : Vertice Mode
     ImVec2 iconPos1 = ImGui::GetCursorScreenPos();
     ImVec2 min1 = iconPos1;
     ImVec2 max1 = ImVec2(min1.x + iconSize.x, min1.y + iconSize.y);
@@ -219,13 +247,8 @@ void ThreeDWindow::threeDRendering()
     draw_list->AddText(ImVec2(min1.x + 10, min1.y + 6), IM_COL32(255, 255, 255, 255), "1");
 
     ImGui::EndGroup();
-
-    // --------- End of Mode Display ----------- //
-
-
-    ImGui::EndChild();
-
 }
+
 
 // --------- Object Manipulation ----------- //
 
@@ -349,6 +372,8 @@ void ThreeDWindow::manipulateThreeDObjects()
 
 void ThreeDWindow::handleClick()
 {
+
+
     if (selectionLocked)
     {
         selectionLocked = false; // Unlock selection for next click
@@ -369,81 +394,92 @@ void ThreeDWindow::handleClick()
         view = openGLContext->getViewMatrix();
         proj = openGLContext->getProjectionMatrix();
 
-        bool preventSelection = ImGuizmo::IsOver();
-        if (!preventSelection)
+        if (dynamic_cast<Normal_Mode*>(ThreeDMode::getCurrentMode()))
         {
-            selector.pickUpTarget((int)relativeMouseX, (int)relativeMouseY,
-                                  windowWidth, windowHeight, view, proj, ThreeDObjectsList);
-        }
+            std::cout << "[DEBUG] Normal Mode active, click mesh operation done." << std::endl;
 
-        ThreeDObject *selected = selector.getSelectedObject();
-        bool shiftPressed = ImGui::GetIO().KeyShift;
+            // --------------------------------------
 
-        if (selected)
-        {
-            // -------- Clicked Object --------
-            if (!shiftPressed)
-            {
-                for (auto *obj : ThreeDObjectsList)
-                    obj->setSelected(false);
-                multipleSelectedObjects.clear();
-            }
-
-            auto it = std::find(multipleSelectedObjects.begin(), multipleSelectedObjects.end(), selected);
-            if (it == multipleSelectedObjects.end())
-            {
-                multipleSelectedObjects.push_back(selected);
-                selected->setSelected(true);
-            }
-            else if (shiftPressed)
-            {
-                multipleSelectedObjects.erase(it);
-                selected->setSelected(false);
-            }
-
-            if (objectInspector)
-            {
-                if (multipleSelectedObjects.size() > 1)
+                // ------- selecting an mesh object ------- //
+                bool preventSelection = ImGuizmo::IsOver();
+                if (!preventSelection)
                 {
-                    objectInspector->clearInspectedObject();
-                    objectInspector->setMultipleInspectedObjects(multipleSelectedObjects);
+                    selector.pickUpTarget((int)relativeMouseX, (int)relativeMouseY,
+                                        windowWidth, windowHeight, view, proj, ThreeDObjectsList);
                 }
-                else
+
+                ThreeDObject *selected = selector.getSelectedObject();
+                bool shiftPressed = ImGui::GetIO().KeyShift;
+
+                if (selected)
                 {
-                    objectInspector->setInspectedObject(selected);
+                    // -------- Clicked Object --------
+                    if (!shiftPressed)
+                    {
+                        for (auto *obj : ThreeDObjectsList)
+                            obj->setSelected(false);
+                        multipleSelectedObjects.clear();
+                    }
+
+                    auto it = std::find(multipleSelectedObjects.begin(), multipleSelectedObjects.end(), selected);
+                    if (it == multipleSelectedObjects.end())
+                    {
+                        multipleSelectedObjects.push_back(selected);
+                        selected->setSelected(true);
+                    }
+                    else if (shiftPressed)
+                    {
+                        multipleSelectedObjects.erase(it);
+                        selected->setSelected(false);
+                    }
+
+                    if (objectInspector)
+                    {
+                        if (multipleSelectedObjects.size() > 1)
+                        {
+                            objectInspector->clearInspectedObject();
+                            objectInspector->setMultipleInspectedObjects(multipleSelectedObjects);
+                        }
+                        else
+                        {
+                            objectInspector->setInspectedObject(selected);
+                        }
+                    }
+
+                    if (hierarchy)
+                        hierarchy->selectFromThreeDWindow();
+
+                    selector.clearTarget();
                 }
-            }
+                else if (!ImGuizmo::IsUsing() && !wasUsingGizmoLastFrame)
+                {
+                    // --------- Click without object hit ---------
+                    std::cout << "[DEBUG] No object hit — clearing selection." << std::endl;
 
-            if (hierarchy)
-                hierarchy->selectFromThreeDWindow();
+                    for (auto *obj : ThreeDObjectsList)
+                        obj->setSelected(false);
 
-            selector.clearTarget();
+                    multipleSelectedObjects.clear();
+                    selector.clearTarget();
+
+                    if (objectInspector)
+                    {
+                        objectInspector->clearInspectedObject();
+                        objectInspector->clearMultipleInspectedObjects();
+                    }
+
+                    if (hierarchy)
+                    {
+                        hierarchy->clearMultipleSelection();
+                        hierarchy->unselectObject(hierarchy->getSelectedObject());
+                    }
+
+                    wasUsingGizmoLastFrame = false;
+                }
+                // --------- End of click handling --------
         }
-        else if (!ImGuizmo::IsUsing() && !wasUsingGizmoLastFrame)
-        {
-            // --------- Click without object hit ---------
-            std::cout << "[DEBUG] No object hit — clearing selection." << std::endl;
 
-            for (auto *obj : ThreeDObjectsList)
-                obj->setSelected(false);
-
-            multipleSelectedObjects.clear();
-            selector.clearTarget();
-
-            if (objectInspector)
-            {
-                objectInspector->clearInspectedObject();
-                objectInspector->clearMultipleInspectedObjects();
-            }
-
-            if (hierarchy)
-            {
-                hierarchy->clearMultipleSelection();
-                hierarchy->unselectObject(hierarchy->getSelectedObject());
-            }
-
-            wasUsingGizmoLastFrame = false;
-        }
+      
     }
 }
 

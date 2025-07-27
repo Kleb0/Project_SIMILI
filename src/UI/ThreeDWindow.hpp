@@ -15,6 +15,10 @@
 #include "Engine/OpenGLContext.hpp"
 #include "Engine/ThreeDObjectSelector.hpp"
 
+#include "UI/ThreeDModes/ThreeDMode.hpp"
+#include "UI/ThreeDModes/Normal_Mode.hpp"
+#include "UI/ThreeDModes/Vertice_Mode.hpp"
+
 //=== Forward declarations ===//
 class HierarchyInspector;
 class ObjectInspector;
@@ -27,10 +31,12 @@ public:
     ThreeDWindow();
     ThreeDWindow(const std::string &title, const std::string &text);
 
+
+    void setModelingMode(ThreeDMode* mode);
     void render() override;
     void threeDRendering();
+    void renderModelingModes();
 
-    void renderModeIcons();
 
     ThreeDWindow &setRenderer(OpenGLContext &context);
 
@@ -57,6 +63,10 @@ public:
     bool wasUsingGizmoLastFrame = false;
     bool selectionLocked = false;
 
+    ThreeDMode *currentMode = nullptr;
+    Vertice_Mode verticeMode;
+    Normal_Mode normalMode;
+
 private:
     void handleClick();
     void toggleMultipleSelection(ThreeDObject *object);
@@ -75,4 +85,6 @@ private:
     std::vector<ThreeDObject *> ThreeDObjectsList;
     std::set<ThreeDObject *> lastSelection;
     ImGuizmo::OPERATION currentGizmoOperation = ImGuizmo::TRANSLATE;
+
+
 };

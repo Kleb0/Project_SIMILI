@@ -31,6 +31,11 @@ fs::path gExecutableDir;
 #include "WorldObjects/Cube.hpp"
 #include "UI/UiCreator.hpp"
 #include "UI/ObjectInspector.hpp"
+
+#include "UI/ThreeDModes/ThreeDMode.hpp"
+#include "UI/ThreeDModes/Vertice_Mode.hpp"
+#include "UI/ThreeDModes/Normal_Mode.hpp"
+
 // #include "UI/DirectX12TestWindow.hpp"
 
 int main(int argc, char **argv)
@@ -74,6 +79,7 @@ int main(int argc, char **argv)
     myThreeDWindow.addThreeDObjectsToScene({&myCube2});
     // myThreeDWindow.removeThreeDObjectsFromScene(&myCube2); // Remove the second cube to test the removal functionality
     myThreeDWindow.addThreeDObjectsToScene({&mainCamera});
+    myThreeDWindow.setModelingMode(&myThreeDWindow.normalMode);
 
     renderer.setCamera(&mainCamera);
     myCube.setPosition(glm::vec3(2.5f, 0.5f, 2.5f));
