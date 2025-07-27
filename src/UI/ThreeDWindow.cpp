@@ -35,10 +35,9 @@ void ThreeDWindow::setModelingMode(ThreeDMode* mode)
     if (mode)
     {
         currentMode = mode;
-        ThreeDMode::setMode(std::unique_ptr<ThreeDMode>(mode));
+        // ThreeDMode::setMode(std::unique_ptr<ThreeDMode>(mode));
     }
 }
-
 
 
 void ThreeDWindow::addThreeDObjectsToScene(const std::vector<ThreeDObject *> &objects)
@@ -121,6 +120,7 @@ void ThreeDWindow::render()
     if (openGLContext)
     {
         ImGui::Text("Attached OpenGL content :");
+        onChangeMod();
         threeDRendering();
     }
 
@@ -220,7 +220,6 @@ void ThreeDWindow::renderModelingModes()
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
     // Icon 0 : Normal Mode
-    // === Mode Normal ===
     ImVec2 min0 = iconPos0;
     ImVec2 max0 = ImVec2(min0.x + iconSize.x, min0.y + iconSize.y);
 
@@ -236,20 +235,57 @@ void ThreeDWindow::renderModelingModes()
     draw_list->AddRect(min0, max0, normalBorderColor, 0.0f, 0, 2.0f);
     draw_list->AddText(ImVec2(min0.x + 10, min0.y + 6), normalTextColor, "0");
 
+    // --- End of Icon 0 ---
+
     ImGui::SetCursorScreenPos(ImVec2(min0.x + iconSize.x + 5, min0.y));
 
-    // Icon 1 : Vertice Mode
+    // === Icon 1 : Vertice Mode ===
+    ImGui::SetCursorScreenPos(ImVec2(min0.x + iconSize.x + 5, min0.y));
     ImVec2 iconPos1 = ImGui::GetCursorScreenPos();
     ImVec2 min1 = iconPos1;
     ImVec2 max1 = ImVec2(min1.x + iconSize.x, min1.y + iconSize.y);
+
+    ImU32 verticeBorderColor = (currentMode == &verticeMode)
+        ? IM_COL32(255, 165, 0, 255)
+        : IM_COL32(255, 255, 255, 255);
+
+    ImU32 verticeTextColor = (currentMode == &verticeMode)
+        ? IM_COL32(255, 200, 100, 255)
+        : IM_COL32(255, 255, 255, 255);
+
     draw_list->AddRectFilled(min1, max1, IM_COL32(0, 0, 0, 0));
-    draw_list->AddRect(min1, max1, IM_COL32(255, 255, 255, 255));
-    draw_list->AddText(ImVec2(min1.x + 10, min1.y + 6), IM_COL32(255, 255, 255, 255), "1");
+    draw_list->AddRect(min1, max1, verticeBorderColor, 0.0f, 0, 2.0f);
+    draw_list->AddText(ImVec2(min1.x + 10, min1.y + 6), verticeTextColor, "1");
+
+    // --- End of Icon 1 ---
 
     ImGui::EndGroup();
 }
 
+void ThreeDWindow::onChangeMod()
+{
+    ImGuiIO& io = ImGui::GetIO();
+    ImGuiKey key1 = ImGuiKey_1;
+    ImGuiKey key2 = ImGuiKey_2;
 
+    bool isPressed1 = ImGui::IsKeyDown(key1);
+    bool isPressed2 = ImGui::IsKeyDown(key2);
+
+    if (isPressed1  && !lastKeyState_1)
+    {
+        setModelingMode(&normalMode);
+    }
+
+
+    if (isPressed2 && !lastKeyState_2)
+    {
+        setModelingMode(&verticeMode);
+    }
+
+    lastKeyState_1 = isPressed1;
+    lastKeyState_2 = isPressed2;
+
+}
 // --------- Object Manipulation ----------- //
 
 void ThreeDWindow::manipulateChildrens(ThreeDObject* parent, const glm::mat4& delta)
@@ -394,7 +430,7 @@ void ThreeDWindow::handleClick()
         view = openGLContext->getViewMatrix();
         proj = openGLContext->getProjectionMatrix();
 
-        if (dynamic_cast<Normal_Mode*>(ThreeDMode::getCurrentMode()))
+        if (currentMode == &normalMode)
         {
             std::cout << "[DEBUG] Normal Mode active, click mesh operation done." << std::endl;
 

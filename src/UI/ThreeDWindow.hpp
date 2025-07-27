@@ -36,6 +36,7 @@ public:
     void render() override;
     void threeDRendering();
     void renderModelingModes();
+    void onChangeMod();
 
 
     ThreeDWindow &setRenderer(OpenGLContext &context);
@@ -66,6 +67,9 @@ public:
     ThreeDMode *currentMode = nullptr;
     Vertice_Mode verticeMode;
     Normal_Mode normalMode;
+
+    bool lastKeyState_1 = false;
+    bool lastKeyState_2 = false;
 
 private:
     void handleClick();
