@@ -1,3 +1,4 @@
+#define GLM_ENABLE_EXPERIMENTAL
 #define IMGUI_ENABLE_ASSERTS
 #include "UI/HierarchyInspector.hpp"
 #include "UI/ObjectInspector.hpp"

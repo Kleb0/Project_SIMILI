@@ -3,6 +3,7 @@
 #include <vector>
 #include <glad/glad.h>
 #include <glm/glm.hpp>
+#include "Engine/Guizmo.hpp"
 #include <WorldObjects/ThreeDObject.hpp>
 #include "WorldObjects/Camera.hpp"
 #include <iostream>

@@ -4,6 +4,7 @@
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <ImGuizmo.h>
+#include "Engine/Guizmo.hpp"
 
 #include <string>
 #include <vector>
