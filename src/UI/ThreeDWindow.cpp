@@ -333,56 +333,18 @@ void ThreeDWindow::applyGizmoTransformation(const glm::mat4& delta)
     }
 }
 
+
 glm::mat4 ThreeDWindow::prepareGizmoFrame(ImGuizmo::OPERATION op)
 {
-    ImGuizmo::BeginFrame();
-    ImGuizmo::Enable(true);
-    ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
-    ImGuizmo::SetDrawlist();
-    ImGuizmo::SetRect(oglChildPos.x, oglChildPos.y, oglChildSize.x, oglChildSize.y);
-    ImGuizmo::SetGizmoSizeClipSpace(0.2f);
-
     view = openGLContext->getViewMatrix();
     proj = openGLContext->getProjectionMatrix();
 
     if (currentMode == &verticeMode && lastSelectedVertice)
     {
-        glm::vec3 pos = lastSelectedVertice->getPosition();
-
-        glm::mat4 model = glm::translate(glm::mat4(1.0f), pos);
-        model = glm::scale(model, glm::vec3(0.5f)); 
-        return model;
+        return Guizmo::renderGizmoForVertice(lastSelectedVertice, op, view, proj, oglChildPos, oglChildSize);
     }
 
-    glm::vec3 center(0.0f);
-    glm::vec3 averageScale(0.0f);
-    std::vector<glm::quat> rotations;
-
-    for (ThreeDObject *obj : multipleSelectedObjects)
-    {
-        center += obj->getPosition();
-        rotations.push_back(obj->rotation);
-        averageScale += obj->getScale();
-    }
-
-    center /= multipleSelectedObjects.size();
-    averageScale /= multipleSelectedObjects.size();
-
-    glm::vec4 cumulative(0.0f);
-    for (const auto& q : rotations)
-    {
-        glm::quat aligned = glm::dot(q, rotations[0]) < 0.0f ? -q : q;
-        cumulative += glm::vec4(aligned.x, aligned.y, aligned.z, aligned.w);
-    }
-
-    cumulative = glm::normalize(cumulative);
-    glm::quat avgRotation = glm::quat(cumulative.w, cumulative.x, cumulative.y, cumulative.z);
-
-    glm::mat4 model = glm::translate(glm::mat4(1.0f), center);
-    model *= glm::toMat4(glm::normalize(avgRotation));
-    model = glm::scale(model, averageScale);
-
-    return model;
+    return Guizmo::renderGizmoForObject(multipleSelectedObjects, op, view, proj, oglChildPos, oglChildSize);
 }
 
 void ThreeDWindow::manipulateThreeDObjects()
@@ -399,38 +361,8 @@ void ThreeDWindow::manipulateThreeDObjects()
     static glm::mat4 prevDummyMatrix = glm::mat4(1.0f);
 
     if (currentMode == &verticeMode && lastSelectedVertice)
-    {
-        glm::vec3 worldPos = lastSelectedVertice->getPosition();
-
-        glm::mat4 model = glm::translate(glm::mat4(1.0f), worldPos);
-        model = glm::scale(model, glm::vec3(1.0f));
-
-        static glm::mat4 prevModel = glm::mat4(1.0f);
-
-        view = openGLContext->getViewMatrix();
-        proj = openGLContext->getProjectionMatrix();
-
-        ImGuizmo::BeginFrame();
-        ImGuizmo::Enable(true);
-        ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
-        ImGuizmo::SetDrawlist();
-        ImGuizmo::SetRect(oglChildPos.x, oglChildPos.y, oglChildSize.x, oglChildSize.y);
-        ImGuizmo::SetGizmoSizeClipSpace(0.2f);
-
-        if (ImGuizmo::Manipulate(
-                glm::value_ptr(view),
-                glm::value_ptr(proj),
-                currentGizmoOperation,
-                ImGuizmo::WORLD,
-                glm::value_ptr(model)))
-        {
-            glm::mat4 delta = model * glm::inverse(prevModel);
-            glm::vec3 translation = glm::vec3(delta[3]);
-
-            lastSelectedVertice->setPosition(worldPos + translation);
-            prevModel = model;
-        }
-
+    {   
+        // manipulation of vertice to be implemented here
         return;
     }
 
@@ -456,7 +388,6 @@ void ThreeDWindow::manipulateThreeDObjects()
 
 void ThreeDWindow::handleClick()
 {
-
 
     if (selectionLocked)
     {
@@ -601,8 +532,7 @@ void ThreeDWindow::handleClick()
     }
 }
 
-
-
+// ----> I do think that this part can be improved, by exempled by being put in another class of the Engine part
 
 void ThreeDWindow::setMultipleSelectedObjects(const std::list<ThreeDObject *> &objects)
 {
