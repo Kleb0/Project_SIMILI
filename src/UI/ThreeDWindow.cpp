@@ -7,6 +7,8 @@
 #include "UI/HierarchyInspector.hpp"
 #include "UI/ObjectInspector.hpp"
 #include "WorldObjects/ThreeDObject.hpp"
+#include "WorldObjects/Vertice.hpp"
+#include "WorldObjects/Cube.hpp"
 #include <SDL3/SDL.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -38,7 +40,6 @@ void ThreeDWindow::setModelingMode(ThreeDMode* mode)
         // ThreeDMode::setMode(std::unique_ptr<ThreeDMode>(mode));
     }
 }
-
 
 void ThreeDWindow::addThreeDObjectsToScene(const std::vector<ThreeDObject *> &objects)
 {
@@ -99,6 +100,7 @@ const std::vector<ThreeDObject *> &ThreeDWindow::getObjects() const
 }
 
 // the threeDWindow use external components, we set them in the main script
+
 void ThreeDWindow::setHierarchy(HierarchyInspector *inspector)
 {
     hierarchy = inspector;
@@ -110,6 +112,7 @@ void ThreeDWindow::setObjectInspector(ObjectInspector *inspector)
 }
 
 // ------- Rendering the ThreeDWindow ------- //
+
 void ThreeDWindow::render()
 {
     ImGuiWindowFlags flags = ImGuiWindowFlags_None;
@@ -126,7 +129,6 @@ void ThreeDWindow::render()
 
     ImGui::End();
 }
-
 
 void ThreeDWindow::threeDRendering()
 {
@@ -233,7 +235,7 @@ void ThreeDWindow::renderModelingModes()
 
     draw_list->AddRectFilled(min0, max0, IM_COL32(0, 0, 0, 0));
     draw_list->AddRect(min0, max0, normalBorderColor, 0.0f, 0, 2.0f);
-    draw_list->AddText(ImVec2(min0.x + 10, min0.y + 6), normalTextColor, "0");
+    draw_list->AddText(ImVec2(min0.x + 10, min0.y + 6), normalTextColor, "1");
 
     // --- End of Icon 0 ---
 
@@ -255,7 +257,7 @@ void ThreeDWindow::renderModelingModes()
 
     draw_list->AddRectFilled(min1, max1, IM_COL32(0, 0, 0, 0));
     draw_list->AddRect(min1, max1, verticeBorderColor, 0.0f, 0, 2.0f);
-    draw_list->AddText(ImVec2(min1.x + 10, min1.y + 6), verticeTextColor, "1");
+    draw_list->AddText(ImVec2(min1.x + 10, min1.y + 6), verticeTextColor, "2");
 
     // --- End of Icon 1 ---
 
@@ -286,6 +288,7 @@ void ThreeDWindow::onChangeMod()
     lastKeyState_2 = isPressed2;
 
 }
+
 // --------- Object Manipulation ----------- //
 
 void ThreeDWindow::manipulateChildrens(ThreeDObject* parent, const glm::mat4& delta)
@@ -342,6 +345,15 @@ glm::mat4 ThreeDWindow::prepareGizmoFrame(ImGuizmo::OPERATION op)
     view = openGLContext->getViewMatrix();
     proj = openGLContext->getProjectionMatrix();
 
+    if (currentMode == &verticeMode && lastSelectedVertice)
+    {
+        glm::vec3 pos = lastSelectedVertice->getPosition();
+
+        glm::mat4 model = glm::translate(glm::mat4(1.0f), pos);
+        model = glm::scale(model, glm::vec3(0.5f)); 
+        return model;
+    }
+
     glm::vec3 center(0.0f);
     glm::vec3 averageScale(0.0f);
     std::vector<glm::quat> rotations;
@@ -375,7 +387,7 @@ glm::mat4 ThreeDWindow::prepareGizmoFrame(ImGuizmo::OPERATION op)
 
 void ThreeDWindow::manipulateThreeDObjects()
 {
-    if (multipleSelectedObjects.empty()) return;
+    if (currentMode != &verticeMode && multipleSelectedObjects.empty()) return;
 
     static ImGuizmo::OPERATION currentGizmoOperation = ImGuizmo::TRANSLATE;
 
@@ -384,8 +396,44 @@ void ThreeDWindow::manipulateThreeDObjects()
     if (ImGui::IsKeyPressed(ImGuiKey_S)) currentGizmoOperation = ImGuizmo::SCALE;
 
     glm::mat4 dummyMatrix = prepareGizmoFrame(currentGizmoOperation);
-
     static glm::mat4 prevDummyMatrix = glm::mat4(1.0f);
+
+    if (currentMode == &verticeMode && lastSelectedVertice)
+    {
+        glm::vec3 worldPos = lastSelectedVertice->getPosition();
+
+        glm::mat4 model = glm::translate(glm::mat4(1.0f), worldPos);
+        model = glm::scale(model, glm::vec3(1.0f));
+
+        static glm::mat4 prevModel = glm::mat4(1.0f);
+
+        view = openGLContext->getViewMatrix();
+        proj = openGLContext->getProjectionMatrix();
+
+        ImGuizmo::BeginFrame();
+        ImGuizmo::Enable(true);
+        ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
+        ImGuizmo::SetDrawlist();
+        ImGuizmo::SetRect(oglChildPos.x, oglChildPos.y, oglChildSize.x, oglChildSize.y);
+        ImGuizmo::SetGizmoSizeClipSpace(0.2f);
+
+        if (ImGuizmo::Manipulate(
+                glm::value_ptr(view),
+                glm::value_ptr(proj),
+                currentGizmoOperation,
+                ImGuizmo::WORLD,
+                glm::value_ptr(model)))
+        {
+            glm::mat4 delta = model * glm::inverse(prevModel);
+            glm::vec3 translation = glm::vec3(delta[3]);
+
+            lastSelectedVertice->setPosition(worldPos + translation);
+            prevModel = model;
+        }
+
+        return;
+    }
+
 
     if (ImGuizmo::Manipulate(
             glm::value_ptr(view),
@@ -440,7 +488,7 @@ void ThreeDWindow::handleClick()
                 bool preventSelection = ImGuizmo::IsOver();
                 if (!preventSelection)
                 {
-                    selector.pickUpTarget((int)relativeMouseX, (int)relativeMouseY,
+                    selector.pickUpMesh((int)relativeMouseX, (int)relativeMouseY,
                                         windowWidth, windowHeight, view, proj, ThreeDObjectsList);
                 }
 
@@ -515,9 +563,46 @@ void ThreeDWindow::handleClick()
                 // --------- End of click handling --------
         }
 
+        if (currentMode == &verticeMode)
+        {
+            std::cout << "[DEBUG] ThreeDwindow : Vertice Mode active, click vertice operation done." << std::endl;
+
+            Vertice* selectedVertice = selector.pickUpVertice((int)relativeMouseX, (int)relativeMouseY,
+                                                            windowWidth, windowHeight, view, proj,
+                                                            ThreeDObjectsList);
+
+            if (selectedVertice)
+            {
+                std::cout << "[DEBUG] ThreeDwindow :  Selected vertice: " << selectedVertice->getName() << std::endl;
+
+                selectedVertice->setSelected(true);
+                lastSelectedVertice = selectedVertice; 
+            }
+            else
+            {
+                std::cout << "[DEBUG]  ThreeDwindow :  No vertice hit — clearing vertice selection." << std::endl;
+
+                for (ThreeDObject* obj : ThreeDObjectsList)
+                {
+                    Cube* cube = dynamic_cast<Cube*>(obj);
+                    if (!cube) continue;
+
+                    for (Vertice* vert : cube->getVertices())
+                    {
+                        vert->setSelected(false);
+                    }
+                }
+
+                lastSelectedVertice = nullptr;
+            }
+        }
+
       
     }
 }
+
+
+
 
 void ThreeDWindow::setMultipleSelectedObjects(const std::list<ThreeDObject *> &objects)
 {

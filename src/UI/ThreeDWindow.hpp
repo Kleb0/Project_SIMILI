@@ -23,6 +23,7 @@
 class HierarchyInspector;
 class ObjectInspector;
 class ThreeDObject;
+class Vertice;
 
 //=== Class ===//
 class ThreeDWindow : public GUIWindow
@@ -88,6 +89,7 @@ private:
     ThreeDObjectSelector selector;
     std::vector<ThreeDObject *> ThreeDObjectsList;
     std::set<ThreeDObject *> lastSelection;
+    Vertice* lastSelectedVertice = nullptr;
     ImGuizmo::OPERATION currentGizmoOperation = ImGuizmo::TRANSLATE;
 
 

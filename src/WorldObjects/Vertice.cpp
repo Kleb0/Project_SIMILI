@@ -89,7 +89,12 @@ void Vertice::render(const glm::mat4& viewProj, const glm::mat4& modelMatrix)
 
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(renderMatrix));
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
-    glUniform4fv(glGetUniformLocation(shaderProgram, "color"), 1, glm::value_ptr(color));
+
+        glm::vec4 finalColor = isSelected()
+        ? glm::vec4(1.0f, 0.5f, 0.0f, 1.0f) 
+        : color;                           
+
+    glUniform4fv(glGetUniformLocation(shaderProgram, "color"), 1, glm::value_ptr(finalColor));
 
     glEnable(GL_PROGRAM_POINT_SIZE);
     glBindVertexArray(vao);
@@ -140,9 +145,9 @@ void Vertice::setPosition(const glm::vec3& pos)
     position = pos;
 }
 
-glm::vec3 Vertice::getPosition() const
-{
-    return position;
+glm::vec3 Vertice::getPosition() const {
+
+    return glm::vec3(getModelMatrix() * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
 }
 
 void Vertice::setName(const std::string& newName)
@@ -159,3 +164,14 @@ glm::mat4 Vertice::getModelMatrix() const
 {
     return glm::translate(glm::mat4(1.0f), position);
 }
+
+void Vertice::setSelected(bool isSelected)
+{
+    VerticeSelected = isSelected;
+}
+
+bool Vertice::isSelected() const
+{
+    return VerticeSelected;
+}
+
