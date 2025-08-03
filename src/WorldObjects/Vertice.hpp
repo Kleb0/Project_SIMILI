@@ -24,7 +24,10 @@ public:
     glm::mat4 getModelMatrix() const;
 
     void setLocalPosition(const glm::vec3 &pos);
-    glm::vec3 getLocalPosition() const;  
+    glm::vec3 getLocalPosition() const;
+
+    void setSelected(bool isSelected);
+    bool isSelected() const;
 
 private:
     unsigned int vao = 0;
@@ -36,4 +39,5 @@ private:
      glm::vec3 localPosition;
 
     void compileShaders();
+    bool VerticeSelected = false;
 };
