@@ -9,7 +9,7 @@
 #include "UI/InfoWindow.hpp"
 #include "UI/ThreeDWindow.hpp"
 #include "UI/ObjectInspector.hpp"
-#include "UI/HierarchyInspector.hpp"
+#include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
 
 #define Add associate
 

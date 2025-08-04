@@ -24,7 +24,7 @@ fs::path gExecutableDir;
 #include "UI/MainSoftwareGUI.hpp"
 #include "UI/InfoWindow.hpp"
 #include "UI/ThreeDWindow.hpp"
-#include "UI/HierarchyInspector.hpp"
+#include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
 #include "WorldObjects/ThreedObject.hpp"
 #include "Engine/OpenGLContext.hpp"
 #include "Engine/ThreeDObjectSelector.hpp"
@@ -37,6 +37,8 @@ fs::path gExecutableDir;
 #include "UI/ThreeDModes/Vertice_Mode.hpp"
 #include "UI/ThreeDModes/Normal_Mode.hpp"
 
+#include "Engine/SimiliSelector.hpp"
+
 // #include "UI/DirectX12TestWindow.hpp"
 
 int main(int argc, char **argv)
@@ -44,6 +46,7 @@ int main(int argc, char **argv)
     gExecutableDir = fs::path(argv[0]).parent_path();
 
     MainSoftwareGUI gui(1280, 720, "Main GUI");
+    SimiliSelector mySimiliSelector;
     InfoWindow myInfoWindow;
     ThreeDWindow myThreeDWindow;
     OpenGLContext renderer;
@@ -81,6 +84,9 @@ int main(int argc, char **argv)
     // myThreeDWindow.removeThreeDObjectsFromScene(&myCube2); // Remove the second cube to test the removal functionality
     myThreeDWindow.addThreeDObjectsToScene({&mainCamera});
     myThreeDWindow.setModelingMode(&myThreeDWindow.normalMode);
+    myThreeDWindow.setSimiliSelector(&mySimiliSelector);
+    mySimiliSelector.setWindow(&myThreeDWindow); 
+    
 
     renderer.setCamera(&mainCamera);
     myCube.setPosition(glm::vec3(2.5f, 0.5f, 2.5f));

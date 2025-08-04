@@ -1,6 +1,7 @@
 #pragma once
 
 //=== Includes ===//
+#include <glad/glad.h>   
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <ImGuizmo.h>
@@ -15,6 +16,9 @@
 #include "UI/GUIWindow.hpp"
 #include "Engine/OpenGLContext.hpp"
 #include "Engine/ThreeDObjectSelector.hpp"
+#include "Engine/SimiliSelector.hpp"
+
+#include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
 
 #include "UI/ThreeDModes/ThreeDMode.hpp"
 #include "UI/ThreeDModes/Normal_Mode.hpp"
@@ -33,6 +37,8 @@ public:
     ThreeDWindow();
     ThreeDWindow(const std::string &title, const std::string &text);
 
+    HierarchyInspector* getHierarchy() const { return hierarchy; }
+    ThreeDObjectSelector& getSelector() { return selector; }
 
     void setModelingMode(ThreeDMode* mode);
     void render() override;
@@ -47,11 +53,13 @@ public:
     void removeThreeDObjectsFromScene(ThreeDObject *object);
     const std::vector<ThreeDObject *> &getObjects() const;
 
-    void externalSelect(ThreeDObject *object);
+    void setSimiliSelector(SimiliSelector* selector) { similiSelector = selector; }
+    SimiliSelector& getSimiliSelector() { return *similiSelector; }
+
+
+    void lockSelectionOnce() { selectionLocked = true; }
+
     ThreeDObject *getSelectedObject() const;
-    void selectMultipleObjects(const std::list<ThreeDObject *> &objects);
-    void setMultipleSelectedObjects(const std::list<ThreeDObject *> &objects);
-    void calculatecenterOfSelection(const std::list<ThreeDObject *> &objects);
 
     void setHierarchy(HierarchyInspector *inspector);
     void setObjectInspector(ObjectInspector *inspector);
@@ -74,6 +82,9 @@ public:
     bool lastKeyState_2 = false;
 
 private:
+    
+    SimiliSelector* similiSelector = nullptr;
+
     void handleClick();
     void toggleMultipleSelection(ThreeDObject *object);
     glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION operation);
@@ -92,6 +103,5 @@ private:
     std::set<ThreeDObject *> lastSelection;
     Vertice* lastSelectedVertice = nullptr;
     ImGuizmo::OPERATION currentGizmoOperation = ImGuizmo::TRANSLATE;
-
 
 };
