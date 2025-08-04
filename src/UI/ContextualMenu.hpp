@@ -4,7 +4,7 @@
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include "UI/ThreeDWindow.hpp"
-#include "UI/HierarchyInspector.hpp"
+#include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
 #include "WorldObjects/ThreeDObject.hpp"
 
 class ObjectInspector;

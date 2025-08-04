@@ -1,6 +1,6 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #define IMGUI_ENABLE_ASSERTS
-#include "UI/HierarchyInspector.hpp"
+#include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
 #include "UI/ObjectInspector.hpp"
 #include "UI/ThreeDWindow.hpp"
 #include <imgui.h>
@@ -9,6 +9,7 @@
 #include <typeinfo>
 #include <filesystem> 
 #include "WorldObjects/ThreeDObject.hpp"
+#include "Engine/ErrorBox.hpp"
 
 HierarchyInspector::HierarchyInspector()
 {
@@ -106,7 +107,7 @@ void HierarchyInspector::render()
         }
 
         if (window)
-            window->externalSelect(nullptr);
+            window->getSimiliSelector().externalSelect(nullptr);
     }
 
     // Drag and drop ghost object
@@ -350,22 +351,32 @@ void HierarchyInspector::drawChildSlots(ThreeDObject* parent,  bool& clickedOnIt
 void HierarchyInspector::clickOnSlot(bool& clickedOnItem, int index, ThreeDObject* obj)
 {
 
+
     if (!ImGui::IsItemClicked(ImGuiMouseButton_Left))
         return;
 
     clickedOnItem = true;
 
+
+    
     if (!obj || !obj->isInspectable())
     {
-        for (auto* o : window->getObjects())
-            o->setSelected(false);
+        // for (auto* o : window->getObjects())
+        //     o->setSelected(false);
+        
+        window->getSimiliSelector().clearSelection();
 
         multipleSelectedObjects.clear();
-        objectInspector->clearMultipleInspectedObjects();
-        objectInspector->clearInspectedObject();
 
+        if(objectInspector)
+        {
+            objectInspector->clearMultipleInspectedObjects();
+            objectInspector->clearInspectedObject();
+
+        }
+        
         selectedObjectInHierarchy = nullptr;
-        window->externalSelect(nullptr);    
+        window->getSimiliSelector().externalSelect(obj);
 
         std::cout << "[HierarchyInspector] Clicked on slot " << index
             << " containing: " << (obj ? typeid(*obj).name() : "nullptr")
@@ -377,7 +388,8 @@ void HierarchyInspector::clickOnSlot(bool& clickedOnItem, int index, ThreeDObjec
     // std::cout << "[HierarchyInspector] Clicked on slot containing an item : " << index
     //         << " (type of content: " << typeid(*obj).name() << ")" << std::endl;
 
-     if (ImGui::GetIO().KeyShift && lastSelectedSlotIndex != -1)
+
+    if (ImGui::GetIO().KeyShift && lastSelectedSlotIndex != -1)
     {
         int start = std::min(index, lastSelectedSlotIndex);
         int end = std::max(index, lastSelectedSlotIndex);
@@ -396,23 +408,34 @@ void HierarchyInspector::clickOnSlot(bool& clickedOnItem, int index, ThreeDObjec
             }
         }
 
-        objectInspector->clearInspectedObject();
-        objectInspector->setMultipleInspectedObjects(multipleSelectedObjects);
-        window->setMultipleSelectedObjects(multipleSelectedObjects);
+        if(objectInspector)
+        {
+            objectInspector->clearInspectedObject();
+            objectInspector->setMultipleInspectedObjects(multipleSelectedObjects);
+        }
+        
+        window->getSimiliSelector().setMultipleSelectedObjects(multipleSelectedObjects);
         selectedObjectInHierarchy = obj;
     }
     else
     {
-        for (auto* o : window->getObjects())
-            o->setSelected(false);
+        // for (auto* o : window->getObjects())
+        //     o->setSelected(false);
+
+        window->getSimiliSelector().clearSelection();
 
         obj->setSelected(true);
         multipleSelectedObjects.clear();
         multipleSelectedObjects.push_back(obj);
 
-        objectInspector->clearMultipleInspectedObjects();
-        objectInspector->setInspectedObject(obj);
-        window->setMultipleSelectedObjects(multipleSelectedObjects);
+        if (objectInspector)
+        {
+            objectInspector->clearMultipleInspectedObjects();
+            objectInspector->setInspectedObject(obj);
+        }
+
+        window->getSimiliSelector().setMultipleSelectedObjects(multipleSelectedObjects);
+
 
         lastSelectedSlotIndex = index;
     }
@@ -420,9 +443,13 @@ void HierarchyInspector::clickOnSlot(bool& clickedOnItem, int index, ThreeDObjec
     selectedObjectInHierarchy = obj;
 
     if (!ImGui::GetIO().KeyShift)
-        window->externalSelect(obj);
+        window->getSimiliSelector().externalSelect(obj);
 
 }
+
+
+
+
 
 void HierarchyInspector::dragObject(ThreeDObject* draggedObj, int index)
 {
@@ -553,7 +580,7 @@ void HierarchyInspector::selectObject(ThreeDObject *obj)
         objectInspector->setInspectedObject(obj);
 
     if (window)
-        window->externalSelect(obj);
+        window->getSimiliSelector().externalSelect(obj);
 }
 
 void HierarchyInspector::selectInList(ThreeDObject *obj)
@@ -575,7 +602,8 @@ void HierarchyInspector::multipleSelection(ThreeDObject *obj)
     {
         multipleSelectedObjects.erase(it);
     }
-    window->selectMultipleObjects(multipleSelectedObjects);
+    window->getSimiliSelector().setMultipleSelectedObjects(multipleSelectedObjects);
+
 }
 
 // ------------ redrawing and updates ------------- //

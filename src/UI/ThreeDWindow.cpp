@@ -4,7 +4,7 @@
 #include <imgui_internal.h>
 #include <ImGuizmo.h>
 #include "UI/ThreeDWindow.hpp"
-#include "UI/HierarchyInspector.hpp"
+#include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
 #include "UI/ObjectInspector.hpp"
 #include "WorldObjects/ThreeDObject.hpp"
 #include "WorldObjects/Vertice.hpp"
@@ -19,6 +19,8 @@
 // #include <windows.h>
 
 ThreeDWindow::ThreeDWindow() {}
+
+// ------- Constructor, setters and getters ------- //
 
 ThreeDWindow::ThreeDWindow(const std::string &title, const std::string &text)
     : title(title), text(text)
@@ -530,88 +532,4 @@ void ThreeDWindow::handleClick()
 
       
     }
-}
-
-// ----> I do think that this part can be improved, by exempled by being put in another class of the Engine part
-
-void ThreeDWindow::setMultipleSelectedObjects(const std::list<ThreeDObject *> &objects)
-{
-    multipleSelectedObjects = objects;
-
-    for (ThreeDObject *obj : ThreeDObjectsList)
-        obj->setSelected(false);
-
-    for (ThreeDObject *obj : multipleSelectedObjects)
-        obj->setSelected(true);
-
-    selector.clearTarget();
-    calculatecenterOfSelection(multipleSelectedObjects);
-    // We locked the selection to prevent further clicks
-    selectionLocked = true;
-}
-
-void ThreeDWindow::calculatecenterOfSelection(const std::list<ThreeDObject *> &objects)
-{
-    if (objects.empty())
-    {
-        centerOfSelection = glm::vec3(0.0f);
-        return;
-    }
-
-    glm::vec3 sum(0.0f);
-
-    for (const ThreeDObject *obj : objects)
-    {
-        sum += obj->getPosition();
-    }
-
-    centerOfSelection = sum / static_cast<float>(objects.size());
-}
-
-void ThreeDWindow::toggleMultipleSelection(ThreeDObject *object)
-{
-    auto it = std::find(multipleSelectedObjects.begin(), multipleSelectedObjects.end(), object);
-    if (it != multipleSelectedObjects.end())
-    {
-        multipleSelectedObjects.erase(it);
-        object->setSelected(false);
-    }
-    else
-    {
-        multipleSelectedObjects.push_back(object);
-        object->setSelected(true);
-    }
-}
-
-void ThreeDWindow::selectMultipleObjects(const std::list<ThreeDObject *> &objects)
-{
-    multipleSelectedObjects = objects;
-
-    for (ThreeDObject *obj : ThreeDObjectsList)
-        obj->setSelected(false);
-
-    for (ThreeDObject *obj : multipleSelectedObjects)
-        obj->setSelected(true);
-    selector.clearTarget();
-}
-
-void ThreeDWindow::externalSelect(ThreeDObject *object)
-{
-    for (auto *obj : ThreeDObjectsList)
-        obj->setSelected(false);
-
-    if (object)
-    {
-        selector.select(object);
-        object->setSelected(true);
-        view = openGLContext->getViewMatrix();
-        proj = openGLContext->getProjectionMatrix();
-    }
-    else
-    {
-        selector.clearTarget();
-    }
-
-    if (hierarchy)
-        hierarchy->selectFromThreeDWindow();
 }
