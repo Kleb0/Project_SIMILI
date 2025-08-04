@@ -13,7 +13,7 @@
 
 HierarchyInspector::HierarchyInspector()
 {
-
+    interactions = std::make_unique<HandleHierarchyInteractions>(this);
     ImGuiIO& io = ImGui::GetIO();
     ImFontConfig font_cfg;
     font_cfg.OversampleH = 3;
@@ -38,7 +38,7 @@ HierarchyInspector::HierarchyInspector()
 }
 
 
-// -------- Initalisition and management --------- //
+// -------- initialization and management --------- //
 void HierarchyInspector::setObjectInspector(ObjectInspector *inspector)
 {
     objectInspector = inspector;
@@ -346,265 +346,28 @@ void HierarchyInspector::drawChildSlots(ThreeDObject* parent,  bool& clickedOnIt
 
 }
 
+// ------------ interactions with list  ------------- //
+void HierarchyInspector::selectObject(ThreeDObject* obj) {
+    if (interactions) interactions->selectObject(obj);
+}
 
-// ----- interactions with List ----- //
-void HierarchyInspector::clickOnSlot(bool& clickedOnItem, int index, ThreeDObject* obj)
-{
+void HierarchyInspector::clickOnSlot(bool& clickedOnItem, int index, ThreeDObject* obj) {
+    if (interactions) interactions->clickOnSlot(clickedOnItem, index, obj);
+}
 
+void HierarchyInspector::dragObject(ThreeDObject* obj, int index) {
+    if (interactions) interactions->dragObject(obj, index);
+}
 
-    if (!ImGui::IsItemClicked(ImGuiMouseButton_Left))
-        return;
+void HierarchyInspector::dropOnSlot(ThreeDObject* obj, int index) {
+    if (interactions) interactions->dropOnSlot(obj, index);
+}
 
-    clickedOnItem = true;
-
-
-    
-    if (!obj || !obj->isInspectable())
-    {
-        // for (auto* o : window->getObjects())
-        //     o->setSelected(false);
-        
-        window->getSimiliSelector().clearSelection();
-
-        multipleSelectedObjects.clear();
-
-        if(objectInspector)
-        {
-            objectInspector->clearMultipleInspectedObjects();
-            objectInspector->clearInspectedObject();
-
-        }
-        
-        selectedObjectInHierarchy = nullptr;
-        window->getSimiliSelector().externalSelect(obj);
-
-        std::cout << "[HierarchyInspector] Clicked on slot " << index
-            << " containing: " << (obj ? typeid(*obj).name() : "nullptr")
-            << " (not inspectable)" << std::endl;
-
-        return;
-    }
-
-    // std::cout << "[HierarchyInspector] Clicked on slot containing an item : " << index
-    //         << " (type of content: " << typeid(*obj).name() << ")" << std::endl;
-
-
-    if (ImGui::GetIO().KeyShift && lastSelectedSlotIndex != -1)
-    {
-        int start = std::min(index, lastSelectedSlotIndex);
-        int end = std::max(index, lastSelectedSlotIndex);
-
-        for (int i = start; i <= end; ++i)
-        {
-            if (i >= 0 && i < static_cast<int>(mergedHierarchyList.size()))
-            {
-                ThreeDObject* rangeObj = static_cast<ThreeDObject*>(mergedHierarchyList[i]);
-
-                if (rangeObj && std::find(multipleSelectedObjects.begin(), multipleSelectedObjects.end(), rangeObj) == multipleSelectedObjects.end())
-                {
-                    multipleSelectedObjects.push_back(rangeObj);
-                    rangeObj->setSelected(true);
-                }
-            }
-        }
-
-        if(objectInspector)
-        {
-            objectInspector->clearInspectedObject();
-            objectInspector->setMultipleInspectedObjects(multipleSelectedObjects);
-        }
-        
-        window->getSimiliSelector().setMultipleSelectedObjects(multipleSelectedObjects);
-        selectedObjectInHierarchy = obj;
-    }
-    else
-    {
-        // for (auto* o : window->getObjects())
-        //     o->setSelected(false);
-
-        window->getSimiliSelector().clearSelection();
-
-        obj->setSelected(true);
-        multipleSelectedObjects.clear();
-        multipleSelectedObjects.push_back(obj);
-
-        if (objectInspector)
-        {
-            objectInspector->clearMultipleInspectedObjects();
-            objectInspector->setInspectedObject(obj);
-        }
-
-        window->getSimiliSelector().setMultipleSelectedObjects(multipleSelectedObjects);
-
-
-        lastSelectedSlotIndex = index;
-    }
-
-    selectedObjectInHierarchy = obj;
-
-    if (!ImGui::GetIO().KeyShift)
-        window->getSimiliSelector().externalSelect(obj);
-
+void HierarchyInspector::dropOnObject(ThreeDObject* parent, ThreeDObject* child, int index) {
+    if (interactions) interactions->dropOnObject(parent, child, index);
 }
 
 
-
-
-
-void HierarchyInspector::dragObject(ThreeDObject* draggedObj, int index)
-{
-
-    if (ImGui::IsMouseDown(ImGuiMouseButton_Left))
-    {
-        lastSelectedObject = draggedObj;
-        {
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_RectOnly))
-            {
-                ImVec2 rectMin = ImGui::GetItemRectMin();
-                ImVec2 rectMax = ImGui::GetItemRectMax();
-                ImDrawList* draw_list = ImGui::GetForegroundDrawList();
-                draw_list->AddRect(rectMin, rectMax, IM_COL32(255, 255, 0, 255), 0.0f, 0, 2.5f);
-                mouseOveringSlotIndex = index;
-                childToDropOn = nullptr;
-                
-            }       
-        }
-
-        
-        std::string ghostLabel = currentlyDraggedObject->getName();
-
-        if (childToDropOn) {
-            ghostLabel += " → " + childToDropOn->getName();
-            dropToSlotIndex = -1;
-        }
-
-        else if (mouseOveringSlotIndex != -1)
-        {
-            ghostLabel += " → Slot [" + std::to_string(mouseOveringSlotIndex) + "]";
-            dropToSlotIndex = mouseOveringSlotIndex;
-        }
-        else
-        {
-            dropToSlotIndex = -1;
-        }
-
-        ImVec2 mousePos = ImGui::GetMousePos();
-        ImVec2 textSize = ImGui::CalcTextSize(ghostLabel.c_str());
-        ImVec2 padding = ImVec2(10.0f, 6.0f);
-        ImVec2 bgMin = ImVec2(mousePos.x + 16.0f, mousePos.y + 16.0f);
-        ImVec2 bgMax = ImVec2(bgMin.x + textSize.x + padding.x * 2, bgMin.y + textSize.y + padding.y * 2);
-
-        ImDrawList* draw_list = ImGui::GetForegroundDrawList();
-        draw_list->AddRectFilled(bgMin, bgMax, IM_COL32(150, 150, 150, 200), 4.0f);
-        draw_list->AddText(ImVec2(bgMin.x + padding.x, bgMin.y + padding.y), IM_COL32(0, 0, 0, 255), ghostLabel.c_str());
-    }
-
-  
-
-    if (index < 0 || index >= static_cast<int>(mergedHierarchyList.size()))
-        return;
-   
-}
-
-void HierarchyInspector::dropOnSlot(ThreeDObject* obj, int index)
-{
-    ThreeDObject* base = mergedHierarchyList[index];
-    EmptyDummy* dummy = dynamic_cast<EmptyDummy*>(base);
-
-    if (dummy && dummy->isDummy())
-    {
-        glm::mat4 objGlobalModel = obj->getGlobalModelMatrix();
-        glm::vec3 objWorldPosition = glm::vec3(objGlobalModel[3]);
-
-        // Unparent the object
-        if (ThreeDObject* currentParent = obj->getParent())
-        {
-            currentParent->removeChild(obj);
-            obj->removeParent();
-            obj->isParented = false;
-        }
-
-        obj->setModelMatrix(objGlobalModel); 
-        obj->setOrigin(context->worldCenter); 
-
-        exchangeSlots(obj, index);
-    }
-    else if (base)
-    {
-        dropOnObject(base, obj, index);
-        dropToSlotIndex = -1;
-    }
-}
-
-void HierarchyInspector::dropOnObject(ThreeDObject* parent, ThreeDObject* child, int index)
-{
-    std::cout << "SUPER GIGA TEST DROP ON OBJECT" << std::endl;
-
-    if (child->getParent() == parent)
-        return;
-
-    glm::vec3 parentWorldOrigin = glm::vec3(parent->getGlobalModelMatrix() * glm::vec4(parent->getOrigin(), 1.0f));
-    glm::mat4 childGlobalBefore = child->getGlobalModelMatrix();
-
-    if (ThreeDObject* oldParent = child->getParent())
-    {
-        oldParent->removeChild(child);
-        child->removeParent();  
-        child->isParented = false;
-    }
-
-    parent->addChild(child);
-    parent->expanded = true;
-    child->setParent(parent);
-    child->isParented = true;
-
-
-    glm::mat4 childGlobalAfter = child->getGlobalModelMatrix(); 
-    glm::vec3 newLocalOrigin = glm::vec3(glm::inverse(childGlobalAfter) * glm::vec4(parentWorldOrigin, 1.0f));
-    child->setOrigin(newLocalOrigin);
-
-    redrawSlotsList();
-}
-
-void HierarchyInspector::selectObject(ThreeDObject *obj)
-{
-    selectedObjectInHierarchy = obj;
-
-    if (obj && !obj->isInspectable()) {
-        if (objectInspector)
-            objectInspector->clearInspectedObject();
-        return;
-    }
-
-    if (objectInspector)
-        objectInspector->setInspectedObject(obj);
-
-    if (window)
-        window->getSimiliSelector().externalSelect(obj);
-}
-
-void HierarchyInspector::selectInList(ThreeDObject *obj)
-{
-    selectedObjectInHierarchy = obj;
-}
-
-void HierarchyInspector::multipleSelection(ThreeDObject *obj)
-{
-
-    auto it = std::find(multipleSelectedObjects.begin(), multipleSelectedObjects.end(), obj);
-    if (it == multipleSelectedObjects.end())
-    {
-        multipleSelectedObjects.push_back(obj);
-        std::cout << "[HierarchyInspector] Add object to multiple selection list: " << obj->getName() << std::endl;
-    }
-
-    else
-    {
-        multipleSelectedObjects.erase(it);
-    }
-    window->getSimiliSelector().setMultipleSelectedObjects(multipleSelectedObjects);
-
-}
 
 // ------------ redrawing and updates ------------- //
 

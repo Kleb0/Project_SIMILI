@@ -1,6 +1,7 @@
 #pragma once
 
 #include <imgui.h> 
+#include "UI/HierarchyInspectorLogic/HandleHierarchyInteractions.hpp"
 #include "UI/GUIWindow.hpp"
 #include "Engine/OpenGLContext.hpp"
 #include "WorldObjects/ThreeDObject.hpp"
@@ -20,6 +21,7 @@ struct HierarchyEntry {
 
 class HierarchyInspector : public GUIWindow
 {
+ friend class HandleHierarchyInteractions;
 public:
     HierarchyInspector();
 
@@ -66,6 +68,7 @@ public:
 
 private:
 
+    std::unique_ptr<HandleHierarchyInteractions> interactions;
     OpenGLContext* context = nullptr;
     ThreeDWindow* window = nullptr;
     ObjectInspector* objectInspector = nullptr;
