@@ -19,7 +19,8 @@ void HandleHierarchyInteractions::clickOnSlot(bool& clickedOnItem, int index, Th
     auto& selector = inspector->window->getSimiliSelector();
     auto& multiSel = inspector->multipleSelectedObjects;
 
-    if (!obj || !obj->isInspectable()) {
+    if (!obj || !obj->isInspectable()) 
+    {
         selector.clearSelection();
         multiSel.clear();
 
@@ -29,38 +30,47 @@ void HandleHierarchyInteractions::clickOnSlot(bool& clickedOnItem, int index, Th
         }
 
         inspector->selectedObjectInHierarchy = nullptr;
-        selector.externalSelect(obj);
+        selector.externalSelect(nullptr);
         return;
     }
 
-    if (ImGui::GetIO().KeyShift && inspector->lastSelectedSlotIndex != -1) {
+
+    if (ImGui::GetIO().KeyShift && inspector->lastSelectedSlotIndex != -1) 
+    {
         int start = std::min(index, inspector->lastSelectedSlotIndex);
         int end = std::max(index, inspector->lastSelectedSlotIndex);
 
-        for (int i = start; i <= end; ++i) {
-            if (i >= 0 && i < static_cast<int>(inspector->mergedHierarchyList.size())) {
-                ThreeDObject* rangeObj = inspector->mergedHierarchyList[i];
-                if (rangeObj && std::find(multiSel.begin(), multiSel.end(), rangeObj) == multiSel.end()) {
-                    multiSel.push_back(rangeObj);
-                    rangeObj->setSelected(true);
+        for (int i = start; i <= end; ++i) 
+        {
+            if (i >= 0 && i < static_cast<int>(inspector->mergedHierarchyList.size())) 
+            {
+                    ThreeDObject* rangeObj = inspector->mergedHierarchyList[i];
+                    if (rangeObj && std::find(multiSel.begin(), multiSel.end(), rangeObj) == multiSel.end())
+                    {
+                        multiSel.push_back(rangeObj);
+                        rangeObj->setSelected(true);
+                    }
                 }
             }
-        }
 
-        if (inspector->objectInspector) {
+        if (inspector->objectInspector) 
+        {
             inspector->objectInspector->clearInspectedObject();
             inspector->objectInspector->setMultipleInspectedObjects(multiSel);
         }
 
         selector.setMultipleSelectedObjects(multiSel);
         inspector->selectedObjectInHierarchy = obj;
-    } else {
+    } 
+    else 
+    {
         selector.clearSelection();
         obj->setSelected(true);
         multiSel.clear();
         multiSel.push_back(obj);
 
-        if (inspector->objectInspector) {
+        if (inspector->objectInspector)
+        {
             inspector->objectInspector->clearMultipleInspectedObjects();
             inspector->objectInspector->setInspectedObject(obj);
         }
@@ -73,6 +83,11 @@ void HandleHierarchyInteractions::clickOnSlot(bool& clickedOnItem, int index, Th
 
     if (!ImGui::GetIO().KeyShift)
         selector.externalSelect(obj);
+
+    if (inspector->window)
+    {
+        inspector->window->setMultipleSelectedObjects(multiSel);
+    }
 }
 
 void HandleHierarchyInteractions::dragObject(ThreeDObject* draggedObj, int index)

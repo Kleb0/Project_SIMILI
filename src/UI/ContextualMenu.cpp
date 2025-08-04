@@ -23,7 +23,6 @@ void ContextualMenu::show()
 
     popupPos = ImGui::GetMousePos();
     isOpen = true;
-    // std::cout << "[ContextualMenu] Contextual menu opened at position: " << popupPos.x << ", " << popupPos.y << std::endl;
 }
 
 void ContextualMenu::hide()
