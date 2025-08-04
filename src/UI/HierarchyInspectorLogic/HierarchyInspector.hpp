@@ -2,6 +2,7 @@
 
 #include <imgui.h> 
 #include "UI/HierarchyInspectorLogic/HandleHierarchyInteractions.hpp"
+#include "UI/HierarchyInspectorLogic/HierarchyListDrawing.hpp"
 #include "UI/GUIWindow.hpp"
 #include "Engine/OpenGLContext.hpp"
 #include "WorldObjects/ThreeDObject.hpp"
@@ -21,33 +22,36 @@ struct HierarchyEntry {
 
 class HierarchyInspector : public GUIWindow
 {
- friend class HandleHierarchyInteractions;
+    friend class HandleHierarchyInteractions;
+    friend class HierarchyListDrawing;
+
 public:
     HierarchyInspector();
 
-    // === Rendering ===
-    void render() override;
-    // -------- Initialization 
-    void drawSlotsList(bool& clickedOnItem); 
-
-    // --------- Management and interactions with slots ----- //
-    void clickOnSlot(bool& clickedOnItem, int index, ThreeDObject* obj);
-    void dragObject(ThreeDObject* obj, int index);
-    void dropOnSlot(ThreeDObject* obj, int index);
-    void dropOnObject(ThreeDObject* parent, ThreeDObject* child, int index);
-    
-    // --------- Redrawing and updates
-    void exchangeSlots(ThreeDObject* obj, int index);
-    void drawChildSlots(ThreeDObject* parent, bool& clickedOnItem);
-    void redrawSlotsList();
-
+    // -------- Initialization and setting
     void setContext(OpenGLContext* ctxt);
     void setThreeDWindow(ThreeDWindow* win);
     void setObjectInspector(ObjectInspector* inspector);
     void setTitle(const std::string& newTitle) { this->title = newTitle; }
 
+    // === Rendering ===
+    void render() override;
+    // -------- Initialization 
+    void drawSlotsList(bool& clickedOnItem); 
+    void drawChildSlots(ThreeDObject* parent, bool& clickedOnItem);
 
-    //---------- Selection inside list -------------//
+    // --------- Management and interactions with slots ----- //
+    void clickOnSlot(bool& clickedOnItem, int index, ThreeDObject* obj);
+    void dragObject(ThreeDObject* obj, int index);
+    void dropOnSlot(ThreeDObject* obj, int index);
+    void dropOnObject(ThreeDObject* parent, ThreeDObject* child, int index);    
+
+    // --------- Redrawing and updates
+    void exchangeSlots(ThreeDObject* obj, int index);
+    void redrawSlotsList();
+
+
+    //---------- Selection inside list in HandleHierarchyInteractions.hpp -------------//
     void selectInList(ThreeDObject* obj);
     void selectObject(ThreeDObject* obj);
     void unselectObject(ThreeDObject* obj);
@@ -69,6 +73,8 @@ public:
 private:
 
     std::unique_ptr<HandleHierarchyInteractions> interactions;
+    std::unique_ptr<HierarchyListDrawing> listDrawer;
+
     OpenGLContext* context = nullptr;
     ThreeDWindow* window = nullptr;
     ObjectInspector* objectInspector = nullptr;

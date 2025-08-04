@@ -533,3 +533,8 @@ void ThreeDWindow::handleClick()
       
     }
 }
+
+void ThreeDWindow::setMultipleSelectedObjects(const std::list<ThreeDObject*>& objects)
+{
+    multipleSelectedObjects = objects;
+}

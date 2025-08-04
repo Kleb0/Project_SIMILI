@@ -64,6 +64,8 @@ public:
     void setHierarchy(HierarchyInspector *inspector);
     void setObjectInspector(ObjectInspector *inspector);
 
+    void setMultipleSelectedObjects(const std::list<ThreeDObject*>& objects);
+
     ImVec2 oglChildPos;
     ImVec2 oglChildSize;
     std::string title = "Hello 3D Window";
