@@ -37,7 +37,8 @@ void HierarchyListDrawing::drawSlotsList(bool& clickedOnItem)
 
     if (!isDragging && inspector->currentlyDraggedObject != nullptr)
     {
-        std::cout << "[HierarchyInspector] Dropping object: " << inspector->currentlyDraggedObject->getName() << std::endl;
+        // std::cout << "[HierarchyInspector] Dropping object: " << inspector->currentlyDraggedObject->getName() << std::endl;
+        std::cout << "[HierarchyInspector] Dropping object with name :" << inspector->currentlyDraggedObject->getName() << "on slot : " << inspector->dropToSlotIndex << std::endl;
 
         if (inspector->childToDropOn)
         {
@@ -55,39 +56,51 @@ void HierarchyListDrawing::drawSlotsList(bool& clickedOnItem)
     // -------- End of drop operation --------- //
 
     // --------- STEP 2 Assign ThreeDObjects to slots --------- //
+
+    
     if (inspector->context && !inspector->objectsAssignedOnce)
     {
-        const std::list<ThreeDObject*>& sceneObjects = inspector->context->getObjects();
 
+        for (int i = 0; i < totalSlots; ++i)
+        {
+            inspector->mergedHierarchyList[i] = inspector->emptySlotPlaceholders[i].get();
+        }
+
+        const std::list<ThreeDObject*>& sceneObjects = inspector->context->getObjects();
         int nextFreeSlot = 0;
 
         for (ThreeDObject* obj : sceneObjects)
         {
-            if (!obj)
+            if (!obj || (obj->isParented || obj->IsVertice()))
                 continue;
-
-            if (obj->isParented || obj->IsVertice())
-                continue; 
 
             int slot = obj->getSlot();
 
-            if (slot < 0 || slot >= totalSlots)
+            if (slot >= 0 && slot < totalSlots &&
+            inspector->mergedHierarchyList[slot] == inspector->emptySlotPlaceholders[slot].get())
             {
-                while (nextFreeSlot < totalSlots && dynamic_cast<EmptyDummy*>(inspector->mergedHierarchyList[nextFreeSlot]) == nullptr)
-                    ++nextFreeSlot;
 
-                if (nextFreeSlot >= totalSlots)
-                {
-                    std::cerr << "Warning: no free slot available for object '" << obj->getName() << "'" << std::endl;
-                    continue;
-                }
+                inspector->mergedHierarchyList[slot] = obj;
+                std::cout << "[HierarchyList] '" << obj->getName() << "' assigned to slot " << slot << std::endl;
+                continue;
+            }
 
-                obj->setSlot(nextFreeSlot);
-                slot = nextFreeSlot;
+            while (nextFreeSlot < totalSlots &&
+            dynamic_cast<EmptyDummy*>(inspector->mergedHierarchyList[nextFreeSlot]) == nullptr)
+            {
                 ++nextFreeSlot;
             }
 
-            inspector->mergedHierarchyList[slot] = obj;
+            if (nextFreeSlot >= totalSlots)
+            {
+                std::cerr << "Warning: no free slot available for object '" << obj->getName() << "'" << std::endl;
+                continue;
+            }
+
+            obj->setSlot(nextFreeSlot);
+            inspector->mergedHierarchyList[nextFreeSlot] = obj;
+            std::cout << "[HierarchyList] '" << obj->getName() << "' assigned to slot " << nextFreeSlot << std::endl;
+            ++nextFreeSlot;
         }
 
         inspector->objectsAssignedOnce = true;
@@ -144,7 +157,7 @@ void HierarchyListDrawing::drawSlotsList(bool& clickedOnItem)
             if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f))
                 inspector->currentlyDraggedObject = obj;
 
-            if (inspector->currentlyDraggedObject)
+            if (inspector->currentlyDraggedObject && ImGui::IsItemHovered(ImGuiHoveredFlags_RectOnly))
                 inspector->dragObject(inspector->currentlyDraggedObject, i);
 
             inspector->clickOnSlot(clickedOnItem, i, obj);
@@ -154,7 +167,7 @@ void HierarchyListDrawing::drawSlotsList(bool& clickedOnItem)
         }
         else if (obj) 
         {
-            if (inspector->currentlyDraggedObject)
+            if (inspector->currentlyDraggedObject && ImGui::IsItemHovered(ImGuiHoveredFlags_RectOnly))
                 inspector->dragObject(inspector->currentlyDraggedObject, i);
 
             inspector->clickOnSlot(clickedOnItem, i, obj);

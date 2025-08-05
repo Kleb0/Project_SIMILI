@@ -96,7 +96,8 @@ void HandleHierarchyInteractions::dragObject(ThreeDObject* draggedObj, int index
 
     inspector->lastSelectedObject = draggedObj;
 
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_RectOnly)) {
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_RectOnly)) 
+    {
         inspector->mouseOveringSlotIndex = index;
         inspector->childToDropOn = nullptr;
 
@@ -107,13 +108,18 @@ void HandleHierarchyInteractions::dragObject(ThreeDObject* draggedObj, int index
 
     std::string ghostLabel = inspector->currentlyDraggedObject->getName();
 
-    if (inspector->childToDropOn) {
+    if (inspector->childToDropOn)
+    {
         ghostLabel += " → " + inspector->childToDropOn->getName();
         inspector->dropToSlotIndex = -1;
-    } else if (inspector->mouseOveringSlotIndex != -1) {
+    } 
+    else if (inspector->mouseOveringSlotIndex != -1) 
+    {
         ghostLabel += " → Slot [" + std::to_string(inspector->mouseOveringSlotIndex) + "]";
         inspector->dropToSlotIndex = inspector->mouseOveringSlotIndex;
-    } else {
+    } 
+    else 
+    {
         inspector->dropToSlotIndex = -1;
     }
 
@@ -131,22 +137,40 @@ void HandleHierarchyInteractions::dragObject(ThreeDObject* draggedObj, int index
 void HandleHierarchyInteractions::dropOnSlot(ThreeDObject* obj, int index)
 {
     ThreeDObject* base = inspector->mergedHierarchyList[index];
+    if (base == obj) 
+    {
+        return;
+    }
+
     auto* dummy = dynamic_cast<EmptyDummy*>(base);
 
-    if (dummy && dummy->isDummy()) {
+    if (dummy && dummy->isDummy()) 
+    {
         glm::mat4 global = obj->getGlobalModelMatrix();
-        if (auto* parent = obj->getParent()) {
+        if (auto* parent = obj->getParent()) 
+        {
             parent->removeChild(obj);
             obj->removeParent();
             obj->isParented = false;
         }
+
         obj->setModelMatrix(global);
         obj->setOrigin(inspector->context->worldCenter);
+        obj->setSlot(index);
         inspector->exchangeSlots(obj, index);
-    } else if (base) {
+
+        inspector->objectsAssignedOnce = false;
+        inspector->redrawSlotsList();
+    } 
+    else if(base)
+    {
         dropOnObject(base, obj, index);
         inspector->dropToSlotIndex = -1;
+
+        inspector->objectsAssignedOnce = false;
+        inspector->redrawSlotsList();
     }
+    
 }
 
 void HandleHierarchyInteractions::dropOnObject(ThreeDObject* parent, ThreeDObject* child, int index)
@@ -156,7 +180,8 @@ void HandleHierarchyInteractions::dropOnObject(ThreeDObject* parent, ThreeDObjec
     glm::vec3 parentOrigin = glm::vec3(parent->getGlobalModelMatrix() * glm::vec4(parent->getOrigin(), 1.0f));
     glm::mat4 childBefore = child->getGlobalModelMatrix();
 
-    if (auto* oldParent = child->getParent()) {
+    if (auto* oldParent = child->getParent()) 
+    {
         oldParent->removeChild(child);
         child->removeParent();
         child->isParented = false;
@@ -171,6 +196,7 @@ void HandleHierarchyInteractions::dropOnObject(ThreeDObject* parent, ThreeDObjec
     glm::vec3 newLocalOrigin = glm::vec3(glm::inverse(childAfter) * glm::vec4(parentOrigin, 1.0f));
     child->setOrigin(newLocalOrigin);
 
+    inspector->objectsAssignedOnce = false;
     inspector->redrawSlotsList();
 }
 
@@ -199,10 +225,13 @@ void HandleHierarchyInteractions::multipleSelection(ThreeDObject* obj)
 {
     auto& list = inspector->multipleSelectedObjects;
     auto it = std::find(list.begin(), list.end(), obj);
-    if (it == list.end()) {
+    if (it == list.end()) 
+    {
         list.push_back(obj);
         std::cout << "[HierarchyInspector] Add object to multiple selection list: " << obj->getName() << std::endl;
-    } else {
+    } 
+    else
+    {
         list.erase(it);
     }
 

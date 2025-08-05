@@ -158,7 +158,7 @@ void HierarchyInspector::redrawSlotsList()
     for (auto& dummy : emptySlotPlaceholders)
         mergedHierarchyList.push_back(dummy.get());
 
-    std::cout << "[HierarchyInspector] redrawSlotsList triggered." << std::endl;
+    // std::cout << "[HierarchyInspector] redrawSlotsList triggered." << std::endl;
 }
 
 
