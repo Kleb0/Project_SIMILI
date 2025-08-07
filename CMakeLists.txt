@@ -28,7 +28,9 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI    
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ThreeDModes
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/HierarchyInspectorLogic
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ThreeDWindow
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDInteractions
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/images
     ${CMAKE_CURRENT_SOURCE_DIR}/src/InternalLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects
@@ -158,7 +160,9 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ThreeDModes
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/HierarchyInspectorLogic
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ThreeDWindow
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDInteractions
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/images
     ${CMAKE_CURRENT_SOURCE_DIR}/src/InternalLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects

@@ -1,6 +1,6 @@
 #include "Engine/SimiliSelector.hpp"
 #include "WorldObjects/ThreeDObject.hpp"
-#include "UI/ThreeDWindow.hpp"
+#include "UI/ThreeDWindow/ThreeDWindow.hpp"
 #include "Engine/ThreeDObjectSelector.hpp"
 #include "Engine/ErrorBox.hpp"
 

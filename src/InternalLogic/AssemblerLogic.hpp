@@ -2,12 +2,11 @@
 #include <iostream>
 
 #include "UI/MainSoftwareGUI.hpp"
-#include "UI/ThreeDWindow.hpp"
 #include "Engine/OpenGLContext.hpp"
 #include "WorldObjects/ThreedObject.hpp"
 #include "UI/GUIWindow.hpp"
 #include "UI/InfoWindow.hpp"
-#include "UI/ThreeDWindow.hpp"
+#include "UI/ThreeDWindow/ThreeDWindow.hpp"
 #include "UI/ObjectInspector.hpp"
 #include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
 

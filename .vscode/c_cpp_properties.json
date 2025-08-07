@@ -7,7 +7,11 @@
          "includePath": [
         "${workspaceFolder}/src",
         "${workspaceFolder}/src/UI",
+        "${workspaceFolder}/src/UI/HierarchyInspectorLogic",
+        "${workspaceFolder}/src/UI/ThreeDModes",
+        "${workspaceFolder}/src/UI/ThreeDWindow",
         "${workspaceFolder}/src/Engine",
+        "${workspaceFolder}/src/Engine/ThreeDInteractions",
         "${workspaceFolder}/src/InternalLogic",
         "${workspaceFolder}/src/AbstractClass",
         "${workspaceFolder}/src/WorldObjects",

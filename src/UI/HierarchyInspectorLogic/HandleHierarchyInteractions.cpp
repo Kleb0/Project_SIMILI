@@ -1,7 +1,7 @@
 #include "UI/HierarchyInspectorLogic/HandleHierarchyInteractions.hpp"
 #include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
 #include "UI/ObjectInspector.hpp"
-#include "UI/ThreeDWindow.hpp"
+#include "UI/ThreeDWindow/ThreeDWindow.hpp"
 #include "Engine/SimiliSelector.hpp"
 #include <imgui.h>
 #include <glm/gtc/matrix_inverse.hpp>
@@ -195,6 +195,13 @@ void HandleHierarchyInteractions::dropOnObject(ThreeDObject* parent, ThreeDObjec
     glm::mat4 childAfter = child->getGlobalModelMatrix();
     glm::vec3 newLocalOrigin = glm::vec3(glm::inverse(childAfter) * glm::vec4(parentOrigin, 1.0f));
     child->setOrigin(newLocalOrigin);
+
+    
+    int childSlot = child->getSlot();
+    if (childSlot >= 0 && childSlot < static_cast<int>(inspector->mergedHierarchyList.size())) {
+        inspector->mergedHierarchyList[childSlot] = inspector->emptySlotPlaceholders[childSlot].get();
+    }
+    child->setSlot(-1); 
 
     inspector->objectsAssignedOnce = false;
     inspector->redrawSlotsList();

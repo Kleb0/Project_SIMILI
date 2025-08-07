@@ -23,7 +23,7 @@ fs::path gExecutableDir;
 #include "InternalLogic/AssemblerLogic.hpp"
 #include "UI/MainSoftwareGUI.hpp"
 #include "UI/InfoWindow.hpp"
-#include "UI/ThreeDWindow.hpp"
+#include "UI/ThreeDWindow/ThreeDWindow.hpp"
 #include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
 #include "WorldObjects/ThreedObject.hpp"
 #include "Engine/OpenGLContext.hpp"
