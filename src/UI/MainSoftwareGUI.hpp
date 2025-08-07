@@ -3,7 +3,7 @@
 #include <GLFW/glfw3.h>
 #include <vector>
 #include <UI/GUIWindow.hpp>
-#include <UI/ThreeDWindow.hpp>
+#include "UI/ThreeDWindow/ThreeDWindow.hpp"
 #include <UI/ObjectInspector.hpp>
 #include <WorldObjects/ThreeDObject.hpp>
 

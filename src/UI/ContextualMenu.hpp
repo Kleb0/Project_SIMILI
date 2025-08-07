@@ -3,7 +3,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <imgui.h>
-#include "UI/ThreeDWindow.hpp"
+#include "UI/ThreeDWindow/ThreeDWindow.hpp"
 #include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
 #include "WorldObjects/ThreeDObject.hpp"
 

@@ -66,13 +66,25 @@ void HierarchyListDrawing::drawSlotsList(bool& clickedOnItem)
             inspector->mergedHierarchyList[i] = inspector->emptySlotPlaceholders[i].get();
         }
 
+
         const std::list<ThreeDObject*>& sceneObjects = inspector->context->getObjects();
         int nextFreeSlot = 0;
 
         for (ThreeDObject* obj : sceneObjects)
         {
-            if (!obj || (obj->isParented || obj->IsVertice()))
-                continue;
+                if (!obj) continue;
+
+                if (obj->isParented)
+                {
+                    std::cout << "[Skip Assign] '" << obj->getName() << "' is parented, skip assigning to mergedHierarchyList" << std::endl;
+                    continue;
+                }
+
+                if (obj->IsVertice())
+                {
+                    std::cout << "[Skip Assign] '" << obj->getName() << "' is a Vertice, skip." << std::endl;
+                    continue;
+                }
 
             int slot = obj->getSlot();
 
@@ -110,37 +122,60 @@ void HierarchyListDrawing::drawSlotsList(bool& clickedOnItem)
     // --------- STEP 3 Draw all slots --------- //
     for (int i = 0; i < totalSlots; ++i)
     {
+
+        // ------ Button design and colors ----- //
         ThreeDObject* obj = inspector->mergedHierarchyList[i];
+
+        if (obj && obj->isParented)
+            continue;
+    
         float slotHeight = 26.0f;
-        ImVec2 size = ImVec2(ImGui::GetContentRegionAvail().x, slotHeight);
+        float numberWidth = 35.0f;
 
         bool isEven = (i % 2 == 0);
-        ImVec4 defaultBgColor = isEven ? ImVec4(0.8f, 0.8f, 0.8f, 1.0f)
-                                    : ImVec4(0.1f, 0.2f, 0.5f, 1.0f);
-        ImVec4 selectedBgColor = ImVec4(0.2f, 0.8f, 0.2f, 1.0f);
+        ImVec4 bgColor = isEven 
+            ? ImVec4(0.156f, 0.156f, 0.156f, 1.0f)
+            : ImVec4(0.168f, 0.168f, 0.168f, 1.0f);
+        ImVec4 selectedColor = ImVec4(0.2f, 0.8f, 0.2f, 1.0f);
+        ImVec4 textColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+
         bool isSlotSelected = obj && obj->getSelected();
 
-        ImVec4 textColor = isSlotSelected
-                        ? ImVec4(0.0f, 0.0f, 0.0f, 1.0f)
-                        : (isEven ? ImVec4(0.0f, 0.0f, 0.0f, 1.0f)
-                                    : ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+        ImGui::PushFont(inspector->unicodeFont);
 
-        ImGui::PushStyleColor(ImGuiCol_Button, isSlotSelected ? selectedBgColor : defaultBgColor);
-        ImGui::PushStyleColor(ImGuiCol_Text, textColor);
+
+        ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+        ImVec2 size = ImVec2(ImGui::GetContentRegionAvail().x, slotHeight);
+
+
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        draw_list->AddRectFilled(cursorPos, ImVec2(cursorPos.x + size.x, cursorPos.y + size.y),
+            ImColor(isSlotSelected ? selectedColor : bgColor));
+
+        ImGui::InvisibleButton(("##slot" + std::to_string(i)).c_str(), size);
+
+        if (ImGui::IsItemClicked())
+            inspector->clickOnSlot(clickedOnItem, i, obj);
+
+        float textOffsetY = 5.0f;
+        ImVec2 numberPos = ImVec2(cursorPos.x + 5.0f, cursorPos.y + textOffsetY);
+        ImVec2 labelPos  = ImVec2(cursorPos.x + numberWidth, cursorPos.y + textOffsetY);
+
+        // draw_list->AddText(numberPos, ImColor(textColor), std::to_string(i).c_str());
 
         std::string label;
         if (obj && obj->getName() != "Empty Slot")
         {
             std::string toggleIcon = obj->getChildren().empty() ? "  " : (obj->expanded ? u8"\u25BC " : u8"\u25B6 ");
-            label = toggleIcon + "--- [" + obj->getName() + "] ---";
+            label = toggleIcon + "[" + std::to_string(i) + "]" + "--- [" + obj->getName() + "] ---";
         }
         else
         {
-            label = "--- Empty Slot [" + std::to_string(i) + "] ---";
+            label = "[" + std::to_string(i) + "]";
         }
 
-        ImGui::PushFont(inspector->unicodeFont);
-        ImGui::Button(label.c_str(), size);
+        draw_list->AddText(labelPos, ImColor(textColor), label.c_str());
+
         ImGui::PopFont();
 
         // prevent from dragging empty slots
@@ -173,7 +208,7 @@ void HierarchyListDrawing::drawSlotsList(bool& clickedOnItem)
             inspector->clickOnSlot(clickedOnItem, i, obj);
         }
 
-        ImGui::PopStyleColor(2);
+        // ImGui::PopStyleColor(2);
     }
     // ----- end of slots drawing ----- //
 }
@@ -223,7 +258,7 @@ void HierarchyListDrawing::drawChildSlots(ThreeDObject* parent,  bool& clickedOn
 
             inspector->childToDropOn = child;
             // - set the child as the parent of currently dragged object
-            inspector->currentlyDraggedObject->setParent(child);
+           // inspector->currentlyDraggedObject->setParent(child);
         }
 
         // ----------------- End of child detection ----------------- //

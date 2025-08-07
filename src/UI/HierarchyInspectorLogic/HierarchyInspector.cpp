@@ -1,7 +1,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #define IMGUI_ENABLE_ASSERTS
 #include "UI/ObjectInspector.hpp"
-#include "UI/ThreeDWindow.hpp"
+#include "UI/ThreeDWindow/ThreeDWindow.hpp"
 #include <imgui.h>
 #include <iostream>
 #include <algorithm>
