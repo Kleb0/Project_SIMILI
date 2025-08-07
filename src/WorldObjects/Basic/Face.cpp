@@ -1,4 +1,4 @@
-#include "WorldObjects/Face.hpp"
+#include "WorldObjects/Basic/Face.hpp"
 #include <glad/glad.h>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
@@ -60,21 +60,13 @@ void Face::initialize()
 {
     compileShaders();
 
-    std::vector<float> faceData;
-    for (Vertice* v : vertices)
-    {
-        glm::vec3 pos = v->getLocalPosition(); 
-        faceData.push_back(pos.x);
-        faceData.push_back(pos.y);
-        faceData.push_back(pos.z);
-    }
-
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &vbo);
 
     glBindVertexArray(vao);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, faceData.size() * sizeof(float), faceData.data(), GL_STATIC_DRAW);
+
+    glBufferData(GL_ARRAY_BUFFER, 4 * 3 * sizeof(float), nullptr, GL_DYNAMIC_DRAW);
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
@@ -82,17 +74,36 @@ void Face::initialize()
     glBindVertexArray(0);
 }
 
+void Face::uploadFromVertices()
+{
+    float faceData[4 * 3];
+    for (int i = 0; i < 4; ++i)
+    {
+        const glm::vec3 p = vertices[i]->getLocalPosition();
+        faceData[i * 3 + 0] = p.x;
+        faceData[i * 3 + 1] = p.y;
+        faceData[i * 3 + 2] = p.z;
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(faceData), faceData);
+}
+
 void Face::render(const glm::mat4& viewProj, const glm::mat4& modelMatrix)
 {
     glUseProgram(shaderProgram);
 
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(modelMatrix));
+    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"),    1, GL_FALSE, glm::value_ptr(modelMatrix));
 
     glBindVertexArray(vao);
+    uploadFromVertices();
+
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
     glBindVertexArray(0);
 }
+
 
 
 void Face::destroy()

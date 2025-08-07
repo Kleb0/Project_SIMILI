@@ -9,7 +9,7 @@
 #include "UI/ObjectInspector.hpp"
 
 #include "WorldObjects/ThreeDObject.hpp"
-#include "WorldObjects/Vertice.hpp"
+#include "WorldObjects/Basic/Vertice.hpp"
 #include "WorldObjects/Cube.hpp"
 
 #include <SDL3/SDL.h>
@@ -307,6 +307,20 @@ void ThreeDWindow::ThreeDWorldInteractions()
             wasUsingGizmoLastFrame
         );
     }
+
+    if(currentMode == &verticeMode)
+    {
+        if(lastSelectedVertice)
+        {
+            VerticeTransform::manipulateVertice(
+                openGLContext,
+                lastSelectedVertice,
+                oglChildPos,
+                oglChildSize,
+                wasUsingGizmoLastFrame
+            );
+        }
+    }
 }
 
 //------- Click Handling ----------- //
@@ -421,18 +435,22 @@ void ThreeDWindow::handleClick()
 
         if (currentMode == &verticeMode)
         {
+            if (ImGuizmo::IsUsing())
+                return;
+
             std::cout << "[DEBUG] ThreeDwindow : Vertice Mode active, click vertice operation done." << std::endl;
 
-            Vertice* selectedVertice = selector.pickUpVertice((int)relativeMouseX, (int)relativeMouseY,
-                                                            windowWidth, windowHeight, view, proj,
-                                                            ThreeDObjectsList);
+            Vertice* selectedVertice = selector.pickUpVertice(
+                (int)relativeMouseX, (int)relativeMouseY,
+                windowWidth, windowHeight, view, proj,
+                ThreeDObjectsList
+            );
 
             if (selectedVertice)
             {
                 std::cout << "[DEBUG] ThreeDwindow :  Selected vertice: " << selectedVertice->getName() << std::endl;
-
                 selectedVertice->setSelected(true);
-                lastSelectedVertice = selectedVertice; 
+                lastSelectedVertice = selectedVertice;
             }
             else
             {
@@ -444,9 +462,7 @@ void ThreeDWindow::handleClick()
                     if (!cube) continue;
 
                     for (Vertice* vert : cube->getVertices())
-                    {
                         vert->setSelected(false);
-                    }
                 }
 
                 lastSelectedVertice = nullptr;

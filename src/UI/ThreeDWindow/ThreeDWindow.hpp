@@ -6,6 +6,7 @@
 #include <imgui.h>
 #include <ImGuizmo.h>
 #include "Engine/ThreeDInteractions/MeshTransform.hpp"
+#include "Engine/ThreeDInteractions/VerticeTransform.hpp"
 
 #include <string>
 #include <vector>

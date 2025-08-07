@@ -2,6 +2,7 @@
 #include <glm/glm.hpp>
 #include <string>
 
+class ThreeDObject; 
 class Vertice
 {
 public:
@@ -29,7 +30,13 @@ public:
     void setSelected(bool isSelected);
     bool isSelected() const;
 
+    void applyTranslationToLocal(const glm::vec3& translation, const glm::mat4& parentModelMatrix);
+
+    void setMeshParent(ThreeDObject* parent);
+    ThreeDObject* getMeshParent() const;
+
 private:
+    ThreeDObject* meshParent = nullptr;
     unsigned int vao = 0;
     unsigned int vbo = 0;
     unsigned int shaderProgram = 0;

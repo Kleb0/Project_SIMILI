@@ -1,7 +1,7 @@
 #pragma once
 
 #include "WorldObjects/ThreeDObject.hpp"
-#include "WorldObjects/Vertice.hpp"
+#include "WorldObjects/Basic/Vertice.hpp"
 #include <vector>
 #include <iostream>
 #include <list>

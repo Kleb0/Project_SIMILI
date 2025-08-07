@@ -15,6 +15,7 @@
         "${workspaceFolder}/src/InternalLogic",
         "${workspaceFolder}/src/AbstractClass",
         "${workspaceFolder}/src/WorldObjects",
+        "${workspaceFolder}/src/WorldObjects/Basic",
         "${workspaceFolder}/src/Resources",
         "${workspaceFolder}/src/ThirdParty",
         "${workspaceFolder}/src/ThirdParty/imgui",

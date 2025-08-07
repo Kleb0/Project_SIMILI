@@ -1,6 +1,6 @@
 #pragma once
 
-#include "WorldObjects/Vertice.hpp"
+#include "WorldObjects/Basic/Vertice.hpp"
 #include <glm/glm.hpp>
 
 class Edge

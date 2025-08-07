@@ -34,6 +34,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/images
     ${CMAKE_CURRENT_SOURCE_DIR}/src/InternalLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Basic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Resources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/example
@@ -166,6 +167,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/images
     ${CMAKE_CURRENT_SOURCE_DIR}/src/InternalLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Basic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Resources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/backends

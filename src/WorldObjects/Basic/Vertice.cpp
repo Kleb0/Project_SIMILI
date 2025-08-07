@@ -1,4 +1,4 @@
-#include "WorldObjects/Vertice.hpp"
+#include "WorldObjects/Basic/Vertice.hpp"
 #include <glad/glad.h>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -165,6 +165,16 @@ glm::mat4 Vertice::getModelMatrix() const
     return glm::translate(glm::mat4(1.0f), position);
 }
 
+void Vertice::setMeshParent(ThreeDObject* parent)
+{
+    meshParent = parent;
+}
+
+ThreeDObject* Vertice::getMeshParent() const
+{
+    return meshParent;
+}
+
 void Vertice::setSelected(bool isSelected)
 {
     VerticeSelected = isSelected;
@@ -173,5 +183,12 @@ void Vertice::setSelected(bool isSelected)
 bool Vertice::isSelected() const
 {
     return VerticeSelected;
+}
+
+void Vertice::applyTranslationToLocal(const glm::vec3& translation, const glm::mat4& parentModelMatrix)
+{
+    glm::mat4 invParent = glm::inverse(parentModelMatrix);
+    glm::vec3 localTranslation = glm::vec3(invParent * glm::vec4(translation, 0.0f));
+    localPosition += localTranslation;
 }
 
