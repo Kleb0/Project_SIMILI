@@ -1,7 +1,7 @@
 #pragma once
 
-#include "WorldObjects/Vertice.hpp"
-#include "WorldObjects/Edge.hpp"
+#include "WorldObjects/Basic/Vertice.hpp"
+#include "WorldObjects/Basic/Edge.hpp"
 #include <glm/glm.hpp>
 #include <vector>
 
@@ -28,4 +28,6 @@ private:
     unsigned int shaderProgram = 0;
 
     void compileShaders();
+
+    void uploadFromVertices();
 };

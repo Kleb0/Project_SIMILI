@@ -33,6 +33,7 @@ void Cube::createVertices()
         vert->setLocalPosition(localPositions[i]); 
         vert->initialize();
         vert->setName("Vertice_" + std::to_string(i));
+        vert->setMeshParent(this);
         vertices.push_back(vert);
     }
 }

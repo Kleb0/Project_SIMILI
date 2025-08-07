@@ -1,9 +1,9 @@
 #pragma once
 
 #include "WorldObjects/ThreedObject.hpp"
-#include "WorldObjects/Vertice.hpp"
-#include "WorldObjects/Edge.hpp"
-#include "WorldObjects/Face.hpp"
+#include "WorldObjects/Basic/Vertice.hpp"
+#include "WorldObjects/Basic/Edge.hpp"
+#include "WorldObjects/Basic/Face.hpp"
 #include <vector>
 
 class Cube : public ThreeDObject

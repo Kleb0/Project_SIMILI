@@ -1,7 +1,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "Engine/Guizmo.hpp"
 #include "WorldObjects/ThreeDObject.hpp"
-#include "WorldObjects/Vertice.hpp"
+#include "WorldObjects/Basic/Vertice.hpp"
 #include <glm/gtc/type_ptr.hpp>
 
 
@@ -46,15 +46,9 @@ const glm::mat4& proj, ImVec2 oglChildPos, ImVec2 oglChildSize)
     return model;
 }
 
-glm::mat4 Guizmo::renderGizmoForVertice(Vertice* vertice, ImGuizmo::OPERATION operation,
+void Guizmo::renderGizmoForVertice(glm::mat4& model, ImGuizmo::OPERATION operation,
 const glm::mat4& view, const glm::mat4& proj, ImVec2 oglChildPos, ImVec2 oglChildSize)
 {
-    if (!vertice) return glm::mat4(1.0f);
-
-    glm::vec3 pos = vertice->getPosition();
-    glm::mat4 model = glm::translate(glm::mat4(1.0f), pos);
-    model = glm::scale(model, glm::vec3(0.5f));
-
     ImGuizmo::BeginFrame();
     ImGuizmo::Enable(true);
     ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
@@ -63,7 +57,6 @@ const glm::mat4& view, const glm::mat4& proj, ImVec2 oglChildPos, ImVec2 oglChil
     ImGuizmo::SetGizmoSizeClipSpace(0.2f);
 
     ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(proj),
-    operation, ImGuizmo::WORLD, glm::value_ptr(model));
-
-    return model;
+                         operation, ImGuizmo::WORLD,
+                         glm::value_ptr(model));
 }
