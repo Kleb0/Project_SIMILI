@@ -74,6 +74,7 @@ public:
     glm::vec3 centerOfSelection = glm::vec3(0.0f);
     GLFWwindow *glfwWindow = nullptr;
     std::list<ThreeDObject *> multipleSelectedObjects;
+    std::list<Vertice *> multipleSelectedVertices;
     bool wasUsingGizmoLastFrame = false;
     bool selectionLocked = false;
 

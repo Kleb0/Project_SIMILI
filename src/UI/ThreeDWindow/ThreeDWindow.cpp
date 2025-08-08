@@ -310,16 +310,13 @@ void ThreeDWindow::ThreeDWorldInteractions()
 
     if(currentMode == &verticeMode)
     {
-        if(lastSelectedVertice)
-        {
-            VerticeTransform::manipulateVertice(
-                openGLContext,
-                lastSelectedVertice,
-                oglChildPos,
-                oglChildSize,
-                wasUsingGizmoLastFrame
-            );
-        }
+        VerticeTransform::manipulateVertices(
+            openGLContext,
+            multipleSelectedVertices,
+            oglChildPos,
+            oglChildSize,
+            wasUsingGizmoLastFrame
+        );
     }
 }
 
@@ -435,41 +432,85 @@ void ThreeDWindow::handleClick()
 
         if (currentMode == &verticeMode)
         {
+            //if SHIFT is pressed  
+
             if (ImGuizmo::IsUsing())
                 return;
 
-            std::cout << "[DEBUG] ThreeDwindow : Vertice Mode active, click vertice operation done." << std::endl;
+            bool shiftPressed = ImGui::GetIO().KeyShift;
+
+            // std::cout << "[DEBUG] ThreeDwindow : Vertice Mode active, click vertice operation done." << std::endl;
 
             Vertice* selectedVertice = selector.pickUpVertice(
                 (int)relativeMouseX, (int)relativeMouseY,
                 windowWidth, windowHeight, view, proj,
-                ThreeDObjectsList
+                ThreeDObjectsList, shiftPressed
             );
 
             if (selectedVertice)
             {
-                std::cout << "[DEBUG] ThreeDwindow :  Selected vertice: " << selectedVertice->getName() << std::endl;
-                selectedVertice->setSelected(true);
-                lastSelectedVertice = selectedVertice;
+                if (shiftPressed)
+                {
+                    auto it = std::find(multipleSelectedVertices.begin(), multipleSelectedVertices.end(), selectedVertice);
+
+                    if (it == multipleSelectedVertices.end())
+                    {
+                        multipleSelectedVertices.push_back(selectedVertice);
+
+                        // std::cout << "[DEBUG] ThreeDWindow.cpp : Added vertice to multi-select: " << selectedVertice->getName() << std::endl;
+                        for(Vertice* v : multipleSelectedVertices)
+                        {
+                            // std::cout << "[DEBUG] ThreeDWindow.cpp : Vertice in multi-select: " << v->getName() << std::endl;
+                            v->setSelected(true);
+                        }
+                    }
+                }
+                else
+                {
+
+                    for (ThreeDObject* obj : ThreeDObjectsList)
+                    {
+                        Cube* cube = dynamic_cast<Cube*>(obj);
+                        if (!cube) continue;
+                        for (Vertice* v : cube->getVertices())
+                            v->setSelected(false);
+                    }
+                    multipleSelectedVertices.clear();
+
+                    selectedVertice->setSelected(true);
+                    multipleSelectedVertices.push_back(selectedVertice);
+                    lastSelectedVertice = selectedVertice;
+
+                    // std::cout << "[DEBUG] ThreeDWindow.cpp : Single vertice selected: " << selectedVertice->getName() << std::endl;
+                }
             }
             else
             {
-                std::cout << "[DEBUG]  ThreeDwindow :  No vertice hit — clearing vertice selection." << std::endl;
 
-                for (ThreeDObject* obj : ThreeDObjectsList)
+                if(!shiftPressed)
                 {
-                    Cube* cube = dynamic_cast<Cube*>(obj);
-                    if (!cube) continue;
 
-                    for (Vertice* vert : cube->getVertices())
-                        vert->setSelected(false);
+                    // std::cout << "[DEBUG] ThreeDwindow.cpp : No vertice hit — clearing vertice selection." << std::endl;
+
+                    for (ThreeDObject* obj : ThreeDObjectsList)
+                    {
+                        Cube* cube = dynamic_cast<Cube*>(obj);
+                        if (!cube) continue;
+
+                        for (Vertice* vert : cube->getVertices())
+                            vert->setSelected(false);
+                    }
+
+                    multipleSelectedVertices.clear();
+                    lastSelectedVertice = nullptr;
                 }
+                else
+                {
+                    std::cout << "[DEBUG] ThreeDWindow.cpp : Shift pressed & no vertice hit — keeping current multi-selection." << std::endl;
 
-                lastSelectedVertice = nullptr;
+                }
             }
-        }
-
-      
+        }      
     }
 }
 

@@ -46,8 +46,10 @@ const glm::mat4& proj, ImVec2 oglChildPos, ImVec2 oglChildSize)
     return model;
 }
 
-void Guizmo::renderGizmoForVertice(glm::mat4& model, ImGuizmo::OPERATION operation,
-const glm::mat4& view, const glm::mat4& proj, ImVec2 oglChildPos, ImVec2 oglChildSize)
+glm::mat4 Guizmo::renderGizmoForVertices(const std::list<Vertice*>& vertices,
+                                         ImGuizmo::OPERATION operation,
+                                         const glm::mat4& view, const glm::mat4& proj,
+                                         ImVec2 oglChildPos, ImVec2 oglChildSize)
 {
     ImGuizmo::BeginFrame();
     ImGuizmo::Enable(true);
@@ -56,7 +58,21 @@ const glm::mat4& view, const glm::mat4& proj, ImVec2 oglChildPos, ImVec2 oglChil
     ImGuizmo::SetRect(oglChildPos.x, oglChildPos.y, oglChildSize.x, oglChildSize.y);
     ImGuizmo::SetGizmoSizeClipSpace(0.2f);
 
-    ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(proj),
-                         operation, ImGuizmo::WORLD,
-                         glm::value_ptr(model));
+    glm::vec3 center(0.0f);
+    int count = 0;
+    for (auto* v : vertices)
+    {
+        if (!v) continue;
+        ThreeDObject* parent = v->getMeshParent();
+        glm::vec3 lp = v->getPosition();
+        glm::vec4 wp = parent ? (parent->getModelMatrix() * glm::vec4(lp, 1.0f)) : glm::vec4(lp, 1.0f);
+        center += glm::vec3(wp);
+        ++count;
+    }
+    if (count > 0) center /= static_cast<float>(count);
+
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), center);
+    return model;
+
+    // the model needs to be updated once the vertices have been manipulated
 }
