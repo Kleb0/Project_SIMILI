@@ -99,30 +99,6 @@ void ThreeDObjectSelector::select(ThreeDObject *object)
     selectedObject = object;
 }
 
-void ThreeDObjectSelector::pickupMultipleTargets(int mouseX, int mouseY, int screenWidth, int screenHeight, 
-const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObject *> &objects)
-{
-    glm::vec3 rayStart = glm::unProject(glm::vec3(mouseX, mouseY, 0.0f), view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
-    glm::vec3 rayEnd = glm::unProject(glm::vec3(mouseX, mouseY, 1.0f), view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
-
-    glm::vec3 rayDir = glm::normalize(rayEnd - rayStart);
-    glm::vec3 rayOrigin = rayStart;
-
-    for (auto *obj : objects)
-    {
-        if (!obj->isSelectable())
-            continue;
-
-        if (rayIntersectsMesh(rayOrigin, rayDir, *obj))
-        {
-            // avoid adding the same object multiple times
-            if (std::find(multipleSelectedObjects.begin(), multipleSelectedObjects.end(), obj) == multipleSelectedObjects.end())
-            {
-                multipleSelectedObjects.push_back(obj);
-            }
-        }
-    }
-}
 
 void ThreeDObjectSelector::clearMultipleSelection()
 {
@@ -132,66 +108,51 @@ void ThreeDObjectSelector::clearMultipleSelection()
 
 // -------- Vertice Selection --------
 
-Vertice* ThreeDObjectSelector::pickUpVertice(int mouseX, int mouseY, int screenWidth, int screenHeight, const glm::mat4& view, const glm::mat4& projection, const std::vector<ThreeDObject*>& objects)
+Vertice* ThreeDObjectSelector::pickUpVertice(int mouseX, int mouseY, int screenWidth, int screenHeight, 
+const glm::mat4& view, const glm::mat4& projection, const std::vector<ThreeDObject*>& objects, bool clearPrevious)
 {
 
-    // std::cout << "[DEBUG] PickupVertice Picking up vertice at mouse position: (" << mouseX << ", " << mouseY << ")" << std::endl;
-
-    float x = (2.0f * mouseX) / screenWidth - 1.0f;
-    float y = 1.0f - (2.0f * mouseY) / screenHeight;
-
     glm::vec3 rayStart = glm::unProject(glm::vec3(mouseX, mouseY, 0.0f),
-                                        view, projection,
-                                        glm::vec4(0, 0, screenWidth, screenHeight));
-    glm::vec3 rayEnd = glm::unProject(glm::vec3(mouseX, mouseY, 1.0f),
-                                      view, projection,
-                                      glm::vec4(0, 0, screenWidth, screenHeight));
+    view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
 
-    glm::vec3 rayDir = glm::normalize(rayEnd - rayStart);
+    glm::vec3 rayEnd   = glm::unProject(glm::vec3(mouseX, mouseY, 1.0f),
+    view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
+
+    glm::vec3 rayDir    = glm::normalize(rayEnd - rayStart);
     glm::vec3 rayOrigin = rayStart;
 
     float closestDistance = std::numeric_limits<float>::max();
     Vertice* closestVertice = nullptr;
 
-    for (ThreeDObject* obj : objects)
+    for (ThreeDObject* obj : objects) 
     {
-        if (!obj->isSelectable())
-            continue;
+        if (!obj->isSelectable()) continue;
 
         Cube* cube = dynamic_cast<Cube*>(obj);
-        if (!cube)
-            continue;
+        if (!cube) continue;
 
-        for (Vertice* vert : cube->getVertices())
+        if (clearPrevious) 
         {
-            vert->setSelected(false); 
+            for (Vertice* v : cube->getVertices())
+                v->setSelected(false);
         }
 
-        for (Vertice* vert : cube->getVertices())
+        for (Vertice* v : cube->getVertices()) 
         {
-
             glm::mat4 modelMatrix = obj->getModelMatrix();
-            glm::vec3 worldPos = glm::vec3(modelMatrix * glm::vec4(vert->getLocalPosition(), 1.0f));
-            vert->setPosition(worldPos);
+            glm::vec3 worldPos = glm::vec3(modelMatrix * glm::vec4(v->getLocalPosition(), 1.0f));
+            v->setPosition(worldPos);
 
-            if (rayIntersectsVertice(rayOrigin, rayDir, *obj, *vert))
-            {
-                float distance = glm::length(vert->getPosition() - rayOrigin);
-                if (distance < closestDistance)
-                {
+            if (rayIntersectsVertice(rayOrigin, rayDir, *obj, *v)) {
+                float distance = glm::length(v->getPosition() - rayOrigin);
+                if (distance < closestDistance) {
                     closestDistance = distance;
-                    closestVertice = vert;
-                    vert->setSelected(true);
-                }
-                else
-                {
-                    vert->setSelected(false);  
+                    closestVertice  = v;
                 }
             }
         }
     }
 
-    
 
     return closestVertice;
 }

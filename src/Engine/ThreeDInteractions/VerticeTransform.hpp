@@ -9,10 +9,12 @@ class Vertice;
 
 namespace VerticeTransform
 {
-    glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, OpenGLContext* context,
-                                 Vertice* vertice, const ImVec2& oglChildPos, const ImVec2& oglChildSize);
+   glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, OpenGLContext* context,
+                             const std::list<Vertice*>& vertices,
+                             const ImVec2& oglChildPos, const ImVec2& oglChildSize);
 
-    void manipulateVertice(OpenGLContext* context, Vertice* selectedVertice,
+    void manipulateVertices(OpenGLContext* context, const std::list<Vertice*>& selectedVertices,
                             const ImVec2& oglChildPos, const ImVec2& oglChildSize,
                             bool& wasUsingGizmoLastFrame);
+
 }

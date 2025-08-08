@@ -19,14 +19,13 @@ public:
 
     ThreeDObject *getSelectedObject() const { return selectedObject; }
 
-
-    void pickupMultipleTargets(int mouseX, int mouseY, int screenWidth, int screenHeight, const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObject *> &objects);
     void clearMultipleSelection();
 
 
 // -------- Vertice picking --------
 
-    Vertice* pickUpVertice(int mouseX, int mouseY, int screenWidth, int screenHeight, const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObject *> &objects);
+    Vertice* pickUpVertice(int mouseX, int mouseY, int screenWidth, int screenHeight, const glm::mat4 &view, const glm::mat4 &projection, 
+const std::vector<ThreeDObject *> &objects, bool clearPrevious = true);
 
 
 private:
