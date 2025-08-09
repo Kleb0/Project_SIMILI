@@ -74,5 +74,4 @@ glm::mat4 Guizmo::renderGizmoForVertices(const std::list<Vertice*>& vertices,
     glm::mat4 model = glm::translate(glm::mat4(1.0f), center);
     return model;
 
-    // the model needs to be updated once the vertices have been manipulated
 }

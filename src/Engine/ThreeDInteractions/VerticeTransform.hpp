@@ -13,7 +13,7 @@ namespace VerticeTransform
                              const std::list<Vertice*>& vertices,
                              const ImVec2& oglChildPos, const ImVec2& oglChildSize);
 
-    void manipulateVertices(OpenGLContext* context, const std::list<Vertice*>& selectedVertices,
+   void manipulateVertices(OpenGLContext* context, const std::list<Vertice*>& selectedVertices,
                             const ImVec2& oglChildPos, const ImVec2& oglChildSize,
                             bool& wasUsingGizmoLastFrame);
 

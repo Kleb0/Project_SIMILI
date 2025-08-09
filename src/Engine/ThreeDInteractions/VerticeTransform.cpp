@@ -10,6 +10,8 @@
 namespace VerticeTransform
 {
 
+
+
 glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, OpenGLContext* context, const std::list<Vertice*>& vertices,
                            const ImVec2& oglChildPos, const ImVec2& oglChildSize)
 {
@@ -23,6 +25,8 @@ glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, OpenGLContext* context, cons
 void manipulateVertices(OpenGLContext* context, const std::list<Vertice*>& selectedVertices,
 const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame)
 {
+
+
     if (selectedVertices.empty()) return;
 
     static ImGuizmo::OPERATION currentGizmoOperation = ImGuizmo::TRANSLATE;
@@ -36,7 +40,6 @@ const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFr
     static size_t previousSetHash = 0;
 
     auto hashSet = [&]() -> size_t {
-    // we use a hash FNV-1a here 
         size_t h = 1469598103934665603ull;
         for (auto* v : selectedVertices) {
             size_t x = reinterpret_cast<size_t>(v);
@@ -65,19 +68,13 @@ const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFr
         previousSetHash = currentHash;
     }
 
-    // std::cout << "[VerticeTransform] Centre des vertices : "
-    //           << center.x << ", " << center.y << ", " << center.z << '\n';
-    // glm::vec3 gizmoPos(dummyMatrix[3]); // colonne 3 = translation
-    // std::cout << "[VerticeTransform] Position du Gizmo   : "
-    //           << gizmoPos.x << ", " << gizmoPos.y << ", " << gizmoPos.z << '\n';
     // -------------
 
     Guizmo::renderGizmoForVertices(selectedVertices, currentGizmoOperation, view, proj, oglChildPos, oglChildSize);
-// ------------
+    // ------------
 
     if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(proj),
-                              currentGizmoOperation, ImGuizmo::WORLD,
-                              glm::value_ptr(dummyMatrix)))
+    currentGizmoOperation, ImGuizmo::WORLD, glm::value_ptr(dummyMatrix)))
     {
         glm::mat4 delta = dummyMatrix * glm::inverse(prevDummyMatrix);
         glm::vec3 translation = glm::vec3(delta[3]);
@@ -88,20 +85,21 @@ const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFr
             if (!parent) continue;
             glm::mat4 parentModelMatrix = parent->getModelMatrix();
             v->applyTranslationToLocal(translation, parentModelMatrix);
-        }
 
+            // ----- We get the new world position from the parent model matrix
+            glm::vec3 newWorld = glm::vec3(parentModelMatrix * glm::vec4(v->getLocalPosition(), 1.0f));
+
+            // ----- We set the local position to the global position for each vertice
+            v->setPosition(newWorld);
+        }
 
         prevDummyMatrix = dummyMatrix;
         wasUsingGizmoLastFrame = true;
     }
     else
     {
-        wasUsingGizmoLastFrame = false;
-       
+        wasUsingGizmoLastFrame = false;            
     }
-
-    // --- Ici recalculer manipulate
-
 }
 
 
