@@ -1,7 +1,5 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "Engine/Guizmo.hpp"
-#include "WorldObjects/ThreeDObject.hpp"
-#include "WorldObjects/Basic/Vertice.hpp"
 #include <glm/gtc/type_ptr.hpp>
 
 
@@ -46,10 +44,8 @@ const glm::mat4& proj, ImVec2 oglChildPos, ImVec2 oglChildSize)
     return model;
 }
 
-glm::mat4 Guizmo::renderGizmoForVertices(const std::list<Vertice*>& vertices,
-                                         ImGuizmo::OPERATION operation,
-                                         const glm::mat4& view, const glm::mat4& proj,
-                                         ImVec2 oglChildPos, ImVec2 oglChildSize)
+glm::mat4 Guizmo::renderGizmoForVertices(const std::list<Vertice*>& vertices,ImGuizmo::OPERATION operation, 
+const glm::mat4& view, const glm::mat4& proj, ImVec2 oglChildPos, ImVec2 oglChildSize)
 {
     ImGuizmo::BeginFrame();
     ImGuizmo::Enable(true);
@@ -74,4 +70,53 @@ glm::mat4 Guizmo::renderGizmoForVertices(const std::list<Vertice*>& vertices,
     glm::mat4 model = glm::translate(glm::mat4(1.0f), center);
     return model;
 
+}
+
+glm::mat4 Guizmo::renderGizmoForFaces(const std::list<Face*>& faces,ImGuizmo::OPERATION operation, 
+const glm::mat4& view, const glm::mat4& proj, ImVec2 oglChildPos, ImVec2 oglChildSize)
+{
+    ImGuizmo::BeginFrame();
+    ImGuizmo::Enable(true);
+    ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
+    ImGuizmo::SetDrawlist();
+    ImGuizmo::SetRect(oglChildPos.x, oglChildPos.y, oglChildSize.x, oglChildSize.y);
+    ImGuizmo::SetGizmoSizeClipSpace(0.2f);
+
+    glm::vec3 gizmoCenter(0.0f);
+    int faceCount = 0;
+
+    for (auto* f : faces)
+    {
+        if (!f) continue;
+
+        const auto& verts = f->getVertices();
+
+        ThreeDObject* parent = verts[0] ? verts[0]->getMeshParent() : nullptr;
+        const glm::mat4 model = parent ? parent->getModelMatrix() : glm::mat4(1.0f);
+
+        glm::vec3 faceCenter(0.0f);
+        int vcount = 0;
+
+        for (auto* v : verts)
+        {
+            if (!v) continue;
+            const glm::vec3 lp = v->getLocalPosition();
+            const glm::vec3 wp = glm::vec3(model * glm::vec4(lp, 1.0f));
+            faceCenter += wp;
+            ++vcount;
+        }
+
+        if (vcount > 0)
+        {
+            faceCenter /= static_cast<float>(vcount);
+            gizmoCenter += faceCenter;
+            ++faceCount;
+        }
+    }
+
+    if (faceCount > 0)
+        gizmoCenter /= static_cast<float>(faceCount);
+
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), gizmoCenter);
+    return model;
 }

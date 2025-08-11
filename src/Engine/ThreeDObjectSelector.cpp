@@ -173,3 +173,115 @@ bool ThreeDObjectSelector::rayIntersectsVertice(const glm::vec3 &rayOrigin, cons
 
     return distance < radius;
 }
+
+
+// ---------- Face Selection ----------
+
+Face* ThreeDObjectSelector::pickupFace(int mouseX, int mouseY, int screenWidth, int screenHeight,
+const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObject *> &objects, bool clearPrevious)
+{
+    glm::vec3 rayStart = glm::unProject(glm::vec3(mouseX, mouseY, 0.0f),
+    view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
+
+    glm::vec3 rayEnd   = glm::unProject(glm::vec3(mouseX, mouseY, 1.0f),
+    view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
+
+    glm::vec3 rayDir    = glm::normalize(rayEnd - rayStart);
+    glm::vec3 rayOrigin = rayStart;
+
+    float closestDistance = std::numeric_limits<float>::max();
+    Face* closestFace = nullptr;
+
+    for (ThreeDObject* obj : objects)
+    {
+        if (!obj || !obj->isSelectable()) continue;
+
+        Cube* cube = dynamic_cast<Cube*>(obj);
+        if (!cube) continue;
+
+        if (clearPrevious)
+        {
+            for (Face* f : cube->getFaces())
+                if (f) f->setSelected(false);
+        }
+
+        const glm::mat4 model = obj->getModelMatrix();
+
+        for (Face* f : cube->getFaces())
+        {
+            if (!f) continue;
+
+            if (!rayIntersectsFace(rayOrigin, rayDir, *obj, *f))
+                continue;
+
+            const auto& verts = f->getVertices();
+            if (verts.size() < 4) continue;
+
+            glm::vec3 p0 = glm::vec3(model * glm::vec4(verts[0]->getLocalPosition(), 1.0f));
+            glm::vec3 p1 = glm::vec3(model * glm::vec4(verts[1]->getLocalPosition(), 1.0f));
+            glm::vec3 p2 = glm::vec3(model * glm::vec4(verts[2]->getLocalPosition(), 1.0f));
+
+            glm::vec3 n = glm::normalize(glm::cross(p1 - p0, p2 - p0));
+            float denom = glm::dot(n, rayDir);
+            if (std::abs(denom) < 1e-6f) continue;
+
+            float t = glm::dot(n, (p0 - rayOrigin)) / denom;
+            if (t < 0.0f) continue;
+
+            glm::vec3 hitPoint = rayOrigin + t * rayDir;
+            float distance = glm::length(hitPoint - rayOrigin);
+
+            if (distance < closestDistance)
+            {
+                closestDistance = distance;
+                closestFace = f;
+            }
+        }
+    }
+
+    if (closestFace)
+        closestFace->setSelected(true);
+
+    return closestFace;
+}
+
+bool ThreeDObjectSelector::rayIntersectsFace(const glm::vec3 &rayOrigin, 
+const glm::vec3 &rayDir, const ThreeDObject &object, const Face &face)
+{
+    const glm::mat4 model = object.getModelMatrix();
+
+    const auto& verts = face.getVertices();
+    if (verts.size() < 4) return false;
+
+    glm::vec3 p0 = glm::vec3(model * glm::vec4(verts[0]->getLocalPosition(), 1.0f));
+    glm::vec3 p1 = glm::vec3(model * glm::vec4(verts[1]->getLocalPosition(), 1.0f));
+    glm::vec3 p2 = glm::vec3(model * glm::vec4(verts[2]->getLocalPosition(), 1.0f));
+    glm::vec3 p3 = glm::vec3(model * glm::vec4(verts[3]->getLocalPosition(), 1.0f));
+
+    glm::vec3 n = glm::normalize(glm::cross(p1 - p0, p2 - p0));
+    float denom = glm::dot(n, rayDir);
+    if (std::abs(denom) < 1e-6f)
+        return false; 
+
+    float t = glm::dot(n, (p0 - rayOrigin)) / denom;
+    if (t < 0.0f)
+        return false;
+
+    glm::vec3 P = rayOrigin + t * rayDir;
+
+    auto pointInTri = [&](const glm::vec3& A, const glm::vec3& B, const glm::vec3& C, const glm::vec3& Pnt) -> bool
+    {
+        glm::vec3 c0 = glm::cross(B - A, Pnt - A);
+        glm::vec3 c1 = glm::cross(C - B, Pnt - B);
+        glm::vec3 c2 = glm::cross(A - C, Pnt - C);
+        float d0 = glm::dot(c0, n);
+        float d1 = glm::dot(c1, n);
+        float d2 = glm::dot(c2, n);
+        const float eps = -1e-6f;
+        return (d0 >= eps) && (d1 >= eps) && (d2 >= eps);
+    };
+
+
+    bool inside = pointInTri(p0, p1, p2, P) || pointInTri(p0, p2, p3, P);
+    return inside;
+}
