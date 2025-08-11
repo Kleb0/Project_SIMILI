@@ -25,7 +25,11 @@ const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, bool bakeToVertices)
     if (selectedFaces.empty()) return;
 
     static ImGuizmo::OPERATION currentGizmoOperation = ImGuizmo::TRANSLATE;
+    static ImGuizmo::MODE currentGizmoMode = ImGuizmo::WORLD;
+
     if (ImGui::IsKeyPressed(ImGuiKey_W)) currentGizmoOperation = ImGuizmo::TRANSLATE;
+    if (ImGui::IsKeyPressed(ImGuiKey_E)) currentGizmoOperation = ImGuizmo::ROTATE;
+    if (ImGui::IsKeyPressed(ImGuiKey_R)) currentGizmoOperation = ImGuizmo::SCALE;
 
     const glm::mat4 view = context->getViewMatrix();
     const glm::mat4 proj = context->getProjectionMatrix();
@@ -34,14 +38,16 @@ const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, bool bakeToVertices)
     static glm::mat4 prevDummyMatrix = glm::mat4(1.0f);
     static size_t    previousSetHash = 0;
 
-    auto hashSet = [&]() -> size_t {
+    auto hashSet = [&]() -> size_t 
+    {
         size_t h = 1469598103934665603ull;
         for (auto* f : selectedFaces) { h ^= reinterpret_cast<size_t>(f); h *= 1099511628211ull; }
         h ^= selectedFaces.size();
         return h;
     };
 
-    auto computeGizmoCenter = [&]() -> glm::vec3 {
+    auto computeGizmoCenter = [&]() -> glm::vec3 
+    {
         glm::vec3 gizmoCenter(0.0f);
         int faceCount = 0;
 
@@ -56,7 +62,8 @@ const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, bool bakeToVertices)
 
             glm::vec3 faceCenter(0.0f);
             int vcount = 0;
-            for (auto* v : verts) {
+            for (auto* v : verts) 
+            {
                 if (!v) continue;
                 const glm::vec3 L = v->getLocalPosition();
                 const glm::vec3 W = glm::vec3(parentModel * glm::vec4(L, 1.0f));
@@ -67,6 +74,7 @@ const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, bool bakeToVertices)
 
         if (faceCount > 0) gizmoCenter /= float(faceCount);
         return gizmoCenter;
+
     };
 
     const glm::vec3 center = computeGizmoCenter();
