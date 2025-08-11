@@ -7,6 +7,7 @@
 #include <ImGuizmo.h>
 #include "Engine/ThreeDInteractions/MeshTransform.hpp"
 #include "Engine/ThreeDInteractions/VerticeTransform.hpp"
+#include "Engine/ThreeDInteractions/FaceTransform.hpp"
 
 #include <string>
 #include <vector>
@@ -24,6 +25,7 @@
 #include "UI/ThreeDModes/ThreeDMode.hpp"
 #include "UI/ThreeDModes/Normal_Mode.hpp"
 #include "UI/ThreeDModes/Vertice_Mode.hpp"
+#include "UI/ThreeDModes/Face_Mode.hpp"
 
 //=== Forward declarations ===//
 class HierarchyInspector;
@@ -75,15 +77,18 @@ public:
     GLFWwindow *glfwWindow = nullptr;
     std::list<ThreeDObject *> multipleSelectedObjects;
     std::list<Vertice *> multipleSelectedVertices;
+    std::list<Face *> multipleSelectedFaces;
     bool wasUsingGizmoLastFrame = false;
     bool selectionLocked = false;
 
     ThreeDMode *currentMode = nullptr;
     Vertice_Mode verticeMode;
     Normal_Mode normalMode;
+    Face_Mode faceMode;
 
     bool lastKeyState_1 = false;
     bool lastKeyState_2 = false;
+    bool lastKeyState_3 = false;
 
 private:
     

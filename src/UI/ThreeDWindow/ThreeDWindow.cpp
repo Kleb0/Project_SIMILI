@@ -38,11 +38,9 @@ ThreeDWindow &ThreeDWindow::setRenderer(OpenGLContext &context)
 
 void ThreeDWindow::setModelingMode(ThreeDMode* mode)
 {
-    std::cout << "[ThreeDWindow] Setting modeling mode to: " << (mode ? mode->getName() : "None") << std::endl;
     if (mode)
     {
         currentMode = mode;
-        // ThreeDMode::setMode(std::unique_ptr<ThreeDMode>(mode));
     }
 }
 
@@ -226,7 +224,7 @@ void ThreeDWindow::renderModelingModes()
     ImVec2 iconPos0 = ImGui::GetCursorScreenPos();
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
-    // Icon 0 : Normal Mode
+    // Icon 1 : Normal Mode
     ImVec2 min0 = iconPos0;
     ImVec2 max0 = ImVec2(min0.x + iconSize.x, min0.y + iconSize.y);
 
@@ -242,11 +240,11 @@ void ThreeDWindow::renderModelingModes()
     draw_list->AddRect(min0, max0, normalBorderColor, 0.0f, 0, 2.0f);
     draw_list->AddText(ImVec2(min0.x + 10, min0.y + 6), normalTextColor, "1");
 
-    // --- End of Icon 0 ---
+    // --- End of Icon 1 ---
 
     ImGui::SetCursorScreenPos(ImVec2(min0.x + iconSize.x + 5, min0.y));
 
-    // === Icon 1 : Vertice Mode ===
+    // === Icon 2 : Vertice Mode ===
     ImGui::SetCursorScreenPos(ImVec2(min0.x + iconSize.x + 5, min0.y));
     ImVec2 iconPos1 = ImGui::GetCursorScreenPos();
     ImVec2 min1 = iconPos1;
@@ -264,7 +262,26 @@ void ThreeDWindow::renderModelingModes()
     draw_list->AddRect(min1, max1, verticeBorderColor, 0.0f, 0, 2.0f);
     draw_list->AddText(ImVec2(min1.x + 10, min1.y + 6), verticeTextColor, "2");
 
-    // --- End of Icon 1 ---
+    // --- End of Icon 2 ---
+
+    // === Icon 3 : Face Mode ===
+    ImGui::SetCursorScreenPos(ImVec2(iconPos0.x + 2 * (iconSize.x + 5), iconPos0.y)); // 3e case
+    ImVec2 iconPos2 = ImGui::GetCursorScreenPos();
+    ImVec2 min2 = iconPos2;
+    ImVec2 max2 = ImVec2(min2.x + iconSize.x, min2.y + iconSize.y);
+
+    ImU32 faceBorderColor = (currentMode == &faceMode)
+        ? IM_COL32(255, 165, 0, 255)
+        : IM_COL32(255, 255, 255, 255);
+
+    ImU32 faceTextColor = (currentMode == &faceMode)
+        ? IM_COL32(255, 200, 100, 255)
+        : IM_COL32(255, 255, 255, 255);
+
+    draw_list->AddRectFilled(min2, max2, IM_COL32(0, 0, 0, 0));
+    draw_list->AddRect(min2, max2, faceBorderColor, 0.0f, 0, 2.0f);
+    draw_list->AddText(ImVec2(min2.x + 10, min2.y + 6), faceTextColor, "3");
+    // --- End of Icon 3 ---
 
     ImGui::EndGroup();
 }
@@ -274,9 +291,11 @@ void ThreeDWindow::onChangeMod()
     ImGuiIO& io = ImGui::GetIO();
     ImGuiKey key1 = ImGuiKey_1;
     ImGuiKey key2 = ImGuiKey_2;
+    ImGuiKey key3 = ImGuiKey_3;
 
     bool isPressed1 = ImGui::IsKeyDown(key1);
     bool isPressed2 = ImGui::IsKeyDown(key2);
+    bool isPressed3 = ImGui::IsKeyDown(key3);
 
     if (isPressed1  && !lastKeyState_1)
     {
@@ -289,8 +308,14 @@ void ThreeDWindow::onChangeMod()
         setModelingMode(&verticeMode);
     }
 
+    if (isPressed3 && !lastKeyState_3)
+    {
+        setModelingMode(&faceMode);
+    }
+
     lastKeyState_1 = isPressed1;
     lastKeyState_2 = isPressed2;
+    lastKeyState_3 = isPressed3;
 
 }
 
@@ -317,6 +342,19 @@ void ThreeDWindow::ThreeDWorldInteractions()
             oglChildSize,
             wasUsingGizmoLastFrame
         );
+    }
+
+    if(currentMode == &faceMode)
+    {
+        FaceTransform::manipulateFaces(
+            openGLContext,
+            multipleSelectedFaces,
+            oglChildPos,
+            oglChildSize,
+            wasUsingGizmoLastFrame,
+            true
+        );
+
     }
 }
 
@@ -511,6 +549,58 @@ void ThreeDWindow::handleClick()
                 }
             }
         }      
+
+        if (currentMode == &faceMode)
+        {
+            if (ImGuizmo::IsUsing())
+                return;
+
+            bool shiftPressed = ImGui::GetIO().KeyShift;
+
+            Face* selectedFace = selector.pickupFace(
+                static_cast<int>(relativeMouseX), static_cast<int>(relativeMouseY),
+                windowWidth, windowHeight, view, proj, ThreeDObjectsList,shiftPressed
+            );
+
+            if (selectedFace)
+            {
+                if (shiftPressed)
+                {
+                    auto it = std::find(multipleSelectedFaces.begin(), multipleSelectedFaces.end(), selectedFace);
+                    if (it == multipleSelectedFaces.end())
+                    {
+                        multipleSelectedFaces.push_back(selectedFace);
+                        for (Face* f : multipleSelectedFaces) if (f) f->setSelected(true);
+                    }
+                }
+                else
+                {
+                    for (ThreeDObject* obj : ThreeDObjectsList)
+                    {
+                        Cube* cube = dynamic_cast<Cube*>(obj);
+                        if (!cube) continue;
+                        for (Face* f : cube->getFaces()) if (f) f->setSelected(false);
+                    }
+                    multipleSelectedFaces.clear();
+
+                    selectedFace->setSelected(true);
+                    multipleSelectedFaces.push_back(selectedFace);
+                }
+            }
+            else
+            {
+                if (!shiftPressed)
+                {
+                    for (ThreeDObject* obj : ThreeDObjectsList)
+                    {
+                        Cube* cube = dynamic_cast<Cube*>(obj);
+                        if (!cube) continue;
+                        for (Face* f : cube->getFaces()) if (f) f->setSelected(false);
+                    }
+                    multipleSelectedFaces.clear();
+                }
+            }
+        }
     }
 }
 
