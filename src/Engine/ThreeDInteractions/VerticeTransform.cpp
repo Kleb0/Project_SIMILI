@@ -13,7 +13,7 @@ namespace VerticeTransform
 
 
 glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, OpenGLContext* context, const std::list<Vertice*>& vertices,
-                           const ImVec2& oglChildPos, const ImVec2& oglChildSize)
+const ImVec2& oglChildPos, const ImVec2& oglChildSize)
 {
         glm::mat4 view = context->getViewMatrix();
         glm::mat4 proj = context->getProjectionMatrix();
@@ -31,6 +31,8 @@ const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFr
 
     static ImGuizmo::OPERATION currentGizmoOperation = ImGuizmo::TRANSLATE;
     if (ImGui::IsKeyPressed(ImGuiKey_W)) currentGizmoOperation = ImGuizmo::TRANSLATE;
+    if (ImGui::IsKeyPressed(ImGuiKey_R)) currentGizmoOperation = ImGuizmo::ROTATE;
+    if (ImGui::IsKeyPressed(ImGuiKey_S)) currentGizmoOperation = ImGuizmo::SCALE;
 
     glm::mat4 view = context->getViewMatrix();
     glm::mat4 proj = context->getProjectionMatrix();
@@ -76,30 +78,33 @@ const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFr
     if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(proj),
     currentGizmoOperation, ImGuizmo::WORLD, glm::value_ptr(dummyMatrix)))
     {
-        glm::mat4 delta = dummyMatrix * glm::inverse(prevDummyMatrix);
-        glm::vec3 translation = glm::vec3(delta[3]);
+        glm::mat4 deltaWorld = dummyMatrix * glm::inverse(prevDummyMatrix);
 
         for (auto* v : selectedVertices) {
             if (!v) continue;
             ThreeDObject* parent = v->getMeshParent();
             if (!parent) continue;
-            glm::mat4 parentModelMatrix = parent->getModelMatrix();
-            v->applyTranslationToLocal(translation, parentModelMatrix);
 
-            // ----- We get the new world position from the parent model matrix
-            glm::vec3 newWorld = glm::vec3(parentModelMatrix * glm::vec4(v->getLocalPosition(), 1.0f));
+            const glm::mat4 P  = parent->getModelMatrix();
+            const glm::mat4 Pi = glm::inverse(P);
 
-            // ----- We set the local position to the global position for each vertice
-            v->setPosition(newWorld);
+            glm::vec4 L  = glm::vec4(v->getLocalPosition(), 1.0f);
+            glm::vec4 W  = P * L;
+            glm::vec4 W2 = deltaWorld * W;
+            glm::vec4 L2 = Pi * W2;
+
+            v->setLocalPosition(glm::vec3(L2));
+            v->setPosition(glm::vec3(W2)); 
         }
 
         prevDummyMatrix = dummyMatrix;
         wasUsingGizmoLastFrame = true;
-    }
+    } 
     else
     {
-        wasUsingGizmoLastFrame = false;            
+        wasUsingGizmoLastFrame = false;
     }
+
 }
 
 
