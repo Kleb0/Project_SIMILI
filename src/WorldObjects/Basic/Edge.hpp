@@ -16,6 +16,12 @@ public:
     Vertice* getStart() const;
     Vertice* getEnd() const;
 
+    void setSelected(bool isSelected);
+    bool isSelected() const;
+
+    void setColor(const glm::vec4& c);
+    glm::vec4 getColor() const;
+
 private:
     Vertice* v1;
     Vertice* v2;
@@ -23,6 +29,9 @@ private:
     unsigned int vao = 0;
     unsigned int vbo = 0;
     unsigned int shaderProgram = 0;
+
+    glm::vec4 color = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f); 
+    bool edgeSelected = false;
 
     void compileShaders();
 };

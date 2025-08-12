@@ -9,10 +9,12 @@
 #include "WorldObjects/ThreeDObject.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
 #include "WorldObjects/Basic/Face.hpp" 
+#include "WorldObjects/Basic/Edge.hpp"
 
 class ThreeDObject;
 class Vertice;
 class Face;
+class Edge;
 class OpenGLContext;
 
 class Guizmo
@@ -26,6 +28,10 @@ public:
     ImVec2 oglChildPos, ImVec2 oglChildSize);
 
     static glm::mat4 renderGizmoForFaces(const std::list<Face*>& faces,
+    ImGuizmo::OPERATION operation, const glm::mat4& view, const glm::mat4& proj,
+    ImVec2 oglChildPos, ImVec2 oglChildSize);
+
+    static glm::mat4 renderGizmoForEdges(const std::list<Edge*>& edges,
     ImGuizmo::OPERATION operation, const glm::mat4& view, const glm::mat4& proj,
     ImVec2 oglChildPos, ImVec2 oglChildSize);
 };

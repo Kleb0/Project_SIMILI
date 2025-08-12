@@ -285,3 +285,128 @@ const glm::vec3 &rayDir, const ThreeDObject &object, const Face &face)
     bool inside = pointInTri(p0, p1, p2, P) || pointInTri(p0, p2, p3, P);
     return inside;
 }
+
+
+// ----------- Edge Selection --------
+
+bool ThreeDObjectSelector::rayIntersectsEdge(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, 
+const ThreeDObject &object, const Edge &edge)
+{
+    const float radius = 0.15f;
+
+    glm::mat4 model = object.getModelMatrix();
+    glm::vec3 a0 = glm::vec3(model * glm::vec4(edge.getStart()->getLocalPosition(), 1.0f));
+    glm::vec3 b0 = glm::vec3(model * glm::vec4(edge.getEnd()->getLocalPosition(),   1.0f));
+    glm::vec3 v = b0 - a0;
+    glm::vec3 u = glm::normalize(rayDir);
+    glm::vec3 w0 = rayOrigin - a0;
+
+    float a = glm::dot(u, u);
+    float b = glm::dot(u, v);
+    float c = glm::dot(v, v);
+    float d = glm::dot(u, w0);
+    float e = glm::dot(v, w0);
+    float D = a * c - b * b;
+
+    float s, t;
+    if (D > 1e-6f)
+    {
+        s = (b * e - c * d) / D;
+        t = (a * e - b * d) / D;
+    }
+    else
+    {
+        s = 0.0f;
+        t = c > 0.0f ? e / c : 0.0f;
+    }
+
+    if (s < 0.0f)
+    {
+        s = 0.0f;
+        t = c > 0.0f ? e / c : 0.0f;
+    }
+
+    t = glm::clamp(t, 0.0f, 1.0f);
+
+    glm::vec3 pc = rayOrigin + s * u;
+    glm::vec3 qc = a0 + t * v;
+
+    float dist = glm::length(pc - qc);
+    return dist < radius && s >= 0.0f;
+}
+
+Edge* ThreeDObjectSelector::pickupEdge(int mouseX, int mouseY, int screenWidth, int screenHeight, 
+const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObject *> &objects, bool clearPrevious)
+{
+    glm::vec3 rayStart = glm::unProject(glm::vec3(mouseX, mouseY, 0.0f), view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
+    glm::vec3 rayEnd   = glm::unProject(glm::vec3(mouseX, mouseY, 1.0f), view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
+    glm::vec3 rayDir   = glm::normalize(rayEnd - rayStart);
+    glm::vec3 rayOrigin = rayStart;
+
+    float closestS = std::numeric_limits<float>::max();
+    Edge* closestEdge = nullptr;
+
+    for (ThreeDObject* obj : objects)
+    {
+        if (!obj->isSelectable()) continue;
+
+        Cube* cube = dynamic_cast<Cube*>(obj);
+        if (!cube) continue;
+
+        if (clearPrevious)
+        {
+            for (Edge* e : cube->getEdges())
+                e->setSelected(false);
+        }
+
+        for (Edge* e : cube->getEdges())
+        {
+            if (!e || !e->getStart() || !e->getEnd()) continue;
+
+            if (rayIntersectsEdge(rayOrigin, rayDir, *obj, *e))
+            {
+                glm::mat4 model = obj->getModelMatrix();
+                glm::vec3 a0 = glm::vec3(model * glm::vec4(e->getStart()->getLocalPosition(), 1.0f));
+                glm::vec3 b0 = glm::vec3(model * glm::vec4(e->getEnd()->getLocalPosition(),   1.0f));
+                glm::vec3 v = b0 - a0;
+                glm::vec3 u = glm::normalize(rayDir);
+                glm::vec3 w0 = rayOrigin - a0;
+
+                float a = glm::dot(u, u);
+                float b = glm::dot(u, v);
+                float c = glm::dot(v, v);
+                float d = glm::dot(u, w0);
+                float ee = glm::dot(v, w0);
+                float D = a * c - b * b;
+
+                float s, t;
+                if (D > 1e-6f)
+                {
+                    s = (b * ee - c * d) / D;
+                    t = (a * ee - b * d) / D;
+                }
+                else
+                {
+                    s = 0.0f;
+                    t = c > 0.0f ? ee / c : 0.0f;
+                }
+
+                if (s < 0.0f)
+                {
+                    s = 0.0f;
+                    t = c > 0.0f ? ee / c : 0.0f;
+                }
+
+                t = glm::clamp(t, 0.0f, 1.0f);
+
+                if (s >= 0.0f && s < closestS)
+                {
+                    closestS = s;
+                    closestEdge = e;
+                }
+            }
+        }
+    }
+
+    return closestEdge;
+}

@@ -3,6 +3,7 @@
 #include "WorldObjects/ThreeDObject.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
 #include "WorldObjects/Basic/Face.hpp"
+#include "WorldObjects/Basic/Edge.hpp"
 #include <vector>
 #include <iostream>
 #include <list>
@@ -33,6 +34,11 @@ public:
     Face* pickupFace(int mouseX, int mouseY, int screenWidth, int screenHeight, const glm::mat4 &view, const glm::mat4 &projection,
     const std::vector<ThreeDObject *> &objects, bool clearPrevious = true);
 
+// ------- Edge Picking ----
+
+    Edge* pickupEdge(int mouseX, int mouseY, int screenWidth, int screenHeight, const glm::mat4 &view, const glm::mat4 &projection,
+    const std::vector<ThreeDObject *> &objects, bool clearPrevious = true);
+
 private:
     ThreeDObject *selectedObject = nullptr;
     std::list<ThreeDObject *> multipleSelectedObjects;
@@ -40,6 +46,7 @@ private:
     bool rayIntersectsMesh(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object);
     bool rayIntersectsVertice(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object, const Vertice &vertice);
     bool rayIntersectsFace(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object, const Face &face);
+    bool rayIntersectsEdge(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object, const Edge &edge);
     
 
 };
