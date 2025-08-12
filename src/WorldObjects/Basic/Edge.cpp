@@ -16,9 +16,10 @@ void main()
 const char* edgeFragmentShaderSrc = R"(
 #version 330 core
 out vec4 FragColor;
+uniform vec4 color;
 void main()
 {
-    FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    FragColor = color;
 }
 )";
 
@@ -78,6 +79,14 @@ void Edge::render(const glm::mat4& viewProj, const glm::mat4& modelMatrix)
     glUseProgram(shaderProgram);
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
 
+
+   
+    glm::vec4 finalColor = edgeSelected
+        ? glm::vec4(1.0f, 0.5f, 0.0f, 1.0f)  
+        : color;                              
+
+    glUniform4fv(glGetUniformLocation(shaderProgram, "color"), 1, glm::value_ptr(finalColor));
+
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
@@ -90,24 +99,16 @@ void Edge::render(const glm::mat4& viewProj, const glm::mat4& modelMatrix)
 
 void Edge::destroy()
 {
-    if (vao)
-    {
-        glDeleteVertexArrays(1, &vao);
-        vao = 0;
-    }
-
-    if (vbo)
-    {
-        glDeleteBuffers(1, &vbo);
-        vbo = 0;
-    }
-
-    if (shaderProgram)
-    {
-        glDeleteProgram(shaderProgram);
-        shaderProgram = 0;
-    }
+    if (vao) { glDeleteVertexArrays(1, &vao); vao = 0; }
+    if (vbo) { glDeleteBuffers(1, &vbo); vbo = 0; }
+    if (shaderProgram) { glDeleteProgram(shaderProgram); shaderProgram = 0; }
 }
 
 Vertice* Edge::getStart() const { return v1; }
 Vertice* Edge::getEnd() const { return v2; }
+
+void Edge::setSelected(bool isSelected) { edgeSelected = isSelected; }
+bool Edge::isSelected() const { return edgeSelected; }
+
+void Edge::setColor(const glm::vec4& c) { color = c; }
+glm::vec4 Edge::getColor() const { return color; }

@@ -41,6 +41,7 @@ void ThreeDWindow::setModelingMode(ThreeDMode* mode)
     if (mode)
     {
         currentMode = mode;
+        // std::cout << "[ThreeDWindow] Current mode set to: " << currentMode->getName() << std::endl;
     }
 }
 
@@ -265,7 +266,7 @@ void ThreeDWindow::renderModelingModes()
     // --- End of Icon 2 ---
 
     // === Icon 3 : Face Mode ===
-    ImGui::SetCursorScreenPos(ImVec2(iconPos0.x + 2 * (iconSize.x + 5), iconPos0.y)); // 3e case
+    ImGui::SetCursorScreenPos(ImVec2(iconPos0.x + 2 * (iconSize.x + 5), iconPos0.y)); // 3rd case
     ImVec2 iconPos2 = ImGui::GetCursorScreenPos();
     ImVec2 min2 = iconPos2;
     ImVec2 max2 = ImVec2(min2.x + iconSize.x, min2.y + iconSize.y);
@@ -283,19 +284,38 @@ void ThreeDWindow::renderModelingModes()
     draw_list->AddText(ImVec2(min2.x + 10, min2.y + 6), faceTextColor, "3");
     // --- End of Icon 3 ---
 
+    // === Icon 4 : Edge Mode ===
+    ImGui::SetCursorScreenPos(ImVec2(iconPos0.x + 3 * (iconSize.x + 5), iconPos0.y)); // 4th case
+    ImVec2 iconPos3 = ImGui::GetCursorScreenPos();
+    ImVec2 min3 = iconPos3;
+    ImVec2 max3 = ImVec2(min3.x + iconSize.x, min3.y + iconSize.y);
+
+    ImU32 edgeBorderColor = (currentMode == &edgeMode)
+        ? IM_COL32(255, 165, 0, 255)
+        : IM_COL32(255, 255, 255, 255);
+
+    ImU32 edgeTextColor = (currentMode == &edgeMode)
+        ? IM_COL32(255, 200, 100, 255)
+        : IM_COL32(255, 255, 255, 255);
+
+    draw_list->AddRectFilled(min3, max3, IM_COL32(0, 0, 0, 0));
+    draw_list->AddRect(min3, max3, edgeBorderColor, 0.0f, 0, 2.0f);
+    draw_list->AddText(ImVec2(min3.x + 10, min3.y + 6), edgeTextColor, "4");
+    // ---- Icon 4 : Edge Mode ----
+
     ImGui::EndGroup();
 }
 
 void ThreeDWindow::onChangeMod()
 {
     ImGuiIO& io = ImGui::GetIO();
-    ImGuiKey key1 = ImGuiKey_1;
-    ImGuiKey key2 = ImGuiKey_2;
-    ImGuiKey key3 = ImGuiKey_3;
+    bool isPressed1 = ImGui::IsKeyDown(ImGuiKey_1) || ImGui::IsKeyDown(ImGuiKey_Keypad1);
+    bool isPressed2 = ImGui::IsKeyDown(ImGuiKey_2) || ImGui::IsKeyDown(ImGuiKey_Keypad2);
+    bool isPressed3 = ImGui::IsKeyDown(ImGuiKey_3) || ImGui::IsKeyDown(ImGuiKey_Keypad3);
 
-    bool isPressed1 = ImGui::IsKeyDown(key1);
-    bool isPressed2 = ImGui::IsKeyDown(key2);
-    bool isPressed3 = ImGui::IsKeyDown(key3);
+    // i don't know why but ImGUI can't read key 4 so we pass by the key apostrophe in Edge Mode.
+    // think for later : Try to implemente a CFG file that can read inputs from Qwerty or Azerty
+    bool isPressed4 = ImGui::IsKeyDown(ImGuiKey_Apostrophe) || ImGui::IsKeyDown(ImGuiKey_Keypad4);
 
     if (isPressed1  && !lastKeyState_1)
     {
@@ -313,9 +333,15 @@ void ThreeDWindow::onChangeMod()
         setModelingMode(&faceMode);
     }
 
+    if (isPressed4 && !lastKeyState_4)
+    {
+        setModelingMode(&edgeMode);
+    }
+
     lastKeyState_1 = isPressed1;
     lastKeyState_2 = isPressed2;
     lastKeyState_3 = isPressed3;
+    lastKeyState_4 = isPressed4;
 
 }
 
@@ -355,6 +381,17 @@ void ThreeDWindow::ThreeDWorldInteractions()
             true
         );
 
+    }
+
+    if(currentMode == &edgeMode)
+    {
+        EdgeTransform::manipulateEdges(
+            openGLContext,
+            multipleSelectedEdges,
+            oglChildPos,
+            oglChildSize,
+            wasUsingGizmoLastFrame
+        );
     }
 }
 
@@ -528,8 +565,6 @@ void ThreeDWindow::handleClick()
                 if(!shiftPressed)
                 {
 
-                    // std::cout << "[DEBUG] ThreeDwindow.cpp : No vertice hit — clearing vertice selection." << std::endl;
-
                     for (ThreeDObject* obj : ThreeDObjectsList)
                     {
                         Cube* cube = dynamic_cast<Cube*>(obj);
@@ -541,11 +576,6 @@ void ThreeDWindow::handleClick()
 
                     multipleSelectedVertices.clear();
                     lastSelectedVertice = nullptr;
-                }
-                else
-                {
-                    std::cout << "[DEBUG] ThreeDWindow.cpp : Shift pressed & no vertice hit — keeping current multi-selection." << std::endl;
-
                 }
             }
         }      
@@ -598,6 +628,58 @@ void ThreeDWindow::handleClick()
                         for (Face* f : cube->getFaces()) if (f) f->setSelected(false);
                     }
                     multipleSelectedFaces.clear();
+                }
+            }
+        }
+
+        if (currentMode == &edgeMode)
+        {
+            if (ImGuizmo::IsUsing())
+                return;
+
+            bool shiftPressed = ImGui::GetIO().KeyShift;
+
+            Edge* selectedEdge = selector.pickupEdge(
+                static_cast<int>(relativeMouseX), static_cast<int>(relativeMouseY),
+                windowWidth, windowHeight, view, proj, ThreeDObjectsList, shiftPressed
+            );
+
+            if (selectedEdge)
+            {
+                if (shiftPressed)
+                {
+                    auto it = std::find(multipleSelectedEdges.begin(), multipleSelectedEdges.end(), selectedEdge);
+                    if (it == multipleSelectedEdges.end())
+                    {
+                        multipleSelectedEdges.push_back(selectedEdge);
+                        for (Edge* e : multipleSelectedEdges) if (e) e->setSelected(true);
+                    }
+                }
+                else
+                {
+                    for (ThreeDObject* obj : ThreeDObjectsList)
+                    {
+                        Cube* cube = dynamic_cast<Cube*>(obj);
+                        if (!cube) continue;
+                        for (Edge* e : cube->getEdges()) if (e) e->setSelected(false);
+                    }
+                    multipleSelectedEdges.clear();
+
+                    selectedEdge->setSelected(true);
+                    multipleSelectedEdges.push_back(selectedEdge);
+                }
+            }
+            else
+            {
+                if (!shiftPressed)
+                {
+                    for (ThreeDObject* obj : ThreeDObjectsList)
+                    {
+                        Cube* cube = dynamic_cast<Cube*>(obj);
+                        if (!cube) continue;
+                        for (Edge* e : cube->getEdges()) if (e) e->setSelected(false);
+                    }
+                    multipleSelectedEdges.clear();
                 }
             }
         }

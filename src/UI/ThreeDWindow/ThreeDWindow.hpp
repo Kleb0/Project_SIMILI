@@ -8,6 +8,7 @@
 #include "Engine/ThreeDInteractions/MeshTransform.hpp"
 #include "Engine/ThreeDInteractions/VerticeTransform.hpp"
 #include "Engine/ThreeDInteractions/FaceTransform.hpp"
+#include "Engine/ThreeDInteractions/EdgeTransform.hpp"
 
 #include <string>
 #include <vector>
@@ -26,12 +27,13 @@
 #include "UI/ThreeDModes/Normal_Mode.hpp"
 #include "UI/ThreeDModes/Vertice_Mode.hpp"
 #include "UI/ThreeDModes/Face_Mode.hpp"
+#include "UI/ThreeDModes/Edge_Mode.hpp"
 
 //=== Forward declarations ===//
 class HierarchyInspector;
 class ObjectInspector;
 class ThreeDObject;
-class Vertice;
+
 
 //=== Class ===//
 class ThreeDWindow : public GUIWindow
@@ -78,6 +80,7 @@ public:
     std::list<ThreeDObject *> multipleSelectedObjects;
     std::list<Vertice *> multipleSelectedVertices;
     std::list<Face *> multipleSelectedFaces;
+    std::list<Edge *> multipleSelectedEdges;
     bool wasUsingGizmoLastFrame = false;
     bool selectionLocked = false;
 
@@ -85,10 +88,12 @@ public:
     Vertice_Mode verticeMode;
     Normal_Mode normalMode;
     Face_Mode faceMode;
+    Edge_Mode edgeMode;
 
     bool lastKeyState_1 = false;
     bool lastKeyState_2 = false;
     bool lastKeyState_3 = false;
+    bool lastKeyState_4 = false;
 
 private:
     

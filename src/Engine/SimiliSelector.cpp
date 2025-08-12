@@ -20,7 +20,7 @@ void SimiliSelector::setMultipleSelectedObjects(const std::list<ThreeDObject*>& 
         obj->setSelected(true);
 
     calculateCenterOfSelection();
-    window->lockSelectionOnce(); // optional helper to replicate previous behavior
+    window->lockSelectionOnce(); 
 }
 
 void SimiliSelector::selectMultipleObjects(const std::list<ThreeDObject*>& objects)

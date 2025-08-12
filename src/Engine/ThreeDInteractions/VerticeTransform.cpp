@@ -80,7 +80,8 @@ const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFr
     {
         glm::mat4 deltaWorld = dummyMatrix * glm::inverse(prevDummyMatrix);
 
-        for (auto* v : selectedVertices) {
+        for (auto* v : selectedVertices) 
+        {
             if (!v) continue;
             ThreeDObject* parent = v->getMeshParent();
             if (!parent) continue;

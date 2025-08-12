@@ -120,3 +120,40 @@ const glm::mat4& view, const glm::mat4& proj, ImVec2 oglChildPos, ImVec2 oglChil
     glm::mat4 model = glm::translate(glm::mat4(1.0f), gizmoCenter);
     return model;
 }
+
+glm::mat4 Guizmo::renderGizmoForEdges(const std::list<Edge*>& edges, ImGuizmo::OPERATION operation, 
+const glm::mat4& view, const glm::mat4& proj, ImVec2 oglChildPos, ImVec2 oglChildSize)
+{
+    ImGuizmo::BeginFrame();
+    ImGuizmo::Enable(true);
+    ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
+    ImGuizmo::SetDrawlist();
+    ImGuizmo::SetRect(oglChildPos.x, oglChildPos.y, oglChildSize.x, oglChildSize.y);
+    ImGuizmo::SetGizmoSizeClipSpace(0.2f);
+
+    glm::vec3 center(0.0f);
+    int count = 0;
+
+    for (auto* e : edges)
+    {
+        if (!e) continue;
+        Vertice* a = e->getStart();
+        Vertice* b = e->getEnd();
+        if (!a || !b) continue;
+
+        ThreeDObject* parent = a->getMeshParent() ? a->getMeshParent() : b->getMeshParent();
+        glm::mat4 parentMat = parent ? parent->getModelMatrix() : glm::mat4(1.0f);
+
+        glm::vec3 wa = glm::vec3(parentMat * glm::vec4(a->getLocalPosition(), 1.0f));
+        glm::vec3 wb = glm::vec3(parentMat * glm::vec4(b->getLocalPosition(), 1.0f));
+
+        glm::vec3 mid = 0.5f * (wa + wb);
+        center += mid;
+        ++count;
+    }
+
+    if (count > 0) center /= static_cast<float>(count);
+
+    return glm::translate(glm::mat4(1.0f), center);
+}
+
