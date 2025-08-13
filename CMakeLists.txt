@@ -25,16 +25,22 @@ endif()
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI    
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ContextualMenu
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ThreeDModes
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/HierarchyInspectorLogic
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ObjectInspectorLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ThreeDWindow
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/UIDocking
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDInteractions
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/images
     ${CMAKE_CURRENT_SOURCE_DIR}/src/InternalLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Basic
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Camera
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Primitives
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Entities
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Resources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/example
@@ -159,15 +165,21 @@ add_executable(${PROJECT_NAME}
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ContextualMenu
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ThreeDModes
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/HierarchyInspectorLogic
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ObjectInspectorLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ThreeDWindow
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/UIDocking
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDInteractions
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/images
     ${CMAKE_CURRENT_SOURCE_DIR}/src/InternalLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Basic
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Camera
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Primitives
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Entities
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Resources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/backends

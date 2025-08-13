@@ -1,7 +1,6 @@
 #include "Engine/ThreeDInteractions/MeshTransform.hpp"
-#include "WorldObjects/ThreeDObject.hpp"
+#include "WorldObjects/Entities/ThreeDObject.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
-#include "WorldObjects/Camera.hpp"
 #include "Engine/OpenGLContext.hpp"
 #include "UI/ThreeDModes/ThreeDMode.hpp"
 #include "UI/ThreeDModes/Vertice_Mode.hpp"

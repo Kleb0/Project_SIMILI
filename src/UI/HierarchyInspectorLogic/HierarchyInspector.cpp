@@ -1,13 +1,13 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #define IMGUI_ENABLE_ASSERTS
-#include "UI/ObjectInspector.hpp"
+#include "UI/ObjectInspectorLogic/ObjectInspector.hpp"
 #include "UI/ThreeDWindow/ThreeDWindow.hpp"
 #include <imgui.h>
 #include <iostream>
 #include <algorithm>
 #include <typeinfo>
 #include <filesystem> 
-#include "WorldObjects/ThreeDObject.hpp"
+#include "WorldObjects/Entities/ThreeDObject.hpp"
 #include "Engine/ErrorBox.hpp"
 
 HierarchyInspector::HierarchyInspector()

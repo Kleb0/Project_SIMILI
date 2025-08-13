@@ -1,6 +1,6 @@
 #pragma once
 #include <string>
-#include "WorldObjects/ThreeDObject.hpp"
+#include "WorldObjects/Entities/ThreeDObject.hpp"
 
 class EmptyDummy : public ThreeDObject
 {

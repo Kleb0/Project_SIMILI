@@ -1,7 +1,7 @@
 #pragma once
 
 #include "UI/GUIWindow.hpp"
-#include "WorldObjects/ThreeDObject.hpp"
+#include "WorldObjects/Entities/ThreeDObject.hpp"
 #include <string>
 #include <iostream>
 #include <list>

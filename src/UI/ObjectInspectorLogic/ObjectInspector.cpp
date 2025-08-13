@@ -1,4 +1,4 @@
-#include "UI/ObjectInspector.hpp"
+#include "UI/ObjectInspectorLogic/ObjectInspector.hpp"
 #include "imgui.h"
 #include <iostream>
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "WorldObjects/ThreeDObject.hpp"
+#include "WorldObjects/Entities/ThreeDObject.hpp"
 
 class HierarchyInspector;
 

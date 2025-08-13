@@ -1,4 +1,4 @@
-#include "WorldObjects/Camera.hpp"
+#include "WorldObjects/Camera/Camera.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
 

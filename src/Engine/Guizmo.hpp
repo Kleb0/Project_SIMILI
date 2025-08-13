@@ -6,7 +6,7 @@
 #include <imgui.h>
 #include <ImGuizmo.h>
 
-#include "WorldObjects/ThreeDObject.hpp"
+#include "WorldObjects/Entities/ThreeDObject.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
 #include "WorldObjects/Basic/Face.hpp" 
 #include "WorldObjects/Basic/Edge.hpp"
