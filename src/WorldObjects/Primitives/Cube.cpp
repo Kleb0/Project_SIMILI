@@ -1,4 +1,4 @@
-#include "WorldObjects/Cube.hpp"
+#include "WorldObjects/Primitives/Cube.hpp"
 #include <glad/glad.h>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>

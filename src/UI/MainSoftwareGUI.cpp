@@ -10,9 +10,9 @@
 #include "UI/MainSoftwareGUI.hpp"
 #include <UI/GUIWindow.hpp>
 #include "imgui_internal.h"
-#include "UI/UiCreator.hpp"
-#include "UI/Uidocking.hpp"
-#include "UI/ContextualMenu.hpp"
+#include "UI/UIDocking/UiCreator.hpp"
+#include "UI/UIDocking/Uidocking.hpp"
+#include "UI/ContextualMenu/ContextualMenu.hpp"
 
 #include <fstream>
 #include <iostream>

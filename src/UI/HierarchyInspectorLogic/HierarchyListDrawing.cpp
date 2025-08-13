@@ -1,6 +1,6 @@
 #include "UI/HierarchyInspectorLogic/HierarchyListDrawing.hpp"
 #include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
-#include "WorldObjects/EmptyDummy.hpp"
+#include "WorldObjects/Entities/EmptyDummy.hpp"
 #include <imgui.h>
 #include <iostream>
 #include <algorithm>

@@ -4,8 +4,8 @@
 #include <vector>
 #include <UI/GUIWindow.hpp>
 #include "UI/ThreeDWindow/ThreeDWindow.hpp"
-#include <UI/ObjectInspector.hpp>
-#include <WorldObjects/ThreeDObject.hpp>
+#include <UI/ObjectInspectorLogic/ObjectInspector.hpp>
+#include <WorldObjects/Entities/ThreeDObject.hpp>
 
 class MainSoftwareGUI
 {

@@ -1,7 +1,7 @@
 #include "Engine/ThreeDInteractions/FaceTransform.hpp"
 #include "WorldObjects/Basic/Face.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
-#include "WorldObjects/ThreeDObject.hpp"
+#include "WorldObjects/Entities/ThreeDObject.hpp"
 #include "Engine/OpenGLContext.hpp"
 #include "Engine/Guizmo.hpp"
 

@@ -5,8 +5,8 @@
 #include "UI/HierarchyInspectorLogic/HierarchyListDrawing.hpp"
 #include "UI/GUIWindow.hpp"
 #include "Engine/OpenGLContext.hpp"
-#include "WorldObjects/ThreeDObject.hpp"
-#include "WorldObjects/EmptyDummy.hpp"
+#include "WorldObjects/Entities/ThreeDObject.hpp"
+#include "WorldObjects/Entities/EmptyDummy.hpp"
 #include <string>
 #include <list>
 #include <vector>

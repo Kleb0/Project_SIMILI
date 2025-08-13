@@ -4,8 +4,8 @@
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include "Engine/Guizmo.hpp"
-#include <WorldObjects/ThreeDObject.hpp>
-#include "WorldObjects/Camera.hpp"
+#include <WorldObjects/Entities/ThreeDObject.hpp>
+#include "WorldObjects/Camera/Camera.hpp"
 #include <iostream>
 #include <list>
 

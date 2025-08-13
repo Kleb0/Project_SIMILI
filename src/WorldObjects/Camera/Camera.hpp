@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include "WorldObjects/ThreedObject.hpp"
+#include "WorldObjects/Entities/ThreedObject.hpp"
 
 class Camera : public ThreeDObject
 {

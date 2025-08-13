@@ -6,11 +6,11 @@
 
 #include "UI/ThreeDWindow/ThreeDWindow.hpp"
 #include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
-#include "UI/ObjectInspector.hpp"
+#include "UI/ObjectInspectorLogic/ObjectInspector.hpp"
 
-#include "WorldObjects/ThreeDObject.hpp"
+#include "WorldObjects/Entities/ThreeDObject.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
-#include "WorldObjects/Cube.hpp"
+#include "WorldObjects/Primitives/Cube.hpp"
 
 #include <SDL3/SDL.h>
 #include <glm/gtc/matrix_transform.hpp>

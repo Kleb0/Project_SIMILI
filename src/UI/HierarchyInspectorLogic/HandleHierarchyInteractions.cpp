@@ -1,6 +1,6 @@
 #include "UI/HierarchyInspectorLogic/HandleHierarchyInteractions.hpp"
 #include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
-#include "UI/ObjectInspector.hpp"
+#include "UI/ObjectInspectorLogic/ObjectInspector.hpp"
 #include "UI/ThreeDWindow/ThreeDWindow.hpp"
 #include "Engine/SimiliSelector.hpp"
 #include <imgui.h>

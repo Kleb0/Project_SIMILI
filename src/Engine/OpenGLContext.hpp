@@ -1,8 +1,8 @@
 #pragma once
 #include <glad/glad.h>
 #include "Engine/ThreeDSceneDrawer.hpp"
-#include "WorldObjects/ThreedObject.hpp"
-#include "WorldObjects/Camera.hpp"
+#include "WorldObjects/Entities/ThreedObject.hpp"
+#include "WorldObjects/Camera/Camera.hpp"
 #include <iostream>
 #include <list>
 

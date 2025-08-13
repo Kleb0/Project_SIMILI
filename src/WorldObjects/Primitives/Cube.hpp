@@ -1,6 +1,6 @@
 #pragma once
 
-#include "WorldObjects/ThreedObject.hpp"
+#include "WorldObjects/Entities/ThreedObject.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
 #include "WorldObjects/Basic/Edge.hpp"
 #include "WorldObjects/Basic/Face.hpp"

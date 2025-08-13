@@ -3,11 +3,11 @@
 
 #include "UI/MainSoftwareGUI.hpp"
 #include "Engine/OpenGLContext.hpp"
-#include "WorldObjects/ThreedObject.hpp"
+#include "WorldObjects/Entities/ThreedObject.hpp"
 #include "UI/GUIWindow.hpp"
 #include "UI/InfoWindow.hpp"
 #include "UI/ThreeDWindow/ThreeDWindow.hpp"
-#include "UI/ObjectInspector.hpp"
+#include "UI/ObjectInspectorLogic/ObjectInspector.hpp"
 #include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
 
 #define Add associate

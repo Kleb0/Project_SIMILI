@@ -1,5 +1,5 @@
 #include "Engine/ThreeDObjectSelector.hpp"
-#include "WorldObjects/Cube.hpp"
+#include "WorldObjects/Primitives/Cube.hpp"
 #include <glm/gtc/matrix_inverse.hpp>
 #include <limits>
 #include <iostream>

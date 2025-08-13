@@ -5,7 +5,7 @@
 #include <imgui.h>
 #include "UI/ThreeDWindow/ThreeDWindow.hpp"
 #include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
-#include "WorldObjects/ThreeDObject.hpp"
+#include "WorldObjects/Entities/ThreeDObject.hpp"
 
 class ObjectInspector;
 

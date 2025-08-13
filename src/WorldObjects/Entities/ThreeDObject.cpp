@@ -1,4 +1,4 @@
-#include "WorldObjects/ThreedObject.hpp"
+#include "WorldObjects/Entities/ThreedObject.hpp"
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
 #include <ImGuizmo.h>

@@ -1,4 +1,4 @@
-#include "UI/Uidocking.hpp"
+#include "UI/UIDocking/Uidocking.hpp"
 #include "imgui_internal.h"
 
 void Uidocking::SetupDefaultDockspace(ImGuiID dockspace_id)

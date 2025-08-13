@@ -2,10 +2,10 @@
 
 #include <imgui_internal.h>
 
-#include "UI/ObjectInspector.hpp"
-#include "UI/ContextualMenu.hpp"
+#include "UI/ObjectInspectorLogic/ObjectInspector.hpp"
+#include "UI/ContextualMenu/ContextualMenu.hpp"
 #include "Engine/OpenGLContext.hpp"
-#include "WorldObjects/Cube.hpp"
+#include "WorldObjects/Primitives/Cube.hpp"
 #include <iostream>
 
 void ContextualMenu::setHierarchyInspector(HierarchyInspector *inspector)

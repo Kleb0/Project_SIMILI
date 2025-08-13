@@ -1,4 +1,4 @@
-#include "EmptyDummy.hpp"
+#include "WorldObjects/Entities/EmptyDummy.hpp"
 
 EmptyDummy::EmptyDummy(int slotIndex)
     : slotIndex(slotIndex) {}

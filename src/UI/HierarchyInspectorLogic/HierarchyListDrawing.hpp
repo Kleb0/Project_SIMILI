@@ -1,7 +1,7 @@
 #pragma once
 
 #include <imgui.h>
-#include "WorldObjects/ThreeDObject.hpp"
+#include "WorldObjects/Entities/ThreeDObject.hpp"
 #include <vector>
 #include <list>
 #include <memory>
