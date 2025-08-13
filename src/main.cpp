@@ -20,7 +20,6 @@ fs::path gExecutableDir;
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <SDL3/SDL.h>
-#include "InternalLogic/AssemblerLogic.hpp"
 #include "UI/MainSoftwareGUI.hpp"
 #include "UI/InfoWindow.hpp"
 #include "UI/ThreeDWindow/ThreeDWindow.hpp"
@@ -91,10 +90,6 @@ int main(int argc, char **argv)
     renderer.setCamera(&mainCamera);
     myCube.setPosition(glm::vec3(2.5f, 0.5f, 2.5f));
     myCube2.setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
-
-    associate(gui, myInfoWindow);
-    associate(gui, myThreeDWindow);
-
     myHierarchy.setTitle("Hierarchy");
     myHierarchy.setContext(&renderer);
     myHierarchy.setThreeDWindow(&myThreeDWindow);
@@ -102,8 +97,12 @@ int main(int argc, char **argv)
     myThreeDWindow.setHierarchy(&myHierarchy);
     myThreeDWindow.setObjectInspector(&objectInspector);
     objectInspector.setTitle("Object Inspector");
-    associate(gui, objectInspector);
-    associate(gui, myHierarchy);
+
+    gui.add(myInfoWindow);
+    gui.add(myThreeDWindow);
+    gui.add(objectInspector);
+    gui.add(myHierarchy);
+
     gui.setThreeDWindow(&myThreeDWindow);
     gui.setObjectInspector(&objectInspector);
     // add(gui, dx12Window);

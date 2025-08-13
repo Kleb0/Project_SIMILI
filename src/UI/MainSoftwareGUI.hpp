@@ -38,8 +38,8 @@ private:
     void mainWindowOptions();
     void popUpModal();
     void shutdown();
-
     void multiScreenSupport();
+
     ThreeDObject *threedObject = nullptr;
     ThreeDWindow *threeDWindow = nullptr;
     ObjectInspector *objectInspector = nullptr;

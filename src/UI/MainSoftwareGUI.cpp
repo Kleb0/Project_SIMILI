@@ -10,7 +10,7 @@
 #include "UI/MainSoftwareGUI.hpp"
 #include <UI/GUIWindow.hpp>
 #include "imgui_internal.h"
-#include "UI/UIDocking/UiCreator.hpp"
+#include "UI/UIDocking/UiCreator.hpp" 
 #include "UI/UIDocking/Uidocking.hpp"
 #include "UI/ContextualMenu/ContextualMenu.hpp"
 
@@ -24,31 +24,14 @@ namespace fs = std::filesystem;
 
 extern std::filesystem::path gExecutableDir;
 
-inline MainSoftwareGUI &associate(MainSoftwareGUI &gui, GUIWindow &win)
-{
-    return gui.add(win);
-}
-
-inline ThreeDWindow &associate(ThreeDWindow &win, ThreeDObject &obj)
-{
-    win.addThreeDObjectsToScene({&obj});
-    return win;
-}
-
-inline OpenGLContext &associate(OpenGLContext &ctx, ThreeDObject &obj)
-{
-    ctx.addThreeDObjectToList(&obj);
-    return ctx;
-}
-
 GLFWwindow *MainSoftwareGUI::getWindow()
 {
     return window;
 }
 
-MainSoftwareGUI &MainSoftwareGUI::add(GUIWindow &window)
+MainSoftwareGUI &MainSoftwareGUI::add(GUIWindow &w)
 {
-    windows.push_back(&window);
+    windows.push_back(&w);
     return *this;
 }
 
