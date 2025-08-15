@@ -13,7 +13,7 @@ namespace FaceTransform
    glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, OpenGLContext* context,
    const std::list<Face*>& faces, const ImVec2& oglChildPos, const ImVec2& oglChildSize);
 
-   void manipulateFaces(OpenGLContext* context, const std::list<Face*>& selectedFaces,
+   void manipulateFaces(OpenGLContext* context, std::list<Face*>& selectedFaces,
    const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, bool bakeToVertices = true);
 
    Face* extrudeSelectedFace(std::list<Face*>& selectedFaces, float distance);
