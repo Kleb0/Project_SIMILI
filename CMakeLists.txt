@@ -34,6 +34,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/UIDocking
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDInteractions
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/MeshEdit
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/images
     ${CMAKE_CURRENT_SOURCE_DIR}/src/InternalLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects
@@ -173,6 +174,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/UIDocking
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDInteractions
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/MeshEdit
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/images
     ${CMAKE_CURRENT_SOURCE_DIR}/src/InternalLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects

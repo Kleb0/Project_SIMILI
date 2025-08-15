@@ -21,6 +21,7 @@
 #include "Engine/ThreeDObjectSelector.hpp"
 #include "Engine/SimiliSelector.hpp"
 
+
 #include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
 
 #include "UI/ThreeDModes/ThreeDMode.hpp"
@@ -29,11 +30,13 @@
 #include "UI/ThreeDModes/Face_Mode.hpp"
 #include "UI/ThreeDModes/Edge_Mode.hpp"
 
+#include "UI/ThreeDWindow/ClickHandler.hpp"
+
 //=== Forward declarations ===//
 class HierarchyInspector;
 class ObjectInspector;
 class ThreeDObject;
-
+class ClickHandler;
 
 //=== Class ===//
 class ThreeDWindow : public GUIWindow
@@ -95,11 +98,13 @@ public:
     bool lastKeyState_3 = false;
     bool lastKeyState_4 = false;
 
+    friend class ClickHandler;
+
 private:
     
     SimiliSelector* similiSelector = nullptr;
 
-    void handleClick();
+    // void handleClick();
     void toggleMultipleSelection(ThreeDObject *object);
 
     void ThreeDWorldInteractions();
@@ -115,5 +120,7 @@ private:
     std::set<ThreeDObject *> lastSelection;
     Vertice* lastSelectedVertice = nullptr;
     ImGuizmo::OPERATION currentGizmoOperation = ImGuizmo::TRANSLATE;
+
+     ClickHandler clickHandler;
 
 };
