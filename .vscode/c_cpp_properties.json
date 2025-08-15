@@ -15,7 +15,7 @@
         "${workspaceFolder}/src/UI/UIDocking",
         "${workspaceFolder}/src/Engine",
         "${workspaceFolder}/src/Engine/ThreeDInteractions",
-        "${workspaceFolder}/src/InternalLogic",
+        "${workspaceFolder}/src/Engine/MeshEdit",
         "${workspaceFolder}/src/WorldObjects",
         "${workspaceFolder}/src/WorldObjects/Basic",
         "${workspaceFolder}/src/WorldObjects/Camera",

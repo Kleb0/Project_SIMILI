@@ -21,12 +21,12 @@
 #include <glm/gtx/string_cast.hpp>
 // #include <windows.h>
 
-ThreeDWindow::ThreeDWindow() {}
+ThreeDWindow::ThreeDWindow() : clickHandler(this) {}
 
 // ------- Constructor, setters and getters ------- //
 
 ThreeDWindow::ThreeDWindow(const std::string &title, const std::string &text)
-    : title(title), text(text)
+    : title(title), text(text), clickHandler(this)
 {
 }
 
@@ -155,7 +155,7 @@ void ThreeDWindow::threeDRendering()
     if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
     {
         ImGui::GetCurrentWindow()->Flags |= ImGuiWindowFlags_NoMove;
-        handleClick();
+        clickHandler.handle();
     }
 
     static bool isDragging = false;
@@ -361,7 +361,8 @@ void ThreeDWindow::ThreeDWorldInteractions()
 
     if(currentMode == &verticeMode)
     {
-        VerticeTransform::manipulateVertices(
+        VerticeTransform::manipulateVertices
+        (
             openGLContext,
             multipleSelectedVertices,
             oglChildPos,
@@ -372,7 +373,8 @@ void ThreeDWindow::ThreeDWorldInteractions()
 
     if(currentMode == &faceMode)
     {
-        FaceTransform::manipulateFaces(
+        FaceTransform::manipulateFaces
+        (
             openGLContext,
             multipleSelectedFaces,
             oglChildPos,
@@ -385,7 +387,8 @@ void ThreeDWindow::ThreeDWorldInteractions()
 
     if(currentMode == &edgeMode)
     {
-        EdgeTransform::manipulateEdges(
+        EdgeTransform::manipulateEdges
+        (
             openGLContext,
             multipleSelectedEdges,
             oglChildPos,
@@ -395,296 +398,6 @@ void ThreeDWindow::ThreeDWorldInteractions()
     }
 }
 
-//------- Click Handling ----------- //
-
-void ThreeDWindow::handleClick()
-{
-
-    if (selectionLocked)
-    {
-        selectionLocked = false; // Unlock selection for next click
-        return;
-    }
-
-    ImVec2 mouse = ImGui::GetMousePos();
-    float relativeMouseX = mouse.x - oglChildPos.x;
-    float relativeMouseY = mouse.y - oglChildPos.y;
-    relativeMouseY = oglChildSize.y - relativeMouseY;
-
-    if (relativeMouseX >= 0 && relativeMouseX <= oglChildSize.x &&
-        relativeMouseY >= 0 && relativeMouseY <= oglChildSize.y)
-    {
-        int windowWidth = static_cast<int>(oglChildSize.x);
-        int windowHeight = static_cast<int>(oglChildSize.y);
-
-        view = openGLContext->getViewMatrix();
-        proj = openGLContext->getProjectionMatrix();
-
-        if (currentMode == &normalMode)
-        {
-            std::cout << "[DEBUG] Normal Mode active, click mesh operation done." << std::endl;
-
-            // --------------------------------------
-
-                // ------- selecting an mesh object ------- //
-                bool preventSelection = ImGuizmo::IsOver();
-                if (!preventSelection)
-                {
-                    selector.pickUpMesh((int)relativeMouseX, (int)relativeMouseY,
-                                        windowWidth, windowHeight, view, proj, ThreeDObjectsList);
-                }
-
-                ThreeDObject *selected = selector.getSelectedObject();
-                bool shiftPressed = ImGui::GetIO().KeyShift;
-
-                if (selected)
-                {
-                    // -------- Clicked Object --------
-                    if (!shiftPressed)
-                    {
-                        for (auto *obj : ThreeDObjectsList)
-                            obj->setSelected(false);
-                        multipleSelectedObjects.clear();
-                    }
-
-                    auto it = std::find(multipleSelectedObjects.begin(), multipleSelectedObjects.end(), selected);
-                    if (it == multipleSelectedObjects.end())
-                    {
-                        multipleSelectedObjects.push_back(selected);
-                        selected->setSelected(true);
-                    }
-                    else if (shiftPressed)
-                    {
-                        multipleSelectedObjects.erase(it);
-                        selected->setSelected(false);
-                    }
-
-                    if (objectInspector)
-                    {
-                        if (multipleSelectedObjects.size() > 1)
-                        {
-                            objectInspector->clearInspectedObject();
-                            objectInspector->setMultipleInspectedObjects(multipleSelectedObjects);
-                        }
-                        else
-                        {
-                            objectInspector->setInspectedObject(selected);
-                        }
-                    }
-
-                    if (hierarchy)
-                        hierarchy->selectFromThreeDWindow();
-
-                    selector.clearTarget();
-                }
-                else if (!ImGuizmo::IsUsing() && !wasUsingGizmoLastFrame)
-                {
-                    // --------- Click without object hit ---------
-                    std::cout << "[DEBUG] No object hit — clearing selection." << std::endl;
-
-                    for (auto *obj : ThreeDObjectsList)
-                        obj->setSelected(false);
-
-                    multipleSelectedObjects.clear();
-                    selector.clearTarget();
-
-                    if (objectInspector)
-                    {
-                        objectInspector->clearInspectedObject();
-                        objectInspector->clearMultipleInspectedObjects();
-                    }
-
-                    if (hierarchy)
-                    {
-                        hierarchy->clearMultipleSelection();
-                        hierarchy->unselectObject(hierarchy->getSelectedObject());
-                    }
-
-                    wasUsingGizmoLastFrame = false;
-                }
-                // --------- End of click handling --------
-        }
-
-        if (currentMode == &verticeMode)
-        {
-            //if SHIFT is pressed  
-
-            if (ImGuizmo::IsUsing())
-                return;
-
-            bool shiftPressed = ImGui::GetIO().KeyShift;
-
-            // std::cout << "[DEBUG] ThreeDwindow : Vertice Mode active, click vertice operation done." << std::endl;
-
-            Vertice* selectedVertice = selector.pickUpVertice(
-                (int)relativeMouseX, (int)relativeMouseY,
-                windowWidth, windowHeight, view, proj,
-                ThreeDObjectsList, shiftPressed
-            );
-
-            if (selectedVertice)
-            {
-                if (shiftPressed)
-                {
-                    auto it = std::find(multipleSelectedVertices.begin(), multipleSelectedVertices.end(), selectedVertice);
-
-                    if (it == multipleSelectedVertices.end())
-                    {
-                        multipleSelectedVertices.push_back(selectedVertice);
-
-                        // std::cout << "[DEBUG] ThreeDWindow.cpp : Added vertice to multi-select: " << selectedVertice->getName() << std::endl;
-                        for(Vertice* v : multipleSelectedVertices)
-                        {
-                            // std::cout << "[DEBUG] ThreeDWindow.cpp : Vertice in multi-select: " << v->getName() << std::endl;
-                            v->setSelected(true);
-                        }
-                    }
-                }
-                else
-                {
-
-                    for (ThreeDObject* obj : ThreeDObjectsList)
-                    {
-                        Cube* cube = dynamic_cast<Cube*>(obj);
-                        if (!cube) continue;
-                        for (Vertice* v : cube->getVertices())
-                            v->setSelected(false);
-                    }
-                    multipleSelectedVertices.clear();
-
-                    selectedVertice->setSelected(true);
-                    multipleSelectedVertices.push_back(selectedVertice);
-                    lastSelectedVertice = selectedVertice;
-
-                    // std::cout << "[DEBUG] ThreeDWindow.cpp : Single vertice selected: " << selectedVertice->getName() << std::endl;
-                }
-            }
-            else
-            {
-
-                if(!shiftPressed)
-                {
-
-                    for (ThreeDObject* obj : ThreeDObjectsList)
-                    {
-                        Cube* cube = dynamic_cast<Cube*>(obj);
-                        if (!cube) continue;
-
-                        for (Vertice* vert : cube->getVertices())
-                            vert->setSelected(false);
-                    }
-
-                    multipleSelectedVertices.clear();
-                    lastSelectedVertice = nullptr;
-                }
-            }
-        }      
-
-        if (currentMode == &faceMode)
-        {
-            if (ImGuizmo::IsUsing())
-                return;
-
-            bool shiftPressed = ImGui::GetIO().KeyShift;
-
-            Face* selectedFace = selector.pickupFace(
-                static_cast<int>(relativeMouseX), static_cast<int>(relativeMouseY),
-                windowWidth, windowHeight, view, proj, ThreeDObjectsList,shiftPressed
-            );
-
-            if (selectedFace)
-            {
-                if (shiftPressed)
-                {
-                    auto it = std::find(multipleSelectedFaces.begin(), multipleSelectedFaces.end(), selectedFace);
-                    if (it == multipleSelectedFaces.end())
-                    {
-                        multipleSelectedFaces.push_back(selectedFace);
-                        for (Face* f : multipleSelectedFaces) if (f) f->setSelected(true);
-                    }
-                }
-                else
-                {
-                    for (ThreeDObject* obj : ThreeDObjectsList)
-                    {
-                        Cube* cube = dynamic_cast<Cube*>(obj);
-                        if (!cube) continue;
-                        for (Face* f : cube->getFaces()) if (f) f->setSelected(false);
-                    }
-                    multipleSelectedFaces.clear();
-
-                    selectedFace->setSelected(true);
-                    multipleSelectedFaces.push_back(selectedFace);
-                }
-            }
-            else
-            {
-                if (!shiftPressed)
-                {
-                    for (ThreeDObject* obj : ThreeDObjectsList)
-                    {
-                        Cube* cube = dynamic_cast<Cube*>(obj);
-                        if (!cube) continue;
-                        for (Face* f : cube->getFaces()) if (f) f->setSelected(false);
-                    }
-                    multipleSelectedFaces.clear();
-                }
-            }
-        }
-
-        if (currentMode == &edgeMode)
-        {
-            if (ImGuizmo::IsUsing())
-                return;
-
-            bool shiftPressed = ImGui::GetIO().KeyShift;
-
-            Edge* selectedEdge = selector.pickupEdge(
-                static_cast<int>(relativeMouseX), static_cast<int>(relativeMouseY),
-                windowWidth, windowHeight, view, proj, ThreeDObjectsList, shiftPressed
-            );
-
-            if (selectedEdge)
-            {
-                if (shiftPressed)
-                {
-                    auto it = std::find(multipleSelectedEdges.begin(), multipleSelectedEdges.end(), selectedEdge);
-                    if (it == multipleSelectedEdges.end())
-                    {
-                        multipleSelectedEdges.push_back(selectedEdge);
-                        for (Edge* e : multipleSelectedEdges) if (e) e->setSelected(true);
-                    }
-                }
-                else
-                {
-                    for (ThreeDObject* obj : ThreeDObjectsList)
-                    {
-                        Cube* cube = dynamic_cast<Cube*>(obj);
-                        if (!cube) continue;
-                        for (Edge* e : cube->getEdges()) if (e) e->setSelected(false);
-                    }
-                    multipleSelectedEdges.clear();
-
-                    selectedEdge->setSelected(true);
-                    multipleSelectedEdges.push_back(selectedEdge);
-                }
-            }
-            else
-            {
-                if (!shiftPressed)
-                {
-                    for (ThreeDObject* obj : ThreeDObjectsList)
-                    {
-                        Cube* cube = dynamic_cast<Cube*>(obj);
-                        if (!cube) continue;
-                        for (Edge* e : cube->getEdges()) if (e) e->setSelected(false);
-                    }
-                    multipleSelectedEdges.clear();
-                }
-            }
-        }
-    }
-}
 
 void ThreeDWindow::setMultipleSelectedObjects(const std::list<ThreeDObject*>& objects)
 {
