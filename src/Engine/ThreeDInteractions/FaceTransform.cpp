@@ -25,7 +25,7 @@ const std::list<Face*>& faces, const ImVec2& oglChildPos, const ImVec2& oglChild
     return Guizmo::renderGizmoForFaces(faces, op, view, proj, oglChildPos, oglChildSize);
 }
 
-void manipulateFaces(OpenGLContext* context, const std::list<Face*>& selectedFaces, const ImVec2& oglChildPos,
+void manipulateFaces(OpenGLContext* context, std::list<Face*>& selectedFaces, const ImVec2& oglChildPos,
 const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, bool bakeToVertices)
 {
     if (selectedFaces.empty()) return;
@@ -45,35 +45,42 @@ const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, bool bakeToVertices)
     static size_t    previousSetHash = 0;
 
 
+    // ---- Extrusion mechanism call ----
     if (ImGui::IsKeyPressed(ImGuiKey_E)) 
     {
         std::cout << "Extruding faces..." << std::endl;
 
-        std::list<Face*> tempSelection(selectedFaces.begin(), selectedFaces.end());
+        
         const float extrudeDist = 0.2f;
-        Face* newCap = FaceTransform::extrudeSelectedFace(tempSelection, extrudeDist);
+        Face* newCap = FaceTransform::extrudeSelectedFace(selectedFaces, extrudeDist);
 
-        if (newCap) {
-            const auto& vs = newCap->getVertices();
-            ThreeDObject* parent = (vs.empty() || !vs[0]) ? nullptr : vs[0]->getMeshParent();
-            const glm::mat4 parentModel = parent ? parent->getModelMatrix() : glm::mat4(1.0f);
+        if (newCap) 
+        {
+        // center the gizmo on the new face
+        const auto& vs = newCap->getVertices();
+        ThreeDObject* parent = (vs.empty() || !vs[0]) ? nullptr : vs[0]->getMeshParent();
+        const glm::mat4 parentModel = parent ? parent->getModelMatrix() : glm::mat4(1.0f);
 
-            glm::vec3 center(0.0f);
-            int count = 0;
-            for (auto* v : vs) {
-                if (!v) continue;
-                const glm::vec3 L = v->getLocalPosition();
-                const glm::vec3 W = glm::vec3(parentModel * glm::vec4(L, 1.0f));
-                center += W; ++count;
-            }
-            if (count > 0) center /= float(count);
+        glm::vec3 center(0.0f);
+        int count = 0;
 
-            currentGizmoOperation = ImGuizmo::TRANSLATE;
-            dummyMatrix      = glm::translate(glm::mat4(1.0f), center);
-            prevDummyMatrix  = dummyMatrix;
-            wasUsingGizmoLastFrame = false;
-            return;
+        for (auto* v : vs) 
+        {
+            if (!v) continue;
+            const glm::vec3 L = v->getLocalPosition();
+            const glm::vec3 W = glm::vec3(parentModel * glm::vec4(L, 1.0f));
+            center += W; ++count;
         }
+        if (count > 0) center /= float(count);
+
+        currentGizmoOperation = ImGuizmo::TRANSLATE;
+        dummyMatrix           = glm::translate(glm::mat4(1.0f), center);
+        prevDummyMatrix       = dummyMatrix;
+        wasUsingGizmoLastFrame = false;
+        return;
+    }
+
+
     }
 
     auto hashSet = [&]() -> size_t 

@@ -22,7 +22,7 @@ const std::list<Edge*>& edges,const ImVec2& oglChildPos, const ImVec2& oglChildS
     return model;
 }
 
-void manipulateEdges(OpenGLContext* context, const std::list<Edge*>& selectedEdges,
+void manipulateEdges(OpenGLContext* context, std::list<Edge*>& selectedEdges,
 const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame)
 {
     if (selectedEdges.empty()) return;
