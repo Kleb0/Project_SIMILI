@@ -20,7 +20,6 @@ public:
     void render(const std::list<ThreeDObject *> &objects, const glm::mat4 &viewProj);
     void drawBackgroundGradient();
 
-    void add(ThreeDObject *object);
     GLuint getTexture() const { return fboTexture; }
     std::vector<glm::vec3> worldCenter;
 

@@ -6,6 +6,9 @@
 #include <iostream>
 #include <list>
 
+#include "WorldObjects/Primitives/Cube.hpp"
+#include "WorldObjects/Mesh_DNA/Mesh_DNA.hpp"
+
 class OpenGLContext
 {
 public:

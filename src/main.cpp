@@ -18,20 +18,22 @@ fs::path gExecutableDir;
 #include <fstream>
 #include <iostream>
 
+#include "Engine/OpenGLContext.hpp"
+#include "Engine/ThreeDObjectSelector.hpp"
+
+#include "WorldObjects/Entities/ThreedObject.hpp"
+#include "WorldObjects/Camera/Camera.hpp"
+#include "WorldObjects/Primitives/Cube.hpp"
+
 #include <glm/gtc/matrix_transform.hpp>
 #include <SDL3/SDL.h>
 #include "UI/MainSoftwareGUI.hpp"
+#include "UI/HistoryLogic/HistoryLogic.hpp"
 #include "UI/InfoWindow.hpp"
 #include "UI/ThreeDWindow/ThreeDWindow.hpp"
 #include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
-#include "WorldObjects/Entities/ThreedObject.hpp"
-#include "Engine/OpenGLContext.hpp"
-#include "Engine/ThreeDObjectSelector.hpp"
-#include "WorldObjects/Camera/Camera.hpp"
-#include "WorldObjects/Primitives/Cube.hpp"
 #include "UI/UIdocking/UiCreator.hpp"
 #include "UI/ObjectInspectorLogic/ObjectInspector.hpp"
-
 #include "UI/ThreeDModes/ThreeDMode.hpp"
 #include "UI/ThreeDModes/Vertice_Mode.hpp"
 #include "UI/ThreeDModes/Normal_Mode.hpp"
@@ -55,6 +57,7 @@ int main(int argc, char **argv)
     Camera mainCamera;
     HierarchyInspector myHierarchy;
     ObjectInspector objectInspector;
+    HistoryLogic historyLogic;
 
     // ------- DirectX 12 has been implemented, so comment it for now as i don't need it actually ------- //
     // If you want to use DirectX 12, uncomment the following lines and make sure to include the necessary headers.
@@ -97,11 +100,14 @@ int main(int argc, char **argv)
     myThreeDWindow.setHierarchy(&myHierarchy);
     myThreeDWindow.setObjectInspector(&objectInspector);
     objectInspector.setTitle("Object Inspector");
+    historyLogic.setTitle("SUPER HISTORY LOGGER");
+    historyLogic.setObjectInspector(&objectInspector);
 
     gui.add(myInfoWindow);
     gui.add(myThreeDWindow);
     gui.add(objectInspector);
     gui.add(myHierarchy);
+    gui.add(historyLogic);
 
     gui.setThreeDWindow(&myThreeDWindow);
     gui.setObjectInspector(&objectInspector);

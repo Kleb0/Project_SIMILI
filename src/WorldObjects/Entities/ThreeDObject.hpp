@@ -65,6 +65,9 @@ public:
     glm::vec3 getOrigin() const;
     
 
+    void setIsMesh(bool flag) { isMesh = flag; }
+    bool getIsMesh() const { return isMesh; }
+
     glm::vec3 position = glm::vec3(0.0f);
     glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
     glm::vec3 _scale = glm::vec3(1.0f);
@@ -90,4 +93,6 @@ protected:
     bool isCurrentlySelected = false;
     std::string name = "Unnamed";
     glm::vec3 origin = glm::vec3(0.0f); 
+
+    bool isMesh = false;
 };

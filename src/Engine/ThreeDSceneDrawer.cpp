@@ -152,16 +152,9 @@ void ThreeDSceneDrawer::render(const std::list<ThreeDObject *> &objects, const g
 	{
 		if (obj)
 		{
-			// std::cout << " Rendering object with name : - " << obj->getName() << std::endl;
 			obj->render(viewProj);
 		}
 	}
-}
-
-void ThreeDSceneDrawer::add(ThreeDObject *object)
-{
-	if (object)
-		objects.push_back(object);
 }
 
 void ThreeDSceneDrawer::drawBackgroundGradient()
