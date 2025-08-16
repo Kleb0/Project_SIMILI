@@ -5,6 +5,7 @@
 #include <UI/GUIWindow.hpp>
 #include "UI/ThreeDWindow/ThreeDWindow.hpp"
 #include <UI/ObjectInspectorLogic/ObjectInspector.hpp>
+#include "UI/HistoryLogic/HistoryLogic.hpp"
 #include <WorldObjects/Entities/ThreeDObject.hpp>
 
 class MainSoftwareGUI

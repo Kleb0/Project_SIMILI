@@ -28,6 +28,7 @@ public:
 
     bool showGlobalOrigin = false;
 
+    ThreeDObject* getInspectedObject() const { return inspectedObject; }
 
 private:
     ThreeDObject *inspectedObject = nullptr;

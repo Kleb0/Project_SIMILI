@@ -29,6 +29,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ContextualMenu
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ThreeDModes
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/HierarchyInspectorLogic
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/HistoryLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ObjectInspectorLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ThreeDWindow
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/UIDocking
@@ -42,12 +43,12 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Camera
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Primitives
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Entities
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Mesh_DNA
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Resources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/example
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glad
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glm
-
     ${SDL3_INCLUDE_DIR}
 )
 
@@ -169,6 +170,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ContextualMenu
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ThreeDModes
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/HierarchyInspectorLogic
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/HistoryLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ObjectInspectorLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ThreeDWindow
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/UIDocking
@@ -182,6 +184,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Camera
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Primitives
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Entities
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Mesh_DNA
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Resources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/backends

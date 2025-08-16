@@ -1,14 +1,21 @@
 #include "WorldObjects/Primitives/Cube.hpp"
+#include "WorldObjects/Mesh_DNA/Mesh_DNA.hpp" 
 #include <glad/glad.h>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 
-Cube::Cube() {}
+Cube::Cube() 
+{
+    setIsMesh(true);
+}
 Cube::~Cube()
 {
 
 }
 
+void Cube::setMeshDNA(MeshDNA* dna) { meshDNA = dna; }
+
+MeshDNA* Cube::getMeshDNA() const { return meshDNA; }
 
 void Cube::createVertices()
 {
@@ -218,6 +225,8 @@ void Cube::destroy()
         }
     }
     faces.clear();
+    delete meshDNA; 
+    meshDNA = nullptr;
 
     std::cout << "[Cube] Resources destroyed manually." << std::endl;
 }

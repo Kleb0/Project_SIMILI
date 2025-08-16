@@ -26,4 +26,6 @@ namespace MeshTransform
 
     void manipulateMesh(OpenGLContext* context, const std::list<ThreeDObject*>& selectedObjects,
     const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame);
+
+    void trackMeshTranslationOnRelease(const std::list<ThreeDObject*>& selectedObjects, const glm::mat4& totalDelta);
 }
