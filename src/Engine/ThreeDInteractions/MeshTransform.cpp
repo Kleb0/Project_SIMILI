@@ -15,6 +15,7 @@
 
 #include <glm/gtx/matrix_decompose.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/epsilon.hpp>
 #include <iostream>
 #include <algorithm>
 
@@ -113,7 +114,7 @@ namespace MeshTransform
         if (!isUsing && gizmoActive)
         {
             glm::mat4 totalDelta = dummyMatrix * glm::inverse(startMatrix);
-            trackMeshTranslationOnRelease(selectedObjects, totalDelta);
+            trackMeshTransformOnRelease(selectedObjects, totalDelta, currentGizmoOperation);
 
             gizmoActive = false;
         }
@@ -121,13 +122,32 @@ namespace MeshTransform
         wasUsingGizmoLastFrame = isUsing;
     }
 
-
-    void MeshTransform::trackMeshTranslationOnRelease(const std::list<ThreeDObject*>& selectedObjects, const glm::mat4& totalDelta)
+    void MeshTransform::trackMeshTransformOnRelease(const std::list<ThreeDObject*>& selectedObjects,
+    const glm::mat4& totalDelta, ImGuizmo::OPERATION op)
     {
-        glm::vec3 t(totalDelta[3]);
-        if (glm::length(t) == 0.0f) return;
+        const glm::mat4 I(1.0f);
+        bool isIdentity = true;
+        for (int c = 0; c < 4 && isIdentity; ++c)
+        {
+            for (int r = 0; r < 4; ++r)
+            {
+                if (!glm::epsilonEqual(totalDelta[c][r], I[c][r], 1e-6f))
+                {
+                    isIdentity = false;
+                    break;
+                }
+            }
+        }
+        if (isIdentity) return;
 
-        glm::mat4 T = glm::translate(glm::mat4(1.0f), t);
+        std::string tag = "unknown";
+        switch (op)
+        {
+            case ImGuizmo::TRANSLATE: tag = "translate"; break;
+            case ImGuizmo::ROTATE:    tag = "rotate";    break;
+            case ImGuizmo::SCALE:     tag = "scale";     break;
+            default: break;
+        }
 
         for (ThreeDObject* obj : selectedObjects)
         {
@@ -135,12 +155,14 @@ namespace MeshTransform
             {
                 if (auto* dna = mesh->getMeshDNA())
                 {
-                   dna->trackWithAutoTick(T, "translate");
-
+                    dna->trackWithAutoTick(totalDelta, tag);
                 }
             }
         }
     }
+
+
+
 
 
 }
