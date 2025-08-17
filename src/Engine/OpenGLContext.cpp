@@ -49,14 +49,12 @@ void OpenGLContext::addThreeDObjectToList(ThreeDObject *object)
     {
         if (auto* cube = dynamic_cast<Cube*>(object))
         {
-            // Evite de créer 2x si déjà présent (ex: re-ajout)
-            if (!cube->getMeshDNA())
-            {
                 MeshDNA* dna = new MeshDNA();
                 dna->name = object->getName();
                 cube->setMeshDNA(dna);
                 std::cout << "[OpenGLContext] MeshDNA attached to mesh: " << object->getName() << std::endl;
-            }
+                dna->ensureInit(cube->getModelMatrix());
+                
         } 
     }
 }

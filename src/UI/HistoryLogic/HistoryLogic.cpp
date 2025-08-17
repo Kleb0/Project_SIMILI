@@ -50,7 +50,7 @@ void HistoryLogic::render()
                     {
                         const auto& ev = hist[i];
                         const glm::vec3 t(ev.delta[3]);
-                        // Élément cliquable
+
                         if (ImGui::Selectable(
                                 (std::string("#") + std::to_string(i) +
                                  "  " + ev.tag +

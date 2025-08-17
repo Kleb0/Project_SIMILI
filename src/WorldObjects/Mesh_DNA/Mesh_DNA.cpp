@@ -4,20 +4,27 @@
 void MeshDNA::clear() {
     history.clear();
     acc = glm::mat4(1.0f);
+    hasInit = false;
+    nextTick = 0;
 }
 
 void MeshDNA::track(const glm::mat4& delta, uint64_t tick, const std::string& tag) {
     history.push_back(MeshTransformEvent{delta, tick, tag});
     acc = delta * acc;
+    if (tick >= nextTick) nextTick = tick + 1;
 }
 
-glm::mat4 MeshDNA::accumulated() const {
-    return acc;
-
+void MeshDNA::trackWithAutoTick(const glm::mat4& delta, const std::string& tag) {
+    track(delta, nextTick++, tag);
 }
 
-const std::vector<MeshTransformEvent>& MeshDNA::getHistory() const {
-    return history;
+glm::mat4 MeshDNA::accumulated() const { return acc; }
+const std::vector<MeshTransformEvent>& MeshDNA::getHistory() const { return history; }
+
+void MeshDNA::ensureInit(const glm::mat4& currentModel) {
+    if (hasInit) return;
+    trackWithAutoTick(currentModel, "init");
+    hasInit = true;
 }
 
 
@@ -43,4 +50,6 @@ void MeshDNA::rewindTo(size_t index_inclusive) {
     {
         acc = history[i].delta * acc;
     }
+
+    nextTick = history.back().tick + 1;
 }

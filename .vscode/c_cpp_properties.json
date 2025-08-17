@@ -17,6 +17,7 @@
         "${workspaceFolder}/src/Engine",
         "${workspaceFolder}/src/Engine/ThreeDInteractions",
         "${workspaceFolder}/src/Engine/MeshEdit",
+        "${workspaceFolder}/src/Engine/ProjectBuilder",
         "${workspaceFolder}/src/WorldObjects",
         "${workspaceFolder}/src/WorldObjects/Basic",
         "${workspaceFolder}/src/WorldObjects/Camera",
