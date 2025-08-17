@@ -3,7 +3,7 @@
 #include "UI/ObjectInspectorLogic/ObjectInspector.hpp"
 #include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
 
-#include "WorldObjects/Primitives/Cube.hpp"
+#include "WorldObjects/Mesh/Mesh.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
 #include "WorldObjects/Basic/Face.hpp"
 #include "WorldObjects/Basic/Edge.hpp"
@@ -132,9 +132,9 @@ void ClickHandler::handle() {
                 {
                     for (ThreeDObject* obj : w->ThreeDObjectsList)
                     {
-                        Cube* cube = dynamic_cast<Cube*>(obj);
-                        if (!cube) continue;
-                        for (Vertice* v : cube->getVertices()) v->setSelected(false);
+                        Mesh* mesh = dynamic_cast<Mesh*>(obj);
+                        if (!mesh) continue;    
+                        for (Vertice* v : mesh->getVertices()) v->setSelected(false);
                     }
                     w->multipleSelectedVertices.clear();
                     selectedVertice->setSelected(true);
@@ -148,9 +148,9 @@ void ClickHandler::handle() {
                 {
                     for (ThreeDObject* obj : w->ThreeDObjectsList)
                     {
-                        Cube* cube = dynamic_cast<Cube*>(obj);
-                        if (!cube) continue;
-                        for (Vertice* vert : cube->getVertices()) vert->setSelected(false);
+                        Mesh* mesh = dynamic_cast<Mesh*>(obj);
+                        if (!mesh) continue;  
+                        for (Vertice* vert : mesh->getVertices()) vert->setSelected(false);
                     }
                     w->multipleSelectedVertices.clear();
                     w->lastSelectedVertice = nullptr;
@@ -183,9 +183,9 @@ void ClickHandler::handle() {
                 {
                     for (ThreeDObject* obj : w->ThreeDObjectsList)
                     {
-                        Cube* cube = dynamic_cast<Cube*>(obj);
-                        if (!cube) continue;
-                        for (Face* f : cube->getFaces()) if (f) f->setSelected(false);
+                        Mesh* mesh = dynamic_cast<Mesh*>(obj);
+                        if (!mesh) continue;
+                        for (Face* f : mesh->getFaces()) if (f) f->setSelected(false);
                     }
                     w->multipleSelectedFaces.clear();
                     selectedFace->setSelected(true);
@@ -198,9 +198,9 @@ void ClickHandler::handle() {
                 {
                     for (ThreeDObject* obj : w->ThreeDObjectsList)
                     {
-                        Cube* cube = dynamic_cast<Cube*>(obj);
-                        if (!cube) continue;
-                        for (Face* f : cube->getFaces()) if (f) f->setSelected(false);
+                        Mesh* mesh = dynamic_cast<Mesh*>(obj);
+                        if (!mesh) continue;
+                        for (Face* f : mesh->getFaces()) if (f) f->setSelected(false);
                     }
                     w->multipleSelectedFaces.clear();
                 }
@@ -232,9 +232,9 @@ void ClickHandler::handle() {
                 {
                     for (ThreeDObject* obj : w->ThreeDObjectsList)
                     {
-                        Cube* cube = dynamic_cast<Cube*>(obj);
-                        if (!cube) continue;
-                        for (Edge* e : cube->getEdges()) if (e) e->setSelected(false);
+                        Mesh* mesh = dynamic_cast<Mesh*>(obj);
+                        if (!mesh) continue;
+                        for (Edge* e : mesh->getEdges()) if (e) e->setSelected(false);
                     }
                     w->multipleSelectedEdges.clear();
                     selectedEdge->setSelected(true);
@@ -247,9 +247,9 @@ void ClickHandler::handle() {
                 {
                     for (ThreeDObject* obj : w->ThreeDObjectsList)
                     {
-                        Cube* cube = dynamic_cast<Cube*>(obj);
-                        if (!cube) continue;
-                        for (Edge* e : cube->getEdges()) if (e) e->setSelected(false);
+                        Mesh* mesh = dynamic_cast<Mesh*>(obj);
+                        if (!mesh) continue;    
+                        for (Edge* e : mesh->getEdges()) if (e) e->setSelected(false);
                     }
                     w->multipleSelectedEdges.clear();
                 }

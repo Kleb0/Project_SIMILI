@@ -10,7 +10,8 @@
 
 #include "WorldObjects/Entities/ThreeDObject.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
-#include "WorldObjects/Primitives/Cube.hpp"
+
+#include "WorldObjects/Mesh/Mesh.hpp"
 
 #include <SDL3/SDL.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -51,7 +52,6 @@ void ThreeDWindow::addThreeDObjectsToScene(const std::vector<ThreeDObject *> &ob
     {
         if (object)
         {
-            // std::cout << "[ThreeDWindow] Adding object: " << object->getName() << std::endl;
             object->initialize();
             ThreeDObjectsList.push_back(object);
             openGLContext->addThreeDObjectToList(object);

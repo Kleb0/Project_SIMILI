@@ -1,5 +1,5 @@
 #include "Engine/ThreeDObjectSelector.hpp"
-#include "WorldObjects/Primitives/Cube.hpp"
+#include "WorldObjects/Mesh/Mesh.hpp"
 #include <glm/gtc/matrix_inverse.hpp>
 #include <limits>
 #include <iostream>
@@ -128,16 +128,16 @@ const glm::mat4& view, const glm::mat4& projection, const std::vector<ThreeDObje
     {
         if (!obj->isSelectable()) continue;
 
-        Cube* cube = dynamic_cast<Cube*>(obj);
-        if (!cube) continue;
+        Mesh * mesh = dynamic_cast<Mesh*>(obj);
+        if (!mesh) continue;
 
         if (clearPrevious) 
         {
-            for (Vertice* v : cube->getVertices())
+            for (Vertice* v : mesh->getVertices())
                 v->setSelected(false);
         }
 
-        for (Vertice* v : cube->getVertices()) 
+        for (Vertice* v : mesh->getVertices()) 
         {
             glm::mat4 modelMatrix = obj->getModelMatrix();
             glm::vec3 worldPos = glm::vec3(modelMatrix * glm::vec4(v->getLocalPosition(), 1.0f));
@@ -196,18 +196,18 @@ const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObje
     {
         if (!obj || !obj->isSelectable()) continue;
 
-        Cube* cube = dynamic_cast<Cube*>(obj);
-        if (!cube) continue;
+        Mesh* mesh = dynamic_cast<Mesh*>(obj);
+        if (!mesh) continue;
 
         if (clearPrevious)
         {
-            for (Face* f : cube->getFaces())
+            for (Face* f : mesh->getFaces())
                 if (f) f->setSelected(false);
         }
 
         const glm::mat4 model = obj->getModelMatrix();
 
-        for (Face* f : cube->getFaces())
+        for (Face* f : mesh->getFaces())
         {
             if (!f) continue;
 
@@ -350,16 +350,16 @@ const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObje
     {
         if (!obj->isSelectable()) continue;
 
-        Cube* cube = dynamic_cast<Cube*>(obj);
-        if (!cube) continue;
+        Mesh* mesh = dynamic_cast<Mesh*>(obj);
+        if (!mesh) continue;
 
         if (clearPrevious)
         {
-            for (Edge* e : cube->getEdges())
+            for (Edge* e : mesh->getEdges())
                 e->setSelected(false);
         }
 
-        for (Edge* e : cube->getEdges())
+        for (Edge* e : mesh->getEdges())
         {
             if (!e || !e->getStart() || !e->getEnd()) continue;
 
