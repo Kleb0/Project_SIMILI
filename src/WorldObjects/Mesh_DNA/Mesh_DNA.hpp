@@ -5,13 +5,16 @@
 #include <string>
 #include <glm/glm.hpp>
 
-struct MeshTransformEvent {
+struct MeshTransformEvent 
+{
     glm::mat4 delta{1.0f};
     uint64_t tick{0};
     std::string tag;
 };
 
-class MeshDNA {
+class MeshDNA 
+{
+
 public:
     std::string uuid, name;
     void clear();
@@ -25,6 +28,10 @@ public:
     void rewindTo(size_t index_inclusive); 
     size_t size() const { return history.size(); }
     void ensureInit(const glm::mat4& currentModel);
+
+    void trackTranslate(const glm::mat4& delta)    { trackWithAutoTick(delta, "translate"); }
+    void trackRotate(const glm::mat4& delta)       { trackWithAutoTick(delta, "rotate"); }
+    void trackScale(const glm::mat4& delta)        { trackWithAutoTick(delta, "scale"); }
 
 private:
     std::vector<MeshTransformEvent> history;
