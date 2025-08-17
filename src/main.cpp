@@ -78,19 +78,15 @@ int main(int argc, char **argv)
     myInfoWindow.title = "Project Viewer";
     myThreeDWindow.title = "3D Viewport";
     myThreeDWindow.setRenderer(renderer);
-
-
     mainCamera.setName("MainCamera");
-
+    renderer.setCamera(&mainCamera);
 
     myThreeDWindow.addThreeDObjectsToScene({ cubeMesh1, cubeMesh2 });
     myThreeDWindow.addThreeDObjectsToScene({&mainCamera});
     myThreeDWindow.setModelingMode(&myThreeDWindow.normalMode);
     myThreeDWindow.setSimiliSelector(&mySimiliSelector);
-    mySimiliSelector.setWindow(&myThreeDWindow); 
-    
 
-
+    mySimiliSelector.setWindow(&myThreeDWindow);     
     myHierarchy.setTitle("Hierarchy");
     myHierarchy.setContext(&renderer);
     myHierarchy.setThreeDWindow(&myThreeDWindow);
