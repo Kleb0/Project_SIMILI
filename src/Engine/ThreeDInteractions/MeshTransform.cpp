@@ -4,7 +4,7 @@
 #include "Engine/OpenGLContext.hpp"
 #include "Engine/Guizmo.hpp"
 
-#include "WorldObjects/Primitives/Cube.hpp"  
+#include "WorldObjects/Mesh/Mesh.hpp" 
 #include "WorldObjects/Mesh_DNA/Mesh_DNA.hpp"
 #include "WorldObjects/Entities/ThreeDObject.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
@@ -131,9 +131,9 @@ namespace MeshTransform
 
         for (ThreeDObject* obj : selectedObjects)
         {
-            if (auto* cube = dynamic_cast<Cube*>(obj))
+            if (auto* mesh = dynamic_cast<Mesh*>(obj))
             {
-                if (auto* dna = cube->getMeshDNA())
+                if (auto* dna = mesh->getMeshDNA())
                 {
                    dna->trackWithAutoTick(T, "translate");
 

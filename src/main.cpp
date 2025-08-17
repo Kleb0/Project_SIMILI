@@ -23,7 +23,9 @@ fs::path gExecutableDir;
 
 #include "WorldObjects/Entities/ThreedObject.hpp"
 #include "WorldObjects/Camera/Camera.hpp"
-#include "WorldObjects/Primitives/Cube.hpp"
+
+#include "Engine/PrimitivesCreation/CreatePrimitive.hpp"
+#include "WorldObjects/Mesh/Mesh.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <SDL3/SDL.h>
@@ -51,13 +53,14 @@ int main(int argc, char **argv)
     InfoWindow myInfoWindow;
     ThreeDWindow myThreeDWindow;
     OpenGLContext renderer;
-    Cube myCube;
-    Cube myCube2;
     ThreeDObjectSelector selector;
     Camera mainCamera;
     HierarchyInspector myHierarchy;
     ObjectInspector objectInspector;
     HistoryLogic historyLogic;
+
+    Mesh* cubeMesh1 = Primitives::CreateCubeMesh(1.0f, glm::vec3(2.5f, 0.5f, 2.5f),"SuperGigaCubeTest", true);
+    Mesh* cubeMesh2 = Primitives::CreateCubeMesh(1.0f,glm::vec3(0.0f, 0.0f, 0.0f), "SuperGigaCubeTest2", true);
 
     // ------- DirectX 12 has been implemented, so comment it for now as i don't need it actually ------- //
     // If you want to use DirectX 12, uncomment the following lines and make sure to include the necessary headers.
@@ -76,23 +79,18 @@ int main(int argc, char **argv)
     myThreeDWindow.title = "3D Viewport";
     myThreeDWindow.setRenderer(renderer);
 
-    myCube.setName("SuperGigaCubeTest");
-    myCube2.setName("SuperGigaCubeTest2");
 
     mainCamera.setName("MainCamera");
 
-    myThreeDWindow.addThreeDObjectsToScene({&myCube});
-    myThreeDWindow.addThreeDObjectsToScene({&myCube2});
-    // myThreeDWindow.removeThreeDObjectsFromScene(&myCube2); // Remove the second cube to test the removal functionality
+
+    myThreeDWindow.addThreeDObjectsToScene({ cubeMesh1, cubeMesh2 });
     myThreeDWindow.addThreeDObjectsToScene({&mainCamera});
     myThreeDWindow.setModelingMode(&myThreeDWindow.normalMode);
     myThreeDWindow.setSimiliSelector(&mySimiliSelector);
     mySimiliSelector.setWindow(&myThreeDWindow); 
     
 
-    renderer.setCamera(&mainCamera);
-    myCube.setPosition(glm::vec3(2.5f, 0.5f, 2.5f));
-    myCube2.setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+
     myHierarchy.setTitle("Hierarchy");
     myHierarchy.setContext(&renderer);
     myHierarchy.setThreeDWindow(&myThreeDWindow);

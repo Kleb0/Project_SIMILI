@@ -1,5 +1,5 @@
 #include "UI/HistoryLogic/HistoryLogic.hpp"
-#include "WorldObjects/Primitives/Cube.hpp"
+#include "WorldObjects/Mesh/Mesh.hpp"
 #include "WorldObjects/Mesh_DNA/Mesh_DNA.hpp" 
 #include "Engine/ThreeDInteractions/MeshTransform.hpp" 
 #include <imgui.h>
@@ -35,9 +35,9 @@ void HistoryLogic::render()
         {
             ImGui::TextDisabled("No single object inspected (multiple selection or none).");
         }
-        else if (auto* cube = dynamic_cast<Cube*>(obj))
+        else if (auto* mesh = dynamic_cast<Mesh*>(obj))
         {
-            if (auto* dna = cube->getMeshDNA())
+            if (auto* dna = mesh->getMeshDNA())
             {
                 const auto& hist = dna->getHistory();
                 if (hist.empty())
@@ -71,14 +71,6 @@ void HistoryLogic::render()
                     }
                 }
             }
-            else
-            {
-                ImGui::TextDisabled("This mesh has no DNA attached.");
-            }
-        }
-        else
-        {
-            ImGui::TextDisabled("Inspected object is not a mesh with DNA (e.g., not a Cube).");
         }
     }
 

@@ -5,7 +5,8 @@
 #include "UI/ObjectInspectorLogic/ObjectInspector.hpp"
 #include "UI/ContextualMenu/ContextualMenu.hpp"
 #include "Engine/OpenGLContext.hpp"
-#include "WorldObjects/Primitives/Cube.hpp"
+#include "WorldObjects/Mesh/Mesh.hpp"
+#include "Engine/PrimitivesCreation/CreatePrimitive.hpp"
 #include <iostream>
 
 void ContextualMenu::setHierarchyInspector(HierarchyInspector *inspector)
@@ -83,9 +84,7 @@ void ContextualMenu::render()
 
         if (ImGui::MenuItem("Create Cube") && threeDWindow)
         {
-            Cube *newCube = new Cube();
-            newCube->setName("newCube");
-            newCube->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+            Mesh* newCube = Primitives::CreateCubeMesh(1.0f, glm::vec3(0.0f, 0.0f, 0.0f),"NewCube", true);
             threeDWindow->addThreeDObjectsToScene({newCube});
 
             std::cout << "[ContextualMenu] Created a new Cube object with name: " << newCube->getName() << std::endl;
@@ -94,8 +93,7 @@ void ContextualMenu::render()
             {
                 hierarchyInspector->selectObject(newCube);
                 hierarchyInspector->redrawSlotsList();                            
-            }
-                
+            }               
         
 
             hide();

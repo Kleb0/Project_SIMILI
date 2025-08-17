@@ -7,7 +7,7 @@
 #include <iostream>
 // #include <windows.h>
 
-#include "WorldObjects/Primitives/Cube.hpp"
+#include "WorldObjects/Mesh/Mesh.hpp"
 #include "WorldObjects/Mesh_DNA/Mesh_DNA.hpp"
 
 OpenGLContext::OpenGLContext()
@@ -45,15 +45,16 @@ void OpenGLContext::addThreeDObjectToList(ThreeDObject *object)
 {
     objects.push_back(object);
     std::cout << "[OpenGLContext] Adding object: " << object->getName() << std::endl;
+
     if(object->getIsMesh())
     {
-        if (auto* cube = dynamic_cast<Cube*>(object))
+        if (auto* mesh = dynamic_cast<Mesh*>(object))
         {
-                MeshDNA* dna = new MeshDNA();
-                dna->name = object->getName();
-                cube->setMeshDNA(dna);
-                std::cout << "[OpenGLContext] MeshDNA attached to mesh: " << object->getName() << std::endl;
-                dna->ensureInit(cube->getModelMatrix());
+            MeshDNA* dna = new MeshDNA();
+            dna->name = object->getName();
+            mesh->setMeshDNA(dna);
+            std::cout << "[OpenGLContext] MeshDNA attached to mesh: " << object->getName() << std::endl;
+            dna->ensureInit(mesh->getModelMatrix());
                 
         } 
     }

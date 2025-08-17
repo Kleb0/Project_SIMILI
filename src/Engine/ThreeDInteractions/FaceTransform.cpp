@@ -2,7 +2,7 @@
 #include "WorldObjects/Basic/Face.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
 #include "WorldObjects/Entities/ThreeDObject.hpp"
-#include "WorldObjects/Primitives/Cube.hpp" 
+#include "WorldObjects/Mesh/Mesh.hpp" 
 #include "Engine/OpenGLContext.hpp"
 #include "Engine/Guizmo.hpp"
 
@@ -178,18 +178,18 @@ Face* extrudeSelectedFace(std::list<Face*>& selectedFaces, float distance)
     ThreeDObject* owner = vs[0]->getMeshParent();
     if (!owner) return nullptr;
 
-    Cube* cube = dynamic_cast<Cube*>(owner);
-    if (!cube) {
+    Mesh* mesh = dynamic_cast<Mesh*>(owner);
+    if (!mesh) {
         return nullptr;
     }
 
-    auto& verts = const_cast<std::vector<Vertice*>&>(cube->getVertices());
-    auto& eds   = const_cast<std::vector<Edge*>&>(cube->getEdges());
-    auto& fs    = const_cast<std::vector<Face*>&>(cube->getFaces());
+    auto& verts = const_cast<std::vector<Vertice*>&>(mesh->getVertices());
+    auto& eds   = const_cast<std::vector<Edge*>&>(mesh->getEdges());
+    auto& fs    = const_cast<std::vector<Face*>&>(mesh->getFaces());
 
     const size_t beforeCount = fs.size();
 
-    const bool ok = MeshEdit::extrudeQuadFace(cube, verts, eds, fs, target, distance);
+    const bool ok = MeshEdit::extrudeQuadFace(mesh, verts, eds, fs, target, distance);
     if (!ok) return nullptr;
 
     if (fs.empty() || fs.size() <= beforeCount) return nullptr;
