@@ -19,6 +19,7 @@
         "${workspaceFolder}/src/Engine/MeshEdit",
         "${workspaceFolder}/src/Engine/PrimitivesCreation",
         "${workspaceFolder}/src/Engine/ProjectBuilder",
+        "${workspaceFolder}/src/Layout_Theme",
         "${workspaceFolder}/src/WorldObjects",
         "${workspaceFolder}/src/WorldObjects/Basic",
         "${workspaceFolder}/src/WorldObjects/Camera",
