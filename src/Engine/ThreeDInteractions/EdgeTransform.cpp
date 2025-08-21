@@ -56,6 +56,7 @@ namespace EdgeTransform
 
         static glm::mat4 accumDelta = glm::mat4(1.0f);
         static std::vector<Vertice*> vertsSnapshot;
+        static bool dragActive = false;
 
         auto hashSet = [&]() -> size_t {
             size_t h = 1469598103934665603ull;
@@ -89,6 +90,9 @@ namespace EdgeTransform
 
         size_t currentHash = hashSet();
         bool usingGizmo = ImGuizmo::IsUsing();
+
+        bool mouseDown = ImGui::IsMouseDown(ImGuiMouseButton_Left);
+        bool mouseReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left);
         bool selectionChanged = (currentHash != previousSetHash);
 
         if (selectionChanged || !usingGizmo) 
@@ -100,14 +104,39 @@ namespace EdgeTransform
             {
                 accumDelta = glm::mat4(1.0f);
                 vertsSnapshot.clear();
+                dragActive = false;
             }
             previousSetHash = currentHash;
         }
 
         Guizmo::renderGizmoForEdges(selectedEdges, currentGizmoOperation, view, proj, oglChildPos, oglChildSize);
 
-        if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(proj),
-                                currentGizmoOperation, ImGuizmo::WORLD, glm::value_ptr(dummyMatrix)))
+        if(!dragActive && usingGizmo && mouseDown)
+        {
+    
+            std::unordered_set<Vertice*> uniq;
+            uniq.reserve(selectedEdges.size() * 2);
+
+            for (auto e : selectedEdges)
+            {
+                if (!e) continue;
+                if (auto* a = e->getStart()) uniq.insert(a);
+                if (auto* b = e->getEnd()) uniq.insert(b);
+            }
+            vertsSnapshot.clear();
+            vertsSnapshot.reserve(uniq.size());
+            for (auto* v : uniq) if (v) vertsSnapshot.push_back(v);
+
+            accumDelta = glm::mat4(1.0f);
+            prevDummyMatrix = dummyMatrix;
+            dragActive = true;
+
+        }
+
+        const bool Manipulated = ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(proj),
+        currentGizmoOperation, ImGuizmo::WORLD, glm::value_ptr(dummyMatrix));
+
+        if(usingGizmo && Manipulated)
         {
             glm::mat4 deltaWorld = dummyMatrix * glm::inverse(prevDummyMatrix);
 
@@ -138,57 +167,40 @@ namespace EdgeTransform
             }
 
             accumDelta = deltaWorld * accumDelta;
-
             prevDummyMatrix = dummyMatrix;
-            wasUsingGizmoLastFrame = true;
+
         }
-        else
+        
+        if(dragActive && mouseReleased)
         {
-            if (wasUsingGizmoLastFrame) 
+        
+            Mesh* parentMesh = nullptr;
+            
+            if (!selectedEdges.empty()) 
             {
-                Mesh* parentMesh = nullptr;
-                if (!selectedEdges.empty()) 
+                Edge* any = *selectedEdges.begin();
+                if (any) 
                 {
-                    Edge* any = *selectedEdges.begin();
-                    if (any) 
-                    {
-                        Vertice* s = any->getStart();
-                        Vertice* e = any->getEnd();
-                        ThreeDObject* p = s && s->getMeshParent() ? s->getMeshParent() : (e ? e->getMeshParent() : nullptr);
-                        parentMesh = p ? dynamic_cast<Mesh*>(p) : nullptr;
-                    }
+                    Vertice* s = any->getStart();
+                    Vertice* e = any->getEnd();
+                    ThreeDObject* p = s && s->getMeshParent() ? s->getMeshParent() : (e ? e->getMeshParent() : nullptr);
+                    parentMesh = p ? dynamic_cast<Mesh*>(p) : nullptr;
                 }
-
-                vertsSnapshot.clear();
-                {
-                    std::unordered_set<Vertice*> uniqueVerts;
-                    uniqueVerts.reserve(selectedEdges.size() * 2);
-
-                    for (auto* e : selectedEdges) 
-                    {
-                        if (!e) continue;
-                        if (auto* a = e->getStart()) uniqueVerts.insert(a);
-                        if (auto* b = e->getEnd()) uniqueVerts.insert(b);
-                    }
-                    vertsSnapshot.reserve(uniqueVerts.size());
-                    for (auto* v : uniqueVerts) if (v) vertsSnapshot.push_back(v);
-                }
-
-                if (parentMesh) 
-                {
-                    if (!isIdentity(accumDelta)) 
-                    {
-                        if (auto* dna = parentMesh->getMeshDNA()) {
-                            dna->trackEdgeModify(accumDelta, vertsSnapshot);
-                        }
-                    }
-                }
-
-                accumDelta = glm::mat4(1.0f);
-                vertsSnapshot.clear();
             }
-            wasUsingGizmoLastFrame = false;
+
+            if (parentMesh && !isIdentity(accumDelta)) 
+            {
+                if (auto* dna = parentMesh->getMeshDNA()) 
+                {
+                     dna->trackEdgeModify(accumDelta, vertsSnapshot);
+                }
+            }
+
+            accumDelta = glm::mat4(1.0f);
+            vertsSnapshot.clear();
+            dragActive = false;
         }
-    }
+        wasUsingGizmoLastFrame = usingGizmo || dragActive;
+    }       
 
 }
