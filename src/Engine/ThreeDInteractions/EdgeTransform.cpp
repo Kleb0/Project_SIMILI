@@ -89,10 +89,18 @@ namespace EdgeTransform
 
         size_t currentHash = hashSet();
         bool usingGizmo = ImGuizmo::IsUsing();
+        bool selectionChanged = (currentHash != previousSetHash);
 
-        if (currentHash != previousSetHash || !usingGizmo) {
+        if (selectionChanged || !usingGizmo) 
+        {
             dummyMatrix = glm::translate(glm::mat4(1.0f), center);
             prevDummyMatrix = dummyMatrix;
+
+            if (selectionChanged) 
+            {
+                accumDelta = glm::mat4(1.0f);
+                vertsSnapshot.clear();
+            }
             previousSetHash = currentHash;
         }
 
@@ -136,11 +144,14 @@ namespace EdgeTransform
         }
         else
         {
-            if (wasUsingGizmoLastFrame) {
+            if (wasUsingGizmoLastFrame) 
+            {
                 Mesh* parentMesh = nullptr;
-                if (!selectedEdges.empty()) {
+                if (!selectedEdges.empty()) 
+                {
                     Edge* any = *selectedEdges.begin();
-                    if (any) {
+                    if (any) 
+                    {
                         Vertice* s = any->getStart();
                         Vertice* e = any->getEnd();
                         ThreeDObject* p = s && s->getMeshParent() ? s->getMeshParent() : (e ? e->getMeshParent() : nullptr);
@@ -152,17 +163,21 @@ namespace EdgeTransform
                 {
                     std::unordered_set<Vertice*> uniqueVerts;
                     uniqueVerts.reserve(selectedEdges.size() * 2);
-                    for (auto* e : selectedEdges) {
+
+                    for (auto* e : selectedEdges) 
+                    {
                         if (!e) continue;
                         if (auto* a = e->getStart()) uniqueVerts.insert(a);
-                        if (auto* b = e->getEnd())   uniqueVerts.insert(b);
+                        if (auto* b = e->getEnd()) uniqueVerts.insert(b);
                     }
                     vertsSnapshot.reserve(uniqueVerts.size());
                     for (auto* v : uniqueVerts) if (v) vertsSnapshot.push_back(v);
                 }
 
-                if (parentMesh) {
-                    if (!isIdentity(accumDelta)) {
+                if (parentMesh) 
+                {
+                    if (!isIdentity(accumDelta)) 
+                    {
                         if (auto* dna = parentMesh->getMeshDNA()) {
                             dna->trackEdgeModify(accumDelta, vertsSnapshot);
                         }
@@ -177,7 +192,3 @@ namespace EdgeTransform
     }
 
 }
-
-
-
-

@@ -32,12 +32,23 @@ void MeshDNA::trackEdgeModify(const glm::mat4& deltaWorld, const std::vector<Ver
     ev.tick = nextTick++;
     ev.tag = "edge_modify";
     ev.isComponentEdit = true;
+    ev.kind  = ComponentEditKind::Edge;  
     ev.affectedVertices = verts;
 
     history.push_back(std::move(ev));
 }
 
-
+void MeshDNA::trackVerticeModify(const glm::mat4& deltaWorld, const std::vector<Vertice*>& verts)
+{
+    MeshTransformEvent ev;
+    ev.delta = deltaWorld;
+    ev.tick  = nextTick++;
+    ev.tag   = "vertex_modify";
+    ev.isComponentEdit = true; 
+    ev.kind  = ComponentEditKind::Vertice;
+    ev.affectedVertices = verts;
+    history.push_back(std::move(ev));
+}
 
 void MeshDNA::trackWithAutoTick(const glm::mat4& delta, const std::string& tag) 
 {
@@ -64,9 +75,9 @@ glm::mat4 MeshDNA::accumulatedUpTo(size_t count) const
     {
         const auto& ev = history[i];
 
-        if (!ev.isComponentEdit) 
-        {
-            a = ev.delta * a;  
+        if (ev.kind == ComponentEditKind::None)
+        { 
+            a = ev.delta * a;
         }
     }
     return a;
@@ -91,48 +102,114 @@ void MeshDNA::rewindTo(size_t index_inclusive)
     nextTick = history.back().tick + 1;
 }
 
+
 void MeshDNA::rewindEdgeHistory(size_t index_inclusive, Mesh* mesh)
 {
-    std::cout<< " Rewind Edge "<< std::endl;
+    std::cout << " Rewind Edge " << std::endl;
 
     if (!mesh) return;
     if (history.empty()) { acc = glm::mat4(1.0f); return; }
     if (index_inclusive + 1 > history.size()) return;
 
-    for (size_t k = history.size(); k-- > index_inclusive + 1; )
+    for (size_t k = history.size(); k-- > index_inclusive + 1; ) 
     {
         const auto& ev = history[k];
-        if (ev.isComponentEdit)
+        if (ev.kind == ComponentEditKind::Edge) 
         {
             const glm::mat4 invDelta = glm::inverse(ev.delta);
-            for (auto* vtx : ev.affectedVertices)
+            for (auto* vtx : ev.affectedVertices) 
             {
                 if (!vtx) continue;
                 ThreeDObject* parent = vtx->getMeshParent();
                 if (!parent) continue;
+
                 const glm::mat4 P  = parent->getModelMatrix();
                 const glm::mat4 Pi = glm::inverse(P);
+
                 glm::vec4 L  = glm::vec4(vtx->getLocalPosition(), 1.0f);
-                glm::vec4 W  = P * L;
-                glm::vec4 W2 = invDelta * W;
+                glm::vec4 W2 = invDelta * (P * L);
                 glm::vec4 L2 = Pi * W2;
+
                 vtx->setLocalPosition(glm::vec3(L2));
                 vtx->setPosition(glm::vec3(W2));
             }
         }
     }
 
-    history.resize(index_inclusive + 1);
+    size_t write = 0;
+
+    for (size_t idx = 0; idx < history.size(); ++idx) 
+    {
+        bool drop = (idx > index_inclusive) && (history[idx].kind == ComponentEditKind::Edge);
+        if (!drop) {
+            history[write++] = std::move(history[idx]);
+        }
+    }
+    history.resize(write);
 
     acc = glm::mat4(1.0f);
-    for (size_t i = 0; i < history.size(); ++i)
+    for (const auto& ev : history) 
     {
-        const auto& ev = history[i];
-        if (!ev.isComponentEdit)
+        if (ev.kind == ComponentEditKind::None)
             acc = ev.delta * acc;
     }
 
-    nextTick = history.back().tick + 1;
+    nextTick = history.empty() ? 0 : history.back().tick + 1;
+}
 
 
+
+
+void MeshDNA::rewindVerticeHistory(size_t index_inclusive, Mesh* mesh)
+{
+    std::cout << " Rewind Vertice " << std::endl;
+    if (!mesh) return;
+    if (history.empty()) { acc = glm::mat4(1.0f); return; }
+    if (index_inclusive + 1 > history.size()) return;
+
+    // 1) Appliquer l'inverse UNIQUEMENT aux vertex_modify strictement après i
+    for (size_t k = history.size(); k-- > index_inclusive + 1; ) 
+    {
+        const auto& ev = history[k];
+        if (ev.kind == ComponentEditKind::Vertice)
+        {
+            const glm::mat4 invDelta = glm::inverse(ev.delta);
+            for (auto* vtx : ev.affectedVertices) 
+            {
+                if (!vtx) continue;
+                ThreeDObject* parent = vtx->getMeshParent();
+                if (!parent) continue;
+
+                const glm::mat4 P  = parent->getModelMatrix();
+                const glm::mat4 Pi = glm::inverse(P);
+
+                glm::vec4 L  = glm::vec4(vtx->getLocalPosition(), 1.0f);
+                glm::vec4 W2 = invDelta * (P * L);
+                glm::vec4 L2 = Pi * W2;
+
+                vtx->setLocalPosition(glm::vec3(L2));
+                vtx->setPosition(glm::vec3(W2));
+            }
+        }
+    }
+
+    size_t write = 0;
+    for (size_t idx = 0; idx < history.size(); ++idx) 
+    {
+        bool drop = (idx > index_inclusive) && (history[idx].kind == ComponentEditKind::Vertice);
+        if (!drop) {
+            history[write++] = std::move(history[idx]);
+        }
+    }
+    history.resize(write);
+
+    acc = glm::mat4(1.0f);
+
+    for (const auto& ev : history) 
+    {
+        if (ev.kind == ComponentEditKind::None)
+            acc = ev.delta * acc;
+    }
+
+    nextTick = history.empty() ? 0 : history.back().tick + 1;
 }

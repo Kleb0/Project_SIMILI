@@ -59,8 +59,7 @@ int main(int argc, char **argv)
     ObjectInspector objectInspector;
     HistoryLogic historyLogic;
 
-    Mesh* cubeMesh1 = Primitives::CreateCubeMesh(1.0f, glm::vec3(2.5f, 0.5f, 2.5f),"SuperGigaCubeTest", true);
-    Mesh* cubeMesh2 = Primitives::CreateCubeMesh(1.0f,glm::vec3(0.0f, 0.0f, 0.0f), "SuperGigaCubeTest2", true);
+    Mesh* cubeMesh1 = Primitives::CreateCubeMesh(1.0f,glm::vec3(0.0f, 0.0f, 0.0f), "Cube", true);
 
     // ------- DirectX 12 has been implemented, so comment it for now as i don't need it actually ------- //
     // If you want to use DirectX 12, uncomment the following lines and make sure to include the necessary headers.
@@ -81,7 +80,7 @@ int main(int argc, char **argv)
     mainCamera.setName("MainCamera");
     renderer.setCamera(&mainCamera);
 
-    myThreeDWindow.addThreeDObjectsToScene({ cubeMesh1, cubeMesh2 });
+    myThreeDWindow.addThreeDObjectsToScene({ cubeMesh1 });
     myThreeDWindow.addThreeDObjectsToScene({&mainCamera});
     myThreeDWindow.setModelingMode(&myThreeDWindow.normalMode);
     myThreeDWindow.setSimiliSelector(&mySimiliSelector);
