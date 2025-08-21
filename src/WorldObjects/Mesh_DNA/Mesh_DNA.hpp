@@ -8,6 +8,13 @@
 class Vertice;
 class Mesh;
 
+enum class ComponentEditKind : uint8_t {
+    None = 0,
+    Edge,
+    Vertice
+};
+
+
 struct MeshTransformEvent 
 {
     glm::mat4 delta{1.0f};
@@ -15,7 +22,8 @@ struct MeshTransformEvent
     std::string tag;
 
     bool isComponentEdit{false}; 
-     std::vector<Vertice*> affectedVertices;
+    ComponentEditKind kind{ComponentEditKind::None};
+    std::vector<Vertice*> affectedVertices;
 
 };
 
@@ -31,6 +39,7 @@ public:
 
 
     void trackEdgeModify(const glm::mat4& deltaWorld, const std::vector<Vertice*>& verts);
+    void trackVerticeModify(const glm::mat4& deltaWorld, const std::vector<Vertice*>& verts);
 
     glm::mat4 accumulated() const;
     const std::vector<MeshTransformEvent>& getHistory() const; 
@@ -39,6 +48,7 @@ public:
 
     void rewindTo(size_t index_inclusive); 
     void rewindEdgeHistory(size_t index_inclusive, Mesh* mesh);
+    void rewindVerticeHistory(size_t index_inclusive, Mesh* mesh);
 
     size_t size() const { return history.size(); }
     void ensureInit(const glm::mat4& currentModel);

@@ -56,7 +56,7 @@ namespace MeshTransform
                 glm::mat4 toOrigin = glm::translate(glm::mat4(1.0f), origin);
                 glm::mat4 back = glm::translate(glm::mat4(1.0f), -origin);
 
-                glm::mat4 newGlobal = toOrigin * delta * back * obj->getGlobalModelMatrix();
+                glm::mat4 newGlobal = toOrigin * delta * back * obj->getGlobalModelMatrix();                
                 obj->setGlobalModelMatrix(newGlobal);
             }
 
@@ -144,8 +144,8 @@ namespace MeshTransform
         switch (op)
         {
             case ImGuizmo::TRANSLATE: tag = "translate"; break;
-            case ImGuizmo::ROTATE:    tag = "rotate";    break;
-            case ImGuizmo::SCALE:     tag = "scale";     break;
+            case ImGuizmo::ROTATE: tag = "rotate"; break;
+            case ImGuizmo::SCALE: tag = "scale"; break;
             default: break;
         }
 

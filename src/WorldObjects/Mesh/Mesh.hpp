@@ -29,32 +29,32 @@ public:
 
 
     Vertice* addVertice(const glm::vec3& localPos, const std::string& name = {});
-    Edge*    addEdge(Vertice* a, Vertice* b);
-    Face*    addFace(Vertice* v0, Vertice* v1, Vertice* v2, Vertice* v3,
-                     Edge* e0 = nullptr, Edge* e1 = nullptr, Edge* e2 = nullptr, Edge* e3 = nullptr);
+    Edge* addEdge(Vertice* a, Vertice* b);
+    Face* addFace(Vertice* v0, Vertice* v1, Vertice* v2, Vertice* v3,
+    Edge* e0 = nullptr, Edge* e1 = nullptr, Edge* e2 = nullptr, Edge* e3 = nullptr);
 
 
     void finalize();
 
     const std::vector<Vertice*>& getVertices() const { return vertices; }
-    const std::vector<Edge*>&    getEdges()    const { return edges; }
-    const std::vector<Face*>&    getFaces()    const { return faces; }
+    const std::vector<Edge*>& getEdges() const { return edges; }
+    const std::vector<Face*>& getFaces() const { return faces; }
 
 
-    bool   hasTopology() const { return !vertices.empty() || !edges.empty() || !faces.empty(); }
+    bool hasTopology() const { return !vertices.empty() || !edges.empty() || !faces.empty(); }
     size_t vertexCount() const { return vertices.size(); }
-    size_t edgeCount()   const { return edges.size(); }
-    size_t faceCount()   const { return faces.size(); }
+    size_t edgeCount() const { return edges.size(); }
+    size_t faceCount() const { return faces.size(); }
 
     void clearGeometry();
 
 private:
     std::vector<Vertice*> vertices;
-    std::vector<Edge*>    edges;
-    std::vector<Face*>    faces;
+    std::vector<Edge*> edges;
+    std::vector<Face*> faces;
 
     MeshDNA* meshDNA = nullptr;
-    bool     ownsDNA = true;
+    bool ownsDNA = true;
 
     // Helpers
     void destroyVertices();
