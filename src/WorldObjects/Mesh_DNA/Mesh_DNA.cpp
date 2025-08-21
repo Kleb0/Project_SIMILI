@@ -105,7 +105,7 @@ void MeshDNA::rewindTo(size_t index_inclusive)
 
 void MeshDNA::rewindEdgeHistory(size_t index_inclusive, Mesh* mesh)
 {
-    std::cout << " Rewind Edge " << std::endl;
+    // std::cout << " Rewind Edge " << std::endl;
 
     if (!mesh) return;
     if (history.empty()) { acc = glm::mat4(1.0f); return; }
@@ -162,7 +162,8 @@ void MeshDNA::rewindEdgeHistory(size_t index_inclusive, Mesh* mesh)
 
 void MeshDNA::rewindVerticeHistory(size_t index_inclusive, Mesh* mesh)
 {
-    std::cout << " Rewind Vertice " << std::endl;
+    // std::cout << " Rewind Vertice " << std::endl;
+
     if (!mesh) return;
     if (history.empty()) { acc = glm::mat4(1.0f); return; }
     if (index_inclusive + 1 > history.size()) return;
