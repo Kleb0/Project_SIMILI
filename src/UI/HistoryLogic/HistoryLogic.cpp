@@ -113,11 +113,16 @@ void HistoryLogic::render()
 
 						if (ImGui::Selectable(line.c_str(), false))
 						{
-							glm::mat4 target  = dna->accumulatedUpTo(i + 1);
+							glm::mat4 target = dna->accumulatedUpTo(i + 1);
 							glm::mat4 current = dna->accumulated();
-							glm::mat4 delta   = target * glm::inverse(current);
+							glm::mat4 delta = target * glm::inverse(current);
 							std::list<ThreeDObject*> one{ obj };
-							MeshTransform::applyGizmoTransformation(delta, one);
+
+							ImGuizmo::OPERATION op = ImGuizmo::TRANSLATE;
+							if (ev.tag == "rotate") op = ImGuizmo::ROTATE;
+							else if (ev.tag == "scale") op = ImGuizmo::SCALE;
+
+							MeshTransform::applyGizmoTransformation(delta, one, op);
 
 							dna->rewindEdgeHistory(i, mesh);
 							dna->rewindVerticeHistory(i, mesh);
