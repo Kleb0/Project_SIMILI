@@ -41,8 +41,27 @@ namespace MeshTransform
         }
     }
 
-    void applyGizmoTransformation(const glm::mat4& delta, const std::list<ThreeDObject*>& selectedObjects)
+    void applyGizmoTransformation(const glm::mat4& delta, const std::list<ThreeDObject*>& selectedObjects, ImGuizmo::OPERATION op)
     {
+        const float epsilon = 1e-5f;
+        const glm::mat4 I(1.0f);
+        bool isIdentity = true;
+
+        for (int c = 0; c < 4 && isIdentity; ++c)
+        {
+            for (int r = 0; r < 4; ++r)
+            {
+                if (!glm::epsilonEqual(delta[c][r], I[c][r], epsilon))
+                {
+                    isIdentity = false;
+                    break;
+                }
+            }
+        }
+
+        if (isIdentity)
+            return;
+
         for (ThreeDObject* obj : selectedObjects)
         {
             if (obj->getParent())
@@ -52,18 +71,50 @@ namespace MeshTransform
             }
             else
             {
-                glm::vec3 origin = obj->getOrigin();
-                glm::mat4 toOrigin = glm::translate(glm::mat4(1.0f), origin);
-                glm::mat4 back = glm::translate(glm::mat4(1.0f), -origin);
+                if (op == ImGuizmo::SCALE)
+                {
+                    // glm::mat4 localDelta = glm::inverse(obj->getGlobalModelMatrix()) * delta * obj->getGlobalModelMatrix();
 
-                glm::mat4 newGlobal = toOrigin * delta * back * obj->getGlobalModelMatrix();                
-                obj->setGlobalModelMatrix(newGlobal);
+                    // glm::vec3 deltaScale;
+                    // deltaScale.x = glm::length(glm::vec3(localDelta[0]));
+                    // deltaScale.y = glm::length(glm::vec3(localDelta[1]));
+                    // deltaScale.z = glm::length(glm::vec3(localDelta[2]));
+
+                    // glm::vec3 currentScale = obj->getScale();
+                    // glm::vec3 newScale = currentScale * deltaScale;
+
+                    // // Reconstruct TRS
+                    // glm::mat4 model = glm::mat4(1.0f);
+                    // model = glm::translate(model, obj->getPosition());
+                    // model *= glm::toMat4(obj->rotation);
+                    // model = glm::scale(model, newScale);
+
+                    // glm::vec3 origin = obj->getOrigin();
+                    // glm::mat4 toOrigin = glm::translate(glm::mat4(1.0f), origin);
+                    // glm::mat4 back = glm::translate(glm::mat4(1.0f), -origin);
+
+                    // glm::mat4 finalModel = toOrigin * model * back;
+                    // obj->setModelMatrix(finalModel);
+                    scaleCleanup(obj, delta);
+
+                }
+
+                else
+                {
+                    glm::vec3 origin = obj->getOrigin();
+                    glm::mat4 toOrigin = glm::translate(glm::mat4(1.0f), origin);
+                    glm::mat4 back = glm::translate(glm::mat4(1.0f), -origin);
+
+                    glm::mat4 newGlobal = toOrigin * delta * back * obj->getGlobalModelMatrix();
+                    obj->setGlobalModelMatrix(newGlobal);
+                }
             }
 
             if (obj->canHaveChildren)
                 manipulateChildrens(obj, delta);
         }
     }
+
 
     glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op,OpenGLContext* context, const std::list<ThreeDObject*>& selectedObjects, 
     const ImVec2& oglChildPos, const ImVec2& oglChildSize)
@@ -77,6 +128,13 @@ namespace MeshTransform
     void MeshTransform::manipulateMesh(OpenGLContext* context, const std::list<ThreeDObject*>& selectedObjects,
     const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame)
     {
+        
+        static bool firstOpDetected = false;
+        static bool didPrintScaleTest = false;
+        static bool didPrintRotationAfterScale = false;
+        static bool hasRotatedOnce = false;
+        static std::vector<glm::vec3> initialPositions;
+
         if (selectedObjects.empty()) return;
 
         static ImGuizmo::OPERATION currentGizmoOperation = ImGuizmo::TRANSLATE;
@@ -100,13 +158,24 @@ namespace MeshTransform
             startMatrix = dummyMatrix;
             prevMatrix  = dummyMatrix;
             gizmoActive = true;
+
+            if (!firstOpDetected)
+            {
+                if (currentGizmoOperation == ImGuizmo::SCALE)
+                {
+                    std::cout << "TEST FIRST OPERATION IS SCALE" << std::endl;
+                    didPrintScaleTest = true;
+                }
+
+                firstOpDetected = true;
+            }
         }
 
         if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(proj),
         currentGizmoOperation, ImGuizmo::WORLD, glm::value_ptr(dummyMatrix)))
         {
             glm::mat4 delta = dummyMatrix * glm::inverse(prevMatrix);
-            applyGizmoTransformation(delta, selectedObjects);
+            applyGizmoTransformation(delta, selectedObjects, currentGizmoOperation);
             prevMatrix = dummyMatrix;
             wasUsingGizmoLastFrame = true;
         }
@@ -116,9 +185,25 @@ namespace MeshTransform
             glm::mat4 totalDelta = dummyMatrix * glm::inverse(startMatrix);
             trackMeshTransformOnRelease(selectedObjects, totalDelta, currentGizmoOperation);
 
-            gizmoActive = false;
-        }
+            if (currentGizmoOperation == ImGuizmo::ROTATE && !hasRotatedOnce)
+            {
+                std::cout << "Rotation done" << std::endl;
+                hasRotatedOnce = true;
+            }
 
+            // ----- uncoment if output needed
+            // if (didPrintScaleTest && currentGizmoOperation == ImGuizmo::SCALE)
+            // {
+            //     outputTransform(selectedObjects, initialPositions, hasRotatedOnce, didPrintRotationAfterScale);
+            // }
+            // ---------------------------------------------------
+
+            gizmoActive = false;
+            firstOpDetected = false;
+            didPrintScaleTest = false;
+            didPrintRotationAfterScale = false;
+            initialPositions.clear();
+        }
         wasUsingGizmoLastFrame = isUsing;
     }
 
@@ -162,7 +247,67 @@ namespace MeshTransform
     }
 
 
+    // it appears that ImGuizmo Scale is bugged so i made a correction to apply to the pivot here
+    void scaleCleanup(ThreeDObject* obj, const glm::mat4& delta)
+    {
+        glm::mat4 localDelta = glm::inverse(obj->getGlobalModelMatrix()) * delta * obj->getGlobalModelMatrix();
 
+        glm::vec3 deltaScale;
+        deltaScale.x = glm::length(glm::vec3(localDelta[0]));
+        deltaScale.y = glm::length(glm::vec3(localDelta[1]));
+        deltaScale.z = glm::length(glm::vec3(localDelta[2]));
+
+        glm::vec3 currentScale = obj->getScale();
+        glm::vec3 newScale = currentScale * deltaScale;
+
+        // Reconstruct TRS
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, obj->getPosition());
+        model *= glm::toMat4(obj->rotation); 
+        model = glm::scale(model, newScale);
+
+
+        glm::vec3 origin = obj->getOrigin();
+        glm::mat4 toOrigin = glm::translate(glm::mat4(1.0f), origin);
+        glm::mat4 back     = glm::translate(glm::mat4(1.0f), -origin);
+
+        glm::mat4 finalModel = toOrigin * model * back;
+        obj->setModelMatrix(finalModel);
+    }
+
+
+    void outputTransform(const std::list<ThreeDObject*>& selectedObjects,
+    const std::vector<glm::vec3>& initialPositions, bool hasRotatedOnce, bool& didPrintRotationAfterScale)
+    {
+        std::cout << "Comparing positions after scale:\n";
+        int i = 0;
+
+        for (ThreeDObject* obj : selectedObjects)
+        {
+            glm::vec3 newPos = glm::vec3(obj->getGlobalModelMatrix()[3]);
+            const glm::vec3& oldPos = (i < initialPositions.size()) ? initialPositions[i] : glm::vec3(0.0f);
+
+            std::string objectName = obj->getName();
+            std::cout << "Object " << i << " (Name: " << objectName << "):\n";
+            std::cout << "  Old position: (" << oldPos.x << ", " << oldPos.y << ", " << oldPos.z << ")\n";
+            std::cout << "  New position: (" << newPos.x << ", " << newPos.y << ", " << newPos.z << ")\n";
+            ++i;
+        }
+
+        std::cout << "Comparing rotation after scale and after first rotation is done :\n";
+
+        if (hasRotatedOnce && !didPrintRotationAfterScale)
+        {
+            std::cout << "\nRotation after scale and first rotation:\n";
+            for (ThreeDObject* obj : selectedObjects)
+            {
+                glm::vec3 rot = obj->getRotation();
+                std::cout << "Object: " << obj->getName() << " - Rotation (degrees): "
+                        << "(" << rot.x << ", " << rot.y << ", " << rot.z << ")\n";
+            }
+            didPrintRotationAfterScale = true;
+        }
+    }
 
 
 }

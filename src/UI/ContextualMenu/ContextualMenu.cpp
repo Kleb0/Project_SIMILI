@@ -87,15 +87,12 @@ void ContextualMenu::render()
             Mesh* newCube = Primitives::CreateCubeMesh(1.0f, glm::vec3(0.0f, 0.0f, 0.0f),"NewCube", true);
             threeDWindow->addThreeDObjectsToScene({newCube});
 
-            std::cout << "[ContextualMenu] Created a new Cube object with name: " << newCube->getName() << std::endl;
-
             if (hierarchyInspector)
             {
                 hierarchyInspector->selectObject(newCube);
                 hierarchyInspector->redrawSlotsList();                            
             }               
         
-
             hide();
         }
 

@@ -61,6 +61,13 @@ void ClickHandler::handle() {
                 {
                     w->multipleSelectedObjects.push_back(selected);
                     selected->setSelected(true);
+                    //cout the position of the selected 
+                    glm::vec3 worldPos = glm::vec3(selected->getGlobalModelMatrix()[3]);
+                    std::cout << "[CLICK HANDLER] : Selected object world position: ("
+                            << worldPos.x << ", "
+                            << worldPos.y << ", "
+                            << worldPos.z << ")" 
+                    << " for object with name " << selected->getName() << std::endl;
                 }
                 else if (shiftPressed)
                 {

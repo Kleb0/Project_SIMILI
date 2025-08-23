@@ -105,7 +105,6 @@ void MeshDNA::rewindTo(size_t index_inclusive)
 
 void MeshDNA::rewindEdgeHistory(size_t index_inclusive, Mesh* mesh)
 {
-    // std::cout << " Rewind Edge " << std::endl;
 
     if (!mesh) return;
     if (history.empty()) { acc = glm::mat4(1.0f); return; }
@@ -123,7 +122,7 @@ void MeshDNA::rewindEdgeHistory(size_t index_inclusive, Mesh* mesh)
                 ThreeDObject* parent = vtx->getMeshParent();
                 if (!parent) continue;
 
-                const glm::mat4 P  = parent->getModelMatrix();
+                const glm::mat4 P = parent->getModelMatrix();
                 const glm::mat4 Pi = glm::inverse(P);
 
                 glm::vec4 L  = glm::vec4(vtx->getLocalPosition(), 1.0f);
@@ -158,17 +157,13 @@ void MeshDNA::rewindEdgeHistory(size_t index_inclusive, Mesh* mesh)
 }
 
 
-
-
 void MeshDNA::rewindVerticeHistory(size_t index_inclusive, Mesh* mesh)
 {
-    // std::cout << " Rewind Vertice " << std::endl;
 
     if (!mesh) return;
     if (history.empty()) { acc = glm::mat4(1.0f); return; }
     if (index_inclusive + 1 > history.size()) return;
 
-    // 1) Appliquer l'inverse UNIQUEMENT aux vertex_modify strictement après i
     for (size_t k = history.size(); k-- > index_inclusive + 1; ) 
     {
         const auto& ev = history[k];
