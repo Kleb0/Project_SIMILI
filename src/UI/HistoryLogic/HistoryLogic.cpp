@@ -100,6 +100,11 @@ void HistoryLogic::render()
 								line = "#" + std::to_string(i) + "  Modify Vertices  ";
 								line += "(verts=" + std::to_string(ev.affectedVertices.size()) + ")";
 							}
+							else if (ev.tag == "face_modify" || ev.kind == ComponentEditKind::Face)
+							{
+								line = "#" + std::to_string(i) + "  Modify Face(s)  ";
+								line += "(verts=" + std::to_string(ev.affectedVertices.size()) + ")";
+							}
 							else
 							{
 								
@@ -126,7 +131,8 @@ void HistoryLogic::render()
 
 							dna->rewindEdgeHistory(i, mesh);
 							dna->rewindVerticeHistory(i, mesh);
-							dna->rewindTo(i);
+							dna->rewindFaceHistory(i, mesh);
+							dna->rewindToAndApply(i, mesh);
 						}
 					}
 				}

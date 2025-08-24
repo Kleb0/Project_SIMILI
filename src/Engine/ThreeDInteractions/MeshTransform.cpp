@@ -73,30 +73,7 @@ namespace MeshTransform
             {
                 if (op == ImGuizmo::SCALE)
                 {
-                    // glm::mat4 localDelta = glm::inverse(obj->getGlobalModelMatrix()) * delta * obj->getGlobalModelMatrix();
-
-                    // glm::vec3 deltaScale;
-                    // deltaScale.x = glm::length(glm::vec3(localDelta[0]));
-                    // deltaScale.y = glm::length(glm::vec3(localDelta[1]));
-                    // deltaScale.z = glm::length(glm::vec3(localDelta[2]));
-
-                    // glm::vec3 currentScale = obj->getScale();
-                    // glm::vec3 newScale = currentScale * deltaScale;
-
-                    // // Reconstruct TRS
-                    // glm::mat4 model = glm::mat4(1.0f);
-                    // model = glm::translate(model, obj->getPosition());
-                    // model *= glm::toMat4(obj->rotation);
-                    // model = glm::scale(model, newScale);
-
-                    // glm::vec3 origin = obj->getOrigin();
-                    // glm::mat4 toOrigin = glm::translate(glm::mat4(1.0f), origin);
-                    // glm::mat4 back = glm::translate(glm::mat4(1.0f), -origin);
-
-                    // glm::mat4 finalModel = toOrigin * model * back;
-                    // obj->setModelMatrix(finalModel);
                     scaleCleanup(obj, delta);
-
                 }
 
                 else
