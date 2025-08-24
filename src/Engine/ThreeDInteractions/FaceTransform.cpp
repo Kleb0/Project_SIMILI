@@ -13,9 +13,20 @@
 
 #include <list>
 #include <iostream>
+ #include <unordered_set>
 
 namespace FaceTransform
 {
+
+
+static inline bool isIdentity(const glm::mat4& m) {
+    static const glm::mat4 I(1.0f);
+    return glm::all(glm::epsilonEqual(glm::vec4(m[0]), glm::vec4(I[0]), 1e-6f)) &&
+    glm::all(glm::epsilonEqual(glm::vec4(m[1]), glm::vec4(I[1]), 1e-6f)) &&
+    glm::all(glm::epsilonEqual(glm::vec4(m[2]), glm::vec4(I[2]), 1e-6f)) &&
+    glm::all(glm::epsilonEqual(glm::vec4(m[3]), glm::vec4(I[3]), 1e-6f));
+}
+
 
 glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, OpenGLContext* context,
 const std::list<Face*>& faces, const ImVec2& oglChildPos, const ImVec2& oglChildSize)
@@ -39,6 +50,10 @@ const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, bool bakeToVertices)
 
     const glm::mat4 view = context->getViewMatrix();
     const glm::mat4 proj = context->getProjectionMatrix();
+
+    static glm::mat4 accumDelta = glm::mat4(1.0f);
+    static std::vector<Vertice*> vertsSnapshot;
+    static bool dragActive = false;
 
     static glm::mat4 dummyMatrix = glm::mat4(1.0f);
     static glm::mat4 prevDummyMatrix = glm::mat4(1.0f);
@@ -83,6 +98,8 @@ const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, bool bakeToVertices)
 
     }
 
+
+
     auto hashSet = [&]() -> size_t 
     {
         size_t h = 1469598103934665603ull;
@@ -90,6 +107,11 @@ const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, bool bakeToVertices)
         h ^= selectedFaces.size();
         return h;
     };
+
+    const bool usingGizmo = ImGuizmo::IsUsing();
+    const bool mouseDown = ImGui::IsMouseDown(ImGuiMouseButton_Left);
+    const bool mouseReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left);
+    const size_t currentHash = hashSet();
 
     auto computeGizmoCenter = [&]() -> glm::vec3 
     {
@@ -123,45 +145,90 @@ const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, bool bakeToVertices)
     };
 
     const glm::vec3 center = computeGizmoCenter();
-
-    const size_t currentHash = hashSet();
-    const bool usingGizmo = ImGuizmo::IsUsing();
-
-    if (currentHash != previousSetHash || !usingGizmo) {
+    
+    if (currentHash != previousSetHash || !usingGizmo) 
+    {
         dummyMatrix = glm::translate(glm::mat4(1.0f), center);
         prevDummyMatrix = dummyMatrix;
         previousSetHash = currentHash;
+        accumDelta = glm::mat4(1.0f);
+        vertsSnapshot.clear();
+        dragActive = false;
     }
 
+    
+
     Guizmo::renderGizmoForFaces(selectedFaces, currentGizmoOperation, view, proj, oglChildPos, oglChildSize);
+
+    if (!dragActive && usingGizmo && mouseDown)
+    {
+        std::unordered_set<Vertice*> uniq;
+        for (auto* f : selectedFaces) {
+            if (!f) continue;
+            for (auto* v : f->getVertices()) if (v) uniq.insert(v);
+        }
+        vertsSnapshot.assign(uniq.begin(), uniq.end());
+        accumDelta = glm::mat4(1.0f);
+        prevDummyMatrix = dummyMatrix;
+        dragActive = true;
+    }
+
 
     if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(proj),
     currentGizmoOperation, ImGuizmo::WORLD, glm::value_ptr(dummyMatrix)))
     {
-
         const glm::mat4 deltaWorld = dummyMatrix * glm::inverse(prevDummyMatrix);
 
         for (auto* f : selectedFaces)
         {
             if (!f) continue;
-
             const auto& verts = f->getVertices();
-
+            if (verts.empty() || !verts[0]) continue;
             ThreeDObject* parent = verts[0]->getMeshParent();
             if (!parent) continue;
 
             const glm::mat4 parentModel = parent->getModelMatrix();
-
             f->applyWorldDelta(deltaWorld, parentModel, bakeToVertices);
         }
 
+        accumDelta      = deltaWorld * accumDelta;
         prevDummyMatrix = dummyMatrix;
         wasUsingGizmoLastFrame = true;
     }
     else
     {
-        wasUsingGizmoLastFrame = false;
+        wasUsingGizmoLastFrame = usingGizmo || dragActive;
     }
+
+    if (dragActive && mouseReleased)
+    {
+        Mesh* parentMesh = nullptr;
+
+        for (auto* f : selectedFaces)
+        {
+            if (!f) continue;
+            const auto& vs = f->getVertices();
+            if (!vs.empty() && vs[0]) {
+                if (auto* p = vs[0]->getMeshParent()) 
+                {
+                    parentMesh = dynamic_cast<Mesh*>(p);
+                    if (parentMesh) break;
+                }
+            }
+        }
+
+        if (parentMesh && !isIdentity(accumDelta))
+        {
+            if (auto* dna = parentMesh->getMeshDNA())
+            {
+                dna->trackFaceModify(accumDelta, vertsSnapshot);
+            }
+        }
+
+        accumDelta = glm::mat4(1.0f);
+        vertsSnapshot.clear();
+        dragActive = false;
+    } 
 }
 
 

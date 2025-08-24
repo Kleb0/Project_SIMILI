@@ -129,27 +129,17 @@ void Mesh::finalize()
 
     for (Vertice* v : vertices)
     {
-        if (!v) continue;
-        v->setMeshParent(this);
 
-        if (v->getName().empty())
-            v->setName("Vertice_" + std::to_string(&v - &vertices[0]));
+        v->setMeshParent(this);
+        v->setName("Vertice_" + std::to_string(&v - &vertices[0]));
         v->initialize();
     }
 
-    for (Edge* e : edges)
-    {
-        if (!e) continue;
-        e->initialize();
-    }
-
-    for (Face* f : faces)
-    {
-        if (!f) continue;
-        f->initialize();
-    }
+    for (Edge* e : edges) e->initialize();
+    for (Face* f : faces) f->initialize();
 
     meshDNA->ensureInit(getModelMatrix());
+    meshDNA->freezeFromMesh(this);
 }
 
 void Mesh::clearGeometry()
