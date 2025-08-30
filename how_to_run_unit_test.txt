@@ -1,0 +1,16 @@
+FOR MSVC environment and if your bash dosn't have "sed":
+
+0 - Your terminal must be in command prompt mod
+
+1 - Find bashsrc
+type in the terminal "echo $HOME"
+
+2 - Add the alias : 
+echo "alias run='cmd.exe /d /c run_test.bat'" >> ~/.bashrc
+
+3 - Reload the alias :
+source ~/.bashrc
+
+4 - Enter in the terminal : run test test_filename.cpp
+
+5 - Once it's done and to redo another test, type one time "  run test test_filename.cpp " and then type it again a second time

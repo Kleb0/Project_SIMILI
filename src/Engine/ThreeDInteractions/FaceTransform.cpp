@@ -10,6 +10,7 @@
 #include <glm/gtc/matrix_inverse.hpp>
 
 #include "Engine/MeshEdit/ExtrudeFace.hpp"
+#include "Engine/ErrorBox.hpp"
 
 #include <list>
 #include <iostream>
@@ -71,7 +72,6 @@ const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, bool bakeToVertices)
 
         if (newCap) 
         {
-        // center the gizmo on the new face
         const auto& vs = newCap->getVertices();
         ThreeDObject* parent = (vs.empty() || !vs[0]) ? nullptr : vs[0]->getMeshParent();
         const glm::mat4 parentModel = parent ? parent->getModelMatrix() : glm::mat4(1.0f);
@@ -93,9 +93,7 @@ const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, bool bakeToVertices)
         prevDummyMatrix       = dummyMatrix;
         wasUsingGizmoLastFrame = false;
         return;
-    }
-
-
+        }
     }
 
 
@@ -239,6 +237,8 @@ Face* extrudeSelectedFace(std::list<Face*>& selectedFaces, float distance)
     Face* target = selectedFaces.front();
     if (!target) return nullptr;
 
+    target->setSelected(false);
+
     const auto& vs = target->getVertices();
     if (vs.empty() || !vs[0]) return nullptr;
 
@@ -246,22 +246,48 @@ Face* extrudeSelectedFace(std::list<Face*>& selectedFaces, float distance)
     if (!owner) return nullptr;
 
     Mesh* mesh = dynamic_cast<Mesh*>(owner);
-    if (!mesh) {
-        return nullptr;
-    }
+    if (!mesh) return nullptr;
 
     auto& verts = const_cast<std::vector<Vertice*>&>(mesh->getVertices());
-    auto& eds   = const_cast<std::vector<Edge*>&>(mesh->getEdges());
-    auto& fs    = const_cast<std::vector<Face*>&>(mesh->getFaces());
+    auto& eds = const_cast<std::vector<Edge*>&>(mesh->getEdges());
+    auto& fs = const_cast<std::vector<Face*>&>(mesh->getFaces());
 
     const size_t beforeCount = fs.size();
 
-    const bool ok = MeshEdit::extrudeQuadFace(mesh, verts, eds, fs, target, distance);
+    // showErrorBox("FaceTransform.cpp L257 : record creation");
+    MeshEdit::ExtrudeResult res{};
+
+    const bool ok = MeshEdit::extrudeQuadFace(mesh, verts, eds, fs, target, distance, &res);
+    // showErrorBox("FaceTransform.cpp L61 : extrusion call returned");
+
     if (!ok) return nullptr;
+
+        if (auto* dna = mesh->getMeshDNA()) 
+        {
+            // showErrorBox("FaceTransform.cpp L266 : record creation");
+            ExtrudeRecord rec{};
+
+            for (int i=0;i<4;++i)
+            {
+                rec.newVerts[i] = res.newVerts[i];
+                rec.capEdges[i] = res.capEdges[i];
+                rec.upEdges[i]  = res.upEdges[i];
+                rec.sideFaces[i]= res.sideFaces[i];
+                rec.oldVerts[i] = res.oldVerts[i];
+                rec.oldEdges[i] = res.oldEdges[i];
+            }
+            rec.capFace = res.capFace;
+            rec.distance = res.distance;
+            dna->trackExtrude(rec);
+            // showErrorBox("Extrusion Test 2 ! ");
+        }
+    // ------
 
     if (fs.empty() || fs.size() <= beforeCount) return nullptr;
     Face* newCap = fs.back();
     if (!newCap) return nullptr;
+
+    selectedFaces.clear();
 
     for (Face* f : selectedFaces) if (f) f->setSelected(false);
     selectedFaces.clear();

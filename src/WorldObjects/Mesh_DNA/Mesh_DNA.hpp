@@ -6,13 +6,31 @@
 #include <glm/glm.hpp>
 
 class Vertice;
+class Edge;
 class Mesh;
+class Face;  
 
 enum class ComponentEditKind : uint8_t {
     None = 0,
     Edge,
     Vertice,
-    Face
+    Face,
+    Extrude
+};
+
+struct ExtrudeRecord 
+{
+    Vertice* newVerts[4]{nullptr,nullptr,nullptr,nullptr};
+    Edge* capEdges[4]{nullptr,nullptr,nullptr,nullptr};
+    Edge* upEdges[4]{nullptr,nullptr,nullptr,nullptr};
+    Face* sideFaces[4]{nullptr,nullptr,nullptr,nullptr};
+    Face* capFace{nullptr};
+
+
+    Vertice* oldVerts[4]{nullptr,nullptr,nullptr,nullptr};
+    Edge* oldEdges[4]{nullptr,nullptr,nullptr,nullptr};
+
+    float distance{0.f};
 };
 
 
@@ -23,8 +41,11 @@ struct MeshTransformEvent
     std::string tag;
 
     bool isComponentEdit{false}; 
+
     ComponentEditKind kind{ComponentEditKind::None};
     std::vector<Vertice*> affectedVertices;
+
+    ExtrudeRecord extrude{};
 
 };
 
@@ -47,6 +68,7 @@ public:
     void trackEdgeModify(const glm::mat4& deltaWorld, const std::vector<Vertice*>& verts);
     void trackVerticeModify(const glm::mat4& deltaWorld, const std::vector<Vertice*>& verts);
     void trackFaceModify(const glm::mat4& deltaWorld, const std::vector<Vertice*>& verts);
+    void trackExtrude(const ExtrudeRecord& rec);
 
     glm::mat4 accumulated() const;
     const std::vector<MeshTransformEvent>& getHistory() const; 
@@ -57,11 +79,12 @@ public:
     void rewindEdgeHistory(size_t index_inclusive, Mesh* mesh);
     void rewindVerticeHistory(size_t index_inclusive, Mesh* mesh);
     void rewindFaceHistory(size_t index_inclusive, Mesh* mesh);
+    void rewindExtrudeHistory(size_t index_inclusive, Mesh* mesh);
 
     size_t size() const { return history.size(); }
     void ensureInit(const glm::mat4& currentModel);
 
-    void freezeFromMesh(const Mesh* mesh); 
+    void freezeFromMesh(const Mesh* mesh);  
     void refreezeFromMesh(const Mesh* mesh);   
     bool hasFreeze() const { return hasFrozen; }
     const glm::mat4& frozenModel() const { return frozenModelMatrix; }

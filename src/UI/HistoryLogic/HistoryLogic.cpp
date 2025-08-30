@@ -31,7 +31,7 @@ void HistoryLogic::render()
 
 	ImGui::TextUnformatted(content.c_str());
 
-		if (objectInspector)
+	if (objectInspector)
 		{
 			ImGui::Separator();
 			ImGui::Text("Currently inspected object transformed list :");
@@ -105,9 +105,13 @@ void HistoryLogic::render()
 								line = "#" + std::to_string(i) + "  Modify Face(s)  ";
 								line += "(verts=" + std::to_string(ev.affectedVertices.size()) + ")";
 							}
-							else
+							else if (ev.tag == "extrude_face" || ev.kind == ComponentEditKind::Extrude)
 							{
-								
+								line = "#" + std::to_string(i) + "  Extrude Face";
+								line += " (dist=" + std::to_string(ev.extrude.distance) + ")";
+							}
+							else
+							{								
 								const glm::vec3 t(ev.delta[3]);
 								line += "(dx=" + std::to_string(t.x) +
 								", dy=" + std::to_string(t.y) +
@@ -128,11 +132,16 @@ void HistoryLogic::render()
 							else if (ev.tag == "scale") op = ImGuizmo::SCALE;
 
 							MeshTransform::applyGizmoTransformation(delta, one, op);
-
+							
 							dna->rewindEdgeHistory(i, mesh);
 							dna->rewindVerticeHistory(i, mesh);
 							dna->rewindFaceHistory(i, mesh);
+							dna->rewindExtrudeHistory(i, mesh);
 							dna->rewindToAndApply(i, mesh);
+
+							ImGui::End();
+							ImGui::PopStyleColor(6);
+							return;							
 						}
 					}
 				}

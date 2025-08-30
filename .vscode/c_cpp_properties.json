@@ -6,6 +6,7 @@
       "intelliSenseMode": "windows-msvc-x64",
          "includePath": [
         "${workspaceFolder}/src",
+        "${workspaceFolder}/src/UnitTest",
         "${workspaceFolder}/src/UI",
         "${workspaceFolder}/src/UI/ContextualMenu",
         "${workspaceFolder}/src/UI/HierarchyInspectorLogic",
@@ -16,7 +17,9 @@
         "${workspaceFolder}/src/UI/UIDocking",
         "${workspaceFolder}/src/Engine",
         "${workspaceFolder}/src/Engine/ThreeDInteractions",
+        "${workspaceFolder}/src/Engine/Save_Scene",
         "${workspaceFolder}/src/Engine/MeshEdit",
+        "${workspaceFolder}/src/Engine/Obj_Export_Import",
         "${workspaceFolder}/src/Engine/PrimitivesCreation",
         "${workspaceFolder}/src/Engine/ProjectBuilder",
         "${workspaceFolder}/src/Layout_Theme",
@@ -37,7 +40,9 @@
         "C:/libs/SDL3/include",
         "C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/um",
         "C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/shared",
-        "C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/winrt"
+        "C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/winrt",
+        "${workspaceFolder}/build_test/_deps/googletest-src/googletest/include",
+        "${workspaceFolder}/build_test/_deps/googletest-src/googlemock/include"
       ],
       "defines": [],
       "cppStandard": "c++17",

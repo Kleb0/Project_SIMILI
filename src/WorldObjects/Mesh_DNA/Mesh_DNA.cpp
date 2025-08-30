@@ -5,6 +5,12 @@
 #include <iostream>
 #include <algorithm>
 #include <iomanip> 
+#include "Engine/ErrorBox.hpp"
+
+template<typename T, typename = void>
+struct has_destroy : std::false_type {};
+template<typename T>
+struct has_destroy<T, std::void_t<decltype(std::declval<T*>()->destroy())>> : std::true_type {};
 
 void MeshDNA::clear()
 {
@@ -139,6 +145,31 @@ void MeshDNA::trackWithAutoTick(const glm::mat4& delta, const std::string& tag)
 {
     track(delta, nextTick++, tag);
 }
+
+void MeshDNA::trackExtrude(const ExtrudeRecord& rec)
+{
+    MeshTransformEvent ev;
+    ev.delta = glm::mat4(1.0f);
+    ev.tick  = nextTick++;
+    ev.tag   = "extrude_face";
+    ev.isComponentEdit = true;
+    ev.kind  = ComponentEditKind::Extrude;
+    ev.extrude = rec; 
+
+    history.push_back(std::move(ev));
+}
+
+
+static void erasePtr(std::vector<Vertice*>& v, Vertice* p) {
+    v.erase(std::remove(v.begin(), v.end(), p), v.end());
+}
+static void erasePtr(std::vector<Edge*>& v, Edge* p) {
+    v.erase(std::remove(v.begin(), v.end(), p), v.end());
+}
+static void erasePtr(std::vector<Face*>& v, Face* p) {
+    v.erase(std::remove(v.begin(), v.end(), p), v.end());
+}
+
 
 glm::mat4 MeshDNA::accumulated() const { return acc; }
 const std::vector<MeshTransformEvent>& MeshDNA::getHistory() const { return history; }
@@ -397,5 +428,108 @@ void MeshDNA::rewindFaceHistory(size_t index_inclusive, Mesh* mesh)
         if (ev.kind == ComponentEditKind::None)
             acc = ev.delta * acc;
 
+    nextTick = history.empty() ? 0 : history.back().tick + 1;
+}
+
+void MeshDNA::rewindExtrudeHistory(size_t index_inclusive, Mesh* mesh)
+{
+    if (!mesh) return;
+    if (history.empty()) { acc = glm::mat4(1.0f); return; }
+    if (index_inclusive + 1 > history.size()) return;
+
+    auto& V = const_cast<std::vector<Vertice*>&>(mesh->getVertices());
+    auto& E = const_cast<std::vector<Edge*>&>(mesh->getEdges());
+    auto& F = const_cast<std::vector<Face*>&>(mesh->getFaces());
+
+    // Helpers sûrs: on enlève du conteneur + destroy() si dispo, mais PAS de delete ici
+    auto removeFace = [&](Face* f){
+        if (!f) return;
+        if (std::find(F.begin(), F.end(), f) == F.end()) return; // déjà retirée/tuée ailleurs
+        erasePtr(F, f);
+        if constexpr (has_destroy<Face>::value) f->destroy();
+    };
+    auto removeEdge = [&](Edge* e){
+        if (!e) return;
+        if (std::find(E.begin(), E.end(), e) == E.end()) return;
+        erasePtr(E, e);
+        if constexpr (has_destroy<Edge>::value) e->destroy();
+    };
+    auto removeVert = [&](Vertice* v){
+        if (!v) return;
+        if (std::find(V.begin(), V.end(), v) == V.end()) return;
+        erasePtr(V, v);
+        if constexpr (has_destroy<Vertice>::value) v->destroy();
+    };
+
+    for (size_t k = history.size(); k-- > index_inclusive + 1; ) 
+    {
+        auto& ev = history[k];
+        if (ev.kind != ComponentEditKind::Extrude) continue;
+
+  
+        for (Face* s : ev.extrude.sideFaces) removeFace(s);
+        removeFace(ev.extrude.capFace);
+
+        for (Edge* ce : ev.extrude.capEdges) removeEdge(ce);
+        for (Edge* ue : ev.extrude.upEdges)  removeEdge(ue);
+
+
+        for (Vertice* nv : ev.extrude.newVerts) removeVert(nv);
+
+        if (ev.extrude.oldVerts[0] && ev.extrude.oldVerts[1] &&
+        ev.extrude.oldVerts[2] && ev.extrude.oldVerts[3] &&
+        ev.extrude.oldEdges[0] && ev.extrude.oldEdges[1] &&
+        ev.extrude.oldEdges[2] && ev.extrude.oldEdges[3])
+        {
+            bool already = std::find_if(F.begin(), F.end(), [&](Face* f)
+            {
+                if (!f) return false;
+                const auto& vs = f->getVertices();
+                const auto& es = f->getEdges();
+
+                return vs.size()==4 && es.size()==4 &&
+                vs[0]==ev.extrude.oldVerts[0] &&
+                vs[1]==ev.extrude.oldVerts[1] &&
+                vs[2]==ev.extrude.oldVerts[2] &&
+                vs[3]==ev.extrude.oldVerts[3] &&
+                es[0]==ev.extrude.oldEdges[0] &&
+                es[1]==ev.extrude.oldEdges[1] &&
+                es[2]==ev.extrude.oldEdges[2] &&
+                es[3]==ev.extrude.oldEdges[3];
+            }) != F.end();
+
+            if (!already) 
+            {
+                Face* restored = mesh->addFace(
+                    ev.extrude.oldVerts[0],
+                    ev.extrude.oldVerts[1],
+                    ev.extrude.oldVerts[2],
+                    ev.extrude.oldVerts[3],
+                    ev.extrude.oldEdges[0],
+                    ev.extrude.oldEdges[1],
+                    ev.extrude.oldEdges[2],
+                    ev.extrude.oldEdges[3]
+                );
+            }
+        }
+    }
+
+  
+    size_t write = 0;
+    for (size_t idx = 0; idx < history.size(); ++idx) 
+    {
+        bool drop = (idx > index_inclusive) && (history[idx].kind == ComponentEditKind::Extrude);
+        if (!drop) history[write++] = std::move(history[idx]);
+    }
+    history.resize(write);
+
+
+    acc = glm::mat4(1.0f);
+    for (const auto& ev2 : history) 
+    {
+        if (ev2.kind != ComponentEditKind::None) continue;
+        if (hasFrozen && isInitEvent(ev2)) continue;
+        acc = ev2.delta * acc;
+    }
     nextTick = history.empty() ? 0 : history.back().tick + 1;
 }
