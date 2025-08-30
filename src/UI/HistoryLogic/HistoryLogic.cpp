@@ -1,4 +1,8 @@
 #include "UI/HistoryLogic/HistoryLogic.hpp"
+#include "UI/ObjectInspectorLogic/ObjectInspector.hpp" 
+#include "Engine/ThreeDScene_DNA/ThreeDScene_DNA.hpp" 
+#include "Engine/OpenGLContext.hpp"
+#include "Engine/ThreeDSceneDrawer.hpp"
 #include "WorldObjects/Mesh/Mesh.hpp"
 #include "WorldObjects/Mesh_DNA/Mesh_DNA.hpp" 
 #include "Engine/ThreeDInteractions/MeshTransform.hpp" 
@@ -38,9 +42,32 @@ void HistoryLogic::render()
 
 			ThreeDObject* obj = objectInspector->getInspectedObject();
 
+			// ----- case when no object is inspect, we display the scene events
 			if (!obj)
 			{
-				ImGui::TextDisabled("No single object inspected (multiple selection or none).");
+				ImGui::Text("Scene events:");
+
+				auto& sceneDrawer = glctx->getScene();
+				auto* sdna = sceneDrawer.getSceneDNA();
+
+				const auto& shist = sdna->getHistory();
+				if (shist.empty())
+				{
+					ImGui::TextDisabled("No scene events yet.");
+				}
+				else
+				{
+					for (size_t i = 0; i < shist.size(); ++i)
+					{
+						const auto& ev = shist[i];
+						const char* k = (ev.kind == SceneEventKind::AddObject) ? "Add " : "Remove ";
+						std::string line = "#" + std::to_string(i) + "  ";
+						line += k;
+						line += ev.objectName;
+						line += "  tick=" + std::to_string(ev.tick);
+						ImGui::TextUnformatted(line.c_str());
+					}
+				}
 			}
 			else if (auto* mesh = dynamic_cast<Mesh*>(obj))
 			{

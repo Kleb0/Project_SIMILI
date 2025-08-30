@@ -44,6 +44,9 @@ public:
     glm::vec3 worldCenter = glm::vec3(0.0f);
     glm::vec3 getWorldCenter() const { return worldCenter; }
 
+    ThreeDSceneDrawer& getScene() { return scene; }
+    const ThreeDSceneDrawer& getScene() const { return scene; }
+
 private:
     glm::mat4 viewMatrix = glm::mat4(1.0f);
     glm::mat4 projMatrix = glm::mat4(1.0f);

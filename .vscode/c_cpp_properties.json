@@ -17,6 +17,7 @@
         "${workspaceFolder}/src/UI/UIDocking",
         "${workspaceFolder}/src/Engine",
         "${workspaceFolder}/src/Engine/ThreeDInteractions",
+        "${workspaceFolder}/src/Engine/ThreeDScene_DNA",
         "${workspaceFolder}/src/Engine/Save_Scene",
         "${workspaceFolder}/src/Engine/MeshEdit",
         "${workspaceFolder}/src/Engine/Obj_Export_Import",

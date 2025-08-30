@@ -56,9 +56,28 @@ void ThreeDSceneDrawer::compileShaders()
 	
 }
 
+void ThreeDSceneDrawer::setSceneDNA(ThreeDScene_DNA* dna, bool takeOwnership)
+{
+    if (sceneDNA && ownsSceneDNA && sceneDNA != dna) {
+        delete sceneDNA;
+    }
+    sceneDNA = dna;
+    ownsSceneDNA = takeOwnership;
+}
+
 void ThreeDSceneDrawer::initizalize()
 {
 	compileShaders();
+
+	if (!sceneDNA) 
+	{
+        auto* dna = new ThreeDScene_DNA();
+        dna->name = "MainSceneDNA";
+        setSceneDNA(dna, true);
+		
+    }
+	
+	sceneDNA->ensureInit();
 
 	std::vector<float> gridVertices;
 	int gridSize = 10;

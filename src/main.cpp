@@ -95,6 +95,7 @@ int main(int argc, char **argv)
     objectInspector.setTitle("Object Inspector");
     historyLogic.setTitle("SUPER HISTORY LOGGER");
     historyLogic.setObjectInspector(&objectInspector);
+    historyLogic.setOpenGLContext(&renderer);
 
     gui.add(myInfoWindow);
     gui.add(myThreeDWindow);
