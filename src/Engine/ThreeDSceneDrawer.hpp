@@ -6,6 +6,7 @@
 #include "Engine/Guizmo.hpp"
 #include <WorldObjects/Entities/ThreeDObject.hpp>
 #include "WorldObjects/Camera/Camera.hpp"
+#include "Engine/ThreeDScene_DNA/ThreeDScene_DNA.hpp"
 #include <iostream>
 #include <list>
 
@@ -16,6 +17,10 @@ public:
     ~ThreeDSceneDrawer() = default;
 
     void initizalize();
+
+    ThreeDScene_DNA* getSceneDNA() const { return sceneDNA; }
+    void setSceneDNA(ThreeDScene_DNA* dna, bool takeOwnership = true);
+
     void resize(int w, int h);
     void render(const std::list<ThreeDObject *> &objects, const glm::mat4 &viewProj);
     void drawBackgroundGradient();
@@ -38,4 +43,7 @@ private:
     GLuint gridVAO = 0;
     GLuint gridVBO = 0;
     GLuint shaderProgram = 0;
+
+    ThreeDScene_DNA* sceneDNA{nullptr};
+    bool ownsSceneDNA{true};
 };

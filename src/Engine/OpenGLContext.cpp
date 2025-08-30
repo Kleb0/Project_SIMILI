@@ -57,6 +57,8 @@ void OpenGLContext::addThreeDObjectToList(ThreeDObject *object)
             dna->ensureInit(mesh->getModelMatrix());
                 
         } 
+        if (auto* sdna = scene.getSceneDNA())
+            sdna->trackAddObject(object->getName());
     }
 }
 
@@ -66,9 +68,11 @@ void OpenGLContext::removeThreeDobjectFromList(ThreeDObject *object)
     auto it = std::remove(objects.begin(), objects.end(), object);
     if (it != objects.end())
     {
-        // message box
-
         std::cout << "[OpenGLContext] Removing object: " << object->getName() << std::endl;
+
+        if (auto* sdna = scene.getSceneDNA())
+            sdna->trackRemoveObject(object->getName());
+
         objects.erase(it, objects.end());
     }
     else

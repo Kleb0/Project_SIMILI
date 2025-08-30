@@ -46,11 +46,11 @@ void ContextualMenu::render()
     {
         ImGui::SetNextWindowPos(popupPos, ImGuiCond_Always);
         ImGui::Begin("##ContextualMenu", nullptr,
-                     ImGuiWindowFlags_AlwaysAutoResize |
-                         ImGuiWindowFlags_NoTitleBar |
-                         ImGuiWindowFlags_NoResize |
-                         ImGuiWindowFlags_NoMove |
-                         ImGuiWindowFlags_NoSavedSettings);
+        ImGuiWindowFlags_AlwaysAutoResize |
+        ImGuiWindowFlags_NoTitleBar |
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoSavedSettings);
 
         ImGui::Text("Contextual Menu");
 

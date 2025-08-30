@@ -183,6 +183,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/UIDocking
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDInteractions
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDSceneDNA
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/Save_Scene
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/MeshEdit
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/Obj_Export_Import
