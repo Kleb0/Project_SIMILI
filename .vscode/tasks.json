@@ -1,6 +1,7 @@
 {
   "version": "2.0.0",
-  "tasks": [
+  "tasks": 
+  [
     {
       "label": "Native Build SIMILI x64 (Release)",
       "type": "shell",
@@ -18,6 +19,6 @@
         "isDefault": true
       },
       "detail": "Initialise vcvars64 et build le projet SIMILI en Release"
-    }
-  ]
+    },
+  ]  
 }

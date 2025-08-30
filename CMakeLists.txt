@@ -38,6 +38,8 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/MeshEdit
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/PrimitivesCreation
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ProjectBuilder
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/Save_Scene
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/Obj_Export_Import
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Layout_Theme
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/images
     ${CMAKE_CURRENT_SOURCE_DIR}/src/InternalLogic
@@ -57,12 +59,13 @@ include_directories(
 
 # Source files
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp)
+list(FILTER SOURCES EXCLUDE REGEX "${CMAKE_CURRENT_SOURCE_DIR}/src/unitTest/.*\\.cpp$")
 list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/ImGuizmo/vcpkg-example/main.cpp")
 list(FILTER SOURCES EXCLUDE REGEX "src/ThirdParty/imgui/backends/.*\\.cpp$")
 list(FILTER SOURCES EXCLUDE REGEX "src/ThirdParty/imgui/examples/.*\\.cpp$")
 list(FILTER SOURCES EXCLUDE REGEX "src/ThirdParty/imgui/misc/.*\\.cpp$")
 list(FILTER SOURCES EXCLUDE REGEX "src/ThirdParty/glm/.*\\.cpp$")
-list(FILTER SOURCES EXCLUDE REGEX "src/ThirdParty/glm/test/.*\\.cpp$")
+list(FILTER SOURCES EXCLUDE REGEX "/([Tt]ests?|[Uu]nit[Tt]ests?)/.*\\.cpp$")
 
 
 file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS src/*.hpp)
@@ -169,6 +172,7 @@ add_executable(${PROJECT_NAME}
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UnitTest
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ContextualMenu
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ThreeDModes
@@ -179,7 +183,9 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/UIDocking
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDInteractions
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/Save_Scene
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/MeshEdit
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/Obj_Export_Import
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/PrimitivesCreation
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ProjectBuilder
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Layout_Theme

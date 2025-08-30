@@ -1,0 +1,101 @@
+cmake_minimum_required(VERSION 3.16)
+project(SIMILI_Mesh_Tests CXX)
+
+if (MSVC)
+  add_definitions(-DUNICODE -D_UNICODE)
+endif()
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+get_filename_component(PROJ_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
+
+include_directories(
+  ${PROJ_ROOT}/src
+  ${PROJ_ROOT}/src/WorldObjects
+  ${PROJ_ROOT}/src/WorldObjects/Basic
+  ${PROJ_ROOT}/src/WorldObjects/Entities
+  ${PROJ_ROOT}/src/WorldObjects/Mesh_DNA
+  ${PROJ_ROOT}/src/Engine
+  ${PROJ_ROOT}/src/ThirdParty/glm
+)
+
+if(NOT DEFINED CORE_GLOB_PATTERNS)
+  set(CORE_GLOB_PATTERNS "${PROJ_ROOT}/src/**/*.cpp")
+endif()
+
+file(GLOB_RECURSE CORE_CANDIDATES CONFIGURE_DEPENDS ${CORE_GLOB_PATTERNS})
+
+set(_path_exclude_regex ".*/UI/.*|.*/ThirdParty/.*|.*/Primitives/.*|.*/Engine/.*|.*/WorldObjects/Basic/.*|.*/WorldObjects/Entities/.*")
+list(FILTER CORE_CANDIDATES EXCLUDE REGEX "${_path_exclude_regex}")
+
+set(CORE_SOURCES "")
+foreach(src ${CORE_CANDIDATES})
+  file(READ "${src}" _content)
+  if(_content MATCHES "#\\s*include\\s*[<\"]imgui\\.h[>\"]"
+     OR _content MATCHES "#\\s*include\\s*[<\"]glad/glad\\.h[>\"]"
+     OR _content MATCHES "#\\s*include\\s*[<\"]GLFW/.*[>\"]"
+     OR _content MATCHES "#\\s*include\\s*[<\"]SDL.*[>\"]")
+  else()
+    list(APPEND CORE_SOURCES "${src}")
+  endif()
+endforeach()
+
+foreach(f IN LISTS CORE_SOURCES)
+  if(NOT EXISTS "${f}")
+    message(FATAL_ERROR "Core source not found: ${f}")
+  endif()
+endforeach()
+
+file(GLOB SHIM_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/shims/*.cpp")
+if(NOT SHIM_SOURCES)
+  message(FATAL_ERROR "No shim .cpp files found in ${CMAKE_CURRENT_LIST_DIR}/shims/")
+endif()
+
+if(NOT DEFINED TEST_FILE)
+  message(FATAL_ERROR "TEST_FILE is required. Call CMake with -DTEST_FILE=path\\to\\your_test.cpp")
+endif()
+
+if(NOT IS_ABSOLUTE "${TEST_FILE}")
+  get_filename_component(TEST_SOURCE "${TEST_FILE}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_LIST_DIR}")
+else()
+  set(TEST_SOURCE "${TEST_FILE}")
+endif()
+
+if(NOT EXISTS "${TEST_SOURCE}")
+  message(FATAL_ERROR "Test source not found: ${TEST_SOURCE}")
+endif()
+
+if(NOT DEFINED TEST_NAME)
+  get_filename_component(TEST_NAME "${TEST_SOURCE}" NAME_WE)
+endif()
+set(EXE_NAME "${TEST_NAME}")
+
+include(FetchContent)
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_Declare(googletest
+  URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+FetchContent_MakeAvailable(googletest)
+
+add_executable(${EXE_NAME}
+  ${TEST_SOURCE}
+  ${CORE_SOURCES}
+  ${SHIM_SOURCES}
+)
+
+target_include_directories(${EXE_NAME} PRIVATE
+  ${gtest_SOURCE_DIR}/googletest/include
+  ${gtest_SOURCE_DIR}/googlemock/include
+)
+
+target_link_libraries(${EXE_NAME} PRIVATE
+  GTest::gtest
+  GTest::gtest_main
+)
+
+include(GoogleTest)
+gtest_discover_tests(${EXE_NAME}
+  DISCOVERY_TIMEOUT 30
+)

@@ -1,0 +1,6 @@
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WIN_DIR="$(cygpath -w "$SCRIPT_DIR")"
+
+exec cmd.exe /d /c "\"$WIN_DIR\\run_test.bat\" $*"
