@@ -2,7 +2,7 @@
 #include "WorldObjects/Basic/Edge.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
 #include "WorldObjects/Mesh/Mesh.hpp"
-#include "Engine/OpenGLContext.hpp"
+#include "Engine/ThreeDScene.hpp"
 #include "Engine/Guizmo.hpp"
 
 #include <glm/gtc/type_ptr.hpp>
@@ -27,17 +27,17 @@ namespace EdgeTransform
         return true;
     }
 
-    glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, OpenGLContext* context,
+    glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, ThreeDScene* scene,
     const std::list<Edge*>& edges,const ImVec2& oglChildPos, const ImVec2& oglChildSize)
     {
-        glm::mat4 view = context->getViewMatrix();
-        glm::mat4 proj = context->getProjectionMatrix();
+        glm::mat4 view = scene->getViewMatrix();
+        glm::mat4 proj = scene->getProjectionMatrix();
 
         glm::mat4 model = Guizmo::renderGizmoForEdges(edges, op, view, proj, oglChildPos, oglChildSize);
         return model;
     }
 
-    void manipulateEdges(OpenGLContext* context, std::list<Edge*>& selectedEdges,
+    void manipulateEdges(ThreeDScene* scene, std::list<Edge*>& selectedEdges,
     const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame)
     {
         if (selectedEdges.empty()) return;
@@ -47,8 +47,8 @@ namespace EdgeTransform
         if (ImGui::IsKeyPressed(ImGuiKey_R)) currentGizmoOperation = ImGuizmo::ROTATE;
         if (ImGui::IsKeyPressed(ImGuiKey_S)) currentGizmoOperation = ImGuizmo::SCALE;
 
-        glm::mat4 view = context->getViewMatrix();
-        glm::mat4 proj = context->getProjectionMatrix();
+        glm::mat4 view = scene->getViewMatrix();
+        glm::mat4 proj = scene->getProjectionMatrix();
 
         static glm::mat4 dummyMatrix = glm::mat4(1.0f);
         static glm::mat4 prevDummyMatrix = glm::mat4(1.0f);

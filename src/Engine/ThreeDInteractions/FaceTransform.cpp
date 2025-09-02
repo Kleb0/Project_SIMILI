@@ -4,6 +4,7 @@
 #include "WorldObjects/Entities/ThreeDObject.hpp"
 #include "WorldObjects/Mesh/Mesh.hpp" 
 #include "Engine/OpenGLContext.hpp"
+#include "Engine/ThreeDScene.hpp"
 #include "Engine/Guizmo.hpp"
 
 #include <glm/gtc/type_ptr.hpp>
@@ -29,15 +30,15 @@ static inline bool isIdentity(const glm::mat4& m) {
 }
 
 
-glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, OpenGLContext* context,
+glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, ThreeDScene* scene,
 const std::list<Face*>& faces, const ImVec2& oglChildPos, const ImVec2& oglChildSize)
 {
-    const glm::mat4 view = context->getViewMatrix();
-    const glm::mat4 proj = context->getProjectionMatrix();
+    const glm::mat4 view = scene->getViewMatrix();
+    const glm::mat4 proj = scene->getProjectionMatrix();
     return Guizmo::renderGizmoForFaces(faces, op, view, proj, oglChildPos, oglChildSize);
 }
 
-void manipulateFaces(OpenGLContext* context, std::list<Face*>& selectedFaces, const ImVec2& oglChildPos,
+void manipulateFaces(ThreeDScene* scene, std::list<Face*>& selectedFaces, const ImVec2& oglChildPos,
 const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, bool bakeToVertices)
 {
     if (selectedFaces.empty()) return;
@@ -49,8 +50,8 @@ const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, bool bakeToVertices)
     if (ImGui::IsKeyPressed(ImGuiKey_R)) currentGizmoOperation = ImGuizmo::ROTATE;
     if (ImGui::IsKeyPressed(ImGuiKey_S)) currentGizmoOperation = ImGuizmo::SCALE;
 
-    const glm::mat4 view = context->getViewMatrix();
-    const glm::mat4 proj = context->getProjectionMatrix();
+    const glm::mat4 view = scene->getViewMatrix();
+    const glm::mat4 proj = scene->getProjectionMatrix();
 
     static glm::mat4 accumDelta = glm::mat4(1.0f);
     static std::vector<Vertice*> vertsSnapshot;

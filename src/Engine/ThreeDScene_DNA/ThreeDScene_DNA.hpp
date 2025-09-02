@@ -1,10 +1,16 @@
 #pragma once
+#define GLM_ENABLE_EXPERIMENTAL
 #include <cstdint>
 #include <string>
 #include <glm/glm.hpp>
+#include <vector>
+#include <list>  
 
+class ThreeDObject;
 
-enum class SceneEventKind : uint8_t {
+enum class SceneEventKind : uint8_t 
+{
+    InitSnapshot,
     AddObject,
     RemoveObject
 };
@@ -12,7 +18,10 @@ enum class SceneEventKind : uint8_t {
 struct SceneEvent {
     SceneEventKind kind{SceneEventKind::AddObject};
     std::string objectName;
+    ThreeDObject* ptr{nullptr};
     uint64_t tick{0};
+    std::vector<std::string> initNames;
+    std::vector<ThreeDObject*> initPtrs;
 };
 
 class ThreeDScene_DNA
@@ -26,19 +35,25 @@ public:
     bool isInitialized() const { return hasInit; }
     uint64_t initTick() const { return init_tick; }
 
-    void trackAddObject(const std::string& name);
-    void trackRemoveObject(const std::string& name);
+    void trackAddObject (const std::string& name, ThreeDObject* obj);
+    void trackRemoveObject(const std::string& name, ThreeDObject* obj);
+
 
     const std::vector<SceneEvent>& getHistory() const { return history; }
     size_t size() const { return history.size(); }
 
+    void finalizeBootstrap();
 
 private:
     bool hasInit{false};
     uint64_t init_tick{0};
-
     uint64_t nextTick{1};
     std::vector<SceneEvent> history;
 
-    void track(SceneEventKind kind, const std::string& name);
+    bool bootstrapping{true};
+    std::vector<std::string> bootstrapNames;
+    std::vector<ThreeDObject*> bootstrapPtrs;
+
+    void track(SceneEventKind kind, const std::string& name, ThreeDObject* obj);
+
 };

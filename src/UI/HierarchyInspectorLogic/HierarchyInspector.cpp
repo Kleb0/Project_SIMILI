@@ -45,9 +45,9 @@ void HierarchyInspector::setObjectInspector(ObjectInspector *inspector)
     objectInspector = inspector;
 }
 
-void HierarchyInspector::setContext(OpenGLContext *ctxt)
+void HierarchyInspector::setThreeDScene(ThreeDScene *scene)
 {
-    context = ctxt;
+    this->scene = scene;
 }
 
 void HierarchyInspector::setThreeDWindow(ThreeDWindow *win)
@@ -158,11 +158,45 @@ void HierarchyInspector::redrawSlotsList()
     for (auto& dummy : emptySlotPlaceholders)
         mergedHierarchyList.push_back(dummy.get());
 
-    // std::cout << "[HierarchyInspector] redrawSlotsList triggered." << std::endl;
+    std::cout << "[HierarchyInspector] redrawSlotsList triggered." << std::endl;
 }
 
 
 // ------------ other  ------------- //
+
+
+void HierarchyInspector::clearSelectionState()
+{
+    if (scene) 
+    {
+        for (auto* o : scene->getObjectsRef()) 
+        {
+            if (o) o->setSelected(false);
+        }
+    }
+
+    selectedObjectInHierarchy = nullptr;
+    objectBeingRenamed = nullptr;
+    currentlyDraggedObject = nullptr;
+    pendingDragTarget = nullptr;
+    lastRepositionedObject = nullptr;
+    lastSelectedObject = nullptr;
+    childToDropOn = nullptr;
+
+    lastSelectedSlotIndex = -1;
+    lastRepositionTargetIndex = -1;
+    mouseOveringSlotIndex = -1;
+    dropToSlotIndex = -1;
+
+    multipleSelectedObjects.clear();
+
+    if (objectInspector) 
+    {
+        objectInspector->clearInspectedObject();
+        objectInspector->clearMultipleInspectedObjects();
+    }
+}
+
 void HierarchyInspector::selectFromThreeDWindow()
 {
 
@@ -181,11 +215,11 @@ void HierarchyInspector::selectFromThreeDWindow()
         return;
     }
     const std::list<ThreeDObject *> emptyList;
-    const std::list<ThreeDObject *> &contextList = context ? context->getObjects() : emptyList;
+    const std::list<ThreeDObject *> &ObjectList = scene ? scene->getObjectsRef() : emptyList;
     const auto &windowList = window->getObjects();
 
-    auto it = std::find(contextList.begin(), contextList.end(), selected);
-    if (it != contextList.end())
+    auto it = std::find(ObjectList.begin(), ObjectList.end(), selected);
+    if (it != ObjectList.end())
     {
         selectedObjectInHierarchy = *it;
         return;
@@ -203,11 +237,10 @@ void HierarchyInspector::unselectObject(ThreeDObject *obj)
     if (!obj)
         return;
 
+    obj->setSelected(false);
+
     if (selectedObjectInHierarchy == obj)
-    {
         selectedObjectInHierarchy = nullptr;
-        // std::cout << "[HierarchyInspector] Unselected object: " << obj->getName() << std::endl;
-    }
 }
 
 void HierarchyInspector::clearMultipleSelection()

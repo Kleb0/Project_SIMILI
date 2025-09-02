@@ -155,7 +155,7 @@ void HandleHierarchyInteractions::dropOnSlot(ThreeDObject* obj, int index)
         }
 
         obj->setModelMatrix(global);
-        obj->setOrigin(inspector->context->worldCenter);
+        obj->setOrigin(inspector->scene->worldCenter.front());
         obj->setSlot(index);
         inspector->exchangeSlots(obj, index);
 
@@ -235,7 +235,7 @@ void HandleHierarchyInteractions::multipleSelection(ThreeDObject* obj)
     if (it == list.end()) 
     {
         list.push_back(obj);
-        std::cout << "[HierarchyInspector] Add object to multiple selection list: " << obj->getName() << std::endl;
+        // std::cout << "[HierarchyInspector] Add object to multiple selection list: " << obj->getName() << std::endl;
     } 
     else
     {

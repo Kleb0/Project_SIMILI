@@ -37,6 +37,7 @@ class HierarchyInspector;
 class ObjectInspector;
 class ThreeDObject;
 class ClickHandler;
+class ThreeDScene;
 
 //=== Class ===//
 class ThreeDWindow : public GUIWindow
@@ -73,6 +74,9 @@ public:
     void setObjectInspector(ObjectInspector *inspector);
 
     void setMultipleSelectedObjects(const std::list<ThreeDObject*>& objects);
+
+    void setThreeDScene(ThreeDScene* s) { this->scene = s; }
+    ThreeDScene* getThreeDScene() const { return scene; }
 
     ImVec2 oglChildPos;
     ImVec2 oglChildSize;
@@ -113,6 +117,7 @@ private:
     glm::mat4 view = glm::mat4(1.0f);
     glm::mat4 proj = glm::mat4(1.0f);
     OpenGLContext *openGLContext = nullptr;
+    ThreeDScene * scene = nullptr;
     ObjectInspector *objectInspector = nullptr;
     HierarchyInspector *hierarchy = nullptr;
     ThreeDObjectSelector selector;

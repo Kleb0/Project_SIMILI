@@ -46,7 +46,6 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Basic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Camera
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Primitives
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Entities
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Mesh_DNA
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Resources
@@ -195,7 +194,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Basic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Camera
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Primitives
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Entities
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Mesh_DNA
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Resources

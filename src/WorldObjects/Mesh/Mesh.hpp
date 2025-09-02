@@ -56,8 +56,9 @@ private:
     MeshDNA* meshDNA = nullptr;
     bool ownsDNA = true;
 
-    // Helpers
     void destroyVertices();
     void destroyEdges();
     void destroyFaces();
+
+    bool CanDisplayRenderMessage = true;
 };

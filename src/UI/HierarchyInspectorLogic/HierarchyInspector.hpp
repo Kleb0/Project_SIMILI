@@ -4,7 +4,7 @@
 #include "UI/HierarchyInspectorLogic/HandleHierarchyInteractions.hpp"
 #include "UI/HierarchyInspectorLogic/HierarchyListDrawing.hpp"
 #include "UI/GUIWindow.hpp"
-#include "Engine/OpenGLContext.hpp"
+#include "Engine/ThreeDScene.hpp"
 #include "WorldObjects/Entities/ThreeDObject.hpp"
 #include "WorldObjects/Entities/EmptyDummy.hpp"
 #include <string>
@@ -29,7 +29,7 @@ public:
     HierarchyInspector();
 
     // -------- Initialization and setting
-    void setContext(OpenGLContext* ctxt);
+    void setThreeDScene(ThreeDScene* scene);
     void setThreeDWindow(ThreeDWindow* win);
     void setObjectInspector(ObjectInspector* inspector);
     void setTitle(const std::string& newTitle) { this->title = newTitle; }
@@ -50,6 +50,9 @@ public:
     void exchangeSlots(ThreeDObject* obj, int index);
     void redrawSlotsList();
 
+    // --------- cleaning ----- //
+
+    void clearSelectionState();
 
     //---------- Selection inside list in HandleHierarchyInteractions.hpp -------------//
     void selectInList(ThreeDObject* obj);
@@ -75,7 +78,7 @@ private:
     std::unique_ptr<HandleHierarchyInteractions> interactions;
     std::unique_ptr<HierarchyListDrawing> listDrawer;
 
-    OpenGLContext* context = nullptr;
+    ThreeDScene* scene = nullptr;
     ThreeDWindow* window = nullptr;
     ObjectInspector* objectInspector = nullptr;
 
