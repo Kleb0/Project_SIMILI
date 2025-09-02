@@ -1,6 +1,6 @@
 #include "Engine/ThreeDInteractions/VerticeTransform.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
-#include "Engine/OpenGLContext.hpp"
+#include "Engine/ThreeDScene.hpp"
 #include "Engine/Guizmo.hpp"
 
 #include <glm/gtc/type_ptr.hpp>
@@ -11,6 +11,7 @@
 #include "WorldObjects/Mesh/Mesh.hpp"
 #include "WorldObjects/Entities/ThreeDObject.hpp"
 #include "WorldObjects/Mesh_DNA/Mesh_DNA.hpp"
+
 
 namespace VerticeTransform
 {
@@ -24,17 +25,17 @@ namespace VerticeTransform
     }
 
 
-    glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, OpenGLContext* context, const std::list<Vertice*>& vertices,
+    glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, ThreeDScene* scene, const std::list<Vertice*>& vertices,
     const ImVec2& oglChildPos, const ImVec2& oglChildSize)
     {
-            glm::mat4 view = context->getViewMatrix();
-            glm::mat4 proj = context->getProjectionMatrix();
+            glm::mat4 view = scene->getViewMatrix();
+            glm::mat4 proj = scene->getProjectionMatrix();
 
             glm::mat4 model = Guizmo::renderGizmoForVertices(vertices, op, view, proj, oglChildPos, oglChildSize);
             return model;
     }
 
-    void manipulateVertices(OpenGLContext* context, const std::list<Vertice*>& selectedVertices,
+    void manipulateVertices(ThreeDScene* scene, const std::list<Vertice*>& selectedVertices,
     const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame)
     {
 
@@ -46,8 +47,8 @@ namespace VerticeTransform
         if (ImGui::IsKeyPressed(ImGuiKey_R)) currentGizmoOperation = ImGuizmo::ROTATE;
         if (ImGui::IsKeyPressed(ImGuiKey_S)) currentGizmoOperation = ImGuizmo::SCALE;
 
-        glm::mat4 view = context->getViewMatrix();
-        glm::mat4 proj = context->getProjectionMatrix();
+        glm::mat4 view = scene->getViewMatrix();
+        glm::mat4 proj = scene->getProjectionMatrix();
 
         static glm::mat4 dummyMatrix = glm::mat4(1.0f);
         static glm::mat4 prevDummyMatrix = glm::mat4(1.0f);

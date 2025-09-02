@@ -11,5 +11,5 @@ public:
     void handle();
 
 private:
-    ThreeDWindow* w;
+    ThreeDWindow* window;
 };

@@ -1,8 +1,9 @@
 #include "UI/HistoryLogic/HistoryLogic.hpp"
 #include "UI/ObjectInspectorLogic/ObjectInspector.hpp" 
+#include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
 #include "Engine/ThreeDScene_DNA/ThreeDScene_DNA.hpp" 
 #include "Engine/OpenGLContext.hpp"
-#include "Engine/ThreeDSceneDrawer.hpp"
+#include "Engine/ThreeDScene.hpp"
 #include "WorldObjects/Mesh/Mesh.hpp"
 #include "WorldObjects/Mesh_DNA/Mesh_DNA.hpp" 
 #include "Engine/ThreeDInteractions/MeshTransform.hpp" 
@@ -42,15 +43,16 @@ void HistoryLogic::render()
 
 			ThreeDObject* obj = objectInspector->getInspectedObject();
 
-			// ----- case when no object is inspect, we display the scene events
+			// ----- case when no object is inspected, display & rewind scene events
 			if (!obj)
 			{
 				ImGui::Text("Scene events:");
 
-				auto& sceneDrawer = glctx->getScene();
-				auto* sdna = sceneDrawer.getSceneDNA();
+				ThreeDScene_DNA* scenedna = scene->getSceneDNA();
+				auto& objList = scene->getObjectsRef();
+				const auto& shist = scenedna->getHistory();
 
-				const auto& shist = sdna->getHistory();
+
 				if (shist.empty())
 				{
 					ImGui::TextDisabled("No scene events yet.");
@@ -60,15 +62,28 @@ void HistoryLogic::render()
 					for (size_t i = 0; i < shist.size(); ++i)
 					{
 						const auto& ev = shist[i];
+						if (ev.kind == SceneEventKind::InitSnapshot)
+						{
+							std::string label = "#" + std::to_string(i) + "  Init History Event : " +
+							std::to_string(ev.initNames.size()) + "  tick=0";
+
+							ImGui::Selectable(label.c_str(), false);
+							continue;
+						}
 						const char* k = (ev.kind == SceneEventKind::AddObject) ? "Add " : "Remove ";
-						std::string line = "#" + std::to_string(i) + "  ";
-						line += k;
-						line += ev.objectName;
-						line += "  tick=" + std::to_string(ev.tick);
-						ImGui::TextUnformatted(line.c_str());
+
+						std::string line = "#" + std::to_string(i) + "  " + k + ev.objectName + "  tick=" + std::to_string(ev.tick);
+
+						if (ImGui::Selectable(line.c_str(), false))
+						{
+							ImGui::End();
+							ImGui::PopStyleColor(6);
+							return;
+						}
 					}
 				}
 			}
+
 			else if (auto* mesh = dynamic_cast<Mesh*>(obj))
 			{
 				if (auto* dna = mesh->getMeshDNA())

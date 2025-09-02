@@ -20,6 +20,8 @@
 #include <iostream>
 #include <algorithm>
 #include <glm/gtx/string_cast.hpp>
+
+#include "Engine/ThreeDScene.hpp"
 // #include <windows.h>
 
 ThreeDWindow::ThreeDWindow() : clickHandler(this) {}
@@ -42,56 +44,52 @@ void ThreeDWindow::setModelingMode(ThreeDMode* mode)
     if (mode)
     {
         currentMode = mode;
-        // std::cout << "[ThreeDWindow] Current mode set to: " << currentMode->getName() << std::endl;
     }
 }
 
-void ThreeDWindow::addThreeDObjectsToScene(const std::vector<ThreeDObject *> &objects)
+void ThreeDWindow::addThreeDObjectsToScene(const std::vector<ThreeDObject*>& objects)
 {
-    for (auto *object : objects)
+    if (!scene)
+        return;
+
+    for (auto* object : objects)
     {
-        if (object)
-        {
-            object->initialize();
-            ThreeDObjectsList.push_back(object);
-            openGLContext->addThreeDObjectToList(object);
+        if (!object) continue;
 
-            if(!object->getParent())
-            {
-                object->setOrigin(openGLContext->worldCenter);
-            }
+        if (!object->getParent())
+            object->setOrigin( scene->worldCenter.empty() ? glm::vec3(0.0f) : scene->worldCenter.front() );
 
-        }
+        scene->addObject(object);
+        ThreeDObjectsList.push_back(object);
     }
 }
 
-void ThreeDWindow::removeThreeDObjectsFromScene(ThreeDObject *object)
+void ThreeDWindow::removeThreeDObjectsFromScene(ThreeDObject* object)
 {
+    if (!object) return;
 
     std::cout << "[ThreeDWindow] Removing object: " << object->getName() << std::endl;
 
-    for (ThreeDObject *child : object->getChildren())
+    for (ThreeDObject* child : object->getChildren())
     {
         std::cout << "[ThreeDWindow] Recursively removing child object: " << child->getName() << std::endl;
         removeThreeDObjectsFromScene(child);
     }
 
-    if (ThreeDObject *parent = object->getParent())
-    {
+    if (ThreeDObject* parent = object->getParent())
         parent->removeChild(object);
-    }
 
     auto it = std::remove(ThreeDObjectsList.begin(), ThreeDObjectsList.end(), object);
     if (it != ThreeDObjectsList.end())
     {
-
-        openGLContext->removeThreeDobjectFromList(object);
         ThreeDObjectsList.erase(it, ThreeDObjectsList.end());
         std::cout << "[ThreeDWindow] Object removed from ThreeDObjectsList." << std::endl;
-        object->destroy();
-        // hierarchy->redrawSlotsList();
     }
+
+    if (scene)
+        scene->removeObject(object);
 }
+
 
 ThreeDObject *ThreeDWindow::getSelectedObject() const
 {
@@ -124,11 +122,14 @@ void ThreeDWindow::render()
 
     ImGui::Text("%s", text.c_str());
 
-    if (openGLContext)
+    if (scene)
     {
-        ImGui::Text("Attached OpenGL content :");
         onChangeMod();
         threeDRendering();
+    }
+    else
+    {
+        ImGui::TextUnformatted("[ThreeDWindow] No ThreeDScene attached.");
     }
 
     ImGui::End();
@@ -137,7 +138,7 @@ void ThreeDWindow::render()
 void ThreeDWindow::threeDRendering()
 {
 
-    ImGui::BeginChild("OpenGLChildWindow", ImVec2(0, 0), true, ImGuiWindowFlags_None);
+    ImGui::BeginChild("3D Scene Window", ImVec2(0, 0), true, ImGuiWindowFlags_None);
 
     oglChildPos = ImGui::GetCursorScreenPos();
     oglChildSize = ImGui::GetContentRegionAvail();
@@ -145,9 +146,9 @@ void ThreeDWindow::threeDRendering()
     int newWidth = static_cast<int>(oglChildSize.x);
     int newHeight = static_cast<int>(oglChildSize.y);
 
-    openGLContext->render();
+    scene->render();
+    ImTextureID textureID = (ImTextureID)(intptr_t)scene->getTexture();
 
-    ImTextureID textureID = (ImTextureID)(intptr_t)openGLContext->getTexture();
     ImGui::Image(textureID, oglChildSize, ImVec2(0, 1), ImVec2(1, 0));
 
     ThreeDWorldInteractions();
@@ -164,9 +165,9 @@ void ThreeDWindow::threeDRendering()
     if (ImGui::IsWindowHovered())
     {
         float wheel = ImGui::GetIO().MouseWheel;
-        if (wheel != 0.0f && openGLContext)
+        if (wheel != 0.0f)
         {
-            Camera *cam = dynamic_cast<Camera *>(openGLContext->getCamera());
+            Camera* cam = scene ? scene->getActiveCamera() : nullptr;
             if (cam && cam->isSoftwareCamera())
             {
                 cam->moveForward(wheel * 0.5f);
@@ -178,7 +179,7 @@ void ThreeDWindow::threeDRendering()
         {
             ImVec2 currentMousePos = ImGui::GetMousePos();
 
-            Camera *cam = dynamic_cast<Camera *>(openGLContext->getCamera());
+            Camera* cam = scene ? scene->getActiveCamera() : nullptr;
             if (cam && cam->isSoftwareCamera())
             {
                 if (!isDragging)
@@ -351,7 +352,7 @@ void ThreeDWindow::ThreeDWorldInteractions()
     if(currentMode == &normalMode)
     {
         MeshTransform::manipulateMesh(
-            openGLContext,
+            scene,
             multipleSelectedObjects,
             oglChildPos,
             oglChildSize,
@@ -363,7 +364,7 @@ void ThreeDWindow::ThreeDWorldInteractions()
     {
         VerticeTransform::manipulateVertices
         (
-            openGLContext,
+            scene,
             multipleSelectedVertices,
             oglChildPos,
             oglChildSize,
@@ -375,7 +376,7 @@ void ThreeDWindow::ThreeDWorldInteractions()
     {
         FaceTransform::manipulateFaces
         (
-            openGLContext,
+            scene,
             multipleSelectedFaces,
             oglChildPos,
             oglChildSize,
@@ -389,7 +390,7 @@ void ThreeDWindow::ThreeDWorldInteractions()
     {
         EdgeTransform::manipulateEdges
         (
-            openGLContext,
+            scene,
             multipleSelectedEdges,
             oglChildPos,
             oglChildSize,

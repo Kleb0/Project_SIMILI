@@ -38,7 +38,7 @@ void HierarchyListDrawing::drawSlotsList(bool& clickedOnItem)
     if (!isDragging && inspector->currentlyDraggedObject != nullptr)
     {
         // std::cout << "[HierarchyInspector] Dropping object: " << inspector->currentlyDraggedObject->getName() << std::endl;
-        std::cout << "[HierarchyInspector] Dropping object with name :" << inspector->currentlyDraggedObject->getName() << "on slot : " << inspector->dropToSlotIndex << std::endl;
+        // std::cout << "[HierarchyInspector] Dropping object with name :" << inspector->currentlyDraggedObject->getName() << "on slot : " << inspector->dropToSlotIndex << std::endl;
 
         if (inspector->childToDropOn)
         {
@@ -58,7 +58,7 @@ void HierarchyListDrawing::drawSlotsList(bool& clickedOnItem)
     // --------- STEP 2 Assign ThreeDObjects to slots --------- //
 
     
-    if (inspector->context && !inspector->objectsAssignedOnce)
+    if (inspector->scene && !inspector->objectsAssignedOnce)
     {
 
         for (int i = 0; i < totalSlots; ++i)
@@ -67,7 +67,7 @@ void HierarchyListDrawing::drawSlotsList(bool& clickedOnItem)
         }
 
 
-        const std::list<ThreeDObject*>& sceneObjects = inspector->context->getObjects();
+        const std::list<ThreeDObject*>& sceneObjects = inspector->scene->getObjectsRef();
         int nextFreeSlot = 0;
 
         for (ThreeDObject* obj : sceneObjects)
@@ -76,13 +76,13 @@ void HierarchyListDrawing::drawSlotsList(bool& clickedOnItem)
 
                 if (obj->isParented)
                 {
-                    std::cout << "[Skip Assign] '" << obj->getName() << "' is parented, skip assigning to mergedHierarchyList" << std::endl;
+                    // std::cout << "[Skip Assign] '" << obj->getName() << "' is parented, skip assigning to mergedHierarchyList" << std::endl;
                     continue;
                 }
 
                 if (obj->IsVertice())
                 {
-                    std::cout << "[Skip Assign] '" << obj->getName() << "' is a Vertice, skip." << std::endl;
+                    // std::cout << "[Skip Assign] '" << obj->getName() << "' is a Vertice, skip." << std::endl;
                     continue;
                 }
 
@@ -93,7 +93,7 @@ void HierarchyListDrawing::drawSlotsList(bool& clickedOnItem)
             {
 
                 inspector->mergedHierarchyList[slot] = obj;
-                std::cout << "[HierarchyList] '" << obj->getName() << "' assigned to slot " << slot << std::endl;
+                // std::cout << "[HierarchyList] '" << obj->getName() << "' assigned to slot " << slot << std::endl;
                 continue;
             }
 
@@ -105,13 +105,13 @@ void HierarchyListDrawing::drawSlotsList(bool& clickedOnItem)
 
             if (nextFreeSlot >= totalSlots)
             {
-                std::cerr << "Warning: no free slot available for object '" << obj->getName() << "'" << std::endl;
+                // std::cerr << "Warning: no free slot available for object '" << obj->getName() << "'" << std::endl;
                 continue;
             }
 
             obj->setSlot(nextFreeSlot);
             inspector->mergedHierarchyList[nextFreeSlot] = obj;
-            std::cout << "[HierarchyList] '" << obj->getName() << "' assigned to slot " << nextFreeSlot << std::endl;
+            // std::cout << "[HierarchyList] '" << obj->getName() << "' assigned to slot " << nextFreeSlot << std::endl;
             ++nextFreeSlot;
         }
 
@@ -142,7 +142,6 @@ void HierarchyListDrawing::drawSlotsList(bool& clickedOnItem)
         bool isSlotSelected = obj && obj->getSelected();
 
         ImGui::PushFont(inspector->unicodeFont);
-
 
         ImVec2 cursorPos = ImGui::GetCursorScreenPos();
         ImVec2 size = ImVec2(ImGui::GetContentRegionAvail().x, slotHeight);

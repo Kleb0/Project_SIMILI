@@ -4,15 +4,15 @@
 #include <imgui.h>
 #include <ImGuizmo.h>
 
-class OpenGLContext;
+class ThreeDScene;
 class Edge;
 
 namespace EdgeTransform
 {
-   glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, OpenGLContext* context,
+   glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, ThreeDScene* scene,
    const std::list<Edge*>& edges, const ImVec2& oglChildPos, const ImVec2& oglChildSize);
 
-   void manipulateEdges(OpenGLContext* context, std::list<Edge*>& selectedEdges,
+   void manipulateEdges(ThreeDScene* scene, std::list<Edge*>& selectedEdges,
    const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame);
 
 }

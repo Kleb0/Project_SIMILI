@@ -14,7 +14,7 @@ Mesh::~Mesh()
 
 void Mesh::initialize()
 {
-
+    CanDisplayRenderMessage = true;
 }
 
 void Mesh::render(const glm::mat4& viewProj)
@@ -29,6 +29,12 @@ void Mesh::render(const glm::mat4& viewProj)
 
     for (Edge* e : edges)
         if (e) e->render(viewProj, modelMatrix);
+
+    if(CanDisplayRenderMessage)
+    {
+        std::cout << "[Mesh] Rendering completed (faces, vertices, edges)\n";
+        CanDisplayRenderMessage = false;
+    }
 }
 
 void Mesh::destroyVertices()

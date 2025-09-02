@@ -11,6 +11,7 @@
 class ThreeDObject;
 class Vertice;
 class OpenGLContext;
+class ThreeDScene;
 class ThreeDMode;
 class Vertice_Mode;
 class Normal_Mode;
@@ -21,10 +22,10 @@ namespace MeshTransform
 
     void applyGizmoTransformation(const glm::mat4& delta, const std::list<ThreeDObject*>& selectedObjects, ImGuizmo::OPERATION op);
 
-    glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, OpenGLContext* context, 
+    glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, ThreeDScene* scene, 
     const std::list<ThreeDObject*>& selectedObjects, const ImVec2& oglChildPos, const ImVec2& oglChildSize);
 
-    void manipulateMesh(OpenGLContext* context, const std::list<ThreeDObject*>& selectedObjects,
+    void manipulateMesh(ThreeDScene* scene, const std::list<ThreeDObject*>& selectedObjects,
     const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame);
 
     void trackMeshTransformOnRelease(const std::list<ThreeDObject*>& selectedObjects, const glm::mat4& totalDelta, ImGuizmo::OPERATION op);

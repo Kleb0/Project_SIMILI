@@ -5,15 +5,15 @@
 #include <ImGuizmo.h>
 #include <list>
 
-class OpenGLContext;
+class ThreeDScene;
 class Face;
 
 namespace FaceTransform
 {
-   glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, OpenGLContext* context,
+   glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, ThreeDScene* scene,
    const std::list<Face*>& faces, const ImVec2& oglChildPos, const ImVec2& oglChildSize);
 
-   void manipulateFaces(OpenGLContext* context, std::list<Face*>& selectedFaces,
+   void manipulateFaces(ThreeDScene* scene, std::list<Face*>& selectedFaces,
    const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, bool bakeToVertices = true);
 
    Face* extrudeSelectedFace(std::list<Face*>& selectedFaces, float distance);

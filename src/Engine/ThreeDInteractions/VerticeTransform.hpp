@@ -4,15 +4,15 @@
 #include <imgui.h>
 #include <ImGuizmo.h>
 
-class OpenGLContext;
+class ThreeDScene;
 class Vertice;
 
 namespace VerticeTransform
 {
-   glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, OpenGLContext* context,
+   glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, ThreeDScene * scene,
    const std::list<Vertice*>& vertices, const ImVec2& oglChildPos, const ImVec2& oglChildSize);
 
-   void manipulateVertices(OpenGLContext* context, const std::list<Vertice*>& selectedVertices,
+   void manipulateVertices(ThreeDScene* scene, const std::list<Vertice*>& selectedVertices,
    const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame);
 
 }

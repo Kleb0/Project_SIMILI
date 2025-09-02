@@ -19,6 +19,7 @@ fs::path gExecutableDir;
 #include <iostream>
 
 #include "Engine/OpenGLContext.hpp"
+#include "Engine/ThreeDScene.hpp"
 #include "Engine/ThreeDObjectSelector.hpp"
 
 #include "WorldObjects/Entities/ThreedObject.hpp"
@@ -41,6 +42,7 @@ fs::path gExecutableDir;
 #include "UI/ThreeDModes/Normal_Mode.hpp"
 
 #include "Engine/SimiliSelector.hpp"
+#include "Engine/ErrorBox.hpp"
 
 // #include "UI/DirectX12TestWindow.hpp"
 
@@ -53,6 +55,7 @@ int main(int argc, char **argv)
     InfoWindow myInfoWindow;
     ThreeDWindow myThreeDWindow;
     OpenGLContext renderer;
+    ThreeDScene myThreeDScene;
     ThreeDObjectSelector selector;
     Camera mainCamera;
     HierarchyInspector myHierarchy;
@@ -72,30 +75,43 @@ int main(int argc, char **argv)
 
     // ----------------------------------------- //
 
-    myThreeDWindow.glfwWindow = gui.getWindow();
 
+
+    myThreeDScene.initizalize(); 
+
+    myThreeDWindow.glfwWindow = gui.getWindow();
     myInfoWindow.title = "Project Viewer";
     myThreeDWindow.title = "3D Viewport";
-    myThreeDWindow.setRenderer(renderer);
-    mainCamera.setName("MainCamera");
-    renderer.setCamera(&mainCamera);
 
+    mainCamera.setName("MainCamera");
+
+    myThreeDWindow.setRenderer(renderer);
+    myThreeDWindow.setHierarchy(&myHierarchy);
+    myThreeDWindow.setObjectInspector(&objectInspector);
+    myThreeDWindow.setThreeDScene(&myThreeDScene);
     myThreeDWindow.addThreeDObjectsToScene({ cubeMesh1 });
     myThreeDWindow.addThreeDObjectsToScene({&mainCamera});
+    myThreeDScene.setActiveCamera(&mainCamera);
+    myThreeDScene.setOpenGLContext(&renderer);
     myThreeDWindow.setModelingMode(&myThreeDWindow.normalMode);
     myThreeDWindow.setSimiliSelector(&mySimiliSelector);
 
-    mySimiliSelector.setWindow(&myThreeDWindow);     
-    myHierarchy.setTitle("Hierarchy");
-    myHierarchy.setContext(&renderer);
+
+
+    mySimiliSelector.setWindow(&myThreeDWindow);  
+
+    myHierarchy.setThreeDScene(&myThreeDScene);
     myHierarchy.setThreeDWindow(&myThreeDWindow);
     myHierarchy.setObjectInspector(&objectInspector);
-    myThreeDWindow.setHierarchy(&myHierarchy);
-    myThreeDWindow.setObjectInspector(&objectInspector);
-    objectInspector.setTitle("Object Inspector");
+
     historyLogic.setTitle("SUPER HISTORY LOGGER");
     historyLogic.setObjectInspector(&objectInspector);
-    historyLogic.setOpenGLContext(&renderer);
+    historyLogic.setThreeDScene(&myThreeDScene);
+    historyLogic.setThreeDWindow(&myThreeDWindow);
+    historyLogic.setHierarchyInspector(&myHierarchy);
+
+    auto* sdna = myThreeDScene.getSceneDNA();
+    if (sdna) sdna->finalizeBootstrap();
 
     gui.add(myInfoWindow);
     gui.add(myThreeDWindow);
@@ -106,6 +122,7 @@ int main(int argc, char **argv)
     gui.setThreeDWindow(&myThreeDWindow);
     gui.setObjectInspector(&objectInspector);
     // add(gui, dx12Window);
+
 
     gui.run();
     UiCreator::saveCurrentLayoutToDefault();

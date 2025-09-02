@@ -2,6 +2,7 @@
 
 #include "Engine/ThreeDInteractions/MeshTransform.hpp"
 #include "Engine/OpenGLContext.hpp"
+#include "Engine/ThreeDScene.hpp"
 #include "Engine/Guizmo.hpp"
 
 #include "WorldObjects/Mesh/Mesh.hpp" 
@@ -93,16 +94,16 @@ namespace MeshTransform
     }
 
 
-    glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op,OpenGLContext* context, const std::list<ThreeDObject*>& selectedObjects, 
+    glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, ThreeDScene* scene, const std::list<ThreeDObject*>& selectedObjects, 
     const ImVec2& oglChildPos, const ImVec2& oglChildSize)
     {
-        glm::mat4 view = context->getViewMatrix();
-        glm::mat4 proj = context->getProjectionMatrix();
+        glm::mat4 view = scene->getViewMatrix();
+        glm::mat4 proj = scene->getProjectionMatrix();
 
         return Guizmo::renderGizmoForObject(selectedObjects, op, view, proj, oglChildPos, oglChildSize);
     }
 
-    void MeshTransform::manipulateMesh(OpenGLContext* context, const std::list<ThreeDObject*>& selectedObjects,
+    void MeshTransform::manipulateMesh(ThreeDScene* scene, const std::list<ThreeDObject*>& selectedObjects,
     const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame)
     {
         
@@ -119,8 +120,8 @@ namespace MeshTransform
         if (ImGui::IsKeyPressed(ImGuiKey_R)) currentGizmoOperation = ImGuizmo::ROTATE;
         if (ImGui::IsKeyPressed(ImGuiKey_S)) currentGizmoOperation = ImGuizmo::SCALE;
 
-        glm::mat4 view = context->getViewMatrix();
-        glm::mat4 proj = context->getProjectionMatrix();
+        glm::mat4 view = scene->getViewMatrix();
+        glm::mat4 proj = scene->getProjectionMatrix();
 
         glm::mat4 dummyMatrix = Guizmo::renderGizmoForObject(selectedObjects, currentGizmoOperation, view, proj, oglChildPos, oglChildSize);
 

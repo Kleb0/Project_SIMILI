@@ -14,11 +14,13 @@
 #include "UI/UIDocking/Uidocking.hpp"
 #include "UI/ContextualMenu/ContextualMenu.hpp"
 
-
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <filesystem>
+
+#include "Engine/ErrorBox.hpp"
+
 namespace fs = std::filesystem;
 
 #include "tinyfiledialogs.h"
@@ -228,6 +230,7 @@ void MainSoftwareGUI::initImGui()
 
 void MainSoftwareGUI::run()
 {
+
     ContextualMenu contextualMenu;
     contextualMenu.setThreeDWindow(threeDWindow);
     contextualMenu.setObjectInspector(objectInspector);
@@ -239,10 +242,12 @@ void MainSoftwareGUI::run()
             contextualMenu.setHierarchyInspector(hierarchy);
     }
 
+
     static bool showSaveLayoutPopup = false;
 
     while (!glfwWindowShouldClose(window))
     {
+
         glfwPollEvents();
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -267,9 +272,10 @@ void MainSoftwareGUI::run()
         ImGui::SetNextWindowPos(viewport->WorkPos);
         ImGui::SetNextWindowSize(viewport->WorkSize);
         ImGui::SetNextWindowViewport(viewport->ID);
+
         window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
-                        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                        ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
 
         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
@@ -291,6 +297,7 @@ void MainSoftwareGUI::run()
 
         ImGui::End();
 
+
         popUpModal();
 
         for (auto *win : windows)
@@ -299,7 +306,9 @@ void MainSoftwareGUI::run()
 
         contextualMenu.render();
 
+
         ImGui::Render();
+
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
@@ -310,6 +319,7 @@ void MainSoftwareGUI::run()
         ImGui::RenderPlatformWindowsDefault();
         glfwMakeContextCurrent(window);
         glfwSwapBuffers(window);
+
     }
 }
 

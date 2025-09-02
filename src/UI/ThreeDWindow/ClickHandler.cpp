@@ -14,52 +14,52 @@
 #include <algorithm>
 #include <iostream>
 
-ClickHandler::ClickHandler(ThreeDWindow* owner) : w(owner) {}
+ClickHandler::ClickHandler(ThreeDWindow* owner) : window(owner) {}
 
 void ClickHandler::handle() {
-    if (w->selectionLocked) {
-        w->selectionLocked = false;
+    if (window->selectionLocked) {
+        window->selectionLocked = false;
         return;
     }
 
     ImVec2 mouse = ImGui::GetMousePos();
-    float relativeMouseX = mouse.x - w->oglChildPos.x;
-    float relativeMouseY = mouse.y - w->oglChildPos.y;
-    relativeMouseY = w->oglChildSize.y - relativeMouseY;
+    float relativeMouseX = mouse.x - window->oglChildPos.x;
+    float relativeMouseY = mouse.y - window->oglChildPos.y;
+    relativeMouseY = window->oglChildSize.y - relativeMouseY;
 
-    if (relativeMouseX >= 0 && relativeMouseX <= w->oglChildSize.x &&
-        relativeMouseY >= 0 && relativeMouseY <= w->oglChildSize.y)
+    if (relativeMouseX >= 0 && relativeMouseX <= window->oglChildSize.x &&
+        relativeMouseY >= 0 && relativeMouseY <= window->oglChildSize.y)
     {
-        int windowWidth = static_cast<int>(w->oglChildSize.x);
-        int windowHeight = static_cast<int>(w->oglChildSize.y);
+        int windowWidth = static_cast<int>(window->oglChildSize.x);
+        int windowHeight = static_cast<int>(window->oglChildSize.y);
 
-        w->view = w->openGLContext->getViewMatrix();
-        w->proj = w->openGLContext->getProjectionMatrix();
+        window->view = window->scene->getViewMatrix();
+        window->proj = window->scene->getProjectionMatrix();
 
-        if (w->currentMode == &w->normalMode)
+        if (window->currentMode == &window->normalMode)
         {
             bool preventSelection = ImGuizmo::IsOver();
             if (!preventSelection)
             {
-                w->selector.pickUpMesh((int)relativeMouseX, (int)relativeMouseY,
-                                       windowWidth, windowHeight, w->view, w->proj, w->ThreeDObjectsList);
+                window->selector.pickUpMesh((int)relativeMouseX, (int)relativeMouseY,
+                                       windowWidth, windowHeight, window->view, window->proj, window->ThreeDObjectsList);
             }
 
-            ThreeDObject* selected = w->selector.getSelectedObject();
+            ThreeDObject* selected = window->selector.getSelectedObject();
             bool shiftPressed = ImGui::GetIO().KeyShift;
 
             if (selected)
             {
                 if (!shiftPressed)
                 {
-                    for (auto* obj : w->ThreeDObjectsList) obj->setSelected(false);
-                    w->multipleSelectedObjects.clear();
+                    for (auto* obj : window->ThreeDObjectsList) obj->setSelected(false);
+                    window->multipleSelectedObjects.clear();
                 }
 
-                auto it = std::find(w->multipleSelectedObjects.begin(), w->multipleSelectedObjects.end(), selected);
-                if (it == w->multipleSelectedObjects.end())
+                auto it = std::find(window->multipleSelectedObjects.begin(), window->multipleSelectedObjects.end(), selected);
+                if (it == window->multipleSelectedObjects.end())
                 {
-                    w->multipleSelectedObjects.push_back(selected);
+                    window->multipleSelectedObjects.push_back(selected);
                     selected->setSelected(true);
                     //cout the position of the selected 
                     glm::vec3 worldPos = glm::vec3(selected->getGlobalModelMatrix()[3]);
@@ -71,194 +71,194 @@ void ClickHandler::handle() {
                 }
                 else if (shiftPressed)
                 {
-                    w->multipleSelectedObjects.erase(it);
+                    window->multipleSelectedObjects.erase(it);
                     selected->setSelected(false);
                 }
 
-                if (w->objectInspector)
+                if (window->objectInspector)
                 {
-                    if (w->multipleSelectedObjects.size() > 1)
+                    if (window->multipleSelectedObjects.size() > 1)
                     {
-                        w->objectInspector->clearInspectedObject();
-                        w->objectInspector->setMultipleInspectedObjects(w->multipleSelectedObjects);
+                        window->objectInspector->clearInspectedObject();
+                        window->objectInspector->setMultipleInspectedObjects(window->multipleSelectedObjects);
                     }
                     else
                     {
-                        w->objectInspector->setInspectedObject(selected);
+                        window->objectInspector->setInspectedObject(selected);
                     }
                 }
 
-                if (w->hierarchy) w->hierarchy->selectFromThreeDWindow();
-                w->selector.clearTarget();
+                if (window->hierarchy) window->hierarchy->selectFromThreeDWindow();
+                window->selector.clearTarget();
             }
-            else if (!ImGuizmo::IsUsing() && !w->wasUsingGizmoLastFrame)
+            else if (!ImGuizmo::IsUsing() && !window->wasUsingGizmoLastFrame)
             {
-                for (auto* obj : w->ThreeDObjectsList) obj->setSelected(false);
-                w->multipleSelectedObjects.clear();
-                w->selector.clearTarget();
+                for (auto* obj : window->ThreeDObjectsList) obj->setSelected(false);
+                window->multipleSelectedObjects.clear();
+                window->selector.clearTarget();
 
-                if (w->objectInspector)
+                if (window->objectInspector)
                 {
-                    w->objectInspector->clearInspectedObject();
-                    w->objectInspector->clearMultipleInspectedObjects();
+                    window->objectInspector->clearInspectedObject();
+                    window->objectInspector->clearMultipleInspectedObjects();
                 }
 
-                if (w->hierarchy)
+                if (window->hierarchy)
                 {
-                    w->hierarchy->clearMultipleSelection();
-                    w->hierarchy->unselectObject(w->hierarchy->getSelectedObject());
+                    window->hierarchy->clearMultipleSelection();
+                    window->hierarchy->unselectObject(window->hierarchy->getSelectedObject());
                 }
 
-                w->wasUsingGizmoLastFrame = false;
+                window->wasUsingGizmoLastFrame = false;
             }
         }
 
-        if (w->currentMode == &w->verticeMode)
+        if (window->currentMode == &window->verticeMode)
         {
             if (ImGuizmo::IsUsing()) return;
             bool shiftPressed = ImGui::GetIO().KeyShift;
 
-            Vertice* selectedVertice = w->selector.pickUpVertice(
+            Vertice* selectedVertice = window->selector.pickUpVertice(
                 (int)relativeMouseX, (int)relativeMouseY,
-                windowWidth, windowHeight, w->view, w->proj,
-                w->ThreeDObjectsList, shiftPressed
+                windowWidth, windowHeight, window->view, window->proj,
+                window->ThreeDObjectsList, shiftPressed
             );
 
             if (selectedVertice)
             {
                 if (shiftPressed)
                 {
-                    auto it = std::find(w->multipleSelectedVertices.begin(), w->multipleSelectedVertices.end(), selectedVertice);
-                    if (it == w->multipleSelectedVertices.end())
+                    auto it = std::find(window->multipleSelectedVertices.begin(), window->multipleSelectedVertices.end(), selectedVertice);
+                    if (it == window->multipleSelectedVertices.end())
                     {
-                        w->multipleSelectedVertices.push_back(selectedVertice);
-                        for (Vertice* v : w->multipleSelectedVertices) v->setSelected(true);
+                        window->multipleSelectedVertices.push_back(selectedVertice);
+                        for (Vertice* v : window->multipleSelectedVertices) v->setSelected(true);
                     }
                 }
                 else
                 {
-                    for (ThreeDObject* obj : w->ThreeDObjectsList)
+                    for (ThreeDObject* obj : window->ThreeDObjectsList)
                     {
                         Mesh* mesh = dynamic_cast<Mesh*>(obj);
                         if (!mesh) continue;    
                         for (Vertice* v : mesh->getVertices()) v->setSelected(false);
                     }
-                    w->multipleSelectedVertices.clear();
+                    window->multipleSelectedVertices.clear();
                     selectedVertice->setSelected(true);
-                    w->multipleSelectedVertices.push_back(selectedVertice);
-                    w->lastSelectedVertice = selectedVertice;
+                    window->multipleSelectedVertices.push_back(selectedVertice);
+                    window->lastSelectedVertice = selectedVertice;
                 }
             }
             else
             {
                 if (!shiftPressed)
                 {
-                    for (ThreeDObject* obj : w->ThreeDObjectsList)
+                    for (ThreeDObject* obj : window->ThreeDObjectsList)
                     {
                         Mesh* mesh = dynamic_cast<Mesh*>(obj);
                         if (!mesh) continue;  
                         for (Vertice* vert : mesh->getVertices()) vert->setSelected(false);
                     }
-                    w->multipleSelectedVertices.clear();
-                    w->lastSelectedVertice = nullptr;
+                    window->multipleSelectedVertices.clear();
+                    window->lastSelectedVertice = nullptr;
                 }
             }
         }
 
-        if (w->currentMode == &w->faceMode)
+        if (window->currentMode == &window->faceMode)
         {
             if (ImGuizmo::IsUsing()) return;
             bool shiftPressed = ImGui::GetIO().KeyShift;
 
-            Face* selectedFace = w->selector.pickupFace(
+            Face* selectedFace = window->selector.pickupFace(
                 static_cast<int>(relativeMouseX), static_cast<int>(relativeMouseY),
-                windowWidth, windowHeight, w->view, w->proj, w->ThreeDObjectsList, shiftPressed
+                windowWidth, windowHeight, window->view, window->proj, window->ThreeDObjectsList, shiftPressed
             );
 
             if (selectedFace)
             {
                 if (shiftPressed)
                 {
-                    auto it = std::find(w->multipleSelectedFaces.begin(), w->multipleSelectedFaces.end(), selectedFace);
-                    if (it == w->multipleSelectedFaces.end())
+                    auto it = std::find(window->multipleSelectedFaces.begin(), window->multipleSelectedFaces.end(), selectedFace);
+                    if (it == window->multipleSelectedFaces.end())
                     {
-                        w->multipleSelectedFaces.push_back(selectedFace);
-                        for (Face* f : w->multipleSelectedFaces) if (f) f->setSelected(true);
+                        window->multipleSelectedFaces.push_back(selectedFace);
+                        for (Face* f : window->multipleSelectedFaces) if (f) f->setSelected(true);
                     }
                 }
                 else
                 {
-                    for (ThreeDObject* obj : w->ThreeDObjectsList)
+                    for (ThreeDObject* obj : window->ThreeDObjectsList)
                     {
                         Mesh* mesh = dynamic_cast<Mesh*>(obj);
                         if (!mesh) continue;
                         for (Face* f : mesh->getFaces()) if (f) f->setSelected(false);
                     }
-                    w->multipleSelectedFaces.clear();
+                    window->multipleSelectedFaces.clear();
                     selectedFace->setSelected(true);
-                    w->multipleSelectedFaces.push_back(selectedFace);
+                    window->multipleSelectedFaces.push_back(selectedFace);
                 }
             }
             else
             {
                 if (!shiftPressed)
                 {
-                    for (ThreeDObject* obj : w->ThreeDObjectsList)
+                    for (ThreeDObject* obj : window->ThreeDObjectsList)
                     {
                         Mesh* mesh = dynamic_cast<Mesh*>(obj);
                         if (!mesh) continue;
                         for (Face* f : mesh->getFaces()) if (f) f->setSelected(false);
                     }
-                    w->multipleSelectedFaces.clear();
+                    window->multipleSelectedFaces.clear();
                 }
             }
         }
 
-        if (w->currentMode == &w->edgeMode)
+        if (window->currentMode == &window->edgeMode)
         {
             if (ImGuizmo::IsUsing()) return;
             bool shiftPressed = ImGui::GetIO().KeyShift;
 
-            Edge* selectedEdge = w->selector.pickupEdge(
+            Edge* selectedEdge = window->selector.pickupEdge(
                 static_cast<int>(relativeMouseX), static_cast<int>(relativeMouseY),
-                windowWidth, windowHeight, w->view, w->proj, w->ThreeDObjectsList, shiftPressed
+                windowWidth, windowHeight, window->view, window->proj, window->ThreeDObjectsList, shiftPressed
             );
 
             if (selectedEdge)
             {
                 if (shiftPressed)
                 {
-                    auto it = std::find(w->multipleSelectedEdges.begin(), w->multipleSelectedEdges.end(), selectedEdge);
-                    if (it == w->multipleSelectedEdges.end())
+                    auto it = std::find(window->multipleSelectedEdges.begin(), window->multipleSelectedEdges.end(), selectedEdge);
+                    if (it == window->multipleSelectedEdges.end())
                     {
-                        w->multipleSelectedEdges.push_back(selectedEdge);
-                        for (Edge* e : w->multipleSelectedEdges) if (e) e->setSelected(true);
+                        window->multipleSelectedEdges.push_back(selectedEdge);
+                        for (Edge* e : window->multipleSelectedEdges) if (e) e->setSelected(true);
                     }
                 }
                 else
                 {
-                    for (ThreeDObject* obj : w->ThreeDObjectsList)
+                    for (ThreeDObject* obj : window->ThreeDObjectsList)
                     {
                         Mesh* mesh = dynamic_cast<Mesh*>(obj);
                         if (!mesh) continue;
                         for (Edge* e : mesh->getEdges()) if (e) e->setSelected(false);
                     }
-                    w->multipleSelectedEdges.clear();
+                    window->multipleSelectedEdges.clear();
                     selectedEdge->setSelected(true);
-                    w->multipleSelectedEdges.push_back(selectedEdge);
+                    window->multipleSelectedEdges.push_back(selectedEdge);
                 }
             }
             else
             {
                 if (!shiftPressed)
                 {
-                    for (ThreeDObject* obj : w->ThreeDObjectsList)
+                    for (ThreeDObject* obj : window->ThreeDObjectsList)
                     {
                         Mesh* mesh = dynamic_cast<Mesh*>(obj);
                         if (!mesh) continue;    
                         for (Edge* e : mesh->getEdges()) if (e) e->setSelected(false);
                     }
-                    w->multipleSelectedEdges.clear();
+                    window->multipleSelectedEdges.clear();
                 }
             }
         }
