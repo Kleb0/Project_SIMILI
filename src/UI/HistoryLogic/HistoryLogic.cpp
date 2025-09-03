@@ -62,20 +62,38 @@ void HistoryLogic::render()
 					for (size_t i = 0; i < shist.size(); ++i)
 					{
 						const auto& ev = shist[i];
+
 						if (ev.kind == SceneEventKind::InitSnapshot)
 						{
-							std::string label = "#" + std::to_string(i) + "  Init History Event : " +
-							std::to_string(ev.initNames.size()) + "  tick=0";
+							std::string label = "#" + std::to_string(i) + "  Init History Event : tick=0";
 
-							ImGui::Selectable(label.c_str(), false);
+							if (ImGui::Selectable(label.c_str(), false))
+							{
+								scenedna->rewindToSceneEvent(i);
+								ImGui::End();
+								ImGui::PopStyleColor(6);
+								return;
+							}
+
 							continue;
 						}
-						const char* k = (ev.kind == SceneEventKind::AddObject) ? "Add " : "Remove ";
 
-						std::string line = "#" + std::to_string(i) + "  " + k + ev.objectName + "  tick=" + std::to_string(ev.tick);
+						std::string eventKindStr;
+						if (ev.kind == SceneEventKind::AddObject)
+						{
+							eventKindStr = "Add";
+						}
+						else if (ev.kind == SceneEventKind::RemoveObject)
+						{
+							eventKindStr = "Remove";
+						}
+
+						std::string line = "#" + std::to_string(i) + "  " + eventKindStr + " " + ev.objectName + "  tick=" + std::to_string(ev.tick);
 
 						if (ImGui::Selectable(line.c_str(), false))
 						{
+							scenedna->rewindToSceneEvent(i);
+							scenedna->cancelLastAddObject(i);
 							ImGui::End();
 							ImGui::PopStyleColor(6);
 							return;

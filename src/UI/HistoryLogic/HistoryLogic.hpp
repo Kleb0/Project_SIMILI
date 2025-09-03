@@ -26,13 +26,11 @@ public:
 
     void setThreeDScene(ThreeDScene* scene) { this->scene = scene; }
 
-
     void setThreeDWindow(ThreeDWindow* w) { threeDWindow = w; }
     ThreeDWindow* getThreeDWindow() const { return threeDWindow; }
 
     void setHierarchyInspector(HierarchyInspector* h) { hierarchyInspector = h; }
     HierarchyInspector* getHierarchyInspector() const { return hierarchyInspector; }
-
     
 private:
     std::string title = "Scene History";
