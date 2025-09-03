@@ -31,8 +31,7 @@ void ThreeDScene_DNA::track(SceneEventKind kind, const std::string& name, ThreeD
 
     const char* k = (kind == SceneEventKind::AddObject ? "ADD" :
     kind == SceneEventKind::RemoveObject ? "REMOVE" : "INIT");
-    std::cout << "[ThreeDScene_DNA] " << k << " object='" << name
-              << "' tick=" << history.back().tick << std::endl;
+
 }
 
 void ThreeDScene_DNA::trackAddObject(const std::string& name, ThreeDObject* obj)
@@ -67,7 +66,37 @@ void ThreeDScene_DNA::finalizeBootstrap()
     bootstrapPtrs.clear();
     bootstrapping = false;
     nextTick = 1;
-
-    // std::cout << "[ThreeDScene_DNA] INIT snapshot recorded with "
-    //           << history.front().initNames.size() << " object(s) at tick=0\n";
 }
+
+bool ThreeDScene_DNA::rewindToSceneEvent(size_t index)
+{
+    if (index >= history.size())
+        return false;
+
+    auto it = history.begin() + index + 1;
+    if (it == history.end())
+        return false;
+
+    history.erase(it, history.end());
+    return true;
+}
+
+
+void ThreeDScene_DNA::cancelLastAddObject(size_t preserveIndex)
+{
+    if (history.empty()) return;
+
+    for (auto it = history.rbegin(); it != history.rend(); ++it)
+    {
+        auto baseIt = std::next(it).base();
+        size_t idx = std::distance(history.begin(), baseIt);
+
+        if (it->kind == SceneEventKind::AddObject && idx != preserveIndex)
+        {
+            auto name = it->objectName;
+            history.erase(baseIt);
+            return;
+        }
+    }
+}
+

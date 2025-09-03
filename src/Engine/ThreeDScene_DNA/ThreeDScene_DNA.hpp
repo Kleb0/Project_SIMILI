@@ -7,6 +7,7 @@
 #include <list>  
 
 class ThreeDObject;
+class ThreeDScene;
 
 enum class SceneEventKind : uint8_t 
 {
@@ -44,6 +45,9 @@ public:
 
     void finalizeBootstrap();
 
+    bool rewindToSceneEvent(size_t index);
+    void cancelLastAddObject(size_t preserveIndex = size_t(-1));
+
 private:
     bool hasInit{false};
     uint64_t init_tick{0};
@@ -54,6 +58,7 @@ private:
     std::vector<std::string> bootstrapNames;
     std::vector<ThreeDObject*> bootstrapPtrs;
 
+    
     void track(SceneEventKind kind, const std::string& name, ThreeDObject* obj);
 
 };
