@@ -14,6 +14,9 @@ public:
     ThreeDObject();
     virtual ~ThreeDObject();
 
+    
+    uint64_t getID() const { return id; }
+
     virtual void initialize() = 0;
     virtual void render(const glm::mat4 &viewProj) = 0;
     virtual void destroy() {}
@@ -93,6 +96,9 @@ protected:
     bool isCurrentlySelected = false;
     std::string name = "Unnamed";
     glm::vec3 origin = glm::vec3(0.0f); 
+
+    uint64_t id;
+    static uint64_t generateRandomID();
 
     bool isMesh = false;
 };

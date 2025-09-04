@@ -63,6 +63,7 @@ int main(int argc, char **argv)
     HistoryLogic historyLogic;
 
     Mesh* cubeMesh1 = Primitives::CreateCubeMesh(1.0f,glm::vec3(0.0f, 0.0f, 0.0f), "Cube", true);
+    std::cout << "ID of the cubeMesh1 is " << cubeMesh1->getID() << std::endl;
 
     // ------- DirectX 12 has been implemented, so comment it for now as i don't need it actually ------- //
     // If you want to use DirectX 12, uncomment the following lines and make sure to include the necessary headers.
@@ -84,11 +85,13 @@ int main(int argc, char **argv)
     myThreeDWindow.title = "3D Viewport";
 
     mainCamera.setName("MainCamera");
+    std::cout << "ID of the Camera is " << mainCamera.getID() << std::endl;
 
     myThreeDWindow.setRenderer(renderer);
     myThreeDWindow.setHierarchy(&myHierarchy);
     myThreeDWindow.setObjectInspector(&objectInspector);
     myThreeDWindow.setThreeDScene(&myThreeDScene);
+    
     myThreeDWindow.addThreeDObjectsToScene({ cubeMesh1 });
     myThreeDWindow.addThreeDObjectsToScene({&mainCamera});
     myThreeDScene.setActiveCamera(&mainCamera);
@@ -104,6 +107,8 @@ int main(int argc, char **argv)
     myHierarchy.setThreeDWindow(&myThreeDWindow);
     myHierarchy.setObjectInspector(&objectInspector);
 
+    myThreeDScene.setHierarchyInspector(&myHierarchy);
+
     historyLogic.setTitle("SUPER HISTORY LOGGER");
     historyLogic.setObjectInspector(&objectInspector);
     historyLogic.setThreeDScene(&myThreeDScene);
@@ -112,6 +117,7 @@ int main(int argc, char **argv)
 
     auto* sdna = myThreeDScene.getSceneDNA();
     if (sdna) sdna->finalizeBootstrap();
+    sdna->setSceneRef(&myThreeDScene);
 
     gui.add(myInfoWindow);
     gui.add(myThreeDWindow);

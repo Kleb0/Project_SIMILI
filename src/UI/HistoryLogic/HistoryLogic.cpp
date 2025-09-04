@@ -57,49 +57,54 @@ void HistoryLogic::render()
 				{
 					ImGui::TextDisabled("No scene events yet.");
 				}
-				else
-				{
-					for (size_t i = 0; i < shist.size(); ++i)
+					else
 					{
-						const auto& ev = shist[i];
+						const auto& shist = scenedna->getHistory();
 
-						if (ev.kind == SceneEventKind::InitSnapshot)
+						for (size_t i = 0; i < shist.size(); ++i)
 						{
-							std::string label = "#" + std::to_string(i) + "  Init History Event : tick=0";
+							const auto& ev = shist[i];
 
-							if (ImGui::Selectable(label.c_str(), false))
+							std::string eventKindStr;
+							if (ev.kind == SceneEventKind::AddObject)
+								eventKindStr = "Add";
+							else if (ev.kind == SceneEventKind::RemoveObject)
+								eventKindStr = "Remove";
+							else if (ev.kind == SceneEventKind::InitSnapshot)
+								eventKindStr = "InitSnapshot";
+
+							std::string line = "#" + std::to_string(i) + "  " + eventKindStr + "  " + ev.objectName;
+
+							if (ev.kind == SceneEventKind::AddObject)
+								line += "  ID=" + std::to_string(ev.objectID);
+
+							line += "  tick=" + std::to_string(ev.tick);
+
+							if (ImGui::Selectable(line.c_str(), false))
 							{
+								for (size_t j = shist.size(); j-- > i + 1;)
+								{
+									const auto& futureEvent = shist[j];
+
+									if (futureEvent.kind == SceneEventKind::AddObject)
+									{
+										scenedna->cancelLastAddObject(j);
+									}
+									else
+									{
+										scenedna->rewindToSceneEvent(j - 1);
+									}
+								}
+
 								scenedna->rewindToSceneEvent(i);
+
 								ImGui::End();
 								ImGui::PopStyleColor(6);
 								return;
 							}
-
-							continue;
-						}
-
-						std::string eventKindStr;
-						if (ev.kind == SceneEventKind::AddObject)
-						{
-							eventKindStr = "Add";
-						}
-						else if (ev.kind == SceneEventKind::RemoveObject)
-						{
-							eventKindStr = "Remove";
-						}
-
-						std::string line = "#" + std::to_string(i) + "  " + eventKindStr + " " + ev.objectName + "  tick=" + std::to_string(ev.tick);
-
-						if (ImGui::Selectable(line.c_str(), false))
-						{
-							scenedna->rewindToSceneEvent(i);
-							scenedna->cancelLastAddObject(i);
-							ImGui::End();
-							ImGui::PopStyleColor(6);
-							return;
 						}
 					}
-				}
+
 			}
 
 			else if (auto* mesh = dynamic_cast<Mesh*>(obj))

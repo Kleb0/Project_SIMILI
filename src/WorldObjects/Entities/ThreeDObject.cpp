@@ -3,9 +3,25 @@
 #include <imgui.h>
 #include <ImGuizmo.h>
 #include <glm/gtx/matrix_decompose.hpp>
+#include <random>
 
-ThreeDObject::ThreeDObject() {}
+ThreeDObject::ThreeDObject() {
+id = generateRandomID();
+}
+
 ThreeDObject::~ThreeDObject() {}
+
+
+// ---- générate random ID ----- //
+
+uint64_t ThreeDObject::generateRandomID() {
+    static std::random_device rd;
+    static std::mt19937_64 gen(rd());
+    static std::uniform_int_distribution<uint64_t> dis;
+
+    return dis(gen);
+}
+
 
 void ThreeDObject::translate(const glm::vec3 &newPosition) { position = newPosition; }
 void ThreeDObject::rotate(const glm::vec3 &newEulerRotationDegrees) { rotation = glm::quat(glm::radians(newEulerRotationDegrees)); }

@@ -14,6 +14,7 @@
 class HistoryLogic; 
 class OpenGLContext;
 class Camera;
+class HierarchyInspector;
 
 class ThreeDScene
 {
@@ -51,10 +52,16 @@ public:
     Camera* getActiveCamera() const { return activeCamera; }
 
     bool containsObject(const ThreeDObject* obj) const;
+    bool removeObjectFromSceneDNA(uint64_t objectID);
+
+    void setHierarchyInspector(HierarchyInspector* inspector) { hierarchyInspector = inspector; }
+    HierarchyInspector* getHierarchyInspector() const { return hierarchyInspector; }
 
 private:
     friend class HistoryLogic;
     friend class OpenGLContext;
+
+    HierarchyInspector* hierarchyInspector = nullptr;
 
     glm::mat4 lastViewProj{1.0f};
     std::list<ThreeDObject *> objects;

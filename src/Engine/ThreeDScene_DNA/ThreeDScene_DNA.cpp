@@ -3,11 +3,17 @@
 #include "WorldObjects/Entities/ThreeDObject.hpp"
 #include <algorithm>
 #include <iostream>
+#include "Engine/ErrorBox.hpp"
 
 
 static inline void erasePtr(std::list<ThreeDObject*>& L, ThreeDObject* p) 
 {
     L.remove(p); 
+}
+
+void ThreeDScene_DNA::setSceneRef(ThreeDScene* scene) 
+{
+    sceneRef = scene;
 }
 
 
@@ -20,20 +26,6 @@ void ThreeDScene_DNA::ensureInit()
     std::cout << "[ThreeDScene_DNA] Initialized once (tick=" << init_tick << ")" << " | name=" << name << std::endl;
 }
 
-void ThreeDScene_DNA::track(SceneEventKind kind, const std::string& name, ThreeDObject* obj)
-{
-    SceneEvent ev;
-    ev.kind = kind;
-    ev.objectName = name;
-    ev.ptr = obj;
-    ev.tick = nextTick++;
-    history.push_back(std::move(ev));
-
-    const char* k = (kind == SceneEventKind::AddObject ? "ADD" :
-    kind == SceneEventKind::RemoveObject ? "REMOVE" : "INIT");
-
-}
-
 void ThreeDScene_DNA::trackAddObject(const std::string& name, ThreeDObject* obj)
 {
     if (bootstrapping) 
@@ -42,14 +34,34 @@ void ThreeDScene_DNA::trackAddObject(const std::string& name, ThreeDObject* obj)
         bootstrapPtrs.push_back(obj);
         return;
     }
-    track(SceneEventKind::AddObject, name, obj);
+
+
+    SceneEvent ev;
+    ev.kind = SceneEventKind::AddObject;
+    ev.objectName = name;
+    ev.ptr = obj;
+    ev.objectID = obj->getID();
+    ev.tick = nextTick++;
+    history.push_back(std::move(ev));
+
+    std::cout << "[SceneDNA] Tracked ADD | name: " << name
+    << " | id: " << ev.objectID
+    << " | tick: " << ev.tick << std::endl;
 }
+
 
 void ThreeDScene_DNA::trackRemoveObject(const std::string& name, ThreeDObject* obj)
 {
-    track(SceneEventKind::RemoveObject, name, obj);
-}
+    SceneEvent ev;
+    ev.kind = SceneEventKind::RemoveObject;
+    ev.objectName = name;
+    ev.ptr = obj;
+    ev.tick = nextTick++;
+    history.push_back(std::move(ev));
 
+    std::cout << "[SceneDNA] Tracked REMOVE | name: " << name
+              << " | tick: " << ev.tick << std::endl;
+}
 void ThreeDScene_DNA::finalizeBootstrap()
 {
     ensureInit();
@@ -84,19 +96,29 @@ bool ThreeDScene_DNA::rewindToSceneEvent(size_t index)
 
 void ThreeDScene_DNA::cancelLastAddObject(size_t preserveIndex)
 {
-    if (history.empty()) return;
+
+    if (history.empty() || !sceneRef) return;
 
     for (auto it = history.rbegin(); it != history.rend(); ++it)
     {
-        auto baseIt = std::next(it).base();
+        auto baseIt = std::prev(it.base());
         size_t idx = std::distance(history.begin(), baseIt);
 
-        if (it->kind == SceneEventKind::AddObject && idx != preserveIndex)
+        if (it->kind == SceneEventKind::AddObject && idx == preserveIndex)
         {
-            auto name = it->objectName;
+            uint64_t targetID = it->objectID;
+
+            for (ThreeDObject* obj : sceneRef->getObjectsRef())
+            {
+                if (obj && obj->getID() == targetID)
+                {
+                    sceneRef->removeObjectFromSceneDNA(targetID);
+                    break;
+                }
+            }
+        
             history.erase(baseIt);
             return;
         }
     }
 }
-
