@@ -4,6 +4,9 @@
 #include <algorithm>
 #include <iostream>
 #include "Engine/ErrorBox.hpp"
+#include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
+#include "WorldObjects/Mesh/Mesh.hpp"
+#include "WorldObjects/Mesh_DNA/Mesh_DNA.hpp"
 
 
 static inline void erasePtr(std::list<ThreeDObject*>& L, ThreeDObject* p) 
@@ -138,7 +141,6 @@ void ThreeDScene_DNA::cancelLastRemoveObject(size_t preserveIndex)
             const uint64_t targetID = it->objectID;
             ThreeDObject* resurrect = nullptr;
 
-
             const auto& gyConst = sceneRef->getGraveyard();
             auto& gy = const_cast<std::list<ThreeDObject*>&>(gyConst); 
 
@@ -166,10 +168,16 @@ void ThreeDScene_DNA::cancelLastRemoveObject(size_t preserveIndex)
             {
                 resurrect->setSelected(false); 
                 if (std::find(objects.begin(), objects.end(), resurrect) == objects.end())
+                {
+
                     objects.push_back(resurrect);
+
+                }
+
             }
 
-            sceneRef->reviveFromGraveyardById(targetID);
+            std::cout << "[ThreeDScene_DNA] Resurrected object from graveyard: " << resurrect->getName() << " (ID=" << targetID << ")" << std::endl;
+            sceneRef->getHierarchyInspector()->redrawSlotsList();
             history.erase(baseIt);
             return;
         }

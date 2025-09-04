@@ -101,7 +101,6 @@ void HistoryLogic::render()
 								}
 
 								scenedna->rewindToSceneEvent(i);
-
 								ImGui::End();
 								ImGui::PopStyleColor(6);
 								return;

@@ -61,9 +61,7 @@ int main(int argc, char **argv)
     HierarchyInspector myHierarchy;
     ObjectInspector objectInspector;
     HistoryLogic historyLogic;
-
     Mesh* cubeMesh1 = Primitives::CreateCubeMesh(1.0f,glm::vec3(0.0f, 0.0f, 0.0f), "Cube", true);
-    std::cout << "ID of the cubeMesh1 is " << cubeMesh1->getID() << std::endl;
 
     // ------- DirectX 12 has been implemented, so comment it for now as i don't need it actually ------- //
     // If you want to use DirectX 12, uncomment the following lines and make sure to include the necessary headers.
@@ -76,8 +74,6 @@ int main(int argc, char **argv)
 
     // ----------------------------------------- //
 
-
-
     myThreeDScene.initizalize(); 
 
     myThreeDWindow.glfwWindow = gui.getWindow();
@@ -85,7 +81,6 @@ int main(int argc, char **argv)
     myThreeDWindow.title = "3D Viewport";
 
     mainCamera.setName("MainCamera");
-    std::cout << "ID of the Camera is " << mainCamera.getID() << std::endl;
 
     myThreeDWindow.setRenderer(renderer);
     myThreeDWindow.setHierarchy(&myHierarchy);
@@ -98,8 +93,6 @@ int main(int argc, char **argv)
     myThreeDScene.setOpenGLContext(&renderer);
     myThreeDWindow.setModelingMode(&myThreeDWindow.normalMode);
     myThreeDWindow.setSimiliSelector(&mySimiliSelector);
-
-
 
     mySimiliSelector.setWindow(&myThreeDWindow);  
 
@@ -128,7 +121,6 @@ int main(int argc, char **argv)
     gui.setThreeDWindow(&myThreeDWindow);
     gui.setObjectInspector(&objectInspector);
     // add(gui, dx12Window);
-
 
     gui.run();
     UiCreator::saveCurrentLayoutToDefault();

@@ -160,13 +160,16 @@ void MeshDNA::trackExtrude(const ExtrudeRecord& rec)
 }
 
 
-static void erasePtr(std::vector<Vertice*>& v, Vertice* p) {
+static void erasePtr(std::vector<Vertice*>& v, Vertice* p) 
+{
     v.erase(std::remove(v.begin(), v.end(), p), v.end());
 }
-static void erasePtr(std::vector<Edge*>& v, Edge* p) {
+static void erasePtr(std::vector<Edge*>& v, Edge* p) 
+{
     v.erase(std::remove(v.begin(), v.end(), p), v.end());
 }
-static void erasePtr(std::vector<Face*>& v, Face* p) {
+static void erasePtr(std::vector<Face*>& v, Face* p) 
+{
     v.erase(std::remove(v.begin(), v.end(), p), v.end());
 }
 
@@ -441,10 +444,9 @@ void MeshDNA::rewindExtrudeHistory(size_t index_inclusive, Mesh* mesh)
     auto& E = const_cast<std::vector<Edge*>&>(mesh->getEdges());
     auto& F = const_cast<std::vector<Face*>&>(mesh->getFaces());
 
-    // Helpers sûrs: on enlève du conteneur + destroy() si dispo, mais PAS de delete ici
     auto removeFace = [&](Face* f){
         if (!f) return;
-        if (std::find(F.begin(), F.end(), f) == F.end()) return; // déjà retirée/tuée ailleurs
+        if (std::find(F.begin(), F.end(), f) == F.end()) return; 
         erasePtr(F, f);
         if constexpr (has_destroy<Face>::value) f->destroy();
     };
