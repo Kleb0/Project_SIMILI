@@ -103,40 +103,25 @@ bool ThreeDScene::containsObject(const ThreeDObject* obj) const
 }
 
 
-void ThreeDScene::softRemove(ThreeDObject* obj)
+void ThreeDScene::pushInGraveyard(ThreeDObject* obj)
 {
     if (!obj) return;
 
     clearSelectionRecursive(obj);
-
     erasePtr(objects, obj);
     graveyard.push_back(obj);
-}
-
-bool ThreeDScene::revive(ThreeDObject* obj)
-{
-    if (!obj) return false;
-
-    clearSelectionRecursive(obj);
-
-    if (auto itG = std::find(graveyard.begin(), graveyard.end(), obj); itG != graveyard.end())
-        graveyard.erase(itG);
-
-
-    if (!containsObject(obj))
-        objects.push_back(obj);
 
     if (auto* mesh = dynamic_cast<Mesh*>(obj))
     {
-        if (!mesh->getMeshDNA())
-            mesh->setMeshDNA(new MeshDNA(), true);
+        GraveyardEntry entry;
+        entry.object = obj;
+        entry.vertices = mesh->getVertices();
+        entry.edges = mesh->getEdges();
+        entry.faces = mesh->getFaces();
+        meshGraveyard.push_back(std::move(entry));
+        std::cout << "[ThreeDScene] Mesh sent to graveyard: " << obj->getName() << " (ID=" << obj->getID() << ")" << std::endl;
 
-        mesh->finalize();
-        return true;
     }
-
-    obj->initialize();
-    return true;
 }
 
 
@@ -323,7 +308,7 @@ bool ThreeDScene::removeObject(ThreeDObject* object)
 
     if (auto* sdna = getSceneDNA())
         sdna->trackRemoveObject(object->getName(), object);
-    softRemove(object);
+    pushInGraveyard(object);
     return true;
 }
 
@@ -347,3 +332,20 @@ bool ThreeDScene::removeObjectFromSceneDNA(uint64_t objectID)
     return false;
 }
 
+bool ThreeDScene::reviveFromGraveyardById(uint64_t id)
+{
+    for (auto it = graveyard.begin(); it != graveyard.end(); ++it)
+    {
+        if (*it && (*it)->getID() == id)
+        {
+            ThreeDObject* obj = *it;
+            graveyard.erase(it);
+            obj->setSelected(false);
+            if (std::find(objects.begin(), objects.end(), obj) == objects.end())
+                objects.push_back(obj);
+            if (auto* hi = getHierarchyInspector()) hi->redrawSlotsList();
+            return true;
+        }
+    }
+    return false;
+}

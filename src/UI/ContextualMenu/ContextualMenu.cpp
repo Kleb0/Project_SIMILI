@@ -71,7 +71,7 @@ void ContextualMenu::render()
                             objectInspector->clearInspectedObject();
 
                         ThreeDObject *toDelete = selected;
-                        threeDWindow->removeThreeDObjectsFromScene({toDelete});
+                        threeDWindow->removeThreeDObjectsFromContextualMenu({toDelete});
                         hierarchyInspector->redrawSlotsList();
                         pendingDeletion = toDelete;
                     }
@@ -105,7 +105,7 @@ void ContextualMenu::render()
 
         if (pendingDeletion)
         {
-            threeDWindow->removeThreeDObjectsFromScene({pendingDeletion});
+            threeDWindow->removeThreeDObjectsFromContextualMenu({pendingDeletion});
             pendingDeletion = nullptr;
         }
     }

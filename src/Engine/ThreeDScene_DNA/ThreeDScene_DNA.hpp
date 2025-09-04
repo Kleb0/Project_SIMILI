@@ -48,6 +48,8 @@ public:
 
     bool rewindToSceneEvent(size_t index);
     void cancelLastAddObject(size_t preserveIndex = size_t(-1));
+    void cancelLastRemoveObject(size_t preserveIndex = size_t(-1));
+
     void setSceneRef(ThreeDScene* scene);
     ThreeDScene* getSceneRef() const { return sceneRef; }
 

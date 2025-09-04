@@ -64,7 +64,7 @@ void ThreeDWindow::addThreeDObjectsToScene(const std::vector<ThreeDObject*>& obj
     }
 }
 
-void ThreeDWindow::removeThreeDObjectsFromScene(ThreeDObject* object)
+void ThreeDWindow::removeThreeDObjectsFromContextualMenu(ThreeDObject* object)
 {
     if (!object) return;
 
@@ -73,7 +73,7 @@ void ThreeDWindow::removeThreeDObjectsFromScene(ThreeDObject* object)
     for (ThreeDObject* child : object->getChildren())
     {
         std::cout << "[ThreeDWindow] Recursively removing child object: " << child->getName() << std::endl;
-        removeThreeDObjectsFromScene(child);
+        removeThreeDObjectsFromContextualMenu(child);
     }
 
     if (ThreeDObject* parent = object->getParent())

@@ -90,6 +90,10 @@ void HistoryLogic::render()
 									{
 										scenedna->cancelLastAddObject(j);
 									}
+									else if (futureEvent.kind == SceneEventKind::RemoveObject)
+									{
+										scenedna->cancelLastRemoveObject(j);
+									}
 									else
 									{
 										scenedna->rewindToSceneEvent(j - 1);
