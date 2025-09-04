@@ -20,6 +20,7 @@ struct SceneEvent {
     SceneEventKind kind{SceneEventKind::AddObject};
     std::string objectName;
     ThreeDObject* ptr{nullptr};
+    uint64_t objectID{0};
     uint64_t tick{0};
     std::vector<std::string> initNames;
     std::vector<ThreeDObject*> initPtrs;
@@ -47,6 +48,9 @@ public:
 
     bool rewindToSceneEvent(size_t index);
     void cancelLastAddObject(size_t preserveIndex = size_t(-1));
+    void setSceneRef(ThreeDScene* scene);
+    ThreeDScene* getSceneRef() const { return sceneRef; }
+
 
 private:
     bool hasInit{false};
@@ -57,8 +61,6 @@ private:
     bool bootstrapping{true};
     std::vector<std::string> bootstrapNames;
     std::vector<ThreeDObject*> bootstrapPtrs;
-
-    
-    void track(SceneEventKind kind, const std::string& name, ThreeDObject* obj);
+    ThreeDScene* sceneRef{nullptr};
 
 };

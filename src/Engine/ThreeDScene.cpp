@@ -12,6 +12,7 @@
 #include "WorldObjects/Mesh/Mesh.hpp"
 #include "WorldObjects/Mesh_DNA/Mesh_DNA.hpp"
 #include "WorldObjects/Camera/Camera.hpp"
+#include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
 
 // === SHADERS ===
 
@@ -318,12 +319,31 @@ bool ThreeDScene::removeObject(ThreeDObject* object)
         return false;
     }
 
-    std::cout << "[ThreeDScene] Removing object: " << object->getName() << std::endl;
-
+    std::cout << "[ThreeDScene] Removing object: " << object->getName() << " with ID : " << object->getID() << std::endl;
 
     if (auto* sdna = getSceneDNA())
         sdna->trackRemoveObject(object->getName(), object);
-
     softRemove(object);
     return true;
 }
+
+bool ThreeDScene::removeObjectFromSceneDNA(uint64_t objectID)
+{
+    for (auto it = objects.begin(); it != objects.end(); ++it)
+    {
+        ThreeDObject* obj = *it;
+        if (obj && obj->getID() == objectID)
+        {
+            std::cout << "[ThreeDScene] Deleting object from scene (no tracking): " 
+            << obj->getName() << " (ID=" << objectID << ")" << std::endl;
+
+            obj->destroy();
+            hierarchyInspector->redrawSlotsList();
+            erasePtr(objects, obj);
+            return true;
+        }
+    }
+
+    return false;
+}
+

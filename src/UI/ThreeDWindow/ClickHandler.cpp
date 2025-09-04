@@ -42,7 +42,7 @@ void ClickHandler::handle() {
             if (!preventSelection)
             {
                 window->selector.pickUpMesh((int)relativeMouseX, (int)relativeMouseY,
-                                       windowWidth, windowHeight, window->view, window->proj, window->ThreeDObjectsList);
+                windowWidth, windowHeight, window->view, window->proj, window->ThreeDObjectsList);
             }
 
             ThreeDObject* selected = window->selector.getSelectedObject();
