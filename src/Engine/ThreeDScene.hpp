@@ -49,7 +49,7 @@ public:
     bool removeObject(ThreeDObject* object);
 
     void pushInGraveyard(ThreeDObject * obj);
-    bool reviveFromGraveyardById(uint64_t id);
+    // bool reviveFromGraveyardById(uint64_t id);
     const std::list<ThreeDObject *>& getGraveyard() const { return graveyard; }
 
     ThreeDScene_DNA* getSceneDNA() const { return sceneDNA; }
@@ -62,6 +62,7 @@ public:
     bool removeObjectFromSceneDNA(uint64_t objectID);
 
     void setHierarchyInspector(HierarchyInspector* inspector) { hierarchyInspector = inspector; }
+    void getHierarchyInspector(HierarchyInspector** inspector) { *inspector = hierarchyInspector; }
     HierarchyInspector* getHierarchyInspector() const { return hierarchyInspector; }
 
 private:

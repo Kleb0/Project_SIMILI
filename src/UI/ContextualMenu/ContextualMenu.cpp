@@ -32,7 +32,6 @@ void ContextualMenu::hide()
         return;
 
     isOpen = false;
-    std::cout << "[ContextualMenu] Contextual menu closed." << std::endl;
 }
 
 void ContextualMenu::setThreeDWindow(ThreeDWindow *window)

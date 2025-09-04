@@ -308,6 +308,7 @@ bool ThreeDScene::removeObject(ThreeDObject* object)
 
     if (auto* sdna = getSceneDNA())
         sdna->trackRemoveObject(object->getName(), object);
+
     pushInGraveyard(object);
     return true;
 }
@@ -329,23 +330,5 @@ bool ThreeDScene::removeObjectFromSceneDNA(uint64_t objectID)
         }
     }
 
-    return false;
-}
-
-bool ThreeDScene::reviveFromGraveyardById(uint64_t id)
-{
-    for (auto it = graveyard.begin(); it != graveyard.end(); ++it)
-    {
-        if (*it && (*it)->getID() == id)
-        {
-            ThreeDObject* obj = *it;
-            graveyard.erase(it);
-            obj->setSelected(false);
-            if (std::find(objects.begin(), objects.end(), obj) == objects.end())
-                objects.push_back(obj);
-            if (auto* hi = getHierarchyInspector()) hi->redrawSlotsList();
-            return true;
-        }
-    }
     return false;
 }
