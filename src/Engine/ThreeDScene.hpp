@@ -16,6 +16,13 @@ class OpenGLContext;
 class Camera;
 class HierarchyInspector;
 
+struct GraveyardEntry {
+    ThreeDObject* object;
+    std::vector<Vertice*> vertices;
+    std::vector<Edge*> edges;
+    std::vector<Face*> faces;
+};
+
 class ThreeDScene
 {
 public:
@@ -41,8 +48,8 @@ public:
     void addObject(ThreeDObject* object);
     bool removeObject(ThreeDObject* object);
 
-    void softRemove(ThreeDObject * obj);
-    bool revive(ThreeDObject * obj);
+    void pushInGraveyard(ThreeDObject * obj);
+    bool reviveFromGraveyardById(uint64_t id);
     const std::list<ThreeDObject *>& getGraveyard() const { return graveyard; }
 
     ThreeDScene_DNA* getSceneDNA() const { return sceneDNA; }
@@ -66,6 +73,7 @@ private:
     glm::mat4 lastViewProj{1.0f};
     std::list<ThreeDObject *> objects;
     std::list<ThreeDObject *> graveyard;
+    std::vector<GraveyardEntry> meshGraveyard;
 
     Camera camera;
     Camera* activeCamera{nullptr};

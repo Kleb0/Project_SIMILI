@@ -56,6 +56,7 @@ void ThreeDScene_DNA::trackRemoveObject(const std::string& name, ThreeDObject* o
     ev.kind = SceneEventKind::RemoveObject;
     ev.objectName = name;
     ev.ptr = obj;
+    ev.objectID = obj ? obj->getID() : 0;
     ev.tick = nextTick++;
     history.push_back(std::move(ev));
 
@@ -117,6 +118,58 @@ void ThreeDScene_DNA::cancelLastAddObject(size_t preserveIndex)
                 }
             }
         
+            history.erase(baseIt);
+            return;
+        }
+    }
+}
+
+void ThreeDScene_DNA::cancelLastRemoveObject(size_t preserveIndex)
+{
+    if (history.empty() || !sceneRef) return;
+
+    for (auto it = history.rbegin(); it != history.rend(); ++it)
+    {
+        auto baseIt = std::prev(it.base());
+        size_t idx = static_cast<size_t>(std::distance(history.begin(), baseIt));
+
+        if (it->kind == SceneEventKind::RemoveObject && idx == preserveIndex)
+        {
+            const uint64_t targetID = it->objectID;
+            ThreeDObject* resurrect = nullptr;
+
+
+            const auto& gyConst = sceneRef->getGraveyard();
+            auto& gy = const_cast<std::list<ThreeDObject*>&>(gyConst); 
+
+            for (auto git = gy.begin(); git != gy.end(); ++git)
+            {
+                ThreeDObject* o = *git;
+                if (o && o->getID() == targetID)
+                {
+                    resurrect = o;
+                    gy.erase(git); 
+                    break;
+                }
+            }
+
+            auto& objects = sceneRef->getObjectsRef();
+            if (!resurrect)
+            {
+                for (auto* o : objects)
+                {
+                    if (o && o->getID() == targetID) { resurrect = o; break; }
+                }
+            }
+
+            if (resurrect)
+            {
+                resurrect->setSelected(false); 
+                if (std::find(objects.begin(), objects.end(), resurrect) == objects.end())
+                    objects.push_back(resurrect);
+            }
+
+            sceneRef->reviveFromGraveyardById(targetID);
             history.erase(baseIt);
             return;
         }
