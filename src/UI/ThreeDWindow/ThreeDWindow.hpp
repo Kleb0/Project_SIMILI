@@ -57,6 +57,7 @@ public:
 
 
     ThreeDWindow &setRenderer(OpenGLContext &context);
+    void addToObjectList(ThreeDObject* object);
 
     void addThreeDObjectsToScene(const std::vector<ThreeDObject *> &objects);
     void removeThreeDObjectsFromContextualMenu(ThreeDObject *object);

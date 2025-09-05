@@ -28,6 +28,7 @@ ThreeDWindow::ThreeDWindow() : clickHandler(this) {}
 
 // ------- Constructor, setters and getters ------- //
 
+
 ThreeDWindow::ThreeDWindow(const std::string &title, const std::string &text)
     : title(title), text(text), clickHandler(this)
 {
@@ -88,6 +89,15 @@ void ThreeDWindow::removeThreeDObjectsFromContextualMenu(ThreeDObject* object)
 
     if (scene)
         scene->removeObject(object);
+}
+
+void ThreeDWindow::addToObjectList(ThreeDObject* object)
+{
+    if (!object) return;
+    if (std::find(ThreeDObjectsList.begin(), ThreeDObjectsList.end(), object) == ThreeDObjectsList.end())
+    {
+        ThreeDObjectsList.push_back(object);
+    }
 }
 
 
