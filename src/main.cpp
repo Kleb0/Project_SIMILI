@@ -100,7 +100,6 @@ int main(int argc, char **argv)
     myHierarchy.setThreeDWindow(&myThreeDWindow);
     myHierarchy.setObjectInspector(&objectInspector);
 
-    myThreeDScene.setHierarchyInspector(&myHierarchy);
 
     historyLogic.setTitle("SUPER HISTORY LOGGER");
     historyLogic.setObjectInspector(&objectInspector);
@@ -108,9 +107,13 @@ int main(int argc, char **argv)
     historyLogic.setThreeDWindow(&myThreeDWindow);
     historyLogic.setHierarchyInspector(&myHierarchy);
 
+
     auto* sdna = myThreeDScene.getSceneDNA();
     if (sdna) sdna->finalizeBootstrap();
     sdna->setSceneRef(&myThreeDScene);
+
+    myThreeDScene.setHierarchyInspector(&myHierarchy);
+    myThreeDScene.setThreeDWindow(&myThreeDWindow);
 
     gui.add(myInfoWindow);
     gui.add(myThreeDWindow);

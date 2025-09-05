@@ -15,6 +15,7 @@ class HistoryLogic;
 class OpenGLContext;
 class Camera;
 class HierarchyInspector;
+class ThreeDWindow;
 
 struct GraveyardEntry {
     ThreeDObject* object;
@@ -65,11 +66,15 @@ public:
     void getHierarchyInspector(HierarchyInspector** inspector) { *inspector = hierarchyInspector; }
     HierarchyInspector* getHierarchyInspector() const { return hierarchyInspector; }
 
+    void setThreeDWindow(ThreeDWindow* window) { threeDWindow = window; }
+    ThreeDWindow* getThreeDWindow() const { return threeDWindow; }
+
 private:
     friend class HistoryLogic;
     friend class OpenGLContext;
 
     HierarchyInspector* hierarchyInspector = nullptr;
+    ThreeDWindow* threeDWindow = nullptr;
 
     glm::mat4 lastViewProj{1.0f};
     std::list<ThreeDObject *> objects;
@@ -87,6 +92,7 @@ private:
     GLuint shaderProgram;
 
     ThreeDScene_DNA* sceneDNA{nullptr};
+    
     bool ownsSceneDNA{true};
     bool ownsViewproj{false};
 };

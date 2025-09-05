@@ -5,6 +5,7 @@
 #include <iostream>
 #include "Engine/ErrorBox.hpp"
 #include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
+#include "UI/ThreeDWindow/ThreeDWindow.hpp"
 #include "WorldObjects/Mesh/Mesh.hpp"
 #include "WorldObjects/Mesh_DNA/Mesh_DNA.hpp"
 
@@ -142,7 +143,7 @@ void ThreeDScene_DNA::cancelLastRemoveObject(size_t preserveIndex)
             ThreeDObject* resurrect = nullptr;
 
             const auto& gyConst = sceneRef->getGraveyard();
-            auto& gy = const_cast<std::list<ThreeDObject*>&>(gyConst); 
+            auto& gy = const_cast<std::list<ThreeDObject*>&>(gyConst);
 
             for (auto git = gy.begin(); git != gy.end(); ++git)
             {
@@ -150,7 +151,7 @@ void ThreeDScene_DNA::cancelLastRemoveObject(size_t preserveIndex)
                 if (o && o->getID() == targetID)
                 {
                     resurrect = o;
-                    gy.erase(git); 
+                    gy.erase(git);
                     break;
                 }
             }
@@ -166,18 +167,29 @@ void ThreeDScene_DNA::cancelLastRemoveObject(size_t preserveIndex)
 
             if (resurrect)
             {
-                resurrect->setSelected(false); 
-                if (std::find(objects.begin(), objects.end(), resurrect) == objects.end())
-                {
+                resurrect->setSelected(false);
+                glm::mat4 G = resurrect->getGlobalModelMatrix();
+                resurrect->removeParent();
+                resurrect->setModelMatrix(G);
 
+                if (std::find(objects.begin(), objects.end(), resurrect) == objects.end())
                     objects.push_back(resurrect);
 
+                if (auto* mesh = dynamic_cast<Mesh*>(resurrect))
+                {
+                    if (!mesh->getMeshDNA())
+                    {
+                        auto* dna = new MeshDNA();
+                        dna->name = resurrect->getName();
+                        mesh->setMeshDNA(dna, true);
+                    }
+                    mesh->getMeshDNA()->ensureInit(mesh->getModelMatrix());
                 }
-
             }
 
             std::cout << "[ThreeDScene_DNA] Resurrected object from graveyard: " << resurrect->getName() << " (ID=" << targetID << ")" << std::endl;
             sceneRef->getHierarchyInspector()->redrawSlotsList();
+            sceneRef->getThreeDWindow()->addToObjectList(resurrect);
             history.erase(baseIt);
             return;
         }
