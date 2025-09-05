@@ -61,9 +61,10 @@ void ThreeDWindow::addThreeDObjectsToScene(const std::vector<ThreeDObject*>& obj
             object->setOrigin( scene->worldCenter.empty() ? glm::vec3(0.0f) : scene->worldCenter.front() );
 
         scene->addObject(object);
-        ThreeDObjectsList.push_back(object);
     }
 }
+
+
 
 void ThreeDWindow::removeThreeDObjectsFromContextualMenu(ThreeDObject* object)
 {
@@ -80,24 +81,9 @@ void ThreeDWindow::removeThreeDObjectsFromContextualMenu(ThreeDObject* object)
     if (ThreeDObject* parent = object->getParent())
         parent->removeChild(object);
 
-    auto it = std::remove(ThreeDObjectsList.begin(), ThreeDObjectsList.end(), object);
-    if (it != ThreeDObjectsList.end())
-    {
-        ThreeDObjectsList.erase(it, ThreeDObjectsList.end());
-        std::cout << "[ThreeDWindow] Object removed from ThreeDObjectsList." << std::endl;
-    }
 
     if (scene)
         scene->removeObject(object);
-}
-
-void ThreeDWindow::addToObjectList(ThreeDObject* object)
-{
-    if (!object) return;
-    if (std::find(ThreeDObjectsList.begin(), ThreeDObjectsList.end(), object) == ThreeDObjectsList.end())
-    {
-        ThreeDObjectsList.push_back(object);
-    }
 }
 
 
@@ -106,10 +92,6 @@ ThreeDObject *ThreeDWindow::getSelectedObject() const
     return selector.getSelectedObject();
 }
 
-const std::vector<ThreeDObject *> &ThreeDWindow::getObjects() const
-{
-    return ThreeDObjectsList;
-}
 
 // the threeDWindow use external components, we set them in the main script
 

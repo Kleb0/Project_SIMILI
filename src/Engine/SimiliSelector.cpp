@@ -9,11 +9,16 @@ void SimiliSelector::setWindow(ThreeDWindow* win) {
     window = win;
 }
 
+void SimiliSelector::setScene(ThreeDScene* scn) 
+{
+    scene = scn;
+}
+
 void SimiliSelector::setMultipleSelectedObjects(const std::list<ThreeDObject*>& objects)
 {
     selectedObjects = objects;
 
-    for (ThreeDObject* obj : window->getObjects())
+    for (ThreeDObject* obj : scene->getObjectsRef())
         obj->setSelected(false);
 
     for (ThreeDObject* obj : selectedObjects)
@@ -25,11 +30,9 @@ void SimiliSelector::setMultipleSelectedObjects(const std::list<ThreeDObject*>& 
 
 void SimiliSelector::selectMultipleObjects(const std::list<ThreeDObject*>& objects)
 {
-
-
     selectedObjects = objects;
 
-    for (ThreeDObject* obj : window->getObjects())
+    for (ThreeDObject* obj : scene->getObjectsRef())
         obj->setSelected(false);
 
     for (ThreeDObject* obj : selectedObjects)
@@ -39,10 +42,13 @@ void SimiliSelector::selectMultipleObjects(const std::list<ThreeDObject*>& objec
 void SimiliSelector::toggleMultipleSelection(ThreeDObject* object)
 {
     auto it = std::find(selectedObjects.begin(), selectedObjects.end(), object);
-    if (it != selectedObjects.end()) {
+    if (it != selectedObjects.end()) 
+    {
         selectedObjects.erase(it);
         object->setSelected(false);
-    } else {
+    } 
+    else 
+    {
         selectedObjects.push_back(object);
         object->setSelected(true);
     }
@@ -50,12 +56,12 @@ void SimiliSelector::toggleMultipleSelection(ThreeDObject* object)
 
 void SimiliSelector::externalSelect(ThreeDObject* object)
 {
-    for (ThreeDObject* obj : window->getObjects())
+    for (ThreeDObject* obj : scene->getObjectsRef())
         obj->setSelected(false);
 
     if (object) 
     {
-        window->getSelector().select(object);
+        window->getSelector().select(object); 
         object->setSelected(true);
     } 
     else 
@@ -95,7 +101,7 @@ glm::vec3 SimiliSelector::getCenterOfSelection() const
 void SimiliSelector::clearSelection()
 {
 
-    const auto& objects = window->getObjects();
+    const auto& objects = scene->getObjectsRef();
     int index = 0;
 
     for (ThreeDObject* obj : objects)

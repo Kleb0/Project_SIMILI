@@ -4,6 +4,7 @@
 
 
 class ThreeDWindow;
+class ThreeDScene;
 
 class ClickHandler {
 public:
@@ -12,4 +13,5 @@ public:
 
 private:
     ThreeDWindow* window;
+    ThreeDScene* scene;
 };

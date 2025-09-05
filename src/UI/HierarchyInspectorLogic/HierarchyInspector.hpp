@@ -15,6 +15,7 @@
 class ThreeDWindow;
 class ObjectInspector;
 
+
 struct HierarchyEntry {
     ThreeDObject* object;
     int depth = 0;
@@ -97,7 +98,7 @@ private:
     std::vector<std::unique_ptr<EmptyDummy>> emptySlotPlaceholders;
     std::list<ThreeDObject*> multipleSelectedObjects;
     std::vector<ThreeDObject*> SlotsList;
-    // new lists 
+
     std::vector<ThreeDObject*> inspectorObjects;
     std::vector<std::unique_ptr<EmptyDummy>> dummyList;
     std::vector<ThreeDObject*> mergedHierarchyList; 

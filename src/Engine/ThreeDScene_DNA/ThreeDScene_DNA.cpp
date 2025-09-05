@@ -189,7 +189,7 @@ void ThreeDScene_DNA::cancelLastRemoveObject(size_t preserveIndex)
 
             std::cout << "[ThreeDScene_DNA] Resurrected object from graveyard: " << resurrect->getName() << " (ID=" << targetID << ")" << std::endl;
             sceneRef->getHierarchyInspector()->redrawSlotsList();
-            sceneRef->getThreeDWindow()->addToObjectList(resurrect);
+            // sceneRef->getThreeDWindow()->addToObjectList(resurrect);
             history.erase(baseIt);
             return;
         }

@@ -7,6 +7,7 @@
 #include <UI/ObjectInspectorLogic/ObjectInspector.hpp>
 #include "UI/HistoryLogic/HistoryLogic.hpp"
 #include <WorldObjects/Entities/ThreeDObject.hpp>
+#include "UI/ContextualMenu/ContextualMenu.hpp"
 
 class MainSoftwareGUI
 {
@@ -27,6 +28,8 @@ public:
         this->add(window);
     }
 
+    void setContextualMenu(ContextualMenu* menu);
+
 private:
     GLFWwindow *window = nullptr;
     std::vector<GUIWindow *> windows;
@@ -44,4 +47,5 @@ private:
     ThreeDObject *threedObject = nullptr;
     ThreeDWindow *threeDWindow = nullptr;
     ObjectInspector *objectInspector = nullptr;
+    ContextualMenu *contextualMenu = nullptr;
 };
