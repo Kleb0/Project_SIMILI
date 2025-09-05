@@ -90,7 +90,6 @@ private:
     GLuint gridVAO;
     GLuint gridVBO;
     GLuint shaderProgram;
-
     ThreeDScene_DNA* sceneDNA{nullptr};
     
     bool ownsSceneDNA{true};

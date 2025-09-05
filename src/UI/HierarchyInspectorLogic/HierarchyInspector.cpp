@@ -45,9 +45,9 @@ void HierarchyInspector::setObjectInspector(ObjectInspector *inspector)
     objectInspector = inspector;
 }
 
-void HierarchyInspector::setThreeDScene(ThreeDScene *scene)
+void HierarchyInspector::setThreeDScene(ThreeDScene *sc)
 {
-    this->scene = scene;
+    scene = sc;
 }
 
 void HierarchyInspector::setThreeDWindow(ThreeDWindow *win)
@@ -216,7 +216,7 @@ void HierarchyInspector::selectFromThreeDWindow()
     }
     const std::list<ThreeDObject *> emptyList;
     const std::list<ThreeDObject *> &ObjectList = scene ? scene->getObjectsRef() : emptyList;
-    const auto &windowList = window->getObjects();
+
 
     auto it = std::find(ObjectList.begin(), ObjectList.end(), selected);
     if (it != ObjectList.end())
@@ -225,11 +225,6 @@ void HierarchyInspector::selectFromThreeDWindow()
         return;
     }
 
-    auto it2 = std::find(windowList.begin(), windowList.end(), selected);
-    if (it2 != windowList.end())
-    {
-        selectedObjectInHierarchy = *it2;
-    }
 }
 
 void HierarchyInspector::unselectObject(ThreeDObject *obj)

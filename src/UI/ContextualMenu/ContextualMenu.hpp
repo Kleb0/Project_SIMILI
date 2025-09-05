@@ -3,12 +3,12 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <imgui.h>
-#include "UI/ThreeDWindow/ThreeDWindow.hpp"
+#include "Engine/ThreeDScene.hpp"
 #include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
 #include "WorldObjects/Entities/ThreeDObject.hpp"
 
 class ObjectInspector;
-
+class ThreeDScene;
 class ContextualMenu
 {
 public:
@@ -19,6 +19,8 @@ public:
     void setThreeDWindow(ThreeDWindow *window);
     void setHierarchyInspector(HierarchyInspector *inspector);
     void setObjectInspector(ObjectInspector *inspector);
+    void setScene(ThreeDScene *scene);
+    ThreeDScene* getScene() const { return scene; }
 
 private:
     bool isOpen = false;
@@ -28,4 +30,5 @@ private:
     ThreeDObject *selectedObject = nullptr;
     ObjectInspector *objectInspector = nullptr;
     ThreeDObject *pendingDeletion = nullptr;
+    ThreeDScene *scene = nullptr;
 };

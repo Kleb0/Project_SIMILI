@@ -38,6 +38,11 @@ MainSoftwareGUI &MainSoftwareGUI::add(GUIWindow &w)
     return *this;
 }
 
+void MainSoftwareGUI::setContextualMenu(ContextualMenu* menu)
+{
+    contextualMenu = menu;
+}
+
 MainSoftwareGUI::MainSoftwareGUI(int width, int height, const char *title)
 {
     initGLFW(width, height, title);
@@ -231,15 +236,15 @@ void MainSoftwareGUI::initImGui()
 void MainSoftwareGUI::run()
 {
 
-    ContextualMenu contextualMenu;
-    contextualMenu.setThreeDWindow(threeDWindow);
-    contextualMenu.setObjectInspector(objectInspector);
+
+    // contextualMenu.setThreeDWindow(threeDWindow);
+    // contextualMenu.setObjectInspector(objectInspector);
 
     for (auto *win : windows)
     {
         auto *hierarchy = dynamic_cast<HierarchyInspector *>(win);
-        if (hierarchy)
-            contextualMenu.setHierarchyInspector(hierarchy);
+        // if (hierarchy)
+        //     contextualMenu.setHierarchyInspector(hierarchy);
     }
 
 
@@ -253,17 +258,16 @@ void MainSoftwareGUI::run()
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+        if (contextualMenu)
         {
-            contextualMenu.show();
-        }
-        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-        {
-            ImGuiWindow *hoveredWindow = GImGui->HoveredWindow;
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+                contextualMenu->show();
 
-            if (!hoveredWindow || std::string(hoveredWindow->Name) != "##ContextualMenu")
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
             {
-                contextualMenu.hide();
+                ImGuiWindow *hoveredWindow = GImGui->HoveredWindow;
+                if (!hoveredWindow || std::string(hoveredWindow->Name) != "##ContextualMenu")
+                    contextualMenu->hide();
             }
         }
 
@@ -304,7 +308,8 @@ void MainSoftwareGUI::run()
             if (win)
                 win->render();
 
-        contextualMenu.render();
+        if (contextualMenu)
+            contextualMenu->render();
 
 
         ImGui::Render();

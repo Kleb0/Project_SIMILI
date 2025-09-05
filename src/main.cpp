@@ -40,6 +40,7 @@ fs::path gExecutableDir;
 #include "UI/ThreeDModes/ThreeDMode.hpp"
 #include "UI/ThreeDModes/Vertice_Mode.hpp"
 #include "UI/ThreeDModes/Normal_Mode.hpp"
+#include "UI/ContextualMenu/ContextualMenu.hpp"
 
 #include "Engine/SimiliSelector.hpp"
 #include "Engine/ErrorBox.hpp"
@@ -61,6 +62,7 @@ int main(int argc, char **argv)
     HierarchyInspector myHierarchy;
     ObjectInspector objectInspector;
     HistoryLogic historyLogic;
+    ContextualMenu contextualMenu;
     Mesh* cubeMesh1 = Primitives::CreateCubeMesh(1.0f,glm::vec3(0.0f, 0.0f, 0.0f), "Cube", true);
 
     // ------- DirectX 12 has been implemented, so comment it for now as i don't need it actually ------- //
@@ -89,17 +91,13 @@ int main(int argc, char **argv)
     
     myThreeDWindow.addThreeDObjectsToScene({ cubeMesh1 });
     myThreeDWindow.addThreeDObjectsToScene({&mainCamera});
+
     myThreeDScene.setActiveCamera(&mainCamera);
     myThreeDScene.setOpenGLContext(&renderer);
     myThreeDWindow.setModelingMode(&myThreeDWindow.normalMode);
     myThreeDWindow.setSimiliSelector(&mySimiliSelector);
 
-    mySimiliSelector.setWindow(&myThreeDWindow);  
-
-    myHierarchy.setThreeDScene(&myThreeDScene);
-    myHierarchy.setThreeDWindow(&myThreeDWindow);
-    myHierarchy.setObjectInspector(&objectInspector);
-
+    mySimiliSelector.setWindow(&myThreeDWindow);      
 
     historyLogic.setTitle("SUPER HISTORY LOGGER");
     historyLogic.setObjectInspector(&objectInspector);
@@ -107,19 +105,28 @@ int main(int argc, char **argv)
     historyLogic.setThreeDWindow(&myThreeDWindow);
     historyLogic.setHierarchyInspector(&myHierarchy);
 
-
     auto* sdna = myThreeDScene.getSceneDNA();
     if (sdna) sdna->finalizeBootstrap();
     sdna->setSceneRef(&myThreeDScene);
 
     myThreeDScene.setHierarchyInspector(&myHierarchy);
     myThreeDScene.setThreeDWindow(&myThreeDWindow);
+    contextualMenu.setScene(&myThreeDScene);
+    contextualMenu.setHierarchyInspector(&myHierarchy);
+    contextualMenu.setObjectInspector(&objectInspector);
+    contextualMenu.setThreeDWindow(&myThreeDWindow);
+    mySimiliSelector.setScene(&myThreeDScene);      
+
+    myHierarchy.setThreeDScene(&myThreeDScene);
+    myHierarchy.setThreeDWindow(&myThreeDWindow);
+    myHierarchy.setObjectInspector(&objectInspector);
 
     gui.add(myInfoWindow);
     gui.add(myThreeDWindow);
     gui.add(objectInspector);
     gui.add(myHierarchy);
     gui.add(historyLogic);
+    gui.setContextualMenu(&contextualMenu);
 
     gui.setThreeDWindow(&myThreeDWindow);
     gui.setObjectInspector(&objectInspector);

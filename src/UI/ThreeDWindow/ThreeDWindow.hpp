@@ -57,7 +57,6 @@ public:
 
 
     ThreeDWindow &setRenderer(OpenGLContext &context);
-    void addToObjectList(ThreeDObject* object);
 
     void addThreeDObjectsToScene(const std::vector<ThreeDObject *> &objects);
     void removeThreeDObjectsFromContextualMenu(ThreeDObject *object);
@@ -109,9 +108,7 @@ private:
     
     SimiliSelector* similiSelector = nullptr;
 
-    // void handleClick();
     void toggleMultipleSelection(ThreeDObject *object);
-
     void ThreeDWorldInteractions();
     
 
@@ -122,7 +119,7 @@ private:
     ObjectInspector *objectInspector = nullptr;
     HierarchyInspector *hierarchy = nullptr;
     ThreeDObjectSelector selector;
-    std::vector<ThreeDObject *> ThreeDObjectsList;
+    // std::vector<ThreeDObject *> ThreeDObjectsList;
     std::set<ThreeDObject *> lastSelection;
     Vertice* lastSelectedVertice = nullptr;
     ImGuizmo::OPERATION currentGizmoOperation = ImGuizmo::TRANSLATE;

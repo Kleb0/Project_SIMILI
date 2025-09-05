@@ -1,5 +1,6 @@
 #include "UI/ThreeDWindow/ClickHandler.hpp"
 #include "UI/ThreeDWindow/ThreeDWindow.hpp"
+#include "Engine/ThreeDScene.hpp"
 #include "UI/ObjectInspectorLogic/ObjectInspector.hpp"
 #include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
 
@@ -16,8 +17,11 @@
 
 ClickHandler::ClickHandler(ThreeDWindow* owner) : window(owner) {}
 
-void ClickHandler::handle() {
-    if (window->selectionLocked) {
+void ClickHandler::handle() 
+{
+    scene = window->getThreeDScene();
+    if (window->selectionLocked) 
+    {
         window->selectionLocked = false;
         return;
     }
@@ -35,6 +39,11 @@ void ClickHandler::handle() {
 
         window->view = window->scene->getViewMatrix();
         window->proj = window->scene->getProjectionMatrix();
+        
+        auto& listRef = scene->getObjectsRef();
+        std::vector<ThreeDObject*> objects;
+        objects.reserve(listRef.size());
+        for (auto* o : listRef) if (o) objects.push_back(o);
 
         if (window->currentMode == &window->normalMode)
         {
@@ -42,7 +51,7 @@ void ClickHandler::handle() {
             if (!preventSelection)
             {
                 window->selector.pickUpMesh((int)relativeMouseX, (int)relativeMouseY,
-                windowWidth, windowHeight, window->view, window->proj, window->ThreeDObjectsList);
+                windowWidth, windowHeight, window->view, window->proj, objects);
             }
 
             ThreeDObject* selected = window->selector.getSelectedObject();
@@ -52,7 +61,7 @@ void ClickHandler::handle() {
             {
                 if (!shiftPressed)
                 {
-                    for (auto* obj : window->ThreeDObjectsList) obj->setSelected(false);
+                    for (auto* obj : objects) obj->setSelected(false);
                     window->multipleSelectedObjects.clear();
                 }
 
@@ -93,7 +102,7 @@ void ClickHandler::handle() {
             }
             else if (!ImGuizmo::IsUsing() && !window->wasUsingGizmoLastFrame)
             {
-                for (auto* obj : window->ThreeDObjectsList) obj->setSelected(false);
+                for (auto* obj : objects) obj->setSelected(false);
                 window->multipleSelectedObjects.clear();
                 window->selector.clearTarget();
 
@@ -121,7 +130,7 @@ void ClickHandler::handle() {
             Vertice* selectedVertice = window->selector.pickUpVertice(
                 (int)relativeMouseX, (int)relativeMouseY,
                 windowWidth, windowHeight, window->view, window->proj,
-                window->ThreeDObjectsList, shiftPressed
+                objects, shiftPressed
             );
 
             if (selectedVertice)
@@ -137,7 +146,7 @@ void ClickHandler::handle() {
                 }
                 else
                 {
-                    for (ThreeDObject* obj : window->ThreeDObjectsList)
+                    for (ThreeDObject* obj : objects)
                     {
                         Mesh* mesh = dynamic_cast<Mesh*>(obj);
                         if (!mesh) continue;    
@@ -153,7 +162,7 @@ void ClickHandler::handle() {
             {
                 if (!shiftPressed)
                 {
-                    for (ThreeDObject* obj : window->ThreeDObjectsList)
+                    for (ThreeDObject* obj : objects)
                     {
                         Mesh* mesh = dynamic_cast<Mesh*>(obj);
                         if (!mesh) continue;  
@@ -172,7 +181,7 @@ void ClickHandler::handle() {
 
             Face* selectedFace = window->selector.pickupFace(
                 static_cast<int>(relativeMouseX), static_cast<int>(relativeMouseY),
-                windowWidth, windowHeight, window->view, window->proj, window->ThreeDObjectsList, shiftPressed
+                windowWidth, windowHeight, window->view, window->proj, objects, shiftPressed
             );
 
             if (selectedFace)
@@ -188,7 +197,7 @@ void ClickHandler::handle() {
                 }
                 else
                 {
-                    for (ThreeDObject* obj : window->ThreeDObjectsList)
+                    for (ThreeDObject* obj : objects)
                     {
                         Mesh* mesh = dynamic_cast<Mesh*>(obj);
                         if (!mesh) continue;
@@ -203,7 +212,7 @@ void ClickHandler::handle() {
             {
                 if (!shiftPressed)
                 {
-                    for (ThreeDObject* obj : window->ThreeDObjectsList)
+                    for (ThreeDObject* obj : objects)
                     {
                         Mesh* mesh = dynamic_cast<Mesh*>(obj);
                         if (!mesh) continue;
@@ -221,7 +230,7 @@ void ClickHandler::handle() {
 
             Edge* selectedEdge = window->selector.pickupEdge(
                 static_cast<int>(relativeMouseX), static_cast<int>(relativeMouseY),
-                windowWidth, windowHeight, window->view, window->proj, window->ThreeDObjectsList, shiftPressed
+                windowWidth, windowHeight, window->view, window->proj, objects, shiftPressed
             );
 
             if (selectedEdge)
@@ -237,7 +246,7 @@ void ClickHandler::handle() {
                 }
                 else
                 {
-                    for (ThreeDObject* obj : window->ThreeDObjectsList)
+                    for (ThreeDObject* obj : objects)
                     {
                         Mesh* mesh = dynamic_cast<Mesh*>(obj);
                         if (!mesh) continue;
@@ -252,7 +261,7 @@ void ClickHandler::handle() {
             {
                 if (!shiftPressed)
                 {
-                    for (ThreeDObject* obj : window->ThreeDObjectsList)
+                    for (ThreeDObject* obj : objects)
                     {
                         Mesh* mesh = dynamic_cast<Mesh*>(obj);
                         if (!mesh) continue;    

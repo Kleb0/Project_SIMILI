@@ -7,7 +7,13 @@
 #include "Engine/OpenGLContext.hpp"
 #include "WorldObjects/Mesh/Mesh.hpp"
 #include "Engine/PrimitivesCreation/CreatePrimitive.hpp"
+#include "Engine/ErrorBox.hpp"
 #include <iostream>
+
+void ContextualMenu::setScene(ThreeDScene* s)
+{
+    scene = s;
+}
 
 void ContextualMenu::setHierarchyInspector(HierarchyInspector *inspector)
 {
@@ -63,17 +69,12 @@ void ContextualMenu::render()
 
                 if (ImGui::MenuItem("Delete selected object"))
                 {
-                    if (threeDWindow && hierarchyInspector)
-                    {
+                    if (objectInspector)
+                        objectInspector->clearInspectedObject();
 
-                        if (objectInspector)
-                            objectInspector->clearInspectedObject();
+                    ThreeDObject *toDelete = selected;
 
-                        ThreeDObject *toDelete = selected;
-                        threeDWindow->removeThreeDObjectsFromContextualMenu({toDelete});
-                        hierarchyInspector->redrawSlotsList();
-                        pendingDeletion = toDelete;
-                    }
+                    scene->removeObject(toDelete);
                     hide();
                     ImGui::End();
                     return;
@@ -81,10 +82,10 @@ void ContextualMenu::render()
             }
         }
 
-        if (ImGui::MenuItem("Create Cube") && threeDWindow)
+        if (ImGui::MenuItem("Create Cube") && scene)
         {
             Mesh* newCube = Primitives::CreateCubeMesh(1.0f, glm::vec3(0.0f, 0.0f, 0.0f),"NewCube", true);
-            threeDWindow->addThreeDObjectsToScene({newCube});
+            scene->addObject(newCube);
 
             if (hierarchyInspector)
             {
@@ -100,12 +101,6 @@ void ContextualMenu::render()
         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
         {
             hide();
-        }
-
-        if (pendingDeletion)
-        {
-            threeDWindow->removeThreeDObjectsFromContextualMenu({pendingDeletion});
-            pendingDeletion = nullptr;
         }
     }
 }

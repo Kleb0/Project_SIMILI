@@ -13,6 +13,7 @@
 #include "WorldObjects/Mesh_DNA/Mesh_DNA.hpp"
 #include "WorldObjects/Camera/Camera.hpp"
 #include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
+#include "ErrorBox.hpp"
 
 // === SHADERS ===
 
@@ -206,11 +207,13 @@ void ThreeDScene::resize(int w, int h)
 
 void ThreeDScene::render()
 {
-    if (!glctx) {
+    if (!glctx) 
+    {
         std::cerr << "[ThreeDScene] ERROR: No OpenGLContext set (call setOpenGLContext).\n";
         return;
     }
-    if (!activeCamera) {
+    if (!activeCamera) 
+    {
         std::cerr << "[ThreeDScene] ERROR: No active camera set.\n";
         return;
     }
@@ -227,7 +230,8 @@ void ThreeDScene::render()
     glm::mat4 proj = activeCamera->getProjectionMatrix(aspect);
     glm::mat4 viewProj = proj * view;
 
-    if (!ownsViewproj) {
+    if (!ownsViewproj) 
+    {
         lastViewProj = viewProj;
         std::cout << "[ThreeDScene] New view projection matrix set.\n";
         ownsViewproj = true;
@@ -295,7 +299,12 @@ void ThreeDScene::addObject(ThreeDObject* object)
 
 bool ThreeDScene::removeObject(ThreeDObject* object)
 {
-    if (!object) return false;
+
+    if (!object) 
+    {
+        return false;
+    }
+
 
     auto it = std::find(objects.begin(), objects.end(), object);
     if (it == objects.end())
@@ -304,11 +313,14 @@ bool ThreeDScene::removeObject(ThreeDObject* object)
         return false;
     }
 
+
+
     std::cout << "[ThreeDScene] Removing object: " << object->getName() << " with ID : " << object->getID() << std::endl;
 
     if (auto* sdna = getSceneDNA())
         sdna->trackRemoveObject(object->getName(), object);
 
+    hierarchyInspector->redrawSlotsList();
     pushInGraveyard(object);
     return true;
 }
