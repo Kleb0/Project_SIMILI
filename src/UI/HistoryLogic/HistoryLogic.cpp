@@ -72,6 +72,8 @@ void HistoryLogic::render()
 								eventKindStr = "Remove";
 							else if (ev.kind == SceneEventKind::InitSnapshot)
 								eventKindStr = "InitSnapshot";
+							else if (ev.kind == SceneEventKind::SlotChange)
+								eventKindStr = "SlotChange";
 
 							std::string line = "#" + std::to_string(i) + "  " + eventKindStr + "  " + ev.objectName;
 

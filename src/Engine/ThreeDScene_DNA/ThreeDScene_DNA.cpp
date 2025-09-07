@@ -53,7 +53,6 @@ void ThreeDScene_DNA::trackAddObject(const std::string& name, ThreeDObject* obj)
     << " | tick: " << ev.tick << std::endl;
 }
 
-
 void ThreeDScene_DNA::trackRemoveObject(const std::string& name, ThreeDObject* obj)
 {
     SceneEvent ev;
@@ -67,6 +66,27 @@ void ThreeDScene_DNA::trackRemoveObject(const std::string& name, ThreeDObject* o
     std::cout << "[SceneDNA] Tracked REMOVE | name: " << name
               << " | tick: " << ev.tick << std::endl;
 }
+
+// -------- hierarchy modification tracking -------- //
+
+void ThreeDScene_DNA::trackSlotChange(const std::string& name, ThreeDObject* obj, int oldSlot, int newSlot)
+{
+    SceneEvent ev;
+    ev.kind = SceneEventKind::SlotChange;
+    ev.objectName = name;
+    ev.ptr = obj;
+    ev.objectID = obj ? obj->getID() : 0;
+    ev.oldSlots = oldSlot;
+    ev.newSlots = newSlot;
+    ev.tick = nextTick++;
+    history.push_back(std::move(ev));
+    std::cout << "[SceneDNA] Tracked SLOT CHANGE | name: " << name
+    << " | id: " << (obj ? obj->getID() : 0)
+    << " | from: " << oldSlot << " to: " << newSlot
+    << " | tick: " << (nextTick - 1) << std::endl;
+}
+
+
 void ThreeDScene_DNA::finalizeBootstrap()
 {
     ensureInit();

@@ -48,44 +48,6 @@ void ThreeDWindow::setModelingMode(ThreeDMode* mode)
     }
 }
 
-void ThreeDWindow::addThreeDObjectsToScene(const std::vector<ThreeDObject*>& objects)
-{
-    if (!scene)
-        return;
-
-    for (auto* object : objects)
-    {
-        if (!object) continue;
-
-        if (!object->getParent())
-            object->setOrigin( scene->worldCenter.empty() ? glm::vec3(0.0f) : scene->worldCenter.front() );
-
-        scene->addObject(object);
-    }
-}
-
-
-
-void ThreeDWindow::removeThreeDObjectsFromContextualMenu(ThreeDObject* object)
-{
-    if (!object) return;
-
-    std::cout << "[ThreeDWindow] Removing object: " << object->getName() << std::endl;
-
-    for (ThreeDObject* child : object->getChildren())
-    {
-        std::cout << "[ThreeDWindow] Recursively removing child object: " << child->getName() << std::endl;
-        removeThreeDObjectsFromContextualMenu(child);
-    }
-
-    if (ThreeDObject* parent = object->getParent())
-        parent->removeChild(object);
-
-
-    if (scene)
-        scene->removeObject(object);
-}
-
 
 ThreeDObject *ThreeDWindow::getSelectedObject() const
 {

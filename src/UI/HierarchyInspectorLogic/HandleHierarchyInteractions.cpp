@@ -156,11 +156,8 @@ void HandleHierarchyInteractions::dropOnSlot(ThreeDObject* obj, int index)
 
         obj->setModelMatrix(global);
         obj->setOrigin(inspector->scene->worldCenter.front());
-        obj->setSlot(index);
         inspector->exchangeSlots(obj, index);
-
         inspector->objectsAssignedOnce = false;
-        inspector->redrawSlotsList();
     } 
     else if(base)
     {

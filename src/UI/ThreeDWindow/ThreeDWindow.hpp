@@ -58,9 +58,6 @@ public:
 
     ThreeDWindow &setRenderer(OpenGLContext &context);
 
-    void addThreeDObjectsToScene(const std::vector<ThreeDObject *> &objects);
-    void removeThreeDObjectsFromContextualMenu(ThreeDObject *object);
-    const std::vector<ThreeDObject *> &getObjects() const;
 
     void setSimiliSelector(SimiliSelector* selector) { similiSelector = selector; }
     SimiliSelector& getSimiliSelector() { return *similiSelector; }

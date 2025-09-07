@@ -264,8 +264,6 @@ void ThreeDScene::drawBackgroundGradient()
 	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 }
 
-
-
 void ThreeDScene::addObject(ThreeDObject* object)
 {
     if (!object) return;
@@ -296,7 +294,6 @@ void ThreeDScene::addObject(ThreeDObject* object)
     object->initialize();
 }
 
-
 bool ThreeDScene::removeObject(ThreeDObject* object)
 {
 
@@ -305,15 +302,12 @@ bool ThreeDScene::removeObject(ThreeDObject* object)
         return false;
     }
 
-
     auto it = std::find(objects.begin(), objects.end(), object);
     if (it == objects.end())
     {
         std::cerr << "[ThreeDScene] ERROR: Object not found in scene objects." << std::endl;
         return false;
     }
-
-
 
     std::cout << "[ThreeDScene] Removing object: " << object->getName() << " with ID : " << object->getID() << std::endl;
 
