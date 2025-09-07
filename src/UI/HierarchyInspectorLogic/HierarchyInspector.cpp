@@ -128,6 +128,9 @@ void HierarchyInspector::drawChildSlots(ThreeDObject* parent, bool& clickedOnIte
 
 void HierarchyInspector::exchangeSlots(ThreeDObject* obj, int targetIndex)
 {
+    std::cout << "[HierarchyInspector] exchangeSlots called." << std::endl;
+
+
     if (!obj || targetIndex < 0 || targetIndex >= static_cast<int>(mergedHierarchyList.size()))
         return;
 
@@ -136,13 +139,21 @@ void HierarchyInspector::exchangeSlots(ThreeDObject* obj, int targetIndex)
     if (!dummy || !dummy->isDummy())
         return;
 
-    int objSlot = obj->getSlot();
-    int dummySlot = dummy->getSlot(); 
+    int oldSlot  = obj->getSlot();
+    int newSlot  = dummy->getSlot(); 
 
-    obj->setSlot(dummySlot);
-    dummy->setSlot(objSlot);
+    obj->setSlot(newSlot);
+    dummy->setSlot(oldSlot);
 
-    std::swap(mergedHierarchyList[dummySlot], mergedHierarchyList[objSlot]);
+    std::cout << "[HierarchyInspector] Swapping slots: " << oldSlot << " <-> " << newSlot << std::endl;
+
+    std::swap(mergedHierarchyList[newSlot], mergedHierarchyList[oldSlot]);
+
+    if (scene && scene->getSceneDNA())
+    {
+        std::cout << "[HierarchyInspector] Tracking slot change in SceneDNA." << std::endl;
+        scene->getSceneDNA()->trackSlotChange(obj->getName(), obj, oldSlot, newSlot);
+    }
 
     objectsAssignedOnce = true;
 

@@ -89,8 +89,8 @@ int main(int argc, char **argv)
     myThreeDWindow.setObjectInspector(&objectInspector);
     myThreeDWindow.setThreeDScene(&myThreeDScene);
     
-    myThreeDWindow.addThreeDObjectsToScene({ cubeMesh1 });
-    myThreeDWindow.addThreeDObjectsToScene({&mainCamera});
+    myThreeDScene.addObject({ cubeMesh1 });
+    myThreeDScene.addObject({&mainCamera});
 
     myThreeDScene.setActiveCamera(&mainCamera);
     myThreeDScene.setOpenGLContext(&renderer);

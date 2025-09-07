@@ -13,10 +13,12 @@ enum class SceneEventKind : uint8_t
 {
     InitSnapshot,
     AddObject,
-    RemoveObject
+    RemoveObject,
+    SlotChange
 };
 
-struct SceneEvent {
+struct SceneEvent 
+{
     SceneEventKind kind{SceneEventKind::AddObject};
     std::string objectName;
     ThreeDObject* ptr{nullptr};
@@ -24,6 +26,8 @@ struct SceneEvent {
     uint64_t tick{0};
     std::vector<std::string> initNames;
     std::vector<ThreeDObject*> initPtrs;
+    int oldSlots{-1};
+    int newSlots{-1};
 };
 
 class ThreeDScene_DNA
@@ -39,6 +43,10 @@ public:
 
     void trackAddObject (const std::string& name, ThreeDObject* obj);
     void trackRemoveObject(const std::string& name, ThreeDObject* obj);
+
+    // --- hierarchy modification tracking 
+    void trackSlotChange(const std::string& name, ThreeDObject* obj, int oldSlot, int newSlot);
+
 
 
     const std::vector<SceneEvent>& getHistory() const { return history; }
