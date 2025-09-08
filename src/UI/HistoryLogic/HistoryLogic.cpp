@@ -75,12 +75,39 @@ void HistoryLogic::render()
 							else if (ev.kind == SceneEventKind::SlotChange)
 								eventKindStr = "SlotChange";
 
-							std::string line = "#" + std::to_string(i) + "  " + eventKindStr + "  " + ev.objectName;
+							std::string line = "#" + std::to_string(i) + "  ";
 
-							if (ev.kind == SceneEventKind::AddObject)
-								line += "  ID=" + std::to_string(ev.objectID);
+							switch (ev.kind)
+							{
+								case SceneEventKind::InitSnapshot:
+									line += " InitSnapshot";
+									break;
 
-							line += "  tick=" + std::to_string(ev.tick);
+								case SceneEventKind::AddObject:
+									line += "Add Object  ";
+									line += ev.objectName + "  ID=" + std::to_string(ev.objectID);
+									break;
+
+								case SceneEventKind::RemoveObject:
+									line += "Remove Object  ";
+									line += ev.objectName + "  ID=" + std::to_string(ev.objectID);
+									break;
+
+								case SceneEventKind::SlotChange:
+									line += "Slot Change  ";
+									line += ev.objectName + "  ";
+									line += "from slot " + std::to_string(ev.oldSlots) + " → to slot " + std::to_string(ev.newSlots);
+									break;
+
+								default:
+									line += "Unknown Event";
+									break;
+							}
+
+							line += "  [tick=" + std::to_string(ev.tick) + "]";
+
+
+
 
 							if (ImGui::Selectable(line.c_str(), false))
 							{
@@ -95,6 +122,10 @@ void HistoryLogic::render()
 									else if (futureEvent.kind == SceneEventKind::RemoveObject)
 									{
 										scenedna->cancelLastRemoveObject(j);
+									}
+									else if (futureEvent.kind == SceneEventKind::SlotChange)
+									{
+										scenedna->cancelLastSlotChange(j);
 									}
 									else
 									{

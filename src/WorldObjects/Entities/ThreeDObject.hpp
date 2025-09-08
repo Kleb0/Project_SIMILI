@@ -65,8 +65,7 @@ public:
     virtual bool isInspectable() const { return true; }
 
     void setOrigin (const glm::vec3& origin);
-    glm::vec3 getOrigin() const;
-    
+    glm::vec3 getOrigin() const;    
 
     void setIsMesh(bool flag) { isMesh = flag; }
     bool getIsMesh() const { return isMesh; }
@@ -77,7 +76,6 @@ public:
 
     ThreeDObject *parent = nullptr;
     std::list<ThreeDObject *> children;
-
     
     bool expanded = true;
 
@@ -88,6 +86,10 @@ public:
     int getMovedSlotIndex() const { return movedSlotIndex; }
     
     virtual bool IsVertice() const { return false; }
+
+    const std::vector<int>& getChangedSlots() const { return changedSlots; }
+    void clearChangedSlots();
+    void appendChangedSlot(int oldSlot);
 
 protected:
 
@@ -101,4 +103,5 @@ protected:
     static uint64_t generateRandomID();
 
     bool isMesh = false;
+    std::vector<int> changedSlots;
 };
