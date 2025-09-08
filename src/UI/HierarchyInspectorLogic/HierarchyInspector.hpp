@@ -14,6 +14,8 @@
 
 class ThreeDWindow;
 class ObjectInspector;
+class HistoryLogic;
+class ThreeDScene_DNA;
 
 
 struct HierarchyEntry {
@@ -75,6 +77,9 @@ public:
 
 
 private:
+
+    friend class HistoryLogic;
+    friend class ThreeDScene_DNA;
 
     std::unique_ptr<HandleHierarchyInteractions> interactions;
     std::unique_ptr<HierarchyListDrawing> listDrawer;

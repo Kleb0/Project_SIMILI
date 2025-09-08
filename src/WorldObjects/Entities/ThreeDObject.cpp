@@ -11,7 +11,6 @@ id = generateRandomID();
 
 ThreeDObject::~ThreeDObject() {}
 
-
 // ---- générate random ID ----- //
 
 uint64_t ThreeDObject::generateRandomID() {
@@ -21,7 +20,6 @@ uint64_t ThreeDObject::generateRandomID() {
 
     return dis(gen);
 }
-
 
 void ThreeDObject::translate(const glm::vec3 &newPosition) { position = newPosition; }
 void ThreeDObject::rotate(const glm::vec3 &newEulerRotationDegrees) { rotation = glm::quat(glm::radians(newEulerRotationDegrees)); }
@@ -142,6 +140,17 @@ void ThreeDObject::setOrigin(const glm::vec3& newOrigin) {
     origin = newOrigin;
 }
 
-glm::vec3 ThreeDObject::getOrigin() const {
+glm::vec3 ThreeDObject::getOrigin() const 
+{
     return origin;
+}
+
+void ThreeDObject::clearChangedSlots() 
+{
+    changedSlots.clear();
+}
+
+void ThreeDObject::appendChangedSlot(int oldSlot) 
+{
+    changedSlots.push_back(oldSlot);
 }

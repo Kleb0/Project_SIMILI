@@ -2,6 +2,8 @@
 #define IMGUI_ENABLE_ASSERTS
 #include "UI/ObjectInspectorLogic/ObjectInspector.hpp"
 #include "UI/ThreeDWindow/ThreeDWindow.hpp"
+#include "UI/HistoryLogic/HistoryLogic.hpp"
+#include "Engine/ThreeDScene_DNA/ThreeDScene_DNA.hpp"
 #include <imgui.h>
 #include <iostream>
 #include <algorithm>
@@ -144,6 +146,7 @@ void HierarchyInspector::exchangeSlots(ThreeDObject* obj, int targetIndex)
 
     obj->setSlot(newSlot);
     dummy->setSlot(oldSlot);
+    obj->appendChangedSlot(oldSlot);
 
     std::cout << "[HierarchyInspector] Swapping slots: " << oldSlot << " <-> " << newSlot << std::endl;
 
