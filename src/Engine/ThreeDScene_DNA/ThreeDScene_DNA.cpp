@@ -242,11 +242,9 @@ void ThreeDScene_DNA::cancelLastSlotChange(size_t preserveIndex)
             std::list<ThreeDObject*>& list = sceneRef->getObjectsRef();
             if (static_cast<size_t>(lastOldSlot) < sceneRef->getHierarchyInspector()->mergedHierarchyList.size())
             {
-                std::swap
-                (
-                    sceneRef->getHierarchyInspector()->mergedHierarchyList[lastOldSlot],
-                    sceneRef->getHierarchyInspector()->mergedHierarchyList[currentSlot]
-                );
+                auto* hi = sceneRef->getHierarchyInspector();
+                hi->mergedHierarchyList[lastOldSlot]  = obj;
+                hi->mergedHierarchyList[currentSlot]  = hi->emptySlotPlaceholders[currentSlot].get();
             }
 
             std::cout << "[ThreeDScene_DNA] Cancelled slot change for object: " 

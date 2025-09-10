@@ -84,8 +84,6 @@ public:
 
     void setMovedSlotIndex(int index) { movedSlotIndex = index; }
     int getMovedSlotIndex() const { return movedSlotIndex; }
-    
-    virtual bool IsVertice() const { return false; }
 
     const std::vector<int>& getChangedSlots() const { return changedSlots; }
     void clearChangedSlots();

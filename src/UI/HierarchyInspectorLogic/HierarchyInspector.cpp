@@ -142,15 +142,18 @@ void HierarchyInspector::exchangeSlots(ThreeDObject* obj, int targetIndex)
         return;
 
     int oldSlot  = obj->getSlot();
-    int newSlot  = dummy->getSlot(); 
+    int newSlot  = targetIndex;
 
-    obj->setSlot(newSlot);
-    dummy->setSlot(oldSlot);
+    if (oldSlot == newSlot) return;
+
     obj->appendChangedSlot(oldSlot);
+    obj->setSlot(newSlot);
+
 
     std::cout << "[HierarchyInspector] Swapping slots: " << oldSlot << " <-> " << newSlot << std::endl;
 
-    std::swap(mergedHierarchyList[newSlot], mergedHierarchyList[oldSlot]);
+    mergedHierarchyList[newSlot] = obj;
+    mergedHierarchyList[oldSlot] = emptySlotPlaceholders[oldSlot].get();
 
     if (scene && scene->getSceneDNA())
     {
