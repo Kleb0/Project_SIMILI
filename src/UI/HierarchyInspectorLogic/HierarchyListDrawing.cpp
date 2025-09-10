@@ -66,7 +66,6 @@ void HierarchyListDrawing::drawSlotsList(bool& clickedOnItem)
             inspector->mergedHierarchyList[i] = inspector->emptySlotPlaceholders[i].get();
         }
 
-
         const std::list<ThreeDObject*>& sceneObjects = inspector->scene->getObjectsRef();
         int nextFreeSlot = 0;
 
@@ -76,13 +75,6 @@ void HierarchyListDrawing::drawSlotsList(bool& clickedOnItem)
 
                 if (obj->isParented)
                 {
-                    // std::cout << "[Skip Assign] '" << obj->getName() << "' is parented, skip assigning to mergedHierarchyList" << std::endl;
-                    continue;
-                }
-
-                if (obj->IsVertice())
-                {
-                    // std::cout << "[Skip Assign] '" << obj->getName() << "' is a Vertice, skip." << std::endl;
                     continue;
                 }
 
@@ -91,9 +83,7 @@ void HierarchyListDrawing::drawSlotsList(bool& clickedOnItem)
             if (slot >= 0 && slot < totalSlots &&
             inspector->mergedHierarchyList[slot] == inspector->emptySlotPlaceholders[slot].get())
             {
-
                 inspector->mergedHierarchyList[slot] = obj;
-                // std::cout << "[HierarchyList] '" << obj->getName() << "' assigned to slot " << slot << std::endl;
                 continue;
             }
 
@@ -105,13 +95,11 @@ void HierarchyListDrawing::drawSlotsList(bool& clickedOnItem)
 
             if (nextFreeSlot >= totalSlots)
             {
-                // std::cerr << "Warning: no free slot available for object '" << obj->getName() << "'" << std::endl;
                 continue;
             }
 
             obj->setSlot(nextFreeSlot);
             inspector->mergedHierarchyList[nextFreeSlot] = obj;
-            // std::cout << "[HierarchyList] '" << obj->getName() << "' assigned to slot " << nextFreeSlot << std::endl;
             ++nextFreeSlot;
         }
 
@@ -221,7 +209,8 @@ void HierarchyListDrawing::drawChildSlots(ThreeDObject* parent,  bool& clickedOn
 
     for (ThreeDObject* child : parent->getChildren())
     {
-        if (!child || child->IsVertice()) continue;
+        if (!child) 
+            continue;
         
         // ---------- Begin Child Slot Rendering ---------- //
 
