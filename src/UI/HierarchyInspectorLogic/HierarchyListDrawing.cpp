@@ -37,9 +37,6 @@ void HierarchyListDrawing::drawSlotsList(bool& clickedOnItem)
 
     if (!isDragging && inspector->currentlyDraggedObject != nullptr)
     {
-        // std::cout << "[HierarchyInspector] Dropping object: " << inspector->currentlyDraggedObject->getName() << std::endl;
-        // std::cout << "[HierarchyInspector] Dropping object with name :" << inspector->currentlyDraggedObject->getName() << "on slot : " << inspector->dropToSlotIndex << std::endl;
-
         if (inspector->childToDropOn)
         {
             inspector->dropOnObject(inspector->childToDropOn, inspector->currentlyDraggedObject, -1);
@@ -99,6 +96,11 @@ void HierarchyListDrawing::drawSlotsList(bool& clickedOnItem)
             }
 
             obj->setSlot(nextFreeSlot);
+
+            if (inspector->scene && inspector->scene->getSceneDNA())
+            {
+                inspector->scene->getSceneDNA()->trackSlotChange(obj->getName(), obj, -1, nextFreeSlot);  
+            }
             inspector->mergedHierarchyList[nextFreeSlot] = obj;
             ++nextFreeSlot;
         }

@@ -26,8 +26,10 @@ struct SceneEvent
     uint64_t tick{0};
     std::vector<std::string> initNames;
     std::vector<ThreeDObject*> initPtrs;
+    std::vector<int> initSlots;
     int oldSlots{-1};
     int newSlots{-1};
+    
 };
 
 class ThreeDScene_DNA
