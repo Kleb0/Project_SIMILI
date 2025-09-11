@@ -97,6 +97,15 @@ void ThreeDScene_DNA::finalizeBootstrap()
     snap.tick = 0;
     snap.initNames = bootstrapNames;
     snap.initPtrs = bootstrapPtrs;
+
+    snap.initSlots.reserve(bootstrapPtrs.size());
+    for (ThreeDObject* obj : bootstrapPtrs)
+    {
+        if (obj)
+            snap.initSlots.push_back(obj->getSlot());
+        else
+            snap.initSlots.push_back(-1); 
+    }
     history.insert(history.begin(), std::move(snap));
 
     bootstrapNames.clear();
@@ -230,26 +239,26 @@ void ThreeDScene_DNA::cancelLastSlotChange(size_t preserveIndex)
             ThreeDObject* obj = it->ptr;
             if (!obj) break;
 
-            const auto& changes = obj->getChangedSlots();
+            auto& changes = const_cast<std::vector<int>&>(obj->getChangedSlots());
             if (changes.empty()) break;
 
             int lastOldSlot = changes.back();
+            changes.pop_back(); 
             int currentSlot = obj->getSlot();
 
             obj->setSlot(lastOldSlot);
-            obj->clearChangedSlots();
 
-            std::list<ThreeDObject*>& list = sceneRef->getObjectsRef();
-            if (static_cast<size_t>(lastOldSlot) < sceneRef->getHierarchyInspector()->mergedHierarchyList.size())
+            auto* hi = sceneRef->getHierarchyInspector();
+            if (hi && lastOldSlot >= 0 && static_cast<size_t>(lastOldSlot) < hi->mergedHierarchyList.size())
             {
-                auto* hi = sceneRef->getHierarchyInspector();
-                hi->mergedHierarchyList[lastOldSlot]  = obj;
-                hi->mergedHierarchyList[currentSlot]  = hi->emptySlotPlaceholders[currentSlot].get();
+                hi->mergedHierarchyList[lastOldSlot] = obj;
+                if (currentSlot >= 0 && static_cast<size_t>(currentSlot) < hi->mergedHierarchyList.size())
+                    hi->mergedHierarchyList[currentSlot] = hi->emptySlotPlaceholders[currentSlot].get();
             }
 
-            std::cout << "[ThreeDScene_DNA] Cancelled slot change for object: " 
-            << obj->getName() << " | from: " << currentSlot 
-            << " back to: " << lastOldSlot << std::endl;
+            std::cout << "[ThreeDScene_DNA] Cancelled slot change for object: "
+                      << obj->getName() << " | from: " << currentSlot
+                      << " back to: " << lastOldSlot << std::endl;
 
             history.erase(baseIt);
             sceneRef->getHierarchyInspector()->redrawSlotsList();
@@ -257,4 +266,3 @@ void ThreeDScene_DNA::cancelLastSlotChange(size_t preserveIndex)
         }
     }
 }
-

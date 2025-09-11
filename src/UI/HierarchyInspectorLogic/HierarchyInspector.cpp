@@ -149,7 +149,6 @@ void HierarchyInspector::exchangeSlots(ThreeDObject* obj, int targetIndex)
     obj->appendChangedSlot(oldSlot);
     obj->setSlot(newSlot);
 
-
     std::cout << "[HierarchyInspector] Swapping slots: " << oldSlot << " <-> " << newSlot << std::endl;
 
     mergedHierarchyList[newSlot] = obj;
