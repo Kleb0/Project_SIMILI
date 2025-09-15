@@ -55,7 +55,6 @@ int main(int argc, char **argv)
     SimiliSelector mySimiliSelector;
     InfoWindow myInfoWindow;
     ThreeDWindow myThreeDWindow;
-    OpenGLContext renderer;
     ThreeDScene myThreeDScene;
     ThreeDObjectSelector selector;
     Camera mainCamera;
@@ -76,24 +75,27 @@ int main(int argc, char **argv)
 
     // ----------------------------------------- //
 
-    myThreeDScene.initizalize(); 
-
     myThreeDWindow.glfwWindow = gui.getWindow();
     myInfoWindow.title = "Project Viewer";
     myThreeDWindow.title = "3D Viewport";
 
     mainCamera.setName("MainCamera");
 
+    // Create OpenGL context AFTER GLFW is initialized
+    OpenGLContext renderer;
     myThreeDWindow.setRenderer(renderer);
     myThreeDWindow.setHierarchy(&myHierarchy);
     myThreeDWindow.setObjectInspector(&objectInspector);
     myThreeDWindow.setThreeDScene(&myThreeDScene);
     
+    // Set OpenGL context BEFORE initializing the scene
+    myThreeDScene.setOpenGLContext(&renderer);
+    myThreeDScene.initizalize(); 
+
     myThreeDScene.addObject({ cubeMesh1 });
     myThreeDScene.addObject({&mainCamera});
 
     myThreeDScene.setActiveCamera(&mainCamera);
-    myThreeDScene.setOpenGLContext(&renderer);
     myThreeDWindow.setModelingMode(&myThreeDWindow.normalMode);
     myThreeDWindow.setSimiliSelector(&mySimiliSelector);
 

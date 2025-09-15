@@ -12,7 +12,6 @@ OpenGLContext::OpenGLContext()
 
 void OpenGLContext::initialize()
 {
-
     if (!fbo) glGenFramebuffers(1, &fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 

@@ -139,7 +139,7 @@ void HistoryLogic::render()
 							{
 								if (ev.kind == SceneEventKind::TransformChange)
 								{
-									scenedna->cancelTransformByID(ev.transformID);
+									scenedna->cancelLastTransformChange(i);
 								}
 								else
 								{
@@ -158,10 +158,6 @@ void HistoryLogic::render()
 										else if (futureEvent.kind == SceneEventKind::SlotChange)
 										{
 											scenedna->cancelLastSlotChange(j);
-										}
-										else if (futureEvent.kind == SceneEventKind::TransformChange)
-										{
-											scenedna->cancelTransformByID(futureEvent.transformID);
 										}
 										else
 										{

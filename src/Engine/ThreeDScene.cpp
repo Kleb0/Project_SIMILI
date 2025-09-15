@@ -109,6 +109,9 @@ void ThreeDScene::pushInGraveyard(ThreeDObject* obj)
     if (!obj) return;
 
     clearSelectionRecursive(obj);
+    
+   
+    
     erasePtr(objects, obj);
     graveyard.push_back(obj);
 
@@ -314,7 +317,6 @@ bool ThreeDScene::removeObject(ThreeDObject* object)
     if (auto* sdna = getSceneDNA())
         sdna->trackRemoveObject(object->getName(), object);
 
-    hierarchyInspector->redrawSlotsList();
     pushInGraveyard(object);
     return true;
 }
@@ -330,7 +332,6 @@ bool ThreeDScene::removeObjectFromSceneDNA(uint64_t objectID)
             << obj->getName() << " (ID=" << objectID << ")" << std::endl;
 
             obj->destroy();
-            hierarchyInspector->redrawSlotsList();
             erasePtr(objects, obj);
             return true;
         }

@@ -53,6 +53,7 @@ public:
     void exchangeSlots(ThreeDObject* obj, int index);
     void redrawSlotsList();
 
+
     // --------- cleaning ----- //
 
     void clearSelectionState();
