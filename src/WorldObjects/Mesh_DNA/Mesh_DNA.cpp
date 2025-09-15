@@ -1,6 +1,7 @@
 #include "WorldObjects/Mesh_DNA/Mesh_DNA.hpp"
 #include "WorldObjects/Mesh/Mesh.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
+#include "Engine/ThreeDScene_DNA/ThreeDScene_DNA.hpp"
 #include <glm/gtc/matrix_inverse.hpp>
 #include <iostream>
 #include <algorithm>
@@ -144,6 +145,19 @@ void MeshDNA::trackVerticeModify(const glm::mat4& deltaWorld, const std::vector<
 void MeshDNA::trackWithAutoTick(const glm::mat4& delta, const std::string& tag) 
 {
     track(delta, nextTick++, tag);
+}
+
+void MeshDNA::trackWithTransformID(const glm::mat4& delta, const std::string& tag, uint64_t transformID)
+{
+    MeshTransformEvent ev;
+    ev.delta = delta;
+    ev.tick = nextTick++;
+    ev.tag = tag;
+    ev.isComponentEdit = false;
+    ev.transformID = transformID; 
+    history.push_back(ev);
+    acc = delta * acc;
+    
 }
 
 void MeshDNA::trackExtrude(const ExtrudeRecord& rec)
@@ -535,3 +549,36 @@ void MeshDNA::rewindExtrudeHistory(size_t index_inclusive, Mesh* mesh)
     }
     nextTick = history.empty() ? 0 : history.back().tick + 1;
 }
+
+bool MeshDNA::cancelTransformByID(uint64_t transformID, Mesh* mesh)
+{
+    if (!mesh || transformID == 0) return false;
+    
+    // Trouver l'événement avec cet ID
+    auto it = std::find_if(history.begin(), history.end(),
+        [transformID](const MeshTransformEvent& ev) {
+            return ev.transformID == transformID && !ev.isComponentEdit;
+        });
+    
+    if (it == history.end()) return false;
+    
+    size_t index = std::distance(history.begin(), it);
+    
+    glm::mat4 inverseDelta = glm::inverse(it->delta);
+    mesh->setModelMatrix(inverseDelta * mesh->getModelMatrix());
+    
+    history.erase(it);
+    
+    acc = glm::mat4(1.0f);
+    for (const auto& ev : history) 
+    {
+        if (ev.isComponentEdit) continue;
+        if (hasFrozen && isInitEvent(ev)) continue;
+        acc = ev.delta * acc;
+    }
+    
+    nextTick = history.empty() ? 0 : history.back().tick + 1;    
+
+    return true;
+}
+

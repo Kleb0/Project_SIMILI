@@ -3,6 +3,7 @@
 #include "Engine/ThreeDInteractions/MeshTransform.hpp"
 #include "Engine/OpenGLContext.hpp"
 #include "Engine/ThreeDScene.hpp"
+#include "Engine/ThreeDScene_DNA/ThreeDScene_DNA.hpp"
 #include "Engine/Guizmo.hpp"
 
 #include "WorldObjects/Mesh/Mesh.hpp" 
@@ -42,7 +43,7 @@ namespace MeshTransform
         }
     }
 
-    void applyGizmoTransformation(const glm::mat4& delta, const std::list<ThreeDObject*>& selectedObjects, ImGuizmo::OPERATION op)
+    void applyGizmoTransformation(ThreeDScene* scene, const glm::mat4& delta, const std::list<ThreeDObject*>& selectedObjects, ImGuizmo::OPERATION op)
     {
         const float epsilon = 1e-5f;
         const glm::mat4 I(1.0f);
@@ -65,6 +66,8 @@ namespace MeshTransform
 
         for (ThreeDObject* obj : selectedObjects)
         {
+            glm::mat4 oldTransform = obj->getModelMatrix();
+            
             if (obj->getParent())
             {
                 glm::mat4 newLocal = delta * obj->getModelMatrix();
@@ -90,6 +93,11 @@ namespace MeshTransform
 
             if (obj->canHaveChildren)
                 manipulateChildrens(obj, delta);
+
+            glm::mat4 newTransform = obj->getModelMatrix();
+            
+
+    
         }
     }
 
@@ -153,7 +161,7 @@ namespace MeshTransform
         currentGizmoOperation, ImGuizmo::WORLD, glm::value_ptr(dummyMatrix)))
         {
             glm::mat4 delta = dummyMatrix * glm::inverse(prevMatrix);
-            applyGizmoTransformation(delta, selectedObjects, currentGizmoOperation);
+            applyGizmoTransformation(scene, delta, selectedObjects, currentGizmoOperation);
             prevMatrix = dummyMatrix;
             wasUsingGizmoLastFrame = true;
         }
@@ -161,7 +169,7 @@ namespace MeshTransform
         if (!isUsing && gizmoActive)
         {
             glm::mat4 totalDelta = dummyMatrix * glm::inverse(startMatrix);
-            trackMeshTransformOnRelease(selectedObjects, totalDelta, currentGizmoOperation);
+            trackMeshTransformOnRelease(scene, selectedObjects, totalDelta, currentGizmoOperation);
 
             if (currentGizmoOperation == ImGuizmo::ROTATE && !hasRotatedOnce)
             {
@@ -185,7 +193,7 @@ namespace MeshTransform
         wasUsingGizmoLastFrame = isUsing;
     }
 
-    void MeshTransform::trackMeshTransformOnRelease(const std::list<ThreeDObject*>& selectedObjects,
+    void MeshTransform::trackMeshTransformOnRelease(ThreeDScene* scene, const std::list<ThreeDObject*>& selectedObjects,
     const glm::mat4& totalDelta, ImGuizmo::OPERATION op)
     {
         const glm::mat4 I(1.0f);
@@ -214,12 +222,33 @@ namespace MeshTransform
 
         for (ThreeDObject* obj : selectedObjects)
         {
+
+            uint64_t transformID = 0;
+            if (scene && scene->getSceneDNA())
+            {
+                transformID = scene->getSceneDNA()->generateTransformID();
+            }
+
             if (auto* mesh = dynamic_cast<Mesh*>(obj))
             {
                 if (auto* dna = mesh->getMeshDNA())
                 {
-                    dna->trackWithAutoTick(totalDelta, tag);
+                    if (transformID > 0)
+                    {
+                        dna->trackWithTransformID(totalDelta, tag, transformID);
+                    }
+                    else
+                    {
+                        dna->trackWithAutoTick(totalDelta, tag);
+                    }
                 }
+            }
+
+            if (scene && scene->getSceneDNA() && !obj->getParent())
+            {
+                glm::mat4 newTransform = obj->getModelMatrix();
+                glm::mat4 oldTransform = glm::inverse(totalDelta) * newTransform;
+                scene->getSceneDNA()->trackTransformChange(obj->getName(), obj, oldTransform, newTransform, transformID);
             }
         }
     }

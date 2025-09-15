@@ -45,6 +45,7 @@ struct MeshTransformEvent
     std::vector<Vertice*> affectedVertices;
 
     ExtrudeRecord extrude{};
+    uint64_t transformID{0}; // ID unique pour synchroniser avec Scene_DNA
 
 };
 
@@ -64,6 +65,7 @@ public:
 
     void track(const glm::mat4& delta, uint64_t tick = 0, const std::string& tag = {});
     void trackWithAutoTick(const glm::mat4& delta, const std::string& tag);
+    void trackWithTransformID(const glm::mat4& delta, const std::string& tag, uint64_t transformID);
     void trackEdgeModify(const glm::mat4& deltaWorld, const std::vector<Vertice*>& verts);
     void trackVerticeModify(const glm::mat4& deltaWorld, const std::vector<Vertice*>& verts);
     void trackFaceModify(const glm::mat4& deltaWorld, const std::vector<Vertice*>& verts);
@@ -79,6 +81,9 @@ public:
     void rewindVerticeHistory(size_t index_inclusive, Mesh* mesh);
     void rewindFaceHistory(size_t index_inclusive, Mesh* mesh);
     void rewindExtrudeHistory(size_t index_inclusive, Mesh* mesh);
+    
+
+    bool cancelTransformByID(uint64_t transformID, Mesh* mesh);
 
     size_t size() const { return history.size(); }
     void ensureInit(const glm::mat4& currentModel);
@@ -93,6 +98,8 @@ public:
     void trackTranslate(const glm::mat4& delta) { trackWithAutoTick(delta, "translate"); }
     void trackRotate(const glm::mat4& delta) { trackWithAutoTick(delta, "rotate"); }
     void trackScale(const glm::mat4& delta) { trackWithAutoTick(delta, "scale"); }
+    
+
 
 private:
     static inline bool isInitEvent(const MeshTransformEvent& ev) 
