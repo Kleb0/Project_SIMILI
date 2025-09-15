@@ -12,95 +12,103 @@
 
 void ContextualMenu::setScene(ThreeDScene* s)
 {
-    scene = s;
+	scene = s;
 }
 
 void ContextualMenu::setHierarchyInspector(HierarchyInspector *inspector)
 {
-    hierarchyInspector = inspector;
+	hierarchyInspector = inspector;
 }
 
 void ContextualMenu::setObjectInspector(ObjectInspector *inspector)
 {
-    objectInspector = inspector;
+	objectInspector = inspector;
 }
 
 void ContextualMenu::show()
 {
 
-    popupPos = ImGui::GetMousePos();
-    isOpen = true;
+	popupPos = ImGui::GetMousePos();
+	isOpen = true;
 }
 
 void ContextualMenu::hide()
 {
-    if (!isOpen)
-        return;
+	if (!isOpen)
+		return;
 
-    isOpen = false;
+	isOpen = false;
 }
 
 void ContextualMenu::setThreeDWindow(ThreeDWindow *window)
 {
-    threeDWindow = window;
+	threeDWindow = window;
 }
 
 void ContextualMenu::render()
 {
-    if (isOpen)
-    {
-        ImGui::SetNextWindowPos(popupPos, ImGuiCond_Always);
-        ImGui::Begin("##ContextualMenu", nullptr,
-        ImGuiWindowFlags_AlwaysAutoResize |
-        ImGuiWindowFlags_NoTitleBar |
-        ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoMove |
-        ImGuiWindowFlags_NoSavedSettings);
+	if (isOpen)
+	{
+		ImGui::SetNextWindowPos(popupPos, ImGuiCond_Always);
+		ImGui::Begin("##ContextualMenu", nullptr,
+		ImGuiWindowFlags_AlwaysAutoResize |
+		ImGuiWindowFlags_NoTitleBar |
+		ImGuiWindowFlags_NoResize |
+		ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_NoSavedSettings);
 
-        ImGui::Text("Contextual Menu");
+		ImGui::Text("Contextual Menu");
 
-        if (hierarchyInspector)
-        {
-            ThreeDObject *selected = hierarchyInspector->getSelectedObject();
-            if (selected)
-            {
-                ImGui::Separator();
-                ImGui::Text("Current Selected object : %s", selected->getName().c_str());
+		if (hierarchyInspector)
+		{
+			ThreeDObject *selected = hierarchyInspector->getSelectedObject();
+			if (selected)
+			{
+				ImGui::Separator();
+				ImGui::Text("Current Selected object : %s", selected->getName().c_str());
 
-                if (ImGui::MenuItem("Delete selected object"))
-                {
-                    if (objectInspector)
-                        objectInspector->clearInspectedObject();
+				if (ImGui::MenuItem("Delete selected object"))
+				{
+					if (objectInspector)
+						objectInspector->clearInspectedObject();
 
                     ThreeDObject *toDelete = selected;
+                    ThreeDObject *parent = toDelete->getParent();
+
+                    if (parent)
+                    {
+                        parent->removeChild(toDelete);
+                    }
 
                     scene->removeObject(toDelete);
-                    hide();
-                    ImGui::End();
-                    return;
-                }
-            }
-        }
+           
+                
+					hide();
+					ImGui::End();
+					return;
+				}
+			}
+		}
 
-        if (ImGui::MenuItem("Create Cube") && scene)
-        {
-            Mesh* newCube = Primitives::CreateCubeMesh(1.0f, glm::vec3(0.0f, 0.0f, 0.0f),"NewCube", true);
-            scene->addObject(newCube);
+		if (ImGui::MenuItem("Create Cube") && scene)
+		{
+			Mesh* newCube = Primitives::CreateCubeMesh(1.0f, glm::vec3(0.0f, 0.0f, 0.0f),"NewCube", true);
+			scene->addObject(newCube);
 
-            if (hierarchyInspector)
-            {
-                hierarchyInspector->selectObject(newCube);
-                hierarchyInspector->redrawSlotsList();                            
-            }               
-        
-            hide();
-        }
+			if (hierarchyInspector)
+			{
+				hierarchyInspector->selectObject(newCube);
+				hierarchyInspector->redrawSlotsList();                            
+			}               
+		
+			hide();
+		}
 
-        ImGui::End();
+		ImGui::End();
 
-        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
-        {
-            hide();
-        }
-    }
+		if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
+		{
+			hide();
+		}
+	}
 }

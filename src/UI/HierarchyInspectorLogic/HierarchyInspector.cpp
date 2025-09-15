@@ -178,6 +178,8 @@ void HierarchyInspector::redrawSlotsList()
 }
 
 
+
+
 // ------------ other  ------------- //
 
 
