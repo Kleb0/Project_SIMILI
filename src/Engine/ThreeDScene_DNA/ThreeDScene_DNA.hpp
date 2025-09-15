@@ -14,7 +14,8 @@ enum class SceneEventKind : uint8_t
     InitSnapshot,
     AddObject,
     RemoveObject,
-    SlotChange
+    SlotChange,
+    TransformChange
 };
 
 struct SceneEvent 
@@ -29,6 +30,10 @@ struct SceneEvent
     std::vector<int> initSlots;
     int oldSlots{-1};
     int newSlots{-1};
+    
+    glm::mat4 oldTransform{1.0f};
+    glm::mat4 newTransform{1.0f};
+    uint64_t transformID{0}; 
     
 };
 
@@ -49,6 +54,13 @@ public:
     // --- hierarchy modification tracking 
     void trackSlotChange(const std::string& name, ThreeDObject* obj, int oldSlot, int newSlot);
 
+    // --- transform tracking for non-parented objects
+    void trackTransformChange(const std::string& name, ThreeDObject* obj, const glm::mat4& oldTransform, const glm::mat4& newTransform, uint64_t transformID = 0);
+    bool isObjectNonParented(ThreeDObject* obj) const;
+    void printTransformHistory() const;
+    void syncWithMeshDNA(ThreeDObject* obj);
+    void syncAllObjectsWithMeshDNA();
+
 
     const std::vector<SceneEvent>& getHistory() const { return history; }
     size_t size() const { return history.size(); }
@@ -59,15 +71,21 @@ public:
     void cancelLastAddObject(size_t preserveIndex = size_t(-1));
     void cancelLastRemoveObject(size_t preserveIndex = size_t(-1));
     void cancelLastSlotChange(size_t preserveIndex = size_t(-1));
+    void cancelLastTransformChange(size_t preserveIndex = size_t(-1));
+    
+ 
+    bool cancelTransformByID(uint64_t transformID);
 
     void setSceneRef(ThreeDScene* scene);
     ThreeDScene* getSceneRef() const { return sceneRef; }
 
+    uint64_t generateTransformID() { return nextTransformID++; }
 
 private:
     bool hasInit{false};
     uint64_t init_tick{0};
     uint64_t nextTick{1};
+    uint64_t nextTransformID{1}; 
     std::vector<SceneEvent> history;
 
     bool bootstrapping{true};

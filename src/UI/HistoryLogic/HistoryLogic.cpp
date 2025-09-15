@@ -74,6 +74,8 @@ void HistoryLogic::render()
 								eventKindStr = "InitSnapshot";
 							else if (ev.kind == SceneEventKind::SlotChange)
 								eventKindStr = "SlotChange";
+							else if (ev.kind == SceneEventKind::TransformChange)
+								eventKindStr = "Transform";
 
 							std::string line = "#" + std::to_string(i) + "  ";
 
@@ -99,6 +101,33 @@ void HistoryLogic::render()
 									line += "from slot " + std::to_string(ev.oldSlots) + " → to slot " + std::to_string(ev.newSlots);
 									break;
 
+								case SceneEventKind::TransformChange:
+									line += "Transform Change  ";
+									line += ev.objectName + "  ";
+									
+									glm::vec3 oldScale, oldTranslation, oldSkew;
+									glm::vec4 oldPerspective;
+									glm::quat oldRotQ;
+									
+									glm::vec3 newScale, newTranslation, newSkew;
+									glm::vec4 newPerspective;
+									glm::quat newRotQ;
+									
+									if (glm::decompose(ev.oldTransform, oldScale, oldRotQ, oldTranslation, oldSkew, oldPerspective) &&
+										glm::decompose(ev.newTransform, newScale, newRotQ, newTranslation, newSkew, newPerspective))
+									{
+										glm::vec3 oldEulerDeg = glm::degrees(glm::eulerAngles(oldRotQ));
+										glm::vec3 newEulerDeg = glm::degrees(glm::eulerAngles(newRotQ));
+										
+										line += "T(" + std::to_string(oldTranslation.x) + "," + std::to_string(oldTranslation.y) + "," + std::to_string(oldTranslation.z) + ")";
+										line += " → T(" + std::to_string(newTranslation.x) + "," + std::to_string(newTranslation.y) + "," + std::to_string(newTranslation.z) + ")";
+									}
+									else
+									{
+										line += "Matrix Transform";
+									}
+									break;
+
 								default:
 									line += "Unknown Event";
 									break;
@@ -106,34 +135,43 @@ void HistoryLogic::render()
 
 							line += "  [tick=" + std::to_string(ev.tick) + "]";
 
-
-
-
 							if (ImGui::Selectable(line.c_str(), false))
 							{
-								for (size_t j = shist.size(); j-- > i + 1;)
+								if (ev.kind == SceneEventKind::TransformChange)
 								{
-									const auto& futureEvent = shist[j];
-
-									if (futureEvent.kind == SceneEventKind::AddObject)
-									{
-										scenedna->cancelLastAddObject(j);
-									}
-									else if (futureEvent.kind == SceneEventKind::RemoveObject)
-									{
-										scenedna->cancelLastRemoveObject(j);
-									}
-									else if (futureEvent.kind == SceneEventKind::SlotChange)
-									{
-										scenedna->cancelLastSlotChange(j);
-									}
-									else
-									{
-										scenedna->rewindToSceneEvent(j - 1);
-									}
+									scenedna->cancelTransformByID(ev.transformID);
 								}
+								else
+								{
+									for (size_t j = shist.size(); j-- > i + 1;)
+									{
+										const auto& futureEvent = shist[j];
 
-								scenedna->rewindToSceneEvent(i);
+										if (futureEvent.kind == SceneEventKind::AddObject)
+										{
+											scenedna->cancelLastAddObject(j);
+										}
+										else if (futureEvent.kind == SceneEventKind::RemoveObject)
+										{
+											scenedna->cancelLastRemoveObject(j);
+										}
+										else if (futureEvent.kind == SceneEventKind::SlotChange)
+										{
+											scenedna->cancelLastSlotChange(j);
+										}
+										else if (futureEvent.kind == SceneEventKind::TransformChange)
+										{
+											scenedna->cancelTransformByID(futureEvent.transformID);
+										}
+										else
+										{
+											scenedna->rewindToSceneEvent(j - 1);
+										}
+									}
+
+									scenedna->rewindToSceneEvent(i);
+								}
+								
 								ImGui::End();
 								ImGui::PopStyleColor(6);
 								return;
@@ -232,7 +270,7 @@ void HistoryLogic::render()
 							if (ev.tag == "rotate") op = ImGuizmo::ROTATE;
 							else if (ev.tag == "scale") op = ImGuizmo::SCALE;
 
-							MeshTransform::applyGizmoTransformation(delta, one, op);
+							MeshTransform::applyGizmoTransformation(scene, delta, one, op);
 							
 							dna->rewindEdgeHistory(i, mesh);
 							dna->rewindVerticeHistory(i, mesh);

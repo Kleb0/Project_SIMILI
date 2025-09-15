@@ -20,7 +20,7 @@ namespace MeshTransform
 {
     void manipulateChildrens(ThreeDObject* parent, const glm::mat4& delta);
 
-    void applyGizmoTransformation(const glm::mat4& delta, const std::list<ThreeDObject*>& selectedObjects, ImGuizmo::OPERATION op);
+    void applyGizmoTransformation(ThreeDScene* scene, const glm::mat4& delta, const std::list<ThreeDObject*>& selectedObjects, ImGuizmo::OPERATION op);
 
     glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, ThreeDScene* scene, 
     const std::list<ThreeDObject*>& selectedObjects, const ImVec2& oglChildPos, const ImVec2& oglChildSize);
@@ -28,7 +28,7 @@ namespace MeshTransform
     void manipulateMesh(ThreeDScene* scene, const std::list<ThreeDObject*>& selectedObjects,
     const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame);
 
-    void trackMeshTransformOnRelease(const std::list<ThreeDObject*>& selectedObjects, const glm::mat4& totalDelta, ImGuizmo::OPERATION op);
+    void trackMeshTransformOnRelease(ThreeDScene* scene, const std::list<ThreeDObject*>& selectedObjects, const glm::mat4& totalDelta, ImGuizmo::OPERATION op);
 
     void scaleCleanup(ThreeDObject* obj, const glm::mat4& delta);
 

@@ -86,6 +86,77 @@ void ThreeDScene_DNA::trackSlotChange(const std::string& name, ThreeDObject* obj
     << " | tick: " << (nextTick - 1) << std::endl;
 }
 
+void ThreeDScene_DNA::trackTransformChange(const std::string& name, ThreeDObject* obj, const glm::mat4& oldTransform, const glm::mat4& newTransform, uint64_t transformID)
+{
+    if (!obj || obj->getParent()) return;
+
+    SceneEvent ev;
+    ev.kind = SceneEventKind::TransformChange;
+    ev.objectName = name;
+    ev.ptr = obj;
+    ev.objectID = obj->getID();
+    ev.oldTransform = oldTransform;
+    ev.newTransform = newTransform;
+    ev.tick = nextTick++;
+    ev.transformID = (transformID > 0) ? transformID : generateTransformID(); 
+    history.push_back(std::move(ev));
+
+}
+
+bool ThreeDScene_DNA::isObjectNonParented(ThreeDObject* obj) const
+{
+    return obj && !obj->getParent();
+}
+
+void ThreeDScene_DNA::printTransformHistory() const
+{
+    std::cout << "\n=== Transform History ===" << std::endl;
+    for (const auto& event : history)
+    {
+        if (event.kind == SceneEventKind::TransformChange)
+        {
+            std::cout << "Transform Change | Object: " << event.objectName 
+                      << " | ID: " << event.objectID 
+                      << " | Tick: " << event.tick << std::endl;
+        }
+    }
+    std::cout << "=== End Transform History ===\n" << std::endl;
+}
+
+void ThreeDScene_DNA::syncWithMeshDNA(ThreeDObject* obj)
+{
+    if (!obj || obj->getParent()) return;
+    
+    auto* mesh = dynamic_cast<Mesh*>(obj);
+    if (!mesh || !mesh->getMeshDNA()) return;
+    
+    const auto& meshHistory = mesh->getMeshDNA()->getHistory();
+    if (meshHistory.empty()) return;
+    
+    for (const auto& meshEvent : meshHistory)
+    {
+        if (meshEvent.isComponentEdit) continue;
+        
+        glm::mat4 oldTransform = glm::inverse(meshEvent.delta) * obj->getModelMatrix();
+        glm::mat4 newTransform = obj->getModelMatrix();
+        
+        trackTransformChange(obj->getName(), obj, oldTransform, newTransform);
+    }
+}
+
+void ThreeDScene_DNA::syncAllObjectsWithMeshDNA()
+{
+    if (!sceneRef) return;
+    
+    for (ThreeDObject* obj : sceneRef->getObjectsRef())
+    {
+        if (obj && !obj->getParent())
+        {
+            syncWithMeshDNA(obj);
+        }
+    }
+}
+
 
 void ThreeDScene_DNA::finalizeBootstrap()
 {
@@ -218,7 +289,6 @@ void ThreeDScene_DNA::cancelLastRemoveObject(size_t preserveIndex)
 
             std::cout << "[ThreeDScene_DNA] Resurrected object from graveyard: " << resurrect->getName() << " (ID=" << targetID << ")" << std::endl;
             sceneRef->getHierarchyInspector()->redrawSlotsList();
-            // sceneRef->getThreeDWindow()->addToObjectList(resurrect);
             history.erase(baseIt);
             return;
         }
@@ -265,4 +335,70 @@ void ThreeDScene_DNA::cancelLastSlotChange(size_t preserveIndex)
             return;
         }
     }
+}
+
+void ThreeDScene_DNA::cancelLastTransformChange(size_t preserveIndex)
+{
+    if (history.empty() || !sceneRef) return;
+
+    for (auto it = history.rbegin(); it != history.rend(); ++it)
+    {
+        auto baseIt = std::prev(it.base());
+        size_t idx = static_cast<size_t>(std::distance(history.begin(), baseIt));
+
+        if (it->kind == SceneEventKind::TransformChange && idx == preserveIndex)
+        {
+            ThreeDObject* obj = it->ptr;
+            if (!obj || obj->getParent()) break;
+
+            if (auto* mesh = dynamic_cast<Mesh*>(obj))
+            {
+                if (auto* meshDNA = mesh->getMeshDNA())
+                {
+                    meshDNA->cancelTransformByID(it->transformID, mesh);
+                }
+            }
+
+            obj->setModelMatrix(it->oldTransform);
+            history.erase(baseIt);
+            return;
+        }
+    }
+}
+
+bool ThreeDScene_DNA::cancelTransformByID(uint64_t transformID)
+{
+    if (transformID == 0) return false;
+    
+    auto it = std::find_if(history.begin(), history.end(),
+        [transformID](const SceneEvent& ev) {
+            return ev.kind == SceneEventKind::TransformChange && ev.transformID == transformID;
+        });
+    
+    if (it == history.end()) return false;
+    
+    ThreeDObject* obj = it->ptr;
+    if (!obj || obj->getParent()) return false;
+    
+    if (auto* mesh = dynamic_cast<Mesh*>(obj))
+    {
+        if (auto* meshDNA = mesh->getMeshDNA())
+        {
+            meshDNA->cancelTransformByID(transformID, mesh);
+        }
+    }
+    
+
+    obj->setModelMatrix(it->oldTransform);
+    
+
+    std::string objectName = it->objectName;
+    
+    history.erase(it);
+    
+    std::cout << "[SceneDNA] Cancelled Transform Change | name: " << objectName
+              << " | transformID: " << transformID
+              << " | remaining events: " << history.size() << std::endl;
+    
+    return true;
 }
