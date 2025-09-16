@@ -107,6 +107,11 @@ void HierarchyListDrawing::drawSlotsList(bool& clickedOnItem)
 		}
 
 		inspector->objectsAssignedOnce = true;
+		
+		if (inspector->scene && inspector->scene->getSceneDNA())
+		{
+			inspector->scene->getSceneDNA()->finalizeBootstrap();
+		}
 	}
 
 

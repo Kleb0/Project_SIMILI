@@ -97,6 +97,17 @@ static inline void clearSelectionRecursive(ThreeDObject* o)
         clearSelectionRecursive(child);
 }
 
+static inline void collectAllChildrenRecursive(ThreeDObject* obj, std::vector<ThreeDObject*>& allChildren)
+{
+    if (!obj) return;
+    
+    for (auto* child : obj->getChildren())
+    {
+        allChildren.push_back(child);
+        collectAllChildrenRecursive(child, allChildren);
+    }
+}
+
 
 bool ThreeDScene::containsObject(const ThreeDObject* obj) const
 {
@@ -110,7 +121,25 @@ void ThreeDScene::pushInGraveyard(ThreeDObject* obj)
 
     clearSelectionRecursive(obj);
     
-   
+    std::vector<ThreeDObject*> allChildren;
+    collectAllChildrenRecursive(obj, allChildren);
+    
+    for (auto* child : allChildren)
+    {
+        if (auto* mesh = dynamic_cast<Mesh*>(child))
+        {
+            GraveyardEntry entry;
+            entry.object = child;
+            entry.vertices = mesh->getVertices();
+            entry.edges = mesh->getEdges();
+            entry.faces = mesh->getFaces();
+            meshGraveyard.push_back(std::move(entry));
+            std::cout << "[ThreeDScene] Child mesh sent to graveyard: " << child->getName() << " (ID=" << child->getID() << ")" << std::endl;
+        }
+        
+        erasePtr(objects, child);
+        graveyard.push_back(child);
+    }
     
     erasePtr(objects, obj);
     graveyard.push_back(obj);
@@ -124,7 +153,6 @@ void ThreeDScene::pushInGraveyard(ThreeDObject* obj)
         entry.faces = mesh->getFaces();
         meshGraveyard.push_back(std::move(entry));
         std::cout << "[ThreeDScene] Mesh sent to graveyard: " << obj->getName() << " (ID=" << obj->getID() << ")" << std::endl;
-
     }
 }
 
@@ -314,10 +342,16 @@ bool ThreeDScene::removeObject(ThreeDObject* object)
 
     std::cout << "[ThreeDScene] Removing object: " << object->getName() << " with ID : " << object->getID() << std::endl;
 
+    if (object->getParent())
+    {
+        object->getParent()->removeChild(object);
+    }
+
     if (auto* sdna = getSceneDNA())
         sdna->trackRemoveObject(object->getName(), object);
 
     pushInGraveyard(object);
+    hierarchyInspector->redrawSlotsList();
     return true;
 }
 

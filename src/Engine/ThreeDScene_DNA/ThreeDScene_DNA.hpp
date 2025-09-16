@@ -70,8 +70,13 @@ public:
     bool rewindToSceneEvent(size_t index);
     void cancelLastAddObject(size_t preserveIndex = size_t(-1));
     void cancelLastRemoveObject(size_t preserveIndex = size_t(-1));
+    void cancelRemoveObjectByID(uint64_t objectID);
+    void cancelAddObjectByID(uint64_t objectID);
     void cancelLastSlotChange(size_t preserveIndex = size_t(-1));
+    void cancelSlotChangeByID(uint64_t objectID);
     void cancelLastTransformChange(size_t preserveIndex = size_t(-1));
+    
+    void resurrectChildrenRecursive(ThreeDObject* parent);
     
  
     bool cancelTransformByID(uint64_t transformID);
