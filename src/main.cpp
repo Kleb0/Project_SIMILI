@@ -108,7 +108,6 @@ int main(int argc, char **argv)
     historyLogic.setHierarchyInspector(&myHierarchy);
 
     auto* sdna = myThreeDScene.getSceneDNA();
-    if (sdna) sdna->finalizeBootstrap();
     sdna->setSceneRef(&myThreeDScene);
 
     myThreeDScene.setHierarchyInspector(&myHierarchy);

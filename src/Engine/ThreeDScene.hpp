@@ -52,6 +52,7 @@ public:
     void pushInGraveyard(ThreeDObject * obj);
     // bool reviveFromGraveyardById(uint64_t id);
     const std::list<ThreeDObject *>& getGraveyard() const { return graveyard; }
+    const std::vector<GraveyardEntry>& getMeshGraveyard() const { return meshGraveyard; }
 
     ThreeDScene_DNA* getSceneDNA() const { return sceneDNA; }
     void setSceneDNA(ThreeDScene_DNA* dna, bool takeOwnership = true);

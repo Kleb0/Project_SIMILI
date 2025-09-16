@@ -71,6 +71,8 @@ void ThreeDScene_DNA::trackRemoveObject(const std::string& name, ThreeDObject* o
 
 void ThreeDScene_DNA::trackSlotChange(const std::string& name, ThreeDObject* obj, int oldSlot, int newSlot)
 {
+    if (bootstrapping) return;
+    
     SceneEvent ev;
     ev.kind = SceneEventKind::SlotChange;
     ev.objectName = name;
@@ -199,6 +201,54 @@ bool ThreeDScene_DNA::rewindToSceneEvent(size_t index)
 }
 
 
+void ThreeDScene_DNA::resurrectChildrenRecursive(ThreeDObject* parent)
+{
+    if (!parent || !sceneRef) return;
+    
+    auto& graveyard = const_cast<std::list<ThreeDObject*>&>(sceneRef->getGraveyard());
+    auto& meshGraveyard = const_cast<std::vector<GraveyardEntry>&>(sceneRef->getMeshGraveyard());
+    auto& objects = sceneRef->getObjectsRef();
+    
+    std::vector<ThreeDObject*> childrenToResurrect;
+    
+    for (auto git = graveyard.begin(); git != graveyard.end();)
+    {
+        ThreeDObject* child = *git;
+        if (child && child->getParent() == parent)
+        {
+            childrenToResurrect.push_back(child);
+            git = graveyard.erase(git);
+        }
+        else
+        {
+            ++git;
+        }
+    }
+    
+    for (auto* child : childrenToResurrect)
+    {
+        child->setSelected(false);
+        
+        if (std::find(objects.begin(), objects.end(), child) == objects.end())
+            objects.push_back(child);
+        
+        if (auto* mesh = dynamic_cast<Mesh*>(child))
+        {
+            if (!mesh->getMeshDNA())
+            {
+                auto* dna = new MeshDNA();
+                dna->name = child->getName();
+                mesh->setMeshDNA(dna, true);
+            }
+            mesh->getMeshDNA()->ensureInit(mesh->getModelMatrix());
+        }
+        
+        std::cout << "[ThreeDScene_DNA] Resurrected child object: " << child->getName() << " (ID=" << child->getID() << ")" << std::endl;
+        
+        resurrectChildrenRecursive(child);
+    }
+}
+
 void ThreeDScene_DNA::cancelLastAddObject(size_t preserveIndex)
 {
 
@@ -285,11 +335,147 @@ void ThreeDScene_DNA::cancelLastRemoveObject(size_t preserveIndex)
                     }
                     mesh->getMeshDNA()->ensureInit(mesh->getModelMatrix());
                 }
+                
+                resurrectChildrenRecursive(resurrect);
             }
 
-            std::cout << "[ThreeDScene_DNA] Resurrected object from graveyard: " << resurrect->getName() << " (ID=" << targetID << ")" << std::endl;
+            // std::cout << "[ThreeDScene_DNA] Resurrected object from graveyard: " << resurrect->getName() << " (ID=" << targetID << ")" << std::endl;
             sceneRef->getHierarchyInspector()->redrawSlotsList();
             history.erase(baseIt);
+            return;
+        }
+    }
+}
+
+void ThreeDScene_DNA::cancelRemoveObjectByID(uint64_t objectID)
+{
+    if (history.empty() || !sceneRef) return;
+
+    for (auto it = history.rbegin(); it != history.rend(); ++it)
+    {
+        auto baseIt = std::prev(it.base());
+
+        if (it->kind == SceneEventKind::RemoveObject && it->objectID == objectID)
+        {
+            const uint64_t targetID = it->objectID;
+            ThreeDObject* resurrect = nullptr;
+
+            const auto& gyConst = sceneRef->getGraveyard();
+            auto& gy = const_cast<std::list<ThreeDObject*>&>(gyConst);
+
+            for (auto git = gy.begin(); git != gy.end(); ++git)
+            {
+                ThreeDObject* o = *git;
+                if (o && o->getID() == targetID)
+                {
+                    resurrect = o;
+                    gy.erase(git);
+                    break;
+                }
+            }
+
+            auto& objects = sceneRef->getObjectsRef();
+            if (!resurrect)
+            {
+                for (auto* o : objects)
+                {
+                    if (o && o->getID() == targetID) { resurrect = o; break; }
+                }
+            }
+
+            if (resurrect)
+            {
+                resurrect->setSelected(false);
+
+                if (std::find(objects.begin(), objects.end(), resurrect) == objects.end())
+                    objects.push_back(resurrect);
+
+                if (auto* mesh = dynamic_cast<Mesh*>(resurrect))
+                {
+                    if (!mesh->getMeshDNA())
+                    {
+                        auto* dna = new MeshDNA();
+                        dna->name = resurrect->getName();
+                        mesh->setMeshDNA(dna, true);
+                    }
+                    mesh->getMeshDNA()->ensureInit(mesh->getModelMatrix());
+                }
+                
+                if (resurrect->getParent())
+                {
+                    resurrect->getParent()->addChild(resurrect);
+                }
+                
+                resurrectChildrenRecursive(resurrect);
+            }
+
+            std::cout << "[ThreeDScene_DNA] Resurrected object from graveyard by ID: " << resurrect->getName() << " (ID=" << targetID << ")" << std::endl;
+            sceneRef->getHierarchyInspector()->redrawSlotsList();
+            history.erase(baseIt);
+            return;
+        }
+    }
+}
+
+void ThreeDScene_DNA::cancelAddObjectByID(uint64_t objectID)
+{
+    if (history.empty() || !sceneRef) return;
+
+    for (auto it = history.rbegin(); it != history.rend(); ++it)
+    {
+        auto baseIt = std::prev(it.base());
+
+        if (it->kind == SceneEventKind::AddObject && it->objectID == objectID)
+        {
+            uint64_t targetID = it->objectID;
+
+            for (ThreeDObject* obj : sceneRef->getObjectsRef())
+            {
+                if (obj && obj->getID() == targetID)
+                {
+                    sceneRef->removeObjectFromSceneDNA(targetID);
+                    break;
+                }
+            }
+        
+            history.erase(baseIt);
+            return;
+        }
+    }
+}
+
+void ThreeDScene_DNA::cancelSlotChangeByID(uint64_t objectID)
+{
+    if (history.empty() || !sceneRef) return;
+
+    for (auto it = history.rbegin(); it != history.rend(); ++it)
+    {
+        auto baseIt = std::prev(it.base());
+
+        if (it->kind == SceneEventKind::SlotChange && it->objectID == objectID)
+        {
+            ThreeDObject* obj = it->ptr;
+            if (!obj) break;
+
+            auto& changes = const_cast<std::vector<int>&>(obj->getChangedSlots());
+            if (changes.empty()) break;
+
+            int lastOldSlot = changes.back();
+            changes.pop_back(); 
+            int currentSlot = obj->getSlot();
+
+            obj->setSlot(lastOldSlot);
+
+            auto* hi = sceneRef->getHierarchyInspector();
+            if (hi && lastOldSlot >= 0 && static_cast<size_t>(lastOldSlot) < hi->mergedHierarchyList.size())
+            {
+                hi->mergedHierarchyList[lastOldSlot] = obj;
+                if (currentSlot >= 0 && static_cast<size_t>(currentSlot) < hi->mergedHierarchyList.size())
+                    hi->mergedHierarchyList[currentSlot] = hi->emptySlotPlaceholders[currentSlot].get();
+            }
+
+            history.erase(baseIt);
+            sceneRef->getHierarchyInspector()->redrawSlotsList();
             return;
         }
     }
@@ -326,9 +512,9 @@ void ThreeDScene_DNA::cancelLastSlotChange(size_t preserveIndex)
                     hi->mergedHierarchyList[currentSlot] = hi->emptySlotPlaceholders[currentSlot].get();
             }
 
-            std::cout << "[ThreeDScene_DNA] Cancelled slot change for object: "
-                      << obj->getName() << " | from: " << currentSlot
-                      << " back to: " << lastOldSlot << std::endl;
+            // std::cout << "[ThreeDScene_DNA] Cancelled slot change for object: "
+            //           << obj->getName() << " | from: " << currentSlot
+            //           << " back to: " << lastOldSlot << std::endl;
 
             history.erase(baseIt);
             sceneRef->getHierarchyInspector()->redrawSlotsList();
@@ -371,7 +557,8 @@ bool ThreeDScene_DNA::cancelTransformByID(uint64_t transformID)
     if (transformID == 0) return false;
     
     auto it = std::find_if(history.begin(), history.end(),
-        [transformID](const SceneEvent& ev) {
+        [transformID](const SceneEvent& ev) 
+        {
             return ev.kind == SceneEventKind::TransformChange && ev.transformID == transformID;
         });
     
@@ -388,17 +575,15 @@ bool ThreeDScene_DNA::cancelTransformByID(uint64_t transformID)
         }
     }
     
-
     obj->setModelMatrix(it->oldTransform);
     
-
     std::string objectName = it->objectName;
     
     history.erase(it);
     
-    std::cout << "[SceneDNA] Cancelled Transform Change | name: " << objectName
-              << " | transformID: " << transformID
-              << " | remaining events: " << history.size() << std::endl;
+    // std::cout << "[SceneDNA] Cancelled Transform Change | name: " << objectName
+    //           << " | transformID: " << transformID
+    //           << " | remaining events: " << history.size() << std::endl;
     
     return true;
 }

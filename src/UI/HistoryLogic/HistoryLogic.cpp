@@ -39,7 +39,6 @@ void HistoryLogic::render()
 	if (objectInspector)
 		{
 			ImGui::Separator();
-			ImGui::Text("Currently inspected object transformed list :");
 
 			ThreeDObject* obj = objectInspector->getInspectedObject();
 
@@ -114,7 +113,7 @@ void HistoryLogic::render()
 									glm::quat newRotQ;
 									
 									if (glm::decompose(ev.oldTransform, oldScale, oldRotQ, oldTranslation, oldSkew, oldPerspective) &&
-										glm::decompose(ev.newTransform, newScale, newRotQ, newTranslation, newSkew, newPerspective))
+									glm::decompose(ev.newTransform, newScale, newRotQ, newTranslation, newSkew, newPerspective))
 									{
 										glm::vec3 oldEulerDeg = glm::degrees(glm::eulerAngles(oldRotQ));
 										glm::vec3 newEulerDeg = glm::degrees(glm::eulerAngles(newRotQ));
@@ -143,25 +142,30 @@ void HistoryLogic::render()
 								}
 								else
 								{
-									for (size_t j = shist.size(); j-- > i + 1;)
+									// ---- Scene_DNA cancel func ----
+									while (shist.size() > i + 1)
 									{
-										const auto& futureEvent = shist[j];
-
+										const auto& futureEvent = shist.back();
+										
 										if (futureEvent.kind == SceneEventKind::AddObject)
 										{
-											scenedna->cancelLastAddObject(j);
+											scenedna->cancelAddObjectByID(futureEvent.objectID);
 										}
 										else if (futureEvent.kind == SceneEventKind::RemoveObject)
 										{
-											scenedna->cancelLastRemoveObject(j);
+											scenedna->cancelRemoveObjectByID(futureEvent.objectID);
 										}
 										else if (futureEvent.kind == SceneEventKind::SlotChange)
 										{
-											scenedna->cancelLastSlotChange(j);
+											scenedna->cancelSlotChangeByID(futureEvent.objectID);
+										}
+										else if (futureEvent.kind == SceneEventKind::TransformChange)
+										{
+											scenedna->cancelTransformByID(futureEvent.transformID);
 										}
 										else
 										{
-											scenedna->rewindToSceneEvent(j - 1);
+											scenedna->rewindToSceneEvent(i);
 										}
 									}
 
@@ -177,10 +181,12 @@ void HistoryLogic::render()
 
 			}
 
+			// ---- Mesh_DNA cancel func ----
 			else if (auto* mesh = dynamic_cast<Mesh*>(obj))
 			{
 				if (auto* dna = mesh->getMeshDNA())
 				{
+					ImGui::Text("Currently inspected object transformed list :");
 					const auto& hist = dna->getHistory();
 					if (hist.empty())
 					{

@@ -72,16 +72,9 @@ void ContextualMenu::render()
 					if (objectInspector)
 						objectInspector->clearInspectedObject();
 
-                    ThreeDObject *toDelete = selected;
-                    ThreeDObject *parent = toDelete->getParent();
+                    ThreeDObject *toDelete = selected;      
 
-                    if (parent)
-                    {
-                        parent->removeChild(toDelete);
-                    }
-
-                    scene->removeObject(toDelete);
-           
+                    scene->removeObject(toDelete);          
                 
 					hide();
 					ImGui::End();
