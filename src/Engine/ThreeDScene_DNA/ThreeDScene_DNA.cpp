@@ -464,6 +464,7 @@ void ThreeDScene_DNA::cancelAddObjectByID(uint64_t objectID)
             }
         
             history.erase(baseIt);
+            sceneRef->getHierarchyInspector()->redrawSlotsList();
             return;
         }
     }
@@ -666,9 +667,7 @@ void ThreeDScene_DNA::cancelParentChangeFromScene_DNA(uint64_t objectID)
                     mergedList[oldSlot] = obj;                   
 
                 }
-            }
-            
-
+            }            
             
             if (sceneRef->getHierarchyInspector())
             {
