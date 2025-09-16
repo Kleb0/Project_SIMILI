@@ -70,6 +70,10 @@ public:
     void renameObject();
     void notifyObjectDeleted(ThreeDObject* obj);
 
+    // Getters pour Scene_DNA
+    std::vector<ThreeDObject*>& getMergedHierarchyList() { return mergedHierarchyList; }
+    std::vector<std::unique_ptr<EmptyDummy>>& getEmptySlotPlaceholders() { return emptySlotPlaceholders; }
+
     std::string title;
     int lastSelectedSlotIndex = -1;
     int lastRepositionTargetIndex = -1;

@@ -127,6 +127,10 @@ void HistoryLogic::render()
 									}
 									break;
 
+								case SceneEventKind::ParentChange:
+									line += "Parent Change";
+									break;
+
 								default:
 									line += "Unknown Event";
 									break;
@@ -162,6 +166,10 @@ void HistoryLogic::render()
 										else if (futureEvent.kind == SceneEventKind::TransformChange)
 										{
 											scenedna->cancelTransformByID(futureEvent.transformID);
+										}
+										else if (futureEvent.kind == SceneEventKind::ParentChange)
+										{
+											scenedna->cancelParentChangeFromScene_DNA(futureEvent.objectID);
 										}
 										else
 										{

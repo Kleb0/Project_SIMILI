@@ -98,10 +98,8 @@ void HierarchyListDrawing::drawSlotsList(bool& clickedOnItem)
 
 			obj->setSlot(nextFreeSlot);
 
-			if (inspector->scene && inspector->scene->getSceneDNA())
-			{
-				inspector->scene->getSceneDNA()->trackSlotChange(obj->getName(), obj, -1, nextFreeSlot);  
-			}
+			// Ne pas tracker l'assignation initiale du slot pour les nouveaux objets
+			// Le slot initial sera inclus dans l'InitSnapshot
 			inspector->mergedHierarchyList[nextFreeSlot] = obj;
 			++nextFreeSlot;
 		}

@@ -88,6 +88,31 @@ void ThreeDScene_DNA::trackSlotChange(const std::string& name, ThreeDObject* obj
     << " | tick: " << (nextTick - 1) << std::endl;
 }
 
+void ThreeDScene_DNA::trackParentChange(const std::string& name, ThreeDObject* obj, ThreeDObject* oldParent, ThreeDObject* newParent, int oldSlot)
+{
+    if (bootstrapping) return;
+    
+    SceneEvent ev;
+    ev.kind = SceneEventKind::ParentChange;
+    ev.objectName = name;
+    ev.ptr = obj;
+    ev.objectID = obj ? obj->getID() : 0;
+    ev.oldParent = oldParent;
+    ev.newParent = newParent;
+    ev.oldParentID = oldParent ? oldParent->getID() : 0;
+    ev.newParentID = newParent ? newParent->getID() : 0;
+    ev.oldSlotBeforeParent = oldSlot;
+    ev.tick = nextTick++;
+    history.push_back(std::move(ev));
+    
+    std::cout << "[SceneDNA] Tracked PARENT CHANGE | name: " << name
+    << " | id: " << (obj ? obj->getID() : 0)
+    << " | from: " << (oldParent ? oldParent->getName() : "null") 
+    << " to: " << (newParent ? newParent->getName() : "null")
+    << " | oldSlot: " << oldSlot
+    << " | tick: " << (nextTick - 1) << std::endl;
+}
+
 void ThreeDScene_DNA::trackTransformChange(const std::string& name, ThreeDObject* obj, const glm::mat4& oldTransform, const glm::mat4& newTransform, uint64_t transformID)
 {
     if (!obj || obj->getParent()) return;
@@ -581,9 +606,78 @@ bool ThreeDScene_DNA::cancelTransformByID(uint64_t transformID)
     
     history.erase(it);
     
-    // std::cout << "[SceneDNA] Cancelled Transform Change | name: " << objectName
-    //           << " | transformID: " << transformID
-    //           << " | remaining events: " << history.size() << std::endl;
     
     return true;
+}
+
+void ThreeDScene_DNA::cancelParentChangeFromScene_DNA(uint64_t objectID)
+{
+    if (history.empty() || !sceneRef) return;
+    
+    for (auto it = history.rbegin(); it != history.rend(); ++it)
+    {
+        auto baseIt = std::prev(it.base());
+        if (it->kind == SceneEventKind::ParentChange && it->objectID == objectID)
+        {
+            ThreeDObject* obj = it->ptr;
+            ThreeDObject* oldParent = it->oldParent;
+            ThreeDObject* newParent = it->newParent;
+            int oldSlot = it->oldSlotBeforeParent;
+            
+            if (!obj) 
+            {
+                std::cerr << "[SceneDNA] ERROR: Object pointer is null for ParentChange cancellation." << std::endl;
+                history.erase(baseIt);
+                return;
+            }
+            
+            if (newParent)
+            {
+                newParent->removeChild(obj);
+            }
+            
+            if (oldParent)
+            {
+                oldParent->addChild(obj);
+                obj->setParent(oldParent);
+                obj->isParented = true;
+            }
+            else
+            {
+                obj->removeParent();
+                obj->isParented = false;
+            }
+            
+            if (oldSlot >= 0 && sceneRef->getHierarchyInspector())
+            {
+                auto* hierarchyInspector = sceneRef->getHierarchyInspector();
+                auto& mergedList = hierarchyInspector->getMergedHierarchyList();
+                auto& emptyPlaceholders = hierarchyInspector->getEmptySlotPlaceholders();
+                
+                if (oldSlot < static_cast<int>(mergedList.size()))
+                {
+                    int currentSlot = obj->getSlot();
+                    if (currentSlot >= 0 && currentSlot < static_cast<int>(mergedList.size()))
+                    {
+                        mergedList[currentSlot] = emptyPlaceholders[currentSlot].get();
+                    }
+                    
+                    obj->setSlot(oldSlot);
+                    mergedList[oldSlot] = obj;                   
+
+                }
+            }
+            
+
+            
+            if (sceneRef->getHierarchyInspector())
+            {
+                sceneRef->getHierarchyInspector()->redrawSlotsList();
+            }
+            
+            history.erase(baseIt);
+            return;
+        }
+    }
+    
 }

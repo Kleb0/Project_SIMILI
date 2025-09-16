@@ -15,7 +15,8 @@ enum class SceneEventKind : uint8_t
     AddObject,
     RemoveObject,
     SlotChange,
-    TransformChange
+    TransformChange,
+    ParentChange
 };
 
 struct SceneEvent 
@@ -33,7 +34,13 @@ struct SceneEvent
     
     glm::mat4 oldTransform{1.0f};
     glm::mat4 newTransform{1.0f};
-    uint64_t transformID{0}; 
+    uint64_t transformID{0};
+
+    ThreeDObject* oldParent{nullptr};
+    ThreeDObject* newParent{nullptr};
+    uint64_t oldParentID{0};
+    uint64_t newParentID{0};
+    int oldSlotBeforeParent{-1};
     
 };
 
@@ -53,6 +60,8 @@ public:
 
     // --- hierarchy modification tracking 
     void trackSlotChange(const std::string& name, ThreeDObject* obj, int oldSlot, int newSlot);
+    void trackParentChange(const std::string& name, ThreeDObject* obj, ThreeDObject* oldParent, ThreeDObject* newParent, int oldSlot = -1);
+    void cancelParentChangeFromScene_DNA(uint64_t objectID);
 
     // --- transform tracking for non-parented objects
     void trackTransformChange(const std::string& name, ThreeDObject* obj, const glm::mat4& oldTransform, const glm::mat4& newTransform, uint64_t transformID = 0);
