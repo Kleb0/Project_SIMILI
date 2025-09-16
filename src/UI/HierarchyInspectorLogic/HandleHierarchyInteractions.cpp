@@ -177,7 +177,9 @@ void HandleHierarchyInteractions::dropOnObject(ThreeDObject* parent, ThreeDObjec
     glm::vec3 parentOrigin = glm::vec3(parent->getGlobalModelMatrix() * glm::vec4(parent->getOrigin(), 1.0f));
     glm::mat4 childBefore = child->getGlobalModelMatrix();
 
-    if (auto* oldParent = child->getParent()) 
+    ThreeDObject* oldParent = child->getParent();
+
+    if (oldParent) 
     {
         oldParent->removeChild(child);
         child->removeParent();
@@ -189,12 +191,16 @@ void HandleHierarchyInteractions::dropOnObject(ThreeDObject* parent, ThreeDObjec
     child->setParent(parent);
     child->isParented = true;
 
+    int childSlot = child->getSlot();
+
+    if (inspector->scene && inspector->scene->getSceneDNA())
+    {
+        inspector->scene->getSceneDNA()->trackParentChange(child->getName(), child, oldParent, parent, childSlot);
+    }
+
     glm::mat4 childAfter = child->getGlobalModelMatrix();
     glm::vec3 newLocalOrigin = glm::vec3(glm::inverse(childAfter) * glm::vec4(parentOrigin, 1.0f));
     child->setOrigin(newLocalOrigin);
-
-    
-    int childSlot = child->getSlot();
     if (childSlot >= 0 && childSlot < static_cast<int>(inspector->mergedHierarchyList.size())) {
         inspector->mergedHierarchyList[childSlot] = inspector->emptySlotPlaceholders[childSlot].get();
     }
