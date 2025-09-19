@@ -130,7 +130,8 @@
     "any": "cpp",
     "queue": "cpp",
     "ranges": "cpp",
-    "cassert": "cpp"
+    "cassert": "cpp",
+    "valarray": "cpp"
   },
 }
 

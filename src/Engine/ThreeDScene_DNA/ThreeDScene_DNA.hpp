@@ -49,11 +49,13 @@ class ThreeDScene_DNA
 public:
     std::string uuid; 
     std::string name{"SceneDNA"};
+    std::string sceneID{""};
 
     void ensureInit();
 
     bool isInitialized() const { return hasInit; }
     uint64_t initTick() const { return init_tick; }
+    const std::string& getSceneID() const { return sceneID; }
 
     void trackAddObject (const std::string& name, ThreeDObject* obj);
     void trackRemoveObject(const std::string& name, ThreeDObject* obj);
@@ -106,5 +108,6 @@ private:
     std::vector<std::string> bootstrapNames;
     std::vector<ThreeDObject*> bootstrapPtrs;
     ThreeDScene* sceneRef{nullptr};
+    std::vector<std::string> transformations;
 
 };

@@ -14,6 +14,7 @@
 #include "WorldObjects/Camera/Camera.hpp"
 #include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
 #include "ErrorBox.hpp"
+#include "json.hpp"
 
 // === SHADERS ===
 
@@ -372,4 +373,11 @@ bool ThreeDScene::removeObjectFromSceneDNA(uint64_t objectID)
     }
 
     return false;
+}
+
+nlohmann::json ThreeDScene::getSceneData() const 
+{
+    nlohmann::json sceneData;
+    sceneData["scene_id"] = sceneDNA->getSceneID(); 
+    return sceneData;
 }

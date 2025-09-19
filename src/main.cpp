@@ -41,7 +41,7 @@ fs::path gExecutableDir;
 #include "UI/ThreeDModes/Vertice_Mode.hpp"
 #include "UI/ThreeDModes/Normal_Mode.hpp"
 #include "UI/ContextualMenu/ContextualMenu.hpp"
-
+#include "UI/OptionMenu/OptionsMenu.hpp"
 #include "Engine/SimiliSelector.hpp"
 #include "Engine/ErrorBox.hpp"
 
@@ -62,6 +62,9 @@ int main(int argc, char **argv)
     ObjectInspector objectInspector;
     HistoryLogic historyLogic;
     ContextualMenu contextualMenu;
+    OptionsMenuContent optionsMenu;
+
+
     Mesh* cubeMesh1 = Primitives::CreateCubeMesh(1.0f,glm::vec3(0.0f, 0.0f, 0.0f), "Cube", true);
 
     // ------- DirectX 12 has been implemented, so comment it for now as i don't need it actually ------- //
@@ -128,10 +131,14 @@ int main(int argc, char **argv)
     gui.add(myHierarchy);
     gui.add(historyLogic);
     gui.setContextualMenu(&contextualMenu);
+    gui.setOptionsMenu(&optionsMenu);
 
     gui.setThreeDWindow(&myThreeDWindow);
     gui.setObjectInspector(&objectInspector);
+
     // add(gui, dx12Window);
+
+    gui.setScene(&myThreeDScene);
 
     gui.run();
     UiCreator::saveCurrentLayoutToDefault();

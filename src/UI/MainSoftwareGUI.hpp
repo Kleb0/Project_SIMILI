@@ -8,7 +8,9 @@
 #include "UI/HistoryLogic/HistoryLogic.hpp"
 #include <WorldObjects/Entities/ThreeDObject.hpp>
 #include "UI/ContextualMenu/ContextualMenu.hpp"
+#include "Engine/SaveLoadSystem/Save_Scene.hpp"
 
+class OptionsMenuContent; // Forward declaration
 class MainSoftwareGUI
 {
 public:
@@ -21,6 +23,7 @@ public:
     MainSoftwareGUI &add(GUIWindow &window);
     void setThreeDWindow(ThreeDWindow *window) { this->threeDWindow = window; }
     void setObjectInspector(ObjectInspector *inspector) { this->objectInspector = inspector; }
+    void setScene(ThreeDScene* scene);
 
     template <typename T>
     void associate(T &window)
@@ -29,7 +32,9 @@ public:
     }
 
     void setContextualMenu(ContextualMenu* menu);
+    void saveActiveScene(const std::string& filePath);
 
+    void setOptionsMenu(OptionsMenuContent* menu) { optionsMenu = menu; }
 private:
     GLFWwindow *window = nullptr;
     std::vector<GUIWindow *> windows;
@@ -39,7 +44,6 @@ private:
     void initImGui();
     void tryLoadLayout();
     void autoSaveLayout();
-    void mainWindowOptions();
     void popUpModal();
     void shutdown();
     void multiScreenSupport();
@@ -48,4 +52,6 @@ private:
     ThreeDWindow *threeDWindow = nullptr;
     ObjectInspector *objectInspector = nullptr;
     ContextualMenu *contextualMenu = nullptr;
+    OptionsMenuContent *optionsMenu = nullptr;
+    ThreeDScene* sceneRef = nullptr;
 };

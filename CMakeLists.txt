@@ -30,7 +30,8 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ThreeDModes
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/HierarchyInspectorLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/HistoryLogic
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ObjectInspectorLogic
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ObjectInspectorLogic
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/OptionMenu
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ThreeDWindow
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/UIDocking
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
@@ -38,7 +39,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/MeshEdit
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/PrimitivesCreation
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ProjectBuilder
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/Save_Scene
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/SaveLoadSystem
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/Obj_Export_Import
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Layout_Theme
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/images
@@ -54,6 +55,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glad
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glm
     ${SDL3_INCLUDE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty
 )
 
 # Source files
@@ -177,13 +179,14 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ThreeDModes
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/HierarchyInspectorLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/HistoryLogic
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ObjectInspectorLogic
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ObjectInspectorLogic
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/OptionMenu
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ThreeDWindow
     ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/UIDocking
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDInteractions
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDSceneDNA
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/Save_Scene
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/SaveLoadSystem
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/MeshEdit
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/Obj_Export_Import
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/PrimitivesCreation
