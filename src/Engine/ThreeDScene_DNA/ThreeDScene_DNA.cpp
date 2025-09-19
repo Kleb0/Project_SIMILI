@@ -1,18 +1,40 @@
+#include <fstream>
 #include "Engine/ThreeDScene_DNA/ThreeDScene_DNA.hpp"
 #include "Engine/ThreeDScene.hpp"
 #include "WorldObjects/Entities/ThreeDObject.hpp"
 #include <algorithm>
 #include <iostream>
+#include <random>
+#include <string>
 #include "Engine/ErrorBox.hpp"
 #include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
 #include "UI/ThreeDWindow/ThreeDWindow.hpp"
 #include "WorldObjects/Mesh/Mesh.hpp"
 #include "WorldObjects/Mesh_DNA/Mesh_DNA.hpp"
+#include "ThirdParty/json.hpp"
+#include "Engine/SaveLoadSystem/Save_Scene.hpp"
 
 
 static inline void erasePtr(std::list<ThreeDObject*>& L, ThreeDObject* p) 
 {
     L.remove(p); 
+}
+
+std::string generateRandomSceneID() 
+{
+    const std::string chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, chars.size() - 1);
+    
+    std::string id;
+    id.reserve(12);
+    
+    for (int i = 0; i < 12; ++i) {
+        id += chars[dis(gen)];
+    }
+    
+    return id;
 }
 
 void ThreeDScene_DNA::setSceneRef(ThreeDScene* scene) 
@@ -26,8 +48,9 @@ void ThreeDScene_DNA::ensureInit()
     if (hasInit) return;
     hasInit = true;
     init_tick = 0;
+    sceneID = generateRandomSceneID();
 
-    std::cout << "[ThreeDScene_DNA] Initialized once (tick=" << init_tick << ")" << " | name=" << name << std::endl;
+    std::cout << "[ThreeDScene_DNA] Initialized once (tick=" << init_tick << ")" << " | name=" << name << " | sceneID=" << sceneID << std::endl;
 }
 
 void ThreeDScene_DNA::trackAddObject(const std::string& name, ThreeDObject* obj)

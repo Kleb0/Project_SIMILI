@@ -45,9 +45,10 @@ void HistoryLogic::render()
 			// ----- case when no object is inspected, display & rewind scene events
 			if (!obj)
 			{
-				ImGui::Text("Scene events:");
-
 				ThreeDScene_DNA* scenedna = scene->getSceneDNA();
+				ImGui::Text("Events for scene with ID : %s", scenedna->getSceneID().c_str());		
+
+				
 				auto& objList = scene->getObjectsRef();
 				const auto& shist = scenedna->getHistory();
 

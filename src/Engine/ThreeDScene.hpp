@@ -10,6 +10,7 @@
 #include "Engine/ThreeDScene_DNA/ThreeDScene_DNA.hpp"
 #include <iostream>
 #include <list>
+#include <json.hpp>
 
 class HistoryLogic; 
 class OpenGLContext;
@@ -69,6 +70,9 @@ public:
 
     void setThreeDWindow(ThreeDWindow* window) { threeDWindow = window; }
     ThreeDWindow* getThreeDWindow() const { return threeDWindow; }
+
+    std::string getSceneID() const { return sceneDNA->getSceneID(); }
+    nlohmann::json getSceneData() const;
 
 private:
     friend class HistoryLogic;
