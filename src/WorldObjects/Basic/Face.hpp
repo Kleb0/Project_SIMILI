@@ -9,8 +9,8 @@ class Face
 {
 public:
     Face(Vertice* v0, Vertice* v1, Vertice* v2, Vertice* v3,
-         Edge* e0, Edge* e1, Edge* e2, Edge* e3);
-    ~Face();
+        Edge* e0, Edge* e1, Edge* e2, Edge* e3);
+    virtual ~Face();
 
     void initialize();
     void render(const glm::mat4& viewProj, const glm::mat4& modelMatrix);
@@ -27,10 +27,11 @@ public:
     void setSelected(bool v) { selected = v; }
     bool isSelected() const { return selected; }
 
-private:
+protected:
     std::vector<Vertice*> vertices;
     std::vector<Edge*> edges;
 
+private:
     unsigned int vao = 0;
     unsigned int vbo = 0;
     unsigned int shaderProgram = 0;

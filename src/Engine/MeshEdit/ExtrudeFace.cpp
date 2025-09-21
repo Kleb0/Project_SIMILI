@@ -1,8 +1,10 @@
 #include "Engine/MeshEdit/ExtrudeFace.hpp"
+#include "WorldObjects/Mesh/Mesh.hpp"
 #include "WorldObjects/Entities/ThreedObject.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
 #include "WorldObjects/Basic/Edge.hpp"
 #include "WorldObjects/Basic/Face.hpp"
+#include "WorldObjects/Basic/Quad.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -45,12 +47,14 @@ namespace MeshEdit
         return e;
     }
 
-    Face* makeFaceQuad(Vertice* v0, Vertice* v1, Vertice* v2, Vertice* v3,
+    Quad* makeQuad(Vertice* v0, Vertice* v1, Vertice* v2, Vertice* v3,
     Edge* e0, Edge* e1, Edge* e2, Edge* e3) 
     {
-        Face* f = new Face(v0, v1, v2, v3, e0, e1, e2, e3);
-        f->initialize();
-        return f;
+        std::array<Vertice*, 4> quadVerts = {v0, v1, v2, v3};
+        std::array<Edge*, 4> quadEdges = {e0, e1, e2, e3};
+        Quad* q = new Quad(quadVerts, quadEdges);
+        q->initialize();
+        return q;
     }
 
     void syncWorldFromLocal(Vertice* v, const glm::mat4& parentModel) 
@@ -66,7 +70,6 @@ namespace MeshEdit
         Face* target, float distance, ExtrudeResult* out
     ) 
     {
-        // showErrorBox("Extrude Face.cpp 74 : Extrusion started");
         if (!owner || !target) return false;
 
         const auto& rVs = target->getVertices();
@@ -80,7 +83,11 @@ namespace MeshEdit
         const glm::vec3 offset = nLocal * distance;
 
         Vertice* nv[4] = {nullptr,nullptr,nullptr,nullptr};
-        for (int i=0;i<4;++i) {
+        Mesh* mesh = dynamic_cast<Mesh*>(owner);
+        MeshDNA* dna = mesh ? mesh->getMeshDNA() : nullptr;
+
+        for (int i=0;i<4;++i) 
+        {
             Vertice* src = oldV[i];
             auto* v = new Vertice();
             v->initialize();
@@ -91,6 +98,7 @@ namespace MeshEdit
             v->setColor(src->getColor());
             vertices.push_back(v);
             nv[i] = v;
+           dna->setVerticeCount(dna->getVerticeCount() + 1);
         }
 
         Edge* capE[4] = {
@@ -99,7 +107,11 @@ namespace MeshEdit
             makeEdge(nv[2], nv[3]),
             makeEdge(nv[3], nv[0]),
         };
-        for (int i=0;i<4;++i) edges.push_back(capE[i]);
+        for (int i=0;i<4;++i) 
+        {
+            edges.push_back(capE[i]);
+            if (dna) dna->setEdgeCount(dna->getEdgeCount() + 1);
+        }
 
         Edge* upE[4] = {
             makeEdge(oldV[0], nv[0]),
@@ -107,31 +119,39 @@ namespace MeshEdit
             makeEdge(oldV[2], nv[2]),
             makeEdge(oldV[3], nv[3]),
         };
-        for (int i=0;i<4;++i) edges.push_back(upE[i]);
+        for (int i=0;i<4;++i) {
+            edges.push_back(upE[i]);
+            dna->setEdgeCount(dna->getEdgeCount() + 1);
+        }
 
-        Face* sideF[4] = {nullptr,nullptr,nullptr,nullptr};
+        Quad* sideF[4] = {nullptr,nullptr,nullptr,nullptr};
         for (int i=0;i<4;++i) 
         {
             const int i1 = (i+1)&3;
-            sideF[i] = makeFaceQuad(oldV[i], oldV[i1], nv[i1], nv[i], oldE[i], upE[i1], capE[i], upE[i]);
+            sideF[i] = makeQuad(oldV[i], oldV[i1], nv[i1], nv[i], oldE[i], upE[i1], capE[i], upE[i]);
             faces.push_back(sideF[i]);
+            dna->setQuadCount(dna->getQuadCount() + 1);
+
         }
 
-        Face* cap = makeFaceQuad(nv[0], nv[1], nv[2], nv[3], capE[0], capE[1], capE[2], capE[3]);
+        Quad* cap = makeQuad(nv[0], nv[1], nv[2], nv[3], capE[0], capE[1], capE[2], capE[3]);
         faces.push_back(cap);
+        dna->setQuadCount(dna->getQuadCount() + 1);
 
         auto it = std::find(faces.begin(), faces.end(), target);
-        if (it != faces.end()) {
+        if (it != faces.end()) 
+        {
             Face* toDelete = *it;
             faces.erase(it);
             if constexpr (has_destroy<Face>::value) {
                 toDelete->destroy();
             }
             delete toDelete;
+            dna->setQuadCount(dna->getQuadCount() - 1);
         }
 
-        // showErrorBox("Extrude Face.cpp L157 : Extrusion done. preparing output");
-        if (out) {
+        if (out) 
+        {
             out->ok = true;
             for (int i=0;i<4;++i) {
                 out->newVerts[i] = nv[i];
@@ -143,9 +163,9 @@ namespace MeshEdit
             }
             out->capFace  = cap;
             out->distance = distance;
-        }
+        }   
+
         return true;
-        // showErrorBox("Extrude Face.cpp L179 : Output prepared return true");
     }
 
 

@@ -100,9 +100,6 @@ void MeshDNA::rewindToAndApply(size_t index_inclusive, Mesh* mesh)
     nextTick = history.back().tick + 1;
 }
 
-
-
-
 void MeshDNA::track(const glm::mat4& delta, uint64_t tick, const std::string& tag) 
 {
     MeshTransformEvent ev;
@@ -201,14 +198,17 @@ void MeshDNA::ensureInit(const glm::mat4& currentModel)
 
 void MeshDNA::freezeFromMesh(const Mesh* mesh)
 {
+    std::cout << "MeshDNA::freezeFromMesh called." << std::endl;
     if (hasFrozen || !mesh) return;
 
     frozenModelMatrix = mesh->getModelMatrix();
     frozenVertices.clear();
     frozenVertices.reserve(mesh->vertexCount());
 
-    const auto& verts = mesh->getVertices();
 
+    const auto& faces = mesh->getFaces();
+
+    const auto& verts = mesh->getVertices();
     for (Vertice* v : verts)
     {
         if (!v) continue;
@@ -224,13 +224,7 @@ void MeshDNA::freezeFromMesh(const Mesh* mesh)
     const glm::vec3 rot = mesh->getRotation();
     const glm::vec3 scl = mesh->getScale();
 
-    std::cout << std::fixed << std::setprecision(3)
-            << "[MeshDNA] Freeze captured | "
-            << "pos=(" << pos.x << ", " << pos.y << ", " << pos.z << ") "
-            << "rot=(" << rot.x << "°, " << rot.y << "°, " << rot.z << "°) "
-            << "scale=(" << scl.x << ", " << scl.y << ", " << scl.z << ")"
-            << std::endl;
-    }
+}
 
 void MeshDNA::refreezeFromMesh(const Mesh* mesh)
 {

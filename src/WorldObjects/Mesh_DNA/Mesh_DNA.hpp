@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <glm/glm.hpp>
+#include <iostream>
 
 class Vertice;
 class Edge;
@@ -45,7 +46,7 @@ struct MeshTransformEvent
     std::vector<Vertice*> affectedVertices;
 
     ExtrudeRecord extrude{};
-    uint64_t transformID{0}; // ID unique pour synchroniser avec Scene_DNA
+    uint64_t transformID{0};
 
 };
 
@@ -98,8 +99,18 @@ public:
     void trackTranslate(const glm::mat4& delta) { trackWithAutoTick(delta, "translate"); }
     void trackRotate(const glm::mat4& delta) { trackWithAutoTick(delta, "rotate"); }
     void trackScale(const glm::mat4& delta) { trackWithAutoTick(delta, "scale"); }
-    
 
+    void setVerticeCount(size_t count) { verticeCount = count; }
+    void setEdgeCount(size_t count) { edgeCount = count; }
+    void setQuadCount(size_t count) { quadCount = count; }
+    void setTriangleCount(size_t count) { triangleCount = count; }
+    void setNgonCount(size_t count) { ngonCount = count; }
+
+    size_t getVerticeCount() const { return verticeCount; }
+    size_t getEdgeCount() const { return edgeCount; }
+    size_t getQuadCount() const { return quadCount; }
+    size_t getTriangleCount() const { return triangleCount; }
+    size_t getNgonCount() const { return ngonCount; }
 
 private:
     static inline bool isInitEvent(const MeshTransformEvent& ev) 
@@ -115,4 +126,11 @@ private:
     bool hasFrozen{false};
     glm::mat4 frozenModelMatrix{1.0f};
     std::vector<SnapshotVertice> frozenVertices;
+
+    size_t verticeCount = 0;
+    size_t edgeCount = 0;
+    size_t quadCount = 0;
+    size_t triangleCount = 0;
+    size_t ngonCount = 0;
+
 };

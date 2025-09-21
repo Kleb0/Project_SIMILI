@@ -259,13 +259,11 @@ Face* extrudeSelectedFace(std::list<Face*>& selectedFaces, float distance)
     MeshEdit::ExtrudeResult res{};
 
     const bool ok = MeshEdit::extrudeQuadFace(mesh, verts, eds, fs, target, distance, &res);
-    // showErrorBox("FaceTransform.cpp L61 : extrusion call returned");
 
     if (!ok) return nullptr;
 
         if (auto* dna = mesh->getMeshDNA()) 
         {
-            // showErrorBox("FaceTransform.cpp L266 : record creation");
             ExtrudeRecord rec{};
 
             for (int i=0;i<4;++i)
@@ -280,7 +278,6 @@ Face* extrudeSelectedFace(std::list<Face*>& selectedFaces, float distance)
             rec.capFace = res.capFace;
             rec.distance = res.distance;
             dna->trackExtrude(rec);
-            // showErrorBox("Extrusion Test 2 ! ");
         }
     // ------
 
