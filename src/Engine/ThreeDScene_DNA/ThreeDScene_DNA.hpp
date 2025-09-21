@@ -16,7 +16,8 @@ enum class SceneEventKind : uint8_t
     RemoveObject,
     SlotChange,
     TransformChange,
-    ParentChange
+    ParentChange,
+    Unparent 
 };
 
 struct SceneEvent 
@@ -41,7 +42,11 @@ struct SceneEvent
     uint64_t oldParentID{0};
     uint64_t newParentID{0};
     int oldSlotBeforeParent{-1};
-    
+
+    ThreeDObject* unparentedObject{nullptr};
+    ThreeDObject* previousParent{nullptr};
+    uint64_t previousParentID{0};
+    int previousSlot{-1};
 };
 
 class ThreeDScene_DNA
@@ -64,6 +69,7 @@ public:
     void trackSlotChange(const std::string& name, ThreeDObject* obj, int oldSlot, int newSlot);
     void trackParentChange(const std::string& name, ThreeDObject* obj, ThreeDObject* oldParent, ThreeDObject* newParent, int oldSlot = -1);
     void cancelParentChangeFromScene_DNA(uint64_t objectID);
+    void trackUnparent(const std::string& name, ThreeDObject* obj, ThreeDObject* oldParent, int oldSlot = -1);
 
     // --- transform tracking for non-parented objects
     void trackTransformChange(const std::string& name, ThreeDObject* obj, const glm::mat4& oldTransform, const glm::mat4& newTransform, uint64_t transformID = 0);
@@ -96,6 +102,7 @@ public:
     ThreeDScene* getSceneRef() const { return sceneRef; }
 
     uint64_t generateTransformID() { return nextTransformID++; }
+
 
 private:
     bool hasInit{false};

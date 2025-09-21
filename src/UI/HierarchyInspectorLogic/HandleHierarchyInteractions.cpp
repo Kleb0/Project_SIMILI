@@ -147,11 +147,16 @@ void HandleHierarchyInteractions::dropOnSlot(ThreeDObject* obj, int index)
     if (dummy && dummy->isDummy()) 
     {
         glm::mat4 global = obj->getGlobalModelMatrix();
+
         if (auto* parent = obj->getParent()) 
         {
+            int oldSlot = obj->getSlot();
             parent->removeChild(obj);
             obj->removeParent();
             obj->isParented = false;
+            if (inspector->scene && inspector->scene->getSceneDNA()) {
+                inspector->scene->getSceneDNA()->trackUnparent(obj->getName(), obj, parent, oldSlot);
+            }
         }
 
         obj->setModelMatrix(global);
