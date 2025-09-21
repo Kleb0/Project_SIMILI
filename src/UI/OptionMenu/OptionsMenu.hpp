@@ -3,10 +3,20 @@
 #include <string>
 #include <functional>
 
+
+class ThreeDScene;
+
 class OptionsMenuContent {
 public:
     bool optionsMenuHasbeenClicked = false;
     ImVec2 optionsButtonPos = ImVec2(0, 0);
     OptionsMenuContent();
-    void render(const std::function<void(const std::string&)>& saveActiveSceneFunc, void* sceneRef);
+
+    void setScene(ThreeDScene* scene) { sceneRef = scene; }
+    ThreeDScene* getScene() const { return sceneRef; }
+
+    void render(void* sceneRef);
+
+private:
+    ThreeDScene* sceneRef = nullptr;
 };

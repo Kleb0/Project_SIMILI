@@ -1,13 +1,15 @@
 #include "OptionsMenu.hpp"
+#include "Engine/ThreeDScene.hpp"
 #include <imgui.h>
 #include <tinyfiledialogs.h>
 #include <fstream>
 #include <cstring>
 #include <iostream>
+#include "Engine/SaveLoadSystem/Save_Scene.hpp"
 
 OptionsMenuContent::OptionsMenuContent() {}
 
-void OptionsMenuContent::render(const std::function<void(const std::string&)>& saveActiveSceneFunc, void* sceneRef)
+void OptionsMenuContent::render(void* sceneRef)
 {
     if (!optionsMenuHasbeenClicked)
         return;
@@ -58,11 +60,6 @@ void OptionsMenuContent::render(const std::function<void(const std::string&)>& s
             filterPatterns,
             "INI Layout Files",
             0);
-        if (loadPath)
-        {
-            // UiCreator::loadLayoutFromFile(loadPath);
-            // UiCreator::saveLastLayoutPath(loadPath);
-        }
     }
     if (ImGui::MenuItem("Save Scene as JSON"))
     {
@@ -73,28 +70,19 @@ void OptionsMenuContent::render(const std::function<void(const std::string&)>& s
             1,
             filterPatterns,
             "JSON Scene Files");
-        if (savePath && saveActiveSceneFunc)
+        if (savePath && sceneRef)
         {
-            try
+            auto* scene = this->sceneRef;
+            if (scene && scene->getSceneDNA())
             {
-                if (sceneRef)
-                {
-                    saveActiveSceneFunc(savePath);
-                    std::cout << "[INFO] Scene saved to: " << savePath << std::endl;
-                }
-                else
-                {
-                    std::cerr << "[ERROR] No active scene to save." << std::endl;
-                }
-            }
-            catch (const std::exception &e)
-            {
-                std::cerr << "[ERROR] Failed to save scene: " << e.what() << std::endl;
-            }
-        }
+                SaveScene saveScene(scene->getSceneData());
+                saveScene.saveSceneToJson(scene->getSceneDNA(), savePath);
+            }       
+        }        
     }
+
     ImGui::Separator();
-    if (ImGui::MenuItem("Fermer"))
+    if (ImGui::MenuItem("Close"))
     {
         optionsMenuHasbeenClicked = false;
     }
