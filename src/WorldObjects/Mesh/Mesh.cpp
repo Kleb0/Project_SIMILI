@@ -1,4 +1,7 @@
 #include "WorldObjects/Mesh/Mesh.hpp"
+#include "WorldObjects/Basic/Quad.hpp"
+#include "WorldObjects/Basic/Triangle.hpp"
+#include "WorldObjects/Basic/Ngon.hpp"
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 
@@ -15,6 +18,27 @@ Mesh::~Mesh()
 void Mesh::initialize()
 {
     CanDisplayRenderMessage = true;
+}
+
+Quad* Mesh::addQuad(const std::array<Vertice*, 4>& vertices, const std::array<Edge*, 4>& edges)
+{
+    auto* quad = new Quad(vertices, edges);
+    faces.push_back(quad);
+    return quad;
+}
+
+Triangle* Mesh::addTriangle(Vertice* v0, Vertice* v1, Vertice* v2, Edge* e0, Edge* e1, Edge* e2)
+{
+    auto* tri = new Triangle(v0, v1, v2, e0, e1, e2);
+    faces.push_back(tri);
+    return tri;
+}
+
+Ngon* Mesh::addNgon(const std::vector<Vertice*>& vertices, const std::vector<Edge*>& edges)
+{
+    auto* ngon = new Ngon(vertices, edges);
+    faces.push_back(ngon);
+    return ngon;
 }
 
 void Mesh::render(const glm::mat4& viewProj)
@@ -129,6 +153,40 @@ Edge* e0, Edge* e1, Edge* e2, Edge* e3)
     faces.push_back(f);
     return f;
 }
+
+std::vector<Quad*> Mesh::getQuads() const
+{
+    std::vector<Quad*> quads;
+    for (Face* f : faces)
+    {
+        if (auto* q = dynamic_cast<Quad*>(f))
+            quads.push_back(q);
+    }
+    return quads;
+}
+
+std::vector<Triangle*> Mesh::getTriangles() const
+{
+    std::vector<Triangle*> triangles;
+    for (Face* f : faces)
+    {
+        if (auto* t = dynamic_cast<Triangle*>(f))
+            triangles.push_back(t);
+    }
+    return triangles;
+}
+
+std::vector<Ngon*> Mesh::getNgons() const
+{
+    std::vector<Ngon*> ngons;
+    for (Face* f : faces)
+    {
+        if (auto* n = dynamic_cast<Ngon*>(f))
+            ngons.push_back(n);
+    }
+    return ngons;
+}
+
 
 void Mesh::finalize()
 {

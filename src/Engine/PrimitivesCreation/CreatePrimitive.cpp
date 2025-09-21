@@ -12,7 +12,12 @@ namespace Primitives
         mesh->setPosition(center);
         mesh->setScale(glm::vec3(size)); 
 
-        const glm::vec3 localPositions[8] = {
+        auto* dna = new MeshDNA();
+        dna->name = name;
+        mesh->setMeshDNA(dna); 
+
+        const glm::vec3 localPositions[8] = 
+        {
             {-0.5f, -0.5f, -0.5f},
             { 0.5f, -0.5f, -0.5f},
             { 0.5f,  0.5f, -0.5f},
@@ -26,9 +31,14 @@ namespace Primitives
         std::vector<Vertice*> vs;
         vs.reserve(8);
         for (int i = 0; i < 8; ++i)
+        {
             vs.push_back(mesh->addVertice(localPositions[i], "Vertice_" + std::to_string(i)));
+            if (attachDNA && mesh->getMeshDNA())
+                mesh->getMeshDNA()->setVerticeCount(mesh->getMeshDNA()->getVerticeCount() + 1);
+        }
 
-        const int edgeIndices[12][2] = {
+        const int edgeIndices[12][2] = 
+        {
             {0, 1}, {1, 2}, {2, 3}, {3, 0},
             {4, 5}, {5, 6}, {6, 7}, {7, 4},
             {0, 4}, {1, 5}, {2, 6}, {3, 7}
@@ -37,10 +47,15 @@ namespace Primitives
         std::vector<Edge*> es;
         es.reserve(12);
         for (int i = 0; i < 12; ++i)
+        {
             es.push_back(mesh->addEdge(vs[edgeIndices[i][0]], vs[edgeIndices[i][1]]));
+            if (attachDNA && mesh->getMeshDNA())
+                mesh->getMeshDNA()->setEdgeCount(mesh->getMeshDNA()->getEdgeCount() + 1);
+        }
 
 
-        const int faceVertIndices[6][4] = {
+        const int faceVertIndices[6][4] = 
+        {
             {0, 1, 2, 3}, 
             {4, 5, 6, 7}, 
             {0, 4, 5, 1}, 
@@ -49,7 +64,8 @@ namespace Primitives
             {1, 5, 6, 2} 
         };
 
-        const int faceEdgeIndices[6][4] = {
+        const int faceEdgeIndices[6][4] = 
+        {
             {0, 1, 2, 3},
             {4, 5, 6, 7},
             {8, 4, 9, 0},
@@ -60,25 +76,24 @@ namespace Primitives
 
         for (int i = 0; i < 6; ++i)
         {
-            mesh->addFace(
+            std::array<Vertice*, 4> quadVerts = 
+            {
                 vs[faceVertIndices[i][0]],
                 vs[faceVertIndices[i][1]],
                 vs[faceVertIndices[i][2]],
-                vs[faceVertIndices[i][3]],
+                vs[faceVertIndices[i][3]]
+            };
+            std::array<Edge*, 4> quadEdges = 
+            {
                 es[faceEdgeIndices[i][0]],
                 es[faceEdgeIndices[i][1]],
                 es[faceEdgeIndices[i][2]],
                 es[faceEdgeIndices[i][3]]
-            );
+            };
+            mesh->addQuad(quadVerts, quadEdges);
+            if (attachDNA && mesh->getMeshDNA())
+                mesh->getMeshDNA()->setQuadCount(mesh->getMeshDNA()->getQuadCount() + 1);
         }
-
-        if (attachDNA)
-        {
-            auto* dna = new MeshDNA();
-            dna->name = name;
-            mesh->setMeshDNA(dna); 
-        }
-
 
         mesh->finalize();
 

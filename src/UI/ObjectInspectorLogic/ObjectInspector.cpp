@@ -1,5 +1,7 @@
 #include "UI/ObjectInspectorLogic/ObjectInspector.hpp"
 #include "imgui.h"
+#include "WorldObjects/Mesh/Mesh.hpp"
+#include "WorldObjects/Mesh_DNA/Mesh_DNA.hpp"
 #include <iostream>
 
 
@@ -8,7 +10,8 @@ ObjectInspector::ObjectInspector() {}
 void ObjectInspector::setInspectedObject(ThreeDObject *object)
 {
 
-    if (object && !object->isInspectable()) {
+    if (object && !object->isInspectable()) 
+    {
         clearInspectedObject();
         return;
     }
@@ -263,7 +266,6 @@ void ObjectInspector::render()
         return;
     }
 
-    // case two : single object selected
     if (inspectedObject)
     {
         renameObject();
@@ -275,9 +277,9 @@ void ObjectInspector::render()
         ImGui::Separator();
         setScale();
         ImGui::Separator();
+        InspectTopology();
 
         dipslayGlobaleCoordinates(inspectedObject);
-    
     }
     else
     {
@@ -285,4 +287,23 @@ void ObjectInspector::render()
     }
 
     ImGui::End();
+}
+
+void ObjectInspector::InspectTopology()
+{
+    if (inspectedObject && inspectedObject->getIsMesh()) 
+    {
+        auto* mesh = dynamic_cast<Mesh*>(inspectedObject);
+        if (mesh && mesh->getMeshDNA()) 
+        {
+            auto* dna = mesh->getMeshDNA();
+            ImGui::Text("Mesh Topology:");
+            ImGui::BulletText("Triangles: %zu", dna->getTriangleCount());
+            ImGui::BulletText("Quads: %zu", dna->getQuadCount());
+            ImGui::BulletText("Ngons: %zu", dna->getNgonCount());
+            ImGui::BulletText("Edges: %zu", dna->getEdgeCount());
+            ImGui::BulletText("Vertices: %zu", dna->getVerticeCount());
+            ImGui::Separator();
+        }
+    }
 }

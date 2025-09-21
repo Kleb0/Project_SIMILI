@@ -30,6 +30,8 @@ public:
 
     ThreeDObject* getInspectedObject() const { return inspectedObject; }
 
+    void InspectTopology();
+
 private:
     ThreeDObject *inspectedObject = nullptr;
     std::list<ThreeDObject *> multipleInspectedObjects;
