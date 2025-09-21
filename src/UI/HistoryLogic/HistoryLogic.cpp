@@ -179,6 +179,10 @@ void HistoryLogic::render()
 										{
 											scenedna->cancelParentChangeFromScene_DNA(futureEvent.objectID);
 										}
+										else if (futureEvent.kind == SceneEventKind::Unparent)
+										{
+											scenedna->cancelUnparentFromScene_DNA(futureEvent.objectID);
+										}
 										else
 										{
 											scenedna->rewindToSceneEvent(i);

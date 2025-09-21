@@ -168,61 +168,6 @@ void ThreeDScene_DNA::trackUnparent(const std::string& name, ThreeDObject* obj, 
     history.push_back(evt);
 }
 
-bool ThreeDScene_DNA::isObjectNonParented(ThreeDObject* obj) const
-{
-    return obj && !obj->getParent();
-}
-
-void ThreeDScene_DNA::printTransformHistory() const
-{
-    std::cout << "\n=== Transform History ===" << std::endl;
-    for (const auto& event : history)
-    {
-        if (event.kind == SceneEventKind::TransformChange)
-        {
-            std::cout << "Transform Change | Object: " << event.objectName 
-                      << " | ID: " << event.objectID 
-                      << " | Tick: " << event.tick << std::endl;
-        }
-    }
-    std::cout << "=== End Transform History ===\n" << std::endl;
-}
-
-void ThreeDScene_DNA::syncWithMeshDNA(ThreeDObject* obj)
-{
-    if (!obj || obj->getParent()) return;
-    
-    auto* mesh = dynamic_cast<Mesh*>(obj);
-    if (!mesh || !mesh->getMeshDNA()) return;
-    
-    const auto& meshHistory = mesh->getMeshDNA()->getHistory();
-    if (meshHistory.empty()) return;
-    
-    for (const auto& meshEvent : meshHistory)
-    {
-        if (meshEvent.isComponentEdit) continue;
-        
-        glm::mat4 oldTransform = glm::inverse(meshEvent.delta) * obj->getModelMatrix();
-        glm::mat4 newTransform = obj->getModelMatrix();
-        
-        trackTransformChange(obj->getName(), obj, oldTransform, newTransform);
-    }
-}
-
-void ThreeDScene_DNA::syncAllObjectsWithMeshDNA()
-{
-    if (!sceneRef) return;
-    
-    for (ThreeDObject* obj : sceneRef->getObjectsRef())
-    {
-        if (obj && !obj->getParent())
-        {
-            syncWithMeshDNA(obj);
-        }
-    }
-}
-
-
 void ThreeDScene_DNA::finalizeBootstrap()
 {
     ensureInit();
@@ -717,4 +662,66 @@ void ThreeDScene_DNA::cancelParentChangeFromScene_DNA(uint64_t objectID)
         }
     }
     
+}
+
+void ThreeDScene_DNA::cancelUnparentFromScene_DNA(uint64_t objectID)
+{
+    if (history.empty() || !sceneRef) return;
+
+    for (auto it = history.rbegin(); it != history.rend(); ++it)
+    {
+        auto baseIt = std::prev(it.base());
+        if (it->kind == SceneEventKind::Unparent && it->objectID == objectID)
+        {
+            ThreeDObject* obj = it->unparentedObject ? it->unparentedObject : it->ptr;
+            ThreeDObject* prevParent = it->previousParent;
+            int prevSlot = it->previousSlot;
+
+            if (!obj)
+            {
+                std::cerr << "[SceneDNA] ERROR: Object pointer is null for Unparent cancellation." << std::endl;
+                history.erase(baseIt);
+                return;
+            }
+
+            if (prevParent)
+            {
+                prevParent->addChild(obj);
+                obj->setParent(prevParent);
+                obj->isParented = true;
+            }
+            else
+            {
+                obj->removeParent();
+                obj->isParented = false;
+            }
+
+            if (prevSlot >= 0 && sceneRef->getHierarchyInspector())
+            {
+                auto* hierarchyInspector = sceneRef->getHierarchyInspector();
+                auto& mergedList = hierarchyInspector->getMergedHierarchyList();
+                auto& emptyPlaceholders = hierarchyInspector->getEmptySlotPlaceholders();
+
+                if (prevSlot < static_cast<int>(mergedList.size()))
+                {
+                    int currentSlot = obj->getSlot();
+                    if (currentSlot >= 0 && currentSlot < static_cast<int>(mergedList.size()))
+                    {
+                        mergedList[currentSlot] = emptyPlaceholders[currentSlot].get();
+                    }
+
+                    obj->setSlot(prevSlot);
+                    mergedList[prevSlot] = obj;
+                }
+            }
+
+            if (sceneRef->getHierarchyInspector())
+            {
+                sceneRef->getHierarchyInspector()->redrawSlotsList();
+            }
+
+            history.erase(baseIt);
+            return;
+        }
+    }
 }
