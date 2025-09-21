@@ -69,15 +69,9 @@ public:
     void trackSlotChange(const std::string& name, ThreeDObject* obj, int oldSlot, int newSlot);
     void trackParentChange(const std::string& name, ThreeDObject* obj, ThreeDObject* oldParent, ThreeDObject* newParent, int oldSlot = -1);
     void cancelParentChangeFromScene_DNA(uint64_t objectID);
+    void cancelUnparentFromScene_DNA(uint64_t objectID);
     void trackUnparent(const std::string& name, ThreeDObject* obj, ThreeDObject* oldParent, int oldSlot = -1);
-
-    // --- transform tracking for non-parented objects
     void trackTransformChange(const std::string& name, ThreeDObject* obj, const glm::mat4& oldTransform, const glm::mat4& newTransform, uint64_t transformID = 0);
-    bool isObjectNonParented(ThreeDObject* obj) const;
-    void printTransformHistory() const;
-    void syncWithMeshDNA(ThreeDObject* obj);
-    void syncAllObjectsWithMeshDNA();
-
 
     const std::vector<SceneEvent>& getHistory() const { return history; }
     size_t size() const { return history.size(); }
