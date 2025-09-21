@@ -125,6 +125,8 @@ int main(int argc, char **argv)
     myHierarchy.setThreeDWindow(&myThreeDWindow);
     myHierarchy.setObjectInspector(&objectInspector);
 
+    optionsMenu.setScene(&myThreeDScene);
+
     gui.add(myInfoWindow);
     gui.add(myThreeDWindow);
     gui.add(objectInspector);

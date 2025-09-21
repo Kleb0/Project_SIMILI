@@ -242,7 +242,7 @@ void MainSoftwareGUI::run()
 			ImGui::OpenPopup("OptionsMenuPopup");
 			if (ImGui::BeginPopup("OptionsMenuPopup"))
 			{
-				optionsMenu->render([this](const std::string& path){ this->saveActiveScene(path); }, sceneRef);
+				optionsMenu->render(sceneRef);
 				ImGui::EndPopup();
 			}
 		}
@@ -293,17 +293,4 @@ void MainSoftwareGUI::multiScreenSupport()
 void MainSoftwareGUI::setScene(ThreeDScene* scene) 
 {
 	sceneRef = scene;
-}
-
-void MainSoftwareGUI::saveActiveScene(const std::string& filePath) 
-{
-	if (sceneRef) 
-	{
-		SaveScene saveScene(sceneRef->getSceneData()); 
-		saveScene.saveToJson(filePath);
-	} 
-	else 
-	{
-		throw std::runtime_error("No active scene to save.");
-	}
 }

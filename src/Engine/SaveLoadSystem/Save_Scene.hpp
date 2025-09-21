@@ -4,22 +4,28 @@
 #include <string>
 #include "ThirdParty/json.hpp"
 
-class SaveScene {
-private:
-    nlohmann::json activeScene;
+class SaveScene 
+{
+
 
 public:
     SaveScene(const nlohmann::json& scene) : activeScene(scene) {}
 
-    void setActiveScene(const nlohmann::json& scene) {
+    void setActiveScene(const nlohmann::json& scene) 
+    {
         activeScene = scene;
     }
 
-    const nlohmann::json& getActiveScene() const {
+    const nlohmann::json& getActiveScene() const 
+    {
         return activeScene;
     }
 
-    void saveToJson(const std::string& filePath) const;
+    void saveSceneToJson(const class ThreeDScene_DNA* dna, const std::string& filePath);
+
+private:
+    nlohmann::json activeScene;
+
 };
 
-#endif // SAVE_SCENE_HPP
+#endif 

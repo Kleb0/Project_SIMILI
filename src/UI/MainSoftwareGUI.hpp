@@ -32,8 +32,6 @@ public:
     }
 
     void setContextualMenu(ContextualMenu* menu);
-    void saveActiveScene(const std::string& filePath);
-
     void setOptionsMenu(OptionsMenuContent* menu) { optionsMenu = menu; }
 private:
     GLFWwindow *window = nullptr;
