@@ -153,6 +153,21 @@ void ThreeDScene_DNA::trackTransformChange(const std::string& name, ThreeDObject
 
 }
 
+void ThreeDScene_DNA::trackUnparent(const std::string& name, ThreeDObject* obj, ThreeDObject* oldParent, int oldSlot)
+{
+    SceneEvent evt;
+    evt.kind = SceneEventKind::Unparent;
+    evt.objectName = name;
+    evt.ptr = obj;
+    evt.objectID = obj ? obj->getID() : 0;
+    evt.tick = nextTick++;
+    evt.unparentedObject = obj;
+    evt.previousParent = oldParent;
+    evt.previousParentID = oldParent ? oldParent->getID() : 0;
+    evt.previousSlot = oldSlot;
+    history.push_back(evt);
+}
+
 bool ThreeDScene_DNA::isObjectNonParented(ThreeDObject* obj) const
 {
     return obj && !obj->getParent();

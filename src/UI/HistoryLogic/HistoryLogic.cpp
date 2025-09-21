@@ -104,21 +104,21 @@ void HistoryLogic::render()
 								case SceneEventKind::TransformChange:
 									line += "Transform Change  ";
 									line += ev.objectName + "  ";
-									
+                                    
 									glm::vec3 oldScale, oldTranslation, oldSkew;
 									glm::vec4 oldPerspective;
 									glm::quat oldRotQ;
-									
+                                    
 									glm::vec3 newScale, newTranslation, newSkew;
 									glm::vec4 newPerspective;
 									glm::quat newRotQ;
-									
+                                    
 									if (glm::decompose(ev.oldTransform, oldScale, oldRotQ, oldTranslation, oldSkew, oldPerspective) &&
 									glm::decompose(ev.newTransform, newScale, newRotQ, newTranslation, newSkew, newPerspective))
 									{
 										glm::vec3 oldEulerDeg = glm::degrees(glm::eulerAngles(oldRotQ));
 										glm::vec3 newEulerDeg = glm::degrees(glm::eulerAngles(newRotQ));
-										
+                                        
 										line += "T(" + std::to_string(oldTranslation.x) + "," + std::to_string(oldTranslation.y) + "," + std::to_string(oldTranslation.z) + ")";
 										line += " → T(" + std::to_string(newTranslation.x) + "," + std::to_string(newTranslation.y) + "," + std::to_string(newTranslation.z) + ")";
 									}
@@ -130,6 +130,13 @@ void HistoryLogic::render()
 
 								case SceneEventKind::ParentChange:
 									line += "Parent Change";
+									break;
+
+								case SceneEventKind::Unparent:
+									line += "Unparent Obj  ";
+									line += (ev.unparentedObject ? ev.unparentedObject->getName() : ev.objectName);
+									line += " from his parent ";
+									line += (ev.previousParent ? ev.previousParent->getName() : "(none)");
 									break;
 
 								default:
