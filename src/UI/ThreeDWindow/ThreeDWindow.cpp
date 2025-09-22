@@ -185,20 +185,16 @@ void ThreeDWindow::renderModelingModes()
     ImVec2 max0 = ImVec2(min0.x + iconSize.x, min0.y + iconSize.y);
 
     ImU32 normalBorderColor = (currentMode == &normalMode)
-        ? IM_COL32(255, 165, 0, 255)   
-        : IM_COL32(255, 255, 255, 255); 
+        ? IM_COL32(255, 165, 0, 255)
+        : IM_COL32(255, 255, 255, 255);
 
     ImU32 normalTextColor = (currentMode == &normalMode)
-        ? IM_COL32(255, 200, 100, 255) 
+        ? IM_COL32(255, 200, 100, 255)
         : IM_COL32(255, 255, 255, 255);
 
     draw_list->AddRectFilled(min0, max0, IM_COL32(0, 0, 0, 0));
     draw_list->AddRect(min0, max0, normalBorderColor, 0.0f, 0, 2.0f);
     draw_list->AddText(ImVec2(min0.x + 10, min0.y + 6), normalTextColor, "1");
-
-    // --- End of Icon 1 ---
-
-    ImGui::SetCursorScreenPos(ImVec2(min0.x + iconSize.x + 5, min0.y));
 
     // === Icon 2 : Vertice Mode ===
     ImGui::SetCursorScreenPos(ImVec2(min0.x + iconSize.x + 5, min0.y));
@@ -258,6 +254,27 @@ void ThreeDWindow::renderModelingModes()
     draw_list->AddText(ImVec2(min3.x + 10, min3.y + 6), edgeTextColor, "4");
     // ---- Icon 4 : Edge Mode ----
 
+    float textX = max3.x + 15;
+    float textY = min3.y + 6;
+    ImGui::SetCursorScreenPos(ImVec2(textX, textY));
+    const char* modeText = "";
+
+    if (currentMode == &normalMode)
+        modeText = "-- Normal mode";
+    else if (currentMode == &verticeMode)
+        modeText = "-- Vertice mode";
+    else if (currentMode == &faceMode)
+        modeText = "-- Face mode";
+    else if (currentMode == &edgeMode)
+        modeText = "-- Edge mode";
+
+    ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), modeText);
+
+    ImGui::EndGroup();
+    draw_list->AddText(ImVec2(min3.x + 10, min3.y + 6), edgeTextColor, "4");
+
+    // ---- Icon 4 : Edge Mode ----
+
     ImGui::EndGroup();
 }
 
@@ -276,7 +293,6 @@ void ThreeDWindow::onChangeMod()
     {
         setModelingMode(&normalMode);
     }
-
 
     if (isPressed2 && !lastKeyState_2)
     {
