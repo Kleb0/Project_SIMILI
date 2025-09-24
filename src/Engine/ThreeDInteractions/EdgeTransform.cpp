@@ -2,8 +2,10 @@
 #include "WorldObjects/Basic/Edge.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
 #include "WorldObjects/Mesh/Mesh.hpp"
+
 #include "Engine/ThreeDScene.hpp"
 #include "Engine/Guizmo.hpp"
+#include "Engine/MeshEdit/EdgeLoop.hpp"
 
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
@@ -42,10 +44,68 @@ namespace EdgeTransform
     {
         if (selectedEdges.empty()) return;
 
+
         static ImGuizmo::OPERATION currentGizmoOperation = ImGuizmo::TRANSLATE;
         if (ImGui::IsKeyPressed(ImGuiKey_W)) currentGizmoOperation = ImGuizmo::TRANSLATE;
         if (ImGui::IsKeyPressed(ImGuiKey_R)) currentGizmoOperation = ImGuizmo::ROTATE;
         if (ImGui::IsKeyPressed(ImGuiKey_S)) currentGizmoOperation = ImGuizmo::SCALE;
+
+
+        // -------- Edge Loop Side Edges Display (toggle) ----------
+        static bool showEdgeLoop = false;
+        static bool prevCtrlLeft = false;
+        bool ctrlLeftPressed = ImGui::IsKeyDown(ImGuiKey_LeftCtrl);
+        bool ctrlLeftJustPressed = ctrlLeftPressed && !prevCtrlLeft;
+        prevCtrlLeft = ctrlLeftPressed;
+
+        if (ctrlLeftJustPressed && selectedEdges.size() == 1) {
+            showEdgeLoop = !showEdgeLoop;
+        }
+
+        if (showEdgeLoop && selectedEdges.size() == 1) 
+        {
+            Edge* selected = selectedEdges.front();
+            Vertice* a = selected->getStart();
+            Vertice* b = selected->getEnd();
+            ThreeDObject* parent = a && a->getMeshParent() ? a->getMeshParent() : (b ? b->getMeshParent() : nullptr);
+            Mesh* mesh = parent ? dynamic_cast<Mesh*>(parent) : nullptr;
+
+            if (mesh) 
+            {
+                auto sideEdges = MeshEdit::FindEdgeLoop(*mesh, *selected);
+                ImDrawList* drawList = ImGui::GetWindowDrawList();
+                const glm::mat4 view = scene->getViewMatrix();
+                const glm::mat4 proj = scene->getProjectionMatrix();
+                for (auto* e : sideEdges) 
+                {
+                    if (!e) continue;
+                    Vertice* va = e->getStart();
+                    Vertice* vb = e->getEnd();
+                    if (!va || !vb) continue;
+                    ThreeDObject* p = va->getMeshParent() ? va->getMeshParent() : vb->getMeshParent();
+                    glm::mat4 parentMat = p ? p->getModelMatrix() : glm::mat4(1.0f);
+                    glm::vec3 wa = glm::vec3(parentMat * glm::vec4(va->getLocalPosition(), 1.0f));
+                    glm::vec3 wb = glm::vec3(parentMat * glm::vec4(vb->getLocalPosition(), 1.0f));
+                    glm::vec4 clipA = proj * view * glm::vec4(wa, 1.0f);
+                    glm::vec4 clipB = proj * view * glm::vec4(wb, 1.0f);
+
+                    if (clipA.w != 0.0f && clipB.w != 0.0f) 
+                    {
+                        ImVec2 screenEdgePosA = ImVec2(
+                            oglChildPos.x + oglChildSize.x * (0.5f + 0.5f * (clipA.x / clipA.w)),
+                            oglChildPos.y + oglChildSize.y * (0.5f - 0.5f * (clipA.y / clipA.w))
+                        );
+                        ImVec2 screenEdgePosB = ImVec2(
+                            oglChildPos.x + oglChildSize.x * (0.5f + 0.5f * (clipB.x / clipB.w)),
+                            oglChildPos.y + oglChildSize.y * (0.5f - 0.5f * (clipB.y / clipB.w))
+                        );
+                        drawList->AddLine(screenEdgePosA, screenEdgePosB, IM_COL32(255,0,0,255), 3.0f);
+                    }
+                }
+            }
+        }
+        // -------- End of Edge Loop Display ----------
+
 
         glm::mat4 view = scene->getViewMatrix();
         glm::mat4 proj = scene->getProjectionMatrix();

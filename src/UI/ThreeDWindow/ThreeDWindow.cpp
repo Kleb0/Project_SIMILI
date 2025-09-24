@@ -273,7 +273,7 @@ void ThreeDWindow::renderModelingModes()
     ImGui::EndGroup();
     draw_list->AddText(ImVec2(min3.x + 10, min3.y + 6), edgeTextColor, "4");
 
-    // ---- Icon 4 : Edge Mode ----
+    // ---- Icon 4 : Edge Mode + text ----
 
     ImGui::EndGroup();
 }
