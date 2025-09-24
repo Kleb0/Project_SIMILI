@@ -222,7 +222,8 @@ namespace EdgeTransform
         bool ctrlLeftJustPressed = ctrlLeftPressed && !prevCtrlLeft;
         prevCtrlLeft = ctrlLeftPressed;
 
-        if (ctrlLeftJustPressed && selectedEdges.size() == 1) {
+        if (ctrlLeftJustPressed && selectedEdges.size() == 1) 
+        {
             showEdgeLoop = !showEdgeLoop;
         }
 
@@ -234,11 +235,9 @@ namespace EdgeTransform
             ThreeDObject* parent = a && a->getMeshParent() ? a->getMeshParent() : (b ? b->getMeshParent() : nullptr);
             Mesh* mesh = parent ? dynamic_cast<Mesh*>(parent) : nullptr;
 
-            if (mesh)
+            if (mesh && a && selected)
             {
-
-             
-
+                std::vector<Edge*> loop = MeshEdit::FindLoop(a, selected, mesh, scene, oglChildPos, oglChildSize);
             }
         }
     }
