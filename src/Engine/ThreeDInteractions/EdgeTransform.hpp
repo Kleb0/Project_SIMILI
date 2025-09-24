@@ -15,4 +15,6 @@ namespace EdgeTransform
    void manipulateEdges(ThreeDScene* scene, std::list<Edge*>& selectedEdges,
    const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame);
 
+   void EnableEdgeLoop(ThreeDScene* scene, std::list<Edge*>& selectedEdges, const ImVec2& oglChildPos, const ImVec2& oglChildSize);
+
 }

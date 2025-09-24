@@ -24,37 +24,7 @@ namespace MeshEdit
     }
 
 
-    std::vector<Edge*> FindEdgeLoop(const Mesh& mesh, const Edge& startEdge)
-    {
-        std::vector<Edge*> sideEdges;
-        std::unordered_set<const Edge*> visitedLoop;
-        const Edge* currentEdge = &startEdge;
-        const Quad* prevQuad = nullptr;
 
-        while (currentEdge && !visitedLoop.count(currentEdge)) 
-        {
-            const Quad* quad = FindAdjacentQuad(mesh, currentEdge, prevQuad);
-            if (!quad) break;
-            const auto& edges = quad->getEdges();
-            int idx = -1;
-            for (int i = 0; i < 4; ++i)
-            {
-                if (edges[i] == currentEdge) {
-                    idx = i;
-                    break;
-                }
-            }
-            if (idx == -1) break;
-            sideEdges.push_back(edges[(idx + 1) % 4]);
-            sideEdges.push_back(edges[(idx + 3) % 4]);
-
-            visitedLoop.insert(currentEdge);
-            Edge* nextEdge = edges[(idx + 2) % 4];
-            prevQuad = quad;
-            currentEdge = nextEdge;
-            if (currentEdge == &startEdge) break; 
-        }
-        return sideEdges;
-    }
+    
 
 }

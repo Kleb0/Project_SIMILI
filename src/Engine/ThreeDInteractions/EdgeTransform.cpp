@@ -1,3 +1,4 @@
+    // Displays the edge loop side edges if toggled   
 #include "Engine/ThreeDInteractions/EdgeTransform.hpp"
 #include "WorldObjects/Basic/Edge.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
@@ -52,58 +53,7 @@ namespace EdgeTransform
 
 
         // -------- Edge Loop Side Edges Display (toggle) ----------
-        static bool showEdgeLoop = false;
-        static bool prevCtrlLeft = false;
-        bool ctrlLeftPressed = ImGui::IsKeyDown(ImGuiKey_LeftCtrl);
-        bool ctrlLeftJustPressed = ctrlLeftPressed && !prevCtrlLeft;
-        prevCtrlLeft = ctrlLeftPressed;
-
-        if (ctrlLeftJustPressed && selectedEdges.size() == 1) {
-            showEdgeLoop = !showEdgeLoop;
-        }
-
-        if (showEdgeLoop && selectedEdges.size() == 1) 
-        {
-            Edge* selected = selectedEdges.front();
-            Vertice* a = selected->getStart();
-            Vertice* b = selected->getEnd();
-            ThreeDObject* parent = a && a->getMeshParent() ? a->getMeshParent() : (b ? b->getMeshParent() : nullptr);
-            Mesh* mesh = parent ? dynamic_cast<Mesh*>(parent) : nullptr;
-
-            if (mesh) 
-            {
-                auto sideEdges = MeshEdit::FindEdgeLoop(*mesh, *selected);
-                ImDrawList* drawList = ImGui::GetWindowDrawList();
-                const glm::mat4 view = scene->getViewMatrix();
-                const glm::mat4 proj = scene->getProjectionMatrix();
-                for (auto* e : sideEdges) 
-                {
-                    if (!e) continue;
-                    Vertice* va = e->getStart();
-                    Vertice* vb = e->getEnd();
-                    if (!va || !vb) continue;
-                    ThreeDObject* p = va->getMeshParent() ? va->getMeshParent() : vb->getMeshParent();
-                    glm::mat4 parentMat = p ? p->getModelMatrix() : glm::mat4(1.0f);
-                    glm::vec3 wa = glm::vec3(parentMat * glm::vec4(va->getLocalPosition(), 1.0f));
-                    glm::vec3 wb = glm::vec3(parentMat * glm::vec4(vb->getLocalPosition(), 1.0f));
-                    glm::vec4 clipA = proj * view * glm::vec4(wa, 1.0f);
-                    glm::vec4 clipB = proj * view * glm::vec4(wb, 1.0f);
-
-                    if (clipA.w != 0.0f && clipB.w != 0.0f) 
-                    {
-                        ImVec2 screenEdgePosA = ImVec2(
-                            oglChildPos.x + oglChildSize.x * (0.5f + 0.5f * (clipA.x / clipA.w)),
-                            oglChildPos.y + oglChildSize.y * (0.5f - 0.5f * (clipA.y / clipA.w))
-                        );
-                        ImVec2 screenEdgePosB = ImVec2(
-                            oglChildPos.x + oglChildSize.x * (0.5f + 0.5f * (clipB.x / clipB.w)),
-                            oglChildPos.y + oglChildSize.y * (0.5f - 0.5f * (clipB.y / clipB.w))
-                        );
-                        drawList->AddLine(screenEdgePosA, screenEdgePosB, IM_COL32(255,0,0,255), 3.0f);
-                    }
-                }
-            }
-        }
+        EnableEdgeLoop(scene, selectedEdges, oglChildPos, oglChildSize);
         // -------- End of Edge Loop Display ----------
 
 
@@ -263,4 +213,33 @@ namespace EdgeTransform
         wasUsingGizmoLastFrame = usingGizmo || dragActive;
     }       
 
+
+    void EnableEdgeLoop(ThreeDScene* scene, std::list<Edge*>& selectedEdges, const ImVec2& oglChildPos, const ImVec2& oglChildSize)
+    {
+        static bool showEdgeLoop = false;
+        static bool prevCtrlLeft = false;
+        bool ctrlLeftPressed = ImGui::IsKeyDown(ImGuiKey_LeftCtrl);
+        bool ctrlLeftJustPressed = ctrlLeftPressed && !prevCtrlLeft;
+        prevCtrlLeft = ctrlLeftPressed;
+
+        if (ctrlLeftJustPressed && selectedEdges.size() == 1) {
+            showEdgeLoop = !showEdgeLoop;
+        }
+
+        if (showEdgeLoop && selectedEdges.size() == 1)
+        {
+            Edge* selected = selectedEdges.front();
+            Vertice* a = selected->getStart();
+            Vertice* b = selected->getEnd();
+            ThreeDObject* parent = a && a->getMeshParent() ? a->getMeshParent() : (b ? b->getMeshParent() : nullptr);
+            Mesh* mesh = parent ? dynamic_cast<Mesh*>(parent) : nullptr;
+
+            if (mesh)
+            {
+
+             
+
+            }
+        }
+    }
 }
