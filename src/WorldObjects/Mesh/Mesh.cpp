@@ -5,7 +5,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 
-Mesh::Mesh()
+Mesh::Mesh() : CanDisplayRenderMessage(true)
 {
     setIsMesh(true);
 }
@@ -190,20 +190,23 @@ std::vector<Ngon*> Mesh::getNgons() const
 
 void Mesh::finalize()
 {
-
-    for (Vertice* v : vertices)
+    for (size_t i = 0; i < vertices.size(); ++i)
     {
-
+        Vertice* v = vertices[i];
+        if (!v) continue;
         v->setMeshParent(this);
-        v->setName("Vertice_" + std::to_string(&v - &vertices[0]));
+        v->setName("Vertice_" + std::to_string(i));
         v->initialize();
     }
 
-    for (Edge* e : edges) e->initialize();
-    for (Face* f : faces) f->initialize();
+    for (Edge* e : edges) { if (e) e->initialize(); }
+    for (Face* f : faces) { if (f) f->initialize(); }
 
-    meshDNA->ensureInit(getModelMatrix());
-    meshDNA->freezeFromMesh(this);
+    if (meshDNA)
+    {
+        meshDNA->ensureInit(getModelMatrix());
+        meshDNA->freezeFromMesh(this);
+    }
 }
 
 void Mesh::clearGeometry()

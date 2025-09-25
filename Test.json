@@ -1,0 +1,29 @@
+{
+    "object_tree": [
+        {
+            "children": [
+                {
+                    "children": [
+                        {
+                            "id": 7965688090710357859,
+                            "object_name": "TestCube",
+                            "slot": -1
+                        }
+                    ],
+                    "id": 3905631147569544568,
+                    "object_name": "NewCube",
+                    "slot": -1
+                }
+            ],
+            "id": 7783424782560499026,
+            "object_name": "Cube",
+            "slot": 0
+        },
+        {
+            "id": 8108038694457642983,
+            "object_name": "MainCamera",
+            "slot": 1
+        }
+    ],
+    "scene_id": "WBT4LwCebA2z"
+}

@@ -1,8 +1,10 @@
 #include "Engine/ThreeDObjectSelector.hpp"
 #include "WorldObjects/Mesh/Mesh.hpp"
 #include <glm/gtc/matrix_inverse.hpp>
+#include <glm/gtx/norm.hpp>
 #include <limits>
 #include <iostream>
+#include <optional>
 
 ThreeDObjectSelector::ThreeDObjectSelector()
 {
@@ -134,11 +136,12 @@ const glm::mat4& view, const glm::mat4& projection, const std::vector<ThreeDObje
         if (clearPrevious) 
         {
             for (Vertice* v : mesh->getVertices())
-                v->setSelected(false);
+                if (v) v->setSelected(false);
         }
 
         for (Vertice* v : mesh->getVertices()) 
         {
+            if (!v) continue;
             glm::mat4 modelMatrix = obj->getModelMatrix();
             glm::vec3 worldPos = glm::vec3(modelMatrix * glm::vec4(v->getLocalPosition(), 1.0f));
             v->setPosition(worldPos);
@@ -214,22 +217,34 @@ const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObje
             if (!rayIntersectsFace(rayOrigin, rayDir, *obj, *f))
                 continue;
 
+            // Compute distance along the ray to the plane using first available triangle
             const auto& verts = f->getVertices();
-            if (verts.size() < 4) continue;
+            if (verts.size() < 3) continue;
 
-            glm::vec3 p0 = glm::vec3(model * glm::vec4(verts[0]->getLocalPosition(), 1.0f));
-            glm::vec3 p1 = glm::vec3(model * glm::vec4(verts[1]->getLocalPosition(), 1.0f));
-            glm::vec3 p2 = glm::vec3(model * glm::vec4(verts[2]->getLocalPosition(), 1.0f));
+            auto getWorld = [&](size_t i) -> std::optional<glm::vec3>
+            {
+                Vertice* v = (i < verts.size()) ? verts[i] : nullptr;
+                if (!v) return std::nullopt;
+                return glm::vec3(model * glm::vec4(v->getLocalPosition(), 1.0f));
+            };
+
+            glm::vec3 p0, p1, p2;
+            bool triOk = false;
+            for (size_t i = 2; i < verts.size() && !triOk; ++i)
+            {
+                auto P0 = getWorld(0), P1 = getWorld(1), P2 = getWorld(i);
+                if (!P0 || !P1 || !P2) continue;
+                p0 = *P0; p1 = *P1; p2 = *P2;
+                if (glm::length2(glm::cross(p1 - p0, p2 - p0)) > 1e-12f) triOk = true;
+            }
+            if (!triOk) continue;
 
             glm::vec3 n = glm::normalize(glm::cross(p1 - p0, p2 - p0));
             float denom = glm::dot(n, rayDir);
             if (std::abs(denom) < 1e-6f) continue;
-
             float t = glm::dot(n, (p0 - rayOrigin)) / denom;
             if (t < 0.0f) continue;
-
-            glm::vec3 hitPoint = rayOrigin + t * rayDir;
-            float distance = glm::length(hitPoint - rayOrigin);
+            float distance = t; // ray param is proportional to distance if rayDir normalized
 
             if (distance < closestDistance)
             {
@@ -251,12 +266,31 @@ const glm::vec3 &rayDir, const ThreeDObject &object, const Face &face)
     const glm::mat4 model = object.getModelMatrix();
 
     const auto& verts = face.getVertices();
-    if (verts.size() < 4) return false;
+    const size_t vcount = verts.size();
+    if (vcount < 3) return false; // need at least a triangle
 
-    glm::vec3 p0 = glm::vec3(model * glm::vec4(verts[0]->getLocalPosition(), 1.0f));
-    glm::vec3 p1 = glm::vec3(model * glm::vec4(verts[1]->getLocalPosition(), 1.0f));
-    glm::vec3 p2 = glm::vec3(model * glm::vec4(verts[2]->getLocalPosition(), 1.0f));
-    glm::vec3 p3 = glm::vec3(model * glm::vec4(verts[3]->getLocalPosition(), 1.0f));
+    // Find first valid triangle (skip null vertices defensively)
+    auto getWorld = [&](size_t i) -> std::optional<glm::vec3>
+    {
+        Vertice* v = (i < vcount) ? verts[i] : nullptr;
+        if (!v) return std::nullopt;
+        return glm::vec3(model * glm::vec4(v->getLocalPosition(), 1.0f));
+    };
+
+    // Build a plane from the first available non-degenerate triangle
+    glm::vec3 p0, p1, p2;
+    bool planeFound = false;
+    for (size_t i = 2; i < vcount && !planeFound; ++i)
+    {
+        auto P0 = getWorld(0);
+        auto P1 = getWorld(1);
+        auto P2 = getWorld(i);
+        if (!P0 || !P1 || !P2) continue;
+        p0 = *P0; p1 = *P1; p2 = *P2;
+        if (glm::length2(glm::cross(p1 - p0, p2 - p0)) > 1e-12f)
+            planeFound = true;
+    }
+    if (!planeFound) return false;
 
     glm::vec3 n = glm::normalize(glm::cross(p1 - p0, p2 - p0));
     float denom = glm::dot(n, rayDir);
@@ -269,11 +303,11 @@ const glm::vec3 &rayDir, const ThreeDObject &object, const Face &face)
 
     glm::vec3 P = rayOrigin + t * rayDir;
 
-    auto pointInTri = [&](const glm::vec3& A, const glm::vec3& B, const glm::vec3& C, const glm::vec3& Pnt) -> bool
+    auto pointInTri = [&](const glm::vec3& A, const glm::vec3& B, const glm::vec3& C) -> bool
     {
-        glm::vec3 c0 = glm::cross(B - A, Pnt - A);
-        glm::vec3 c1 = glm::cross(C - B, Pnt - B);
-        glm::vec3 c2 = glm::cross(A - C, Pnt - C);
+        glm::vec3 c0 = glm::cross(B - A, P - A);
+        glm::vec3 c1 = glm::cross(C - B, P - B);
+        glm::vec3 c2 = glm::cross(A - C, P - C);
         float d0 = glm::dot(c0, n);
         float d1 = glm::dot(c1, n);
         float d2 = glm::dot(c2, n);
@@ -281,9 +315,22 @@ const glm::vec3 &rayDir, const ThreeDObject &object, const Face &face)
         return (d0 >= eps) && (d1 >= eps) && (d2 >= eps);
     };
 
+    // Triangles: single test
+    if (vcount == 3)
+    {
+        auto P0 = getWorld(0), P1 = getWorld(1), P2 = getWorld(2);
+        if (!P0 || !P1 || !P2) return false;
+        return pointInTri(*P0, *P1, *P2);
+    }
 
-    bool inside = pointInTri(p0, p1, p2, P) || pointInTri(p0, p2, p3, P);
-    return inside;
+    // Quads or Ngons: fan triangulation around vertex 0
+    for (size_t i = 1; i + 1 < vcount; ++i)
+    {
+        auto A = getWorld(0), B = getWorld(i), C = getWorld(i + 1);
+        if (!A || !B || !C) continue;
+        if (pointInTri(*A, *B, *C)) return true;
+    }
+    return false;
 }
 
 
@@ -356,7 +403,7 @@ const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObje
         if (clearPrevious)
         {
             for (Edge* e : mesh->getEdges())
-                e->setSelected(false);
+                if (e) e->setSelected(false);
         }
 
         for (Edge* e : mesh->getEdges())
