@@ -2,7 +2,6 @@
 #include "WorldObjects/Mesh/Mesh.hpp"
 #include "WorldObjects/Basic/Edge.hpp"
 #include "WorldObjects/Basic/Quad.hpp"
-#include "WorldObjects/Entities/ThreeDObject.hpp"
 #include "Engine/ThreeDScene.hpp"
 #include <vector>
 #include <unordered_set>
@@ -114,20 +113,13 @@ namespace MeshEdit
         glm::mat4 proj = scene->getProjectionMatrix();
 
         std::vector<glm::vec3> centers;
-        centers.reserve(loop.size());
         for (Edge* e : loop)
         {
             if (!e) continue;
             Vertice* va = e->getStart();
             Vertice* vb = e->getEnd();
-            if (!va || !vb) continue;
-
-            ThreeDObject* parent = va->getMeshParent();
-            if (!parent) parent = vb->getMeshParent();
-            glm::mat4 model = parent ? parent->getGlobalModelMatrix() : glm::mat4(1.0f);
-
-            glm::vec3 pa = glm::vec3(model * glm::vec4(va->getLocalPosition(), 1.0f));
-            glm::vec3 pb = glm::vec3(model * glm::vec4(vb->getLocalPosition(), 1.0f));
+            glm::vec3 pa = va->getLocalPosition();
+            glm::vec3 pb = vb->getLocalPosition();
             glm::vec3 center = 0.5f * (pa + pb);
             centers.push_back(center);
         }

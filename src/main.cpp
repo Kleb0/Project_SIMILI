@@ -41,7 +41,6 @@ fs::path gExecutableDir;
 #include "UI/ThreeDModes/Vertice_Mode.hpp"
 #include "UI/ThreeDModes/Normal_Mode.hpp"
 #include "UI/ContextualMenu/ContextualMenu.hpp"
-#include "UI/EdgeLoopParameters/EdgeLoopParameters.hpp"
 #include "UI/OptionMenu/OptionsMenu.hpp"
 #include "Engine/SimiliSelector.hpp"
 #include "Engine/ErrorBox.hpp"
@@ -63,7 +62,6 @@ int main(int argc, char **argv)
     ObjectInspector objectInspector;
     HistoryLogic historyLogic;
     ContextualMenu contextualMenu;
-    EdgeLoopParameters edgeLoopParameters;
     OptionsMenuContent optionsMenu;
 
 
@@ -121,7 +119,6 @@ int main(int argc, char **argv)
     contextualMenu.setHierarchyInspector(&myHierarchy);
     contextualMenu.setObjectInspector(&objectInspector);
     contextualMenu.setThreeDWindow(&myThreeDWindow);
-    edgeLoopParameters.setScene(&myThreeDScene);
     mySimiliSelector.setScene(&myThreeDScene);      
 
     myHierarchy.setThreeDScene(&myThreeDScene);
@@ -136,7 +133,6 @@ int main(int argc, char **argv)
     gui.add(myHierarchy);
     gui.add(historyLogic);
     gui.setContextualMenu(&contextualMenu);
-    gui.setEdgeLoopParameters(&edgeLoopParameters);
     gui.setOptionsMenu(&optionsMenu);
 
     gui.setThreeDWindow(&myThreeDWindow);
