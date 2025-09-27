@@ -79,11 +79,24 @@ namespace MeshEdit
 		Vertice* oldV[4] = {rVs[0], rVs[1], rVs[2], rVs[3]};
 		Edge* oldE[4] = {rEs[0], rEs[1], rEs[2], rEs[3]};
 
-		const glm::vec3 nLocal = computeFaceNormalLocal(target);
+		glm::vec3 nLocal = computeFaceNormalLocal(target);
+
+		Mesh* mesh = dynamic_cast<Mesh*>(owner);
+		glm::vec3 meshCenter(0.0f);
+		if (mesh) {
+			const auto& meshVerts = mesh->getVertices();
+			for (auto* v : meshVerts) meshCenter += v->getLocalPosition();
+			if (!meshVerts.empty()) meshCenter /= float(meshVerts.size());
+		}
+		glm::vec3 faceCenter(0.0f);
+		for (int i=0;i<4;++i) faceCenter += rVs[i]->getLocalPosition();
+		faceCenter /= 4.0f;
+		glm::vec3 toCenter = glm::normalize(meshCenter - faceCenter);
+
+		if (glm::dot(nLocal, toCenter) > 0.0f) nLocal = -nLocal;
 		const glm::vec3 offset = nLocal * distance;
 
 		Vertice* nv[4] = {nullptr,nullptr,nullptr,nullptr};
-		Mesh* mesh = dynamic_cast<Mesh*>(owner);
 		MeshDNA* dna = mesh ? mesh->getMeshDNA() : nullptr;
 
 		for (int i=0;i<4;++i) 

@@ -8,7 +8,6 @@
 #include "UI/HistoryLogic/HistoryLogic.hpp"
 #include <WorldObjects/Entities/ThreeDObject.hpp>
 #include "UI/ContextualMenu/ContextualMenu.hpp"
-#include "UI/EdgeLoopParameters/EdgeLoopParameters.hpp"
 #include "Engine/SaveLoadSystem/Save_Scene.hpp"
 
 class OptionsMenuContent; // Forward declaration
@@ -33,7 +32,6 @@ public:
     }
 
     void setContextualMenu(ContextualMenu* menu);
-    void setEdgeLoopParameters(EdgeLoopParameters* params);
     void setOptionsMenu(OptionsMenuContent* menu) { optionsMenu = menu; }
 private:
     GLFWwindow *window = nullptr;
@@ -52,7 +50,6 @@ private:
     ThreeDWindow *threeDWindow = nullptr;
     ObjectInspector *objectInspector = nullptr;
     ContextualMenu *contextualMenu = nullptr;
-    EdgeLoopParameters* edgeLoopParameters = nullptr;
     OptionsMenuContent *optionsMenu = nullptr;
     ThreeDScene* sceneRef = nullptr;
 };

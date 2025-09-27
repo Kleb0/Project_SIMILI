@@ -45,12 +45,6 @@ void MainSoftwareGUI::setContextualMenu(ContextualMenu* menu)
 	contextualMenu = menu;
 }
 
-void MainSoftwareGUI::setEdgeLoopParameters(EdgeLoopParameters* params)
-{
-	edgeLoopParameters = params;
-}
-
-
 MainSoftwareGUI::MainSoftwareGUI(int width, int height, const char *title)
 {
 	initGLFW(width, height, title);
@@ -252,47 +246,6 @@ void MainSoftwareGUI::run()
 				ImGui::EndPopup();
 			}
 		}
-
-		// EdgeLoopParameters popup logic
-		static bool edgeLoopParametersPopupOpen = false;
-		if (threeDWindow && edgeLoopParameters)
-		{
-			if (threeDWindow->currentMode == &threeDWindow->edgeMode)
-			{
-				if (threeDWindow->multipleSelectedEdges.size() == 1)
-				{
-					static bool showEdgeLoop = false;
-					static bool prevCtrlLeft = false;
-					bool ctrlLeftPressed = ImGui::IsKeyDown(ImGuiKey_LeftCtrl);
-					bool ctrlLeftJustPressed = ctrlLeftPressed && !prevCtrlLeft;
-					prevCtrlLeft = ctrlLeftPressed;
-					if (ctrlLeftJustPressed)
-					{
-						showEdgeLoop = !showEdgeLoop;
-						if (showEdgeLoop)
-							edgeLoopParametersPopupOpen = true;
-						else
-							edgeLoopParametersPopupOpen = false;
-					}
-					if (edgeLoopParametersPopupOpen)
-						ImGui::OpenPopup("EdgeLoopParametersPopup");
-					if (ImGui::BeginPopup("EdgeLoopParametersPopup"))
-					{
-						edgeLoopParameters->render();
-						ImGui::EndPopup();
-					}
-				}
-				else
-				{
-					edgeLoopParametersPopupOpen = false;
-				}
-			}
-			else
-			{
-				edgeLoopParametersPopupOpen = false;
-			}
-		}
-		// ----------------- End of EdgeLoopParameters popup  -----------------
 
 
 		ImGui::Render();
