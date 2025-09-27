@@ -40,10 +40,16 @@ namespace MeshEdit
 		return n / std::sqrt(len2);
 	}
 
-	Edge* makeEdge(Vertice* a, Vertice* b) 
+	Edge* findOrMakeEdge(std::vector<Edge*>& edges, Vertice* a, Vertice* b) 
 	{
+		for (Edge* e : edges) {
+			if ((e->getStart() == a && e->getEnd() == b) || (e->getStart() == b && e->getEnd() == a)) {
+				return e;
+			}
+		}
 		Edge* e = new Edge(a, b);
 		e->initialize();
+		edges.push_back(e);
 		return e;
 	}
 
@@ -115,36 +121,38 @@ namespace MeshEdit
 		}
 
 		Edge* capE[4] = {
-			makeEdge(nv[0], nv[1]),
-			makeEdge(nv[1], nv[2]),
-			makeEdge(nv[2], nv[3]),
-			makeEdge(nv[3], nv[0]),
+			findOrMakeEdge(edges, nv[0], nv[1]),
+			findOrMakeEdge(edges, nv[1], nv[2]),
+			findOrMakeEdge(edges, nv[2], nv[3]),
+			findOrMakeEdge(edges, nv[3], nv[0]),
 		};
-		for (int i=0;i<4;++i) 
-		{
-			edges.push_back(capE[i]);
+		for (int i=0;i<4;++i) {
 			if (dna) dna->setEdgeCount(dna->getEdgeCount() + 1);
 		}
 
 		Edge* upE[4] = {
-			makeEdge(oldV[0], nv[0]),
-			makeEdge(oldV[1], nv[1]),
-			makeEdge(oldV[2], nv[2]),
-			makeEdge(oldV[3], nv[3]),
+			findOrMakeEdge(edges, oldV[0], nv[0]),
+			findOrMakeEdge(edges, oldV[1], nv[1]),
+			findOrMakeEdge(edges, oldV[2], nv[2]),
+			findOrMakeEdge(edges, oldV[3], nv[3]),
 		};
 		for (int i=0;i<4;++i) {
-			edges.push_back(upE[i]);
-			dna->setEdgeCount(dna->getEdgeCount() + 1);
+			if (dna) dna->setEdgeCount(dna->getEdgeCount() + 1);
 		}
 
 		Quad* sideF[4] = {nullptr,nullptr,nullptr,nullptr};
 		for (int i=0;i<4;++i) 
 		{
 			const int i1 = (i+1)&3;
-			sideF[i] = makeQuad(oldV[i], oldV[i1], nv[i1], nv[i], oldE[i], upE[i1], capE[i], upE[i]);
+			sideF[i] = makeQuad(
+				oldV[i], oldV[i1], nv[i1], nv[i],
+				findOrMakeEdge(edges, oldV[i], oldV[i1]),
+				findOrMakeEdge(edges, oldV[i1], nv[i1]),
+				findOrMakeEdge(edges, nv[i1], nv[i]),
+				findOrMakeEdge(edges, nv[i], oldV[i])
+			);
 			faces.push_back(sideF[i]);
 			dna->setQuadCount(dna->getQuadCount() + 1);
-
 		}
 
 		Quad* cap = makeQuad(nv[0], nv[1], nv[2], nv[3], capE[0], capE[1], capE[2], capE[3]);
