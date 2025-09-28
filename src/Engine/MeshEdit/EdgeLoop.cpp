@@ -133,8 +133,10 @@ namespace MeshEdit
             if (!e) continue;
             Vertice* va = e->getStart();
             Vertice* vb = e->getEnd();
-            glm::vec3 pa = va->getLocalPosition();
-            glm::vec3 pb = vb->getLocalPosition();
+            ThreeDObject* parent = va->getMeshParent() ? va->getMeshParent() : (vb ? vb->getMeshParent() : nullptr);
+            glm::mat4 model = parent ? parent->getModelMatrix() : glm::mat4(1.0f);
+            glm::vec3 pa = glm::vec3(model * glm::vec4(va->getLocalPosition(), 1.0f));
+            glm::vec3 pb = glm::vec3(model * glm::vec4(vb->getLocalPosition(), 1.0f));
             glm::vec3 center = 0.5f * (pa + pb);
             centers.push_back(center);
         }

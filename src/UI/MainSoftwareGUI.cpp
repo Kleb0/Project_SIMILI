@@ -45,6 +45,11 @@ void MainSoftwareGUI::setContextualMenu(ContextualMenu* menu)
 	contextualMenu = menu;
 }
 
+void MainSoftwareGUI::setEdgeLoopControl(EdgeLoopControl* control)
+{
+	edgeLoopControl = control;
+}
+
 MainSoftwareGUI::MainSoftwareGUI(int width, int height, const char *title)
 {
 	initGLFW(width, height, title);
@@ -89,7 +94,44 @@ void MainSoftwareGUI::autoSaveLayout()
 	}
 }
 
+void MainSoftwareGUI::DisplayEdgeLoopControl(ThreeDWindow *window)
+{
 
+	if (!edgeLoopControl || !window)
+		return;
+
+	static ImVec2 edgeLoopMenuPos = ImVec2(-1, -1);
+	static bool isDraggingMenu = false;
+
+	if (window->currentMode == &window->edgeMode && window->isEdgeLoopActive)
+	{
+		if (edgeLoopMenuPos.x < 0 || edgeLoopMenuPos.y < 0)
+		{
+			ImVec2 mousePos = ImGui::GetMousePos();
+			edgeLoopMenuPos = ImVec2(mousePos.x + 10, mousePos.y + 10);
+		}
+
+		ImGui::SetNextWindowPos(edgeLoopMenuPos, ImGuiCond_Always);
+		edgeLoopControl->show();
+
+		ImGui::Begin("EdgeLoopControl", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking);
+		ImGui::Text("EdgeLoopControl");
+
+		if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) && ImGui::IsMouseDown(ImGuiMouseButton_Left))
+		{
+			ImVec2 mouseDelta = ImGui::GetIO().MouseDelta;
+			edgeLoopMenuPos.x += mouseDelta.x;
+			edgeLoopMenuPos.y += mouseDelta.y;
+		}
+
+		ImGui::End();
+	}
+	if(window->isEdgeLoopActive == false)
+	{
+		edgeLoopControl->hide();
+		edgeLoopMenuPos = ImVec2(-1, -1);
+	}
+}
 
 
 void MainSoftwareGUI::initGLFW(int width, int height, const char *title)
@@ -236,6 +278,8 @@ void MainSoftwareGUI::run()
 
 		if (contextualMenu)
 			contextualMenu->render();
+
+		DisplayEdgeLoopControl(threeDWindow);
 
 		if (optionsMenu && optionsMenu->optionsMenuHasbeenClicked)
 		{
