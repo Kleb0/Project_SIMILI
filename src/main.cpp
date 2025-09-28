@@ -42,6 +42,7 @@ fs::path gExecutableDir;
 #include "UI/ThreeDModes/Normal_Mode.hpp"
 #include "UI/ContextualMenu/ContextualMenu.hpp"
 #include "UI/OptionMenu/OptionsMenu.hpp"
+#include "UI/EdgeLoopControl/EdgeLoopControl.hpp"
 #include "Engine/SimiliSelector.hpp"
 #include "Engine/ErrorBox.hpp"
 
@@ -63,6 +64,7 @@ int main(int argc, char **argv)
     HistoryLogic historyLogic;
     ContextualMenu contextualMenu;
     OptionsMenuContent optionsMenu;
+    EdgeLoopControl edgeLoopControl;
 
 
     Mesh* cubeMesh1 = Primitives::CreateCubeMesh(1.0f,glm::vec3(0.0f, 0.0f, 0.0f), "Cube", true);
@@ -134,6 +136,7 @@ int main(int argc, char **argv)
     gui.add(historyLogic);
     gui.setContextualMenu(&contextualMenu);
     gui.setOptionsMenu(&optionsMenu);
+    gui.setEdgeLoopControl(&edgeLoopControl);
 
     gui.setThreeDWindow(&myThreeDWindow);
     gui.setObjectInspector(&objectInspector);

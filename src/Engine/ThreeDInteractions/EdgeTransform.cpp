@@ -5,6 +5,7 @@
 #include "WorldObjects/Mesh/Mesh.hpp"
 
 #include "Engine/ThreeDScene.hpp"
+#include "UI/ThreeDWindow/ThreeDWindow.hpp"
 #include "Engine/Guizmo.hpp"
 #include "Engine/MeshEdit/EdgeLoop.hpp"
 
@@ -41,7 +42,7 @@ namespace EdgeTransform
     }
 
     void manipulateEdges(ThreeDScene* scene, std::list<Edge*>& selectedEdges,
-    const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame)
+    const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, ThreeDWindow* threeDWindow)
     {
         if (selectedEdges.empty()) return;
 
@@ -53,7 +54,7 @@ namespace EdgeTransform
 
 
         // -------- Edge Loop Side Edges Display (toggle) ----------
-        EnableEdgeLoop(scene, selectedEdges, oglChildPos, oglChildSize);
+        EnableEdgeLoop(scene, selectedEdges, oglChildPos, oglChildSize, threeDWindow);
         // -------- End of Edge Loop Display ----------
 
 
@@ -214,7 +215,8 @@ namespace EdgeTransform
     }       
 
 
-    void EnableEdgeLoop(ThreeDScene* scene, std::list<Edge*>& selectedEdges, const ImVec2& oglChildPos, const ImVec2& oglChildSize)
+    void EnableEdgeLoop(ThreeDScene* scene, std::list<Edge*>& selectedEdges, const ImVec2& oglChildPos, 
+    const ImVec2& oglChildSize, ThreeDWindow* window)
     {
         static bool showEdgeLoop = false;
         static bool prevCtrlLeft = false;
@@ -225,6 +227,7 @@ namespace EdgeTransform
         if (ctrlLeftJustPressed && selectedEdges.size() == 1) 
         {
             showEdgeLoop = !showEdgeLoop;
+            window->isEdgeLoopActive = showEdgeLoop;
         }
 
         if (showEdgeLoop && selectedEdges.size() == 1)
@@ -238,7 +241,9 @@ namespace EdgeTransform
             if (mesh && a && selected)
             {
                 std::vector<Edge*> loop = MeshEdit::FindLoop(a, selected, mesh, scene, oglChildPos, oglChildSize);
-            }
+                window->isEdgeLoopActive = true;
+            }           
         }
+
     }
 }

@@ -364,7 +364,8 @@ void ThreeDWindow::ThreeDWorldInteractions()
             multipleSelectedEdges,
             oglChildPos,
             oglChildSize,
-            wasUsingGizmoLastFrame
+            wasUsingGizmoLastFrame,
+            this
         );
     }
 }

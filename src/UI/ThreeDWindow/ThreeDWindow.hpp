@@ -99,6 +99,8 @@ public:
     bool lastKeyState_3 = false;
     bool lastKeyState_4 = false;
 
+    bool isEdgeLoopActive = false;
+
     friend class ClickHandler;
 
 private:

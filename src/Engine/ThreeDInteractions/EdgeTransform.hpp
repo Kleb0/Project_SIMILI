@@ -5,6 +5,7 @@
 #include <ImGuizmo.h>
 
 class ThreeDScene;
+class ThreeDWindow;
 class Edge;
 
 namespace EdgeTransform
@@ -13,8 +14,8 @@ namespace EdgeTransform
    const std::list<Edge*>& edges, const ImVec2& oglChildPos, const ImVec2& oglChildSize);
 
    void manipulateEdges(ThreeDScene* scene, std::list<Edge*>& selectedEdges,
-   const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame);
+   const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, ThreeDWindow* threeDWindow);
 
-   void EnableEdgeLoop(ThreeDScene* scene, std::list<Edge*>& selectedEdges, const ImVec2& oglChildPos, const ImVec2& oglChildSize);
+   void EnableEdgeLoop(ThreeDScene* scene, std::list<Edge*>& selectedEdges, const ImVec2& oglChildPos, const ImVec2& oglChildSize, ThreeDWindow* window);
 
 }
