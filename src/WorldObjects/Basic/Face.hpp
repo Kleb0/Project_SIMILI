@@ -1,9 +1,10 @@
 #pragma once
 
-#include "WorldObjects/Basic/Vertice.hpp"
-#include "WorldObjects/Basic/Edge.hpp"
 #include <glm/glm.hpp>
 #include <vector>
+
+class Vertice;
+class Edge;
 
 class Face
 {
@@ -18,6 +19,7 @@ public:
 
     const std::vector<Vertice*>& getVertices() const;
     const std::vector<Edge*>& getEdges() const;
+    std::vector<Edge*>& getEdgesNonConst() { return edges; }
 
     const glm::mat4& getFaceTransform() const { return faceTransform; }
     void setFaceTransform(const glm::mat4& m) { faceTransform = m; }

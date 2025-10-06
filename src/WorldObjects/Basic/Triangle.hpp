@@ -1,6 +1,13 @@
+
+
+
 #pragma once
-#include "Face.hpp"
+#include "WorldObjects/Basic/Face.hpp"
 #include <array>
+
+
+class Vertice;
+class Edge;
 
 class Triangle : public Face {
 public:

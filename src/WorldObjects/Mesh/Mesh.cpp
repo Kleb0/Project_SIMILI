@@ -212,3 +212,22 @@ void Mesh::clearGeometry()
     destroyEdges();
     destroyFaces();
 }
+
+void Mesh::updateGeometry()
+{
+    std::cout << "[Mesh] Updating geometry...";
+
+    for (Edge* e : edges)
+        if (e) e->destroy();
+    for (Face* f : faces)
+        if (f) f->destroy();
+    for (Vertice* v : vertices)
+        if (v) v->destroy();
+
+    for (Edge* e : edges)
+        if (e) e->initialize();
+    for (Face* f : faces)
+        if (f) f->initialize();
+    for (Vertice* v : vertices)
+        if (v) v->initialize();
+}
