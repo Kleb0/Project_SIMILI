@@ -1,6 +1,13 @@
+
+
+
 #pragma once
-#include "Face.hpp"
+#include "WorldObjects/Basic/Face.hpp"
 #include <vector>
+
+
+class Vertice;
+class Edge;
 
 class Ngon : public Face {
 public:

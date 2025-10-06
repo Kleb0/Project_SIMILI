@@ -1,4 +1,6 @@
 #include "WorldObjects/Basic/Face.hpp"
+#include "WorldObjects/Basic/Vertice.hpp"
+#include "WorldObjects/Basic/Edge.hpp"
 #include <glad/glad.h>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>

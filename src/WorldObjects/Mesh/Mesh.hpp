@@ -1,4 +1,5 @@
 #pragma once
+#include "Engine/MeshEdit/CutQuad.hpp"
 
 #include "WorldObjects/Entities/ThreedObject.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
@@ -24,6 +25,7 @@ public:
     void initialize() override;
     void render(const glm::mat4& viewProj) override;
     void destroy() override;
+    void updateGeometry();
 
     void setMeshDNA(MeshDNA* dna, bool takeOwnership = true);
     MeshDNA* getMeshDNA() const { return meshDNA; }
@@ -43,6 +45,7 @@ public:
     const std::vector<Vertice*>& getVertices() const { return vertices; }
     const std::vector<Edge*>& getEdges() const { return edges; }
     const std::vector<Face*>& getFaces() const { return faces; }
+    std::vector<Face*>& getFacesNonConst() { return faces; }
 
     std::vector<Quad*> getQuads() const;
     std::vector<Triangle*> getTriangles() const;
@@ -54,6 +57,7 @@ public:
     size_t faceCount() const { return faces.size(); }
 
     void clearGeometry();
+    std::vector<Edge*>& getEdgesNonConst() { return edges; }
 
 private:
     std::vector<Vertice*> vertices;

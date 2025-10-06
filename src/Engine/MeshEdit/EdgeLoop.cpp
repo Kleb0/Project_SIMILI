@@ -1,4 +1,5 @@
 #include "Engine/MeshEdit/EdgeLoop.hpp"
+#include "Engine/MeshEdit/CutQuad.hpp"
 #include "WorldObjects/Mesh/Mesh.hpp"
 #include "WorldObjects/Basic/Edge.hpp"
 #include "WorldObjects/Basic/Quad.hpp"
@@ -10,17 +11,20 @@
 namespace MeshEdit 
 {
 
+    std::vector<Quad*> traversedQuads;
+
     std::vector<Edge*> FindLoop(Vertice* startVert, Edge* selectedEdge, Mesh* mesh, ThreeDScene* scene, const ImVec2& oglChildPos, const ImVec2& oglChildSize)
     {
         std::vector<Edge*> loop;
         if (!selectedEdge || !mesh || !scene) return loop;
 
-        // initialize and start from the selected edge
         Edge* currentEdge = selectedEdge;
         loop.push_back(currentEdge);
 
+
         Quad* startQuad = nullptr;
-        for (Quad* q : mesh->getQuads()) {
+        const auto& meshQuads = mesh->getQuads();
+        for (Quad* q : meshQuads) {
             const auto& edges = q->getEdgesArray();
             for (int i = 0; i < 4; ++i) {
                 if (edges[i] == currentEdge) {
@@ -32,7 +36,6 @@ namespace MeshEdit
         }
         if (!startQuad) return loop;
 
-        // find the start quad and edge index
         Quad* currentQuad = startQuad;
         int edgeIdx = -1;
         const auto& edgesArr = currentQuad->getEdgesArray();
@@ -44,13 +47,11 @@ namespace MeshEdit
         }
         if (edgeIdx == -1) return loop;
 
-        // the good edge is the one that don't share a vertice with the current edge
         auto sharesVertice = [](Edge* e1, Edge* e2) {
             return (e1->getStart() == e2->getStart() || e1->getStart() == e2->getEnd() ||
                     e1->getEnd() == e2->getStart() || e1->getEnd() == e2->getEnd());
         };
 
-        // as a quad has 4 edges, we iterate 4 times
         int nextEdgeIdx = -1;
         for (int i = 0; i < 4; ++i) {
             if (i == edgeIdx) continue;
@@ -61,19 +62,22 @@ namespace MeshEdit
         }
         if (nextEdgeIdx == -1) return loop;
 
-        // the next edge is the one opposite to the current edge in the quad
         Edge* nextEdge = edgesArr[nextEdgeIdx];
 
         Edge* firstEdge = currentEdge;
         Edge* oppEdge = nextEdge;
         Quad* quad = currentQuad;
         int safety = 0;
+        traversedQuads.clear();
+        std::unordered_set<Quad*> visitedQuads;
+        traversedQuads.push_back(quad);
+        visitedQuads.insert(quad);
         while (oppEdge && oppEdge != firstEdge && safety < 100) {
             loop.push_back(oppEdge);
 
             Quad* nextQuad = nullptr;
-            for (Quad* q : mesh->getQuads()) {
-                if (q == quad) continue;
+            for (Quad* q : meshQuads) {
+                if (visitedQuads.count(q)) continue;
                 const auto& qEdges = q->getEdgesArray();
                 for (int i = 0; i < 4; ++i) {
                     if (qEdges[i] == oppEdge) {
@@ -85,7 +89,9 @@ namespace MeshEdit
             }
             if (!nextQuad) break;
 
-            // in the new quad, find the edge opposite to oppEdge
+            traversedQuads.push_back(nextQuad);
+            visitedQuads.insert(nextQuad);
+
             int oppIdx = -1;
             const auto& nextEdgesArr = nextQuad->getEdgesArray();
             for (int i = 0; i < 4; ++i) {
@@ -110,11 +116,14 @@ namespace MeshEdit
             ++safety;
         }
 
-      
-
         if (!loop.empty() && scene) 
         {
             CreatePerpendicularEdgeLoopGhost(loop, scene, oglChildPos, oglChildSize);
+        }
+
+        if (ImGui::IsKeyPressed(ImGuiKey_E)) 
+        {
+            MeshEdit::CutQuad(loop, mesh, traversedQuads);
         }
 
         return loop;
@@ -163,6 +172,37 @@ namespace MeshEdit
                 drawList->AddLine(screenA, screenB, IM_COL32(255,128,0,255), 4.0f); 
             }
         }
+
+        createGhostVertices(loop, scene, oglChildPos, oglChildSize);
     }
 
+    void createGhostVertices(const std::vector<Edge*>& loop, ThreeDScene* scene, const ImVec2& oglChildPos, const ImVec2& oglChildSize)
+    {
+        if (loop.empty() || !scene) return;
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        glm::mat4 view = scene->getViewMatrix();
+        glm::mat4 proj = scene->getProjectionMatrix();
+
+        for (Edge* e : loop)
+        {
+            if (!e) continue;
+            Vertice* va = e->getStart();
+            Vertice* vb = e->getEnd();
+            ThreeDObject* parent = va->getMeshParent() ? va->getMeshParent() : (vb ? vb->getMeshParent() : nullptr);
+            glm::mat4 model = parent ? parent->getModelMatrix() : glm::mat4(1.0f);
+            glm::vec3 pa = glm::vec3(model * glm::vec4(va->getLocalPosition(), 1.0f));
+            glm::vec3 pb = glm::vec3(model * glm::vec4(vb->getLocalPosition(), 1.0f));
+            glm::vec3 ghostPos = 0.5f * (pa + pb);
+            glm::vec4 worldGhost(ghostPos, 1.0f);
+            glm::vec4 clipGhost = proj * view * worldGhost;
+            if (clipGhost.w != 0.0f)
+            {
+                ImVec2 screenGhost = ImVec2(
+                    oglChildPos.x + oglChildSize.x * (0.5f + 0.5f * (clipGhost.x / clipGhost.w)),
+                    oglChildPos.y + oglChildSize.y * (0.5f - 0.5f * (clipGhost.y / clipGhost.w))
+                );
+                drawList->AddCircleFilled(screenGhost, 7.0f, IM_COL32(255,0,0,255));
+            }
+        }
+    }
 }

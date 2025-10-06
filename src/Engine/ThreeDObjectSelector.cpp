@@ -24,9 +24,15 @@ void ThreeDObjectSelector::pickUpMesh(int mouseX, int mouseY, int screenWidth, i
 
     for (auto *obj : objects)
     {
-        if (!obj->isSelectable())
-            continue;
-
+        if (!obj) continue;
+        if (!obj->isSelectable()) continue;
+        Mesh* mesh = dynamic_cast<Mesh*>(obj);
+        if (mesh) {
+            const auto& verts = mesh->getVertices();
+            const auto& edges = mesh->getEdges();
+            const auto& faces = mesh->getFaces();
+            if (verts.empty() && edges.empty() && faces.empty()) continue;
+        }
         if (rayIntersectsMesh(rayOrigin, rayDir, *obj))
         {
             float distance = glm::length(obj->getPosition() - rayOrigin);

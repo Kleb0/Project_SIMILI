@@ -1,7 +1,12 @@
-#pragma once
 
-#include "WorldObjects/Basic/Vertice.hpp"
+
+#pragma once
 #include <glm/glm.hpp>
+#include <vector>
+
+// Forward declarations
+class Vertice;
+class Mesh;
 
 class Edge
 {
@@ -13,6 +18,8 @@ public:
     void render(const glm::mat4& viewProj, const glm::mat4& modelMatrix);
     void destroy();
 
+    std::vector<Vertice*> insertVerticesAlongEdge(int count, Mesh* parentMesh);
+
     Vertice* getStart() const;
     Vertice* getEnd() const;
 
@@ -21,6 +28,8 @@ public:
 
     void setColor(const glm::vec4& c);
     glm::vec4 getColor() const;
+
+    void splitEdge(Vertice* newVertice, Mesh* parentMesh);
 
 private:
     Vertice* v1;

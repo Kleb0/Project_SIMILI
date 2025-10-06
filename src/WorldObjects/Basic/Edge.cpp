@@ -1,7 +1,11 @@
 #include "WorldObjects/Basic/Edge.hpp"
+#include "WorldObjects/Basic/Vertice.hpp"
+#include "Engine/MeshEdit/CutQuad.hpp"
+#include "WorldObjects/Mesh/Mesh.hpp"
 #include <glad/glad.h>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
+
 
 const char* edgeVertexShaderSrc = R"(
 #version 330 core
@@ -112,3 +116,51 @@ bool Edge::isSelected() const { return edgeSelected; }
 
 void Edge::setColor(const glm::vec4& c) { color = c; }
 glm::vec4 Edge::getColor() const { return color; }
+
+std::vector<Vertice*> Edge::insertVerticesAlongEdge(int count, Mesh* parentMesh)
+{
+    std::vector<Vertice*> newVertices;
+    if (!v1 || !v2 || !parentMesh || count < 1) return newVertices;
+
+    glm::vec3 p1 = v1->getLocalPosition();
+    glm::vec3 p2 = v2->getLocalPosition();
+    for (int i = 1; i <= count; ++i)
+    {
+        float t = float(i) / float(count + 1);
+        glm::vec3 pos = (1.0f - t) * p1 + t * p2;
+        Vertice* v = parentMesh->addVertice(pos);
+        newVertices.push_back(v);
+    }
+    return newVertices;
+}
+
+void Edge::splitEdge(Vertice* newVertice, Mesh* parentMesh)
+{
+    if (!v1 || !v2 || !newVertice || !parentMesh) return;
+
+    Edge* e1 = parentMesh->addEdge(v1, newVertice);
+    Edge* e2 = parentMesh->addEdge(newVertice, v2);
+
+    for (Face* f : parentMesh->getFaces())
+    {
+        if (!f) continue;
+        auto& faceEdges = f->getEdgesNonConst();
+        for (size_t i = 0; i < faceEdges.size(); ++i)
+        {
+            if (faceEdges[i] == this)
+            {
+                faceEdges[i] = e1;
+                break;
+            }
+        }
+    }
+
+    auto& meshEdges = parentMesh->getEdgesNonConst();
+    auto it = std::find(meshEdges.begin(), meshEdges.end(), this);
+    if (it != meshEdges.end())
+    {
+        meshEdges.erase(it);
+    }
+    
+    this->destroy();
+}
