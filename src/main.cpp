@@ -96,9 +96,16 @@ int main(int argc, char **argv)
     // Set OpenGL context BEFORE initializing the scene
     myThreeDScene.setOpenGLContext(&renderer);
     myThreeDScene.initizalize(); 
-
-    myThreeDScene.addObject({ cubeMesh1 });
-    myThreeDScene.addObject({&mainCamera});
+    
+    mainCamera.initialize();
+    cubeMesh1->initialize();
+    
+    glfwPollEvents();
+    
+    myThreeDScene.addObject(cubeMesh1);
+    myThreeDScene.addObject(&mainCamera);
+    
+    myThreeDScene.render();
 
     myThreeDScene.setActiveCamera(&mainCamera);
     myThreeDWindow.setModelingMode(&myThreeDWindow.normalMode);

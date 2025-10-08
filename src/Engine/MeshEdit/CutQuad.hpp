@@ -8,5 +8,5 @@
 namespace MeshEdit 
 {
 	void CutQuad(const std::vector<Edge*>& loop, Mesh* mesh, const std::vector<Quad*>& traversedQuads);
-
+	
 }

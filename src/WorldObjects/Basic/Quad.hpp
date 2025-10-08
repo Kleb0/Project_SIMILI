@@ -18,6 +18,7 @@ public:
     Quad(const std::array<Vertice*, 4>& vertices, const std::array<Edge*, 4>& edges);
     const std::array<Vertice*, 4>& getVerticesArray() const;
     const std::array<Edge*, 4>& getEdgesArray() const;
+    std::array<Edge*, 4>& getEdgesNonConst() { return m_edges; }
 
     std::pair<Quad*, Quad*> splitQuad(Edge* edgeToSplit, Vertice* newVertex, Mesh* mesh);
 

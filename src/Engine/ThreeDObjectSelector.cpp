@@ -4,59 +4,93 @@
 #include <limits>
 #include <iostream>
 
+#include "Engine/ErrorBox.hpp"
+
 ThreeDObjectSelector::ThreeDObjectSelector()
 {
 }
 
 void ThreeDObjectSelector::pickUpMesh(int mouseX, int mouseY, int screenWidth, int screenHeight, const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObject *> &objects)
 {
-    float x = (2.0f * mouseX) / screenWidth - 1.0f;
-    float y = 1.0f - (2.0f * mouseY) / screenHeight;
-
-    glm::vec3 rayStart = glm::unProject(glm::vec3(mouseX, mouseY, 0.0f), view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
-    glm::vec3 rayEnd = glm::unProject(glm::vec3(mouseX, mouseY, 1.0f), view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
-
-    glm::vec3 rayDir = glm::normalize(rayEnd - rayStart);
-    glm::vec3 rayOrigin = rayStart;
-
-    float closestDistance = std::numeric_limits<float>::max();
-    ThreeDObject *closestObject = nullptr;
-
-    for (auto *obj : objects)
+    if (screenWidth <= 0 || screenHeight <= 0) 
     {
-        if (!obj) continue;
-        if (!obj->isSelectable()) continue;
-        Mesh* mesh = dynamic_cast<Mesh*>(obj);
-        if (mesh) {
-            const auto& verts = mesh->getVertices();
-            const auto& edges = mesh->getEdges();
-            const auto& faces = mesh->getFaces();
-            if (verts.empty() && edges.empty() && faces.empty()) continue;
-        }
-        if (rayIntersectsMesh(rayOrigin, rayDir, *obj))
+        std::cerr << "[ThreeDObjectSelector] Invalid screen dimensions" << std::endl;
+        return;
+    }
+    
+    try 
+    {
+        float x = (2.0f * mouseX) / screenWidth - 1.0f;
+        float y = 1.0f - (2.0f * mouseY) / screenHeight;
+
+        glm::vec3 rayStart = glm::unProject(glm::vec3(mouseX, mouseY, 0.0f), view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
+        glm::vec3 rayEnd = glm::unProject(glm::vec3(mouseX, mouseY, 1.0f), view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
+
+        glm::vec3 rayDir = glm::normalize(rayEnd - rayStart);
+        glm::vec3 rayOrigin = rayStart;
+
+        float closestDistance = std::numeric_limits<float>::max();
+        ThreeDObject *closestObject = nullptr;
+
+        for (auto *obj : objects)
         {
-            float distance = glm::length(obj->getPosition() - rayOrigin);
-            if (distance < closestDistance)
+            if (!obj) continue;
+            if (!obj->isSelectable()) continue;
+            
+            try {
+                Mesh* mesh = dynamic_cast<Mesh*>(obj);
+                if (mesh) {
+                    const auto& verts = mesh->getVertices();
+                    const auto& edges = mesh->getEdges();
+                    const auto& faces = mesh->getFaces();
+                    if (verts.empty() && edges.empty() && faces.empty()) continue;
+                }
+                
+                if (rayIntersectsMesh(rayOrigin, rayDir, *obj))
+                {
+                    float distance = glm::length(obj->getPosition() - rayOrigin);
+                    if (distance < closestDistance)
+                    {
+                        closestDistance = distance;
+                        closestObject = obj;
+                    }
+                }
+            } 
+            catch (const std::exception& e) 
             {
-                closestDistance = distance;
-                closestObject = obj;
+                std::cerr << "[ThreeDObjectSelector] Error processing object: " << e.what() << std::endl;
             }
         }
-    }
 
-    selectedObject = closestObject;
+        selectedObject = closestObject;
+    } 
+    catch (const std::exception& e) {
+        std::cerr << "[ThreeDObjectSelector] Error during pickUpMesh: " << e.what() << std::endl;
+    }
 }
 
 bool ThreeDObjectSelector::rayIntersectsMesh(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object)
 {
+    try {
+        glm::mat4 model = object.getModelMatrix();
+        if (glm::length(glm::vec3(model[0])) < 0.0001f || 
+            glm::length(glm::vec3(model[1])) < 0.0001f || 
+            glm::length(glm::vec3(model[2])) < 0.0001f) {
+            // Invalid matrix - one of the axes has near-zero length
+            return false;
+        }
+        
+        glm::vec3 center = glm::vec3(model * glm::vec4(0, 0, 0, 1));
+        glm::vec3 halfScale = object.getScale() * 0.5f;
+        
+        // Protect against zero scale
+        if (halfScale.x <= 0.0001f || halfScale.y <= 0.0001f || halfScale.z <= 0.0001f) {
+            return false;
+        }
 
-    glm::mat4 model = object.getModelMatrix();
-    glm::vec3 center = glm::vec3(model * glm::vec4(0, 0, 0, 1));
-    glm::vec3 halfScale = object.getScale() * 0.5f;
-
-    glm::vec3 xAxis = glm::normalize(glm::vec3(model[0]));
-    glm::vec3 yAxis = glm::normalize(glm::vec3(model[1]));
-    glm::vec3 zAxis = glm::normalize(glm::vec3(model[2]));
+        glm::vec3 xAxis = glm::normalize(glm::vec3(model[0]));
+        glm::vec3 yAxis = glm::normalize(glm::vec3(model[1]));
+        glm::vec3 zAxis = glm::normalize(glm::vec3(model[2]));
 
     glm::vec3 delta = center - rayOrigin;
 
@@ -90,9 +124,18 @@ bool ThreeDObjectSelector::rayIntersectsMesh(const glm::vec3 &rayOrigin, const g
         return true;
     };
 
-    return testAxis(xAxis, halfScale.x) &&
-           testAxis(yAxis, halfScale.y) &&
-           testAxis(zAxis, halfScale.z);
+    bool result = testAxis(xAxis, halfScale.x) &&
+                testAxis(yAxis, halfScale.y) &&
+                testAxis(zAxis, halfScale.z);
+
+
+    return result;
+    } 
+    catch (const std::exception& e) 
+    {
+        std::cerr << "[ThreeDObjectSelector] Error in rayIntersectsMesh: " << e.what() << std::endl;
+        return false;
+    }
 }
 
 void ThreeDObjectSelector::clearTarget()
