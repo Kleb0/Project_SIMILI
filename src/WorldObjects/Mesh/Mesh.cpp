@@ -3,6 +3,7 @@
 #include "WorldObjects/Basic/Triangle.hpp"
 #include "WorldObjects/Basic/Ngon.hpp"
 #include <glm/gtc/type_ptr.hpp>
+#include <glad/glad.h>
 #include <iostream>
 
 Mesh::Mesh()
@@ -43,21 +44,69 @@ Ngon* Mesh::addNgon(const std::vector<Vertice*>& vertices, const std::vector<Edg
 
 void Mesh::render(const glm::mat4& viewProj)
 {
-    const glm::mat4 modelMatrix = getModelMatrix();
-
-    for (Face* f : faces)
-        if (f) f->render(viewProj, modelMatrix);
-
-    for (Vertice* v : vertices)
-        if (v) v->render(viewProj, modelMatrix);
-
-    for (Edge* e : edges)
-        if (e) e->render(viewProj, modelMatrix);
-
-    if(CanDisplayRenderMessage)
+    try 
     {
-        std::cout << "[Mesh] Rendering completed (faces, vertices, edges)\n";
-        CanDisplayRenderMessage = false;
+        const glm::mat4 modelMatrix = getModelMatrix();
+
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(1.0f, 1.0f);
+        for (Face* f : faces) 
+        {
+            if (f) 
+            {
+                try 
+                {
+                    f->render(viewProj, modelMatrix);
+                } 
+                catch (const std::exception& e) 
+                {
+                    std::cerr << "[Mesh] Error rendering face: " << e.what() << std::endl;
+                }
+            }
+        }
+        glDisable(GL_POLYGON_OFFSET_FILL);
+
+        for (Vertice* v : vertices) 
+        {
+            if (v) 
+            {
+                try 
+                {
+                    v->render(viewProj, modelMatrix);
+                } 
+                catch (const std::exception& e) 
+                {
+                    std::cerr << "[Mesh] Error rendering vertex: " << e.what() << std::endl;
+                }
+            }
+        }
+
+        glLineWidth(2.0f);
+        for (Edge* e : edges) 
+        {
+            if (e) 
+            {
+                try 
+                {
+                    e->render(viewProj, modelMatrix);
+                } 
+                catch (const std::exception& e) 
+                {
+                    std::cerr << "[Mesh] Error rendering edge: " << e.what() << std::endl;
+                }
+            }
+        }
+        glLineWidth(1.0f);
+
+        if(CanDisplayRenderMessage)
+        {
+            std::cout << "[Mesh] Rendering completed (faces, vertices, edges)\n";
+            CanDisplayRenderMessage = false;
+        }
+    } 
+    catch (const std::exception& e) 
+    {
+        std::cerr << "[Mesh] Error in render method: " << e.what() << std::endl;
     }
 }
 

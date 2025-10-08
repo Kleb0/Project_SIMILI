@@ -10,6 +10,8 @@
 #include "WorldObjects/Basic/Edge.hpp"
 #include "WorldObjects/Camera/Camera.hpp"
 
+#include "Engine/ErrorBox.hpp"
+
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <algorithm>
@@ -20,6 +22,11 @@ ClickHandler::ClickHandler(ThreeDWindow* owner) : window(owner) {}
 void ClickHandler::handle() 
 {
     scene = window->getThreeDScene();
+    if (!scene) {
+        std::cerr << "[CLICK HANDLER] Error: No ThreeDScene available" << std::endl;
+        return;
+    }
+
     if (window->selectionLocked) 
     {
         window->selectionLocked = false;
@@ -42,14 +49,29 @@ void ClickHandler::handle()
         
         auto& listRef = scene->getObjectsRef();
         std::vector<ThreeDObject*> objects;
+        
+        if (listRef.empty()) 
+        {
+            std::cout << "[CLICK HANDLER] No objects in scene or scene not ready" << std::endl;
+            return;
+        }
+        
         objects.reserve(listRef.size());
-        for (auto* o : listRef) if (o) objects.push_back(o);
+        for (auto* o : listRef) 
+        {
+            if (o)
+            {
+                objects.push_back(o);
+            }
+        }
 
         if (window->currentMode == &window->normalMode)
         {
             bool preventSelection = ImGuizmo::IsOver();
             if (!preventSelection)
             {
+                // showErrorBox("ClickHandler:: Test ");
+
                 window->selector.pickUpMesh((int)relativeMouseX, (int)relativeMouseY,
                 windowWidth, windowHeight, window->view, window->proj, objects);
             }
@@ -66,17 +88,25 @@ void ClickHandler::handle()
                 }
 
                 auto it = std::find(window->multipleSelectedObjects.begin(), window->multipleSelectedObjects.end(), selected);
+                
                 if (it == window->multipleSelectedObjects.end())
                 {
                     window->multipleSelectedObjects.push_back(selected);
                     selected->setSelected(true);
-                    //cout the position of the selected 
-                    glm::vec3 worldPos = glm::vec3(selected->getGlobalModelMatrix()[3]);
-                    std::cout << "[CLICK HANDLER] : Selected object world position: ("
-                            << worldPos.x << ", "
-                            << worldPos.y << ", "
-                            << worldPos.z << ")" 
-                    << " for object with name " << selected->getName() << std::endl;
+                    try 
+                    {
+                        glm::mat4 globalMatrix = selected->getGlobalModelMatrix();
+                        glm::vec3 worldPos = glm::vec3(globalMatrix[3]);
+                        std::cout << "[CLICK HANDLER] : Selected object world position: ("
+                                << worldPos.x << ", "
+                                << worldPos.y << ", "
+                                << worldPos.z << ")" 
+                        << " for object with name " << selected->getName() << std::endl;
+                    } 
+                    catch (const std::exception& e) 
+                    {
+                        std::cerr << "[CLICK HANDLER] Error getting object position: " << e.what() << std::endl;
+                    }
                 }
                 else if (shiftPressed)
                 {

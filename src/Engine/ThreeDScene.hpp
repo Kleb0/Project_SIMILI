@@ -46,7 +46,11 @@ public:
     GLuint getTexture() const; 
     std::vector<glm::vec3> worldCenter;
 
-    std::list<ThreeDObject*>& getObjectsRef() { return objects; }
+    std::list<ThreeDObject*>& getObjectsRef() 
+    { 
+        static std::list<ThreeDObject*> emptyList;
+        return glctx ? objects : emptyList; 
+    }
     void addObject(ThreeDObject* object);
     bool removeObject(ThreeDObject* object);
 

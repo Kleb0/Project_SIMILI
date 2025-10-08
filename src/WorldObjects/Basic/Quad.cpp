@@ -49,8 +49,7 @@ void Quad::setCutVertices(const std::array<Vertice*, 3>& vertsA, const std::arra
 
 void Quad::splitQuadFromCut(Mesh* mesh)
 {
-    // Crée un quad à partir des sommets du cut
-    // Pour former un rectangle correct : A2 -> A3 -> B3 -> B2
+
     Quad* quad1 = Quad::createQuadFromVertices(
         cutVerticesA[1], // A2
         cutVerticesA[2], // A3  
