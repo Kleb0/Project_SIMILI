@@ -127,6 +127,11 @@ namespace MeshEdit
 			findOrMakeEdge(edges, nv[3], nv[0]),
 		};
 		for (int i=0;i<4;++i) {
+			// Associer les nouveaux edges aux vertices
+			if (capE[i]) {
+				nv[i]->addEdge(capE[i]);
+				nv[(i+1)%4]->addEdge(capE[i]);
+			}
 			if (dna) dna->setEdgeCount(dna->getEdgeCount() + 1);
 		}
 
@@ -137,6 +142,11 @@ namespace MeshEdit
 			findOrMakeEdge(edges, oldV[3], nv[3]),
 		};
 		for (int i=0;i<4;++i) {
+			// Associer les edges verticaux aux vertices
+			if (upE[i]) {
+				oldV[i]->addEdge(upE[i]);
+				nv[i]->addEdge(upE[i]);
+			}
 			if (dna) dna->setEdgeCount(dna->getEdgeCount() + 1);
 		}
 
@@ -151,11 +161,17 @@ namespace MeshEdit
 				findOrMakeEdge(edges, nv[i1], nv[i]),
 				findOrMakeEdge(edges, nv[i], oldV[i])
 			);
+			if (mesh) {
+				sideF[i]->setParentMesh(mesh);
+			}
 			faces.push_back(sideF[i]);
 			dna->setQuadCount(dna->getQuadCount() + 1);
 		}
 
 		Quad* cap = makeQuad(nv[0], nv[1], nv[2], nv[3], capE[0], capE[1], capE[2], capE[3]);
+		if (mesh) {
+			cap->setParentMesh(mesh);
+		}
 		faces.push_back(cap);
 		dna->setQuadCount(dna->getQuadCount() + 1);
 
@@ -164,17 +180,78 @@ namespace MeshEdit
 		{
 			Face* toDelete = *it;
 			faces.erase(it);
-			if constexpr (has_destroy<Face>::value) {
+			if constexpr (has_destroy<Face>::value) 
+			{
 				toDelete->destroy();
 			}
 			delete toDelete;
 			dna->setQuadCount(dna->getQuadCount() - 1);
 		}
 
+		std::vector<Face*> allFaces;
+		allFaces.reserve(faces.size());
+		for (Face* f : faces) {
+			if (f) allFaces.push_back(f);
+		}
+
+		for (Edge* edge : edges)
+		{
+			if (!edge) continue;
+			std::vector<Face*> sharedFaces;
+			
+			Vertice* vertA = edge->getStart();
+			Vertice* vertB = edge->getEnd();
+			if (!vertA || !vertB) continue;
+			
+			for (Face* face : allFaces)
+			{
+				if (!face) continue;
+				const auto& faceEdges = face->getEdges();
+				
+				bool hasEdge = false;
+				for (Edge* faceEdge : faceEdges)
+				{
+					if (faceEdge == edge)
+					{
+						hasEdge = true;
+						break;
+					}
+				}
+				
+				if (hasEdge)
+				{
+					bool alreadyAdded = false;
+					for (Face* existingFace : sharedFaces)
+					{
+						if (existingFace == face)
+						{
+							alreadyAdded = true;
+							break;
+						}
+					}
+					
+					if (!alreadyAdded)
+					{
+						sharedFaces.push_back(face);
+						
+						if (sharedFaces.size() > 2)
+						{
+							std::cout << "[ExtrudeFace] WARNING: Edge has more than 2 shared faces! This violates manifold topology." << std::endl;
+							sharedFaces.resize(2);
+							break;
+						}
+					}
+				}
+			}
+			
+			edge->setSharedFaces(sharedFaces);
+		}
+
 		if (out) 
 		{
 			out->ok = true;
-			for (int i=0;i<4;++i) {
+			for (int i=0;i<4;++i) 
+			{
 				out->newVerts[i] = nv[i];
 				out->capEdges[i] = capE[i];
 				out->upEdges[i] = upE[i];

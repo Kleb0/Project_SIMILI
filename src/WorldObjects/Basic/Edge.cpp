@@ -117,6 +117,30 @@ bool Edge::isSelected() const { return edgeSelected; }
 void Edge::setColor(const glm::vec4& c) { color = c; }
 glm::vec4 Edge::getColor() const { return color; }
 
+
+void Edge::setSharedFaces(const std::vector<Face*>& faces)
+{
+    sharedFaces = faces;
+    for (const auto& f : faces)
+    {
+        if (dynamic_cast<class Quad*>(f))
+        {
+            quadEdge = true;
+            break;
+        }
+    }
+}
+
+bool Edge::isQuadEdge() const
+{
+    return quadEdge;
+}
+
+const std::vector<Face*>& Edge::getSharedFaces() const
+{
+    return sharedFaces;
+}
+
 std::vector<Vertice*> Edge::insertVerticesAlongEdge(int count, Mesh* parentMesh)
 {
     std::vector<Vertice*> newVertices;

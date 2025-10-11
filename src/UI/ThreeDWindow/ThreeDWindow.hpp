@@ -1,3 +1,5 @@
+
+ 
 #pragma once
 
 //=== Includes ===//
@@ -38,6 +40,7 @@ class ObjectInspector;
 class ThreeDObject;
 class ClickHandler;
 class ThreeDScene;
+class MainSoftwareGUI;
 
 //=== Class ===//
 class ThreeDWindow : public GUIWindow
@@ -75,16 +78,23 @@ public:
     void setThreeDScene(ThreeDScene* s) { this->scene = s; }
     ThreeDScene* getThreeDScene() const { return scene; }
 
+    void setMainGUI(MainSoftwareGUI* gui);
+    MainSoftwareGUI* getMainGUI() const { return mainGUI; }
+
+    const std::list<Face*>& getmultipleSelectedFace() const { return multipleSelectedFaces; }
+
     ImVec2 oglChildPos;
     ImVec2 oglChildSize;
     std::string title = "Hello 3D Window";
     std::string text = "This is a 3D window with OpenGL content.";
     glm::vec3 centerOfSelection = glm::vec3(0.0f);
     GLFWwindow *glfwWindow = nullptr;
+
     std::list<ThreeDObject *> multipleSelectedObjects;
     std::list<Vertice *> multipleSelectedVertices;
     std::list<Face *> multipleSelectedFaces;
     std::list<Edge *> multipleSelectedEdges;
+
     bool wasUsingGizmoLastFrame = false;
     bool selectionLocked = false;
 
@@ -98,8 +108,10 @@ public:
     bool lastKeyState_2 = false;
     bool lastKeyState_3 = false;
     bool lastKeyState_4 = false;
-
     bool isEdgeLoopActive = false;
+
+    bool hasSelectedFace() const { return !multipleSelectedFaces.empty(); }
+    void clearSelectedFaces();
 
     friend class ClickHandler;
 
@@ -107,7 +119,7 @@ private:
     
     SimiliSelector* similiSelector = nullptr;
 
-    void toggleMultipleSelection(ThreeDObject *object);
+
     void ThreeDWorldInteractions();
     
 
@@ -122,7 +134,8 @@ private:
     std::set<ThreeDObject *> lastSelection;
     Vertice* lastSelectedVertice = nullptr;
     ImGuizmo::OPERATION currentGizmoOperation = ImGuizmo::TRANSLATE;
-
-     ClickHandler clickHandler;
+    
+    MainSoftwareGUI* mainGUI = nullptr;
+    ClickHandler clickHandler;
 
 };

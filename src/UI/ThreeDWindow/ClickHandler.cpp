@@ -272,6 +272,7 @@ void ClickHandler::handle()
                     {
                         window->multipleSelectedEdges.push_back(selectedEdge);
                         for (Edge* e : window->multipleSelectedEdges) if (e) e->setSelected(true);
+                        
                     }
                 }
                 else
@@ -281,10 +282,24 @@ void ClickHandler::handle()
                         Mesh* mesh = dynamic_cast<Mesh*>(obj);
                         if (!mesh) continue;
                         for (Edge* e : mesh->getEdges()) if (e) e->setSelected(false);
+                        for (Face* f : mesh->getFaces()) if (f) f->setColor(glm::vec4(1.0f)); 
                     }
+                    
                     window->multipleSelectedEdges.clear();
                     selectedEdge->setSelected(true);
                     window->multipleSelectedEdges.push_back(selectedEdge);
+                    
+                    // const auto& sharedFaces = selectedEdge->getSharedFaces();
+                    // const glm::vec4 blueColor(0.1f, 0.3f, 1.0f, 1.0f); 
+                    // for (Face* face : sharedFaces)
+                    // {
+                    //     if (face)
+                    //     {
+                    //         face->setColor(blueColor);
+                    //     }
+                    // }
+                    
+                    // std::cout << "[CLICK HANDLER] Edge selected with " << sharedFaces.size() << " shared faces colored in red" << std::endl;
                 }
             }
             else
@@ -296,6 +311,7 @@ void ClickHandler::handle()
                         Mesh* mesh = dynamic_cast<Mesh*>(obj);
                         if (!mesh) continue;    
                         for (Edge* e : mesh->getEdges()) if (e) e->setSelected(false);
+                        for (Face* f : mesh->getFaces()) if (f) f->setColor(glm::vec4(1.0f)); 
                     }
                     window->multipleSelectedEdges.clear();
                 }

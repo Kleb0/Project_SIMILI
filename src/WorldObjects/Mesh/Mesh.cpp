@@ -249,8 +249,15 @@ void Mesh::finalize()
     }
 
     for (Edge* e : edges) e->initialize();
-    for (Face* f : faces) f->initialize();
 
+    for (Face* f : faces) 
+    {
+
+        f->setParentMesh(this);      
+        f->initialize();
+    } 
+
+    
     meshDNA->ensureInit(getModelMatrix());
     meshDNA->freezeFromMesh(this);
 }
@@ -262,21 +269,70 @@ void Mesh::clearGeometry()
     destroyFaces();
 }
 
-void Mesh::updateGeometry()
+void Mesh::destroyFaces(const std::vector<Face*>& facesToDestroy)
 {
-    std::cout << "[Mesh] Updating geometry...";
-
-    for (Edge* e : edges)
-        if (e) e->destroy();
-    for (Face* f : faces)
-        if (f) f->destroy();
-    for (Vertice* v : vertices)
-        if (v) v->destroy();
-
-    for (Edge* e : edges)
-        if (e) e->initialize();
-    for (Face* f : faces)
-        if (f) f->initialize();
-    for (Vertice* v : vertices)
-        if (v) v->initialize();
+    for (Face* f : facesToDestroy)
+    {
+        if (!f) continue;
+        
+        // Retirer la face du vecteur faces
+        auto it = std::find(faces.begin(), faces.end(), f);
+        if (it != faces.end())
+        {
+            faces.erase(it);
+        }
+        
+        // Détruire la face
+        f->destroy();
+        delete f;
+    }
+    
+    std::cout << "[Mesh] Specified faces destroyed. Remaining faces: " << faces.size() << std::endl;
 }
+
+void Mesh::destroyOrphanEdges()
+{
+    auto& meshEdges = getEdgesNonConst();
+    for (auto it = meshEdges.begin(); it != meshEdges.end();)
+    {
+        Edge* edge = *it;
+        if (edge && edge->getSharedFaces().empty())
+        {
+            // Retirer l'edge des vertices qui le référencent
+            if (edge->getStart())
+                edge->getStart()->removeEdge(edge);
+            if (edge->getEnd())
+                edge->getEnd()->removeEdge(edge);
+            
+            edge->destroy();
+            delete edge;
+            it = meshEdges.erase(it);
+            std::cout << "[Mesh] Edge with empty sharedFaces destroyed" << std::endl;
+        }
+        else
+        {
+            ++it;
+        }
+    }
+}
+
+void Mesh::destroyOrphanVertices()
+{
+    auto& meshVertices = vertices;
+    for (auto it = meshVertices.begin(); it != meshVertices.end();)
+    {
+        Vertice* vertice = *it;
+        if (vertice && vertice->getEdges().empty())
+        {
+            vertice->destroy();
+            delete vertice;
+            it = meshVertices.erase(it);
+            std::cout << "[Mesh] Vertice with no edges destroyed" << std::endl;
+        }
+        else
+        {
+            ++it;
+        }
+    }
+}
+

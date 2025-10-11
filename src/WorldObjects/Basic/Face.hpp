@@ -25,9 +25,14 @@ public:
     void setFaceTransform(const glm::mat4& m) { faceTransform = m; }
     void applyWorldDelta(const glm::mat4& deltaWorld, const glm::mat4& parentModel, bool bakeToVertices);
 
-
     void setSelected(bool v) { selected = v; }
     bool isSelected() const { return selected; }
+
+    void setParentMesh(class Mesh* mesh);
+    class Mesh* getParentMesh() const;
+
+    void setColor(const glm::vec4& c);
+    const glm::vec4& getColor() const;
 
 protected:
     std::vector<Vertice*> vertices;
@@ -40,6 +45,10 @@ private:
 
     bool selected = false;
     glm::mat4 faceTransform = glm::mat4(1.0f);
+
+    Mesh* parentMesh = nullptr;
+
+    glm::vec4 color = glm::vec4(1.0f); 
 
     void compileShaders();
     void uploadFromVertices();

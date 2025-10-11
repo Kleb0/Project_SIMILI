@@ -31,9 +31,16 @@ public:
 
     void splitEdge(Vertice* newVertice, Mesh* parentMesh);
 
+    bool isQuadEdge() const;
+    void setSharedFaces(const std::vector<class Face*>& faces);
+    const std::vector<class Face*>& getSharedFaces() const;
+
 private:
     Vertice* v1;
     Vertice* v2;
+
+    std::vector<class Face*> sharedFaces;
+    bool quadEdge = false;
 
     unsigned int vao = 0;
     unsigned int vbo = 0;

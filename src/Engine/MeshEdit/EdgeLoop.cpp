@@ -3,6 +3,7 @@
 #include "WorldObjects/Mesh/Mesh.hpp"
 #include "WorldObjects/Basic/Edge.hpp"
 #include "WorldObjects/Basic/Quad.hpp"
+#include "WorldObjects/Basic/Vertice.hpp"
 #include "Engine/ThreeDScene.hpp"
 #include <vector>
 #include <unordered_set>
@@ -10,297 +11,495 @@
 
 namespace MeshEdit 
 {
+	std::vector<Quad*> traversedQuads;
 
-    std::vector<Quad*> traversedQuads;
 
-    std::vector<Edge*> FindLoop(Vertice* startVert, Edge* selectedEdge, Mesh* mesh, ThreeDScene* scene, const ImVec2& oglChildPos, const ImVec2& oglChildSize)
-    {
-        std::vector<Edge*> loop;
-        if (!selectedEdge || !mesh || !scene)
-        {
-            return loop;
-        }
+	std::vector<Edge*> FindLoop(Vertice* startVert, Edge* selectedEdge, Mesh* mesh, ThreeDScene* scene, const ImVec2& oglChildPos, const ImVec2& oglChildSize)		
+	{
+		std::vector<Edge*> DirectionA;
+		std::vector<Edge*> DirectionB;
+		std::vector<Quad*> JoiningQuad;
 
-        Edge* currentEdge = selectedEdge;
-        Quad* currentQuad = nullptr;
-        const auto& meshQuads = mesh->getQuads();
-        for (Quad* q : meshQuads)
-        {
-            const auto& edges = q->getEdgesArray();
-            for (int i = 0; i < 4; ++i)
-            {
-                if (edges[i] == currentEdge)
-                {
-                    currentQuad = q;
-                    break;
-                }
-            }
-            if (currentQuad)
-            {
-                break;
-            }
-        }
-        if (!currentQuad)
-        {
-            return loop;
-        }
+		std::vector<Edge*> loop;
+		std::vector<Quad*> visitedQuads;
 
-        traversedQuads.clear();
-        std::unordered_set<Quad*> visitedQuads;
+		static Edge* lastSelectedEdge = nullptr;
+		static std::unordered_set<Quad*> alreadyPrinted;
+		static bool prevCtrlLeft = false;
+		
+		bool ctrlLeftPressed = ImGui::IsKeyDown(ImGuiKey_LeftCtrl);
+		bool ctrlLeftJustPressed = ctrlLeftPressed && !prevCtrlLeft;
+		prevCtrlLeft = ctrlLeftPressed;
+		
+		if (lastSelectedEdge != selectedEdge || ctrlLeftJustPressed) 
+		{
+			alreadyPrinted.clear();
+			lastSelectedEdge = selectedEdge;
+		}
 
-        // Détermination de la direction de parcours (comme dans CutQuad)
-        glm::vec3 refDirA;
-        bool referenceSet = false;
+		loop.push_back(selectedEdge);
 
-        auto getEdgeDir = [](Edge* e) -> glm::vec3
-        {
-            return e->getEnd()->getLocalPosition() - e->getStart()->getLocalPosition();
-        };
+		// ---- selected edge part ---- //
+		const auto& sharedFaces = selectedEdge->getSharedFaces();
+		std::vector<std::vector<Edge*>> directions;
 
-        auto traverse = [&](Edge* edge, Quad* quad, int direction)
-        {
-            int safety = 0;
-            while (quad && edge && safety < 100)
-            {
-                if (visitedQuads.count(quad))
-                {
-                    break;
-                }
-                loop.push_back(edge);
-                traversedQuads.push_back(quad);
-                visitedQuads.insert(quad);
+		std::vector<Edge*> startEdges;
+		std::vector<Edge*> exitEdges;
 
-                // Trouver l'index de l'edge courant
-                int edgeIdx = -1;
-                const auto& edgesArr = quad->getEdgesArray();
-                for (int i = 0; i < 4; ++i)
-                {
-                    if (edgesArr[i] == edge)
-                    {
-                        edgeIdx = i;
-                        break;
-                    }
-                }
-                if (edgeIdx == -1)
-                {
-                    break;
-                }
+		for (Face* f : sharedFaces) 
+		{
+			Quad* quad = dynamic_cast<Quad*>(f);
+			if (!quad) continue;
+			Edge* opposite = nullptr;
+			for (Edge* e : quad->getEdgesArray()) 
+			{
+				if (e == selectedEdge) continue;
 
-                // Détermination de la direction de l'edge courant
-                glm::vec3 currentDir = getEdgeDir(edge);
-                if (!referenceSet)
-                {
-                    refDirA = glm::normalize(currentDir);
-                    referenceSet = true;
-                }
+				Vertice* eStart = e->getStart();
+				Vertice* eEnd = e->getEnd();
+				Vertice* selStart = selectedEdge->getStart();
+				Vertice* selEnd = selectedEdge->getEnd();
 
-                // Chercher l'edge parallèle (entry/exit) selon la direction
-                int parallelIdx = -1;
-                for (int i = 0; i < 4; ++i)
-                {
-                    if (i == edgeIdx)
-                    {
-                        continue;
-                    }
-                    glm::vec3 testDir = getEdgeDir(edgesArr[i]);
-                    float dot = glm::dot(glm::normalize(testDir), refDirA);
-                    // On veut l'edge le plus parallèle (dot proche de +1 ou -1)
-                    if (std::abs(dot) > 0.99f)
-                    {
-                        parallelIdx = i;
-                        break;
-                    }
-                }
-                if (parallelIdx == -1)
-                {
-                    // Si pas d'edge parallèle, on est au bord (triangle ou fin)
-                    break;
-                }
-                Edge* parallelEdge = edgesArr[parallelIdx];
+				if ((eStart != selStart && eStart != selEnd) && (eEnd != selStart && eEnd != selEnd)) 
+				{
+					opposite = e;
+					break;
+				}
+			}
 
-                // Trouver le quad suivant qui partage cet edge
-                Quad* nextQuad = nullptr;
-                for (Quad* q : meshQuads)
-                {
-                    if (q == quad)
-                    {
-                        continue;
-                    }
-                    const auto& qEdges = q->getEdgesArray();
-                    for (int i = 0; i < 4; ++i)
-                    {
-                        if (qEdges[i] == parallelEdge)
-                        {
-                            nextQuad = q;
-                            break;
-                        }
-                    }
-                    if (nextQuad)
-                    {
-                        break;
-                    }
-                }
-                if (!nextQuad)
-                {
-                    break;
-                }
-                edge = parallelEdge;
-                quad = nextQuad;
-                ++safety;
-            }
-        };
+			startEdges.push_back(selectedEdge);
 
-        // Traverse forward
-        traverse(currentEdge, currentQuad, 1);
+			if (opposite) exitEdges.push_back(opposite);
 
-        // Traverse backward (opposé)
-        int startEdgeIdx = -1;
-        const auto& startEdgesArr = currentQuad->getEdgesArray();
-        for (int i = 0; i < 4; ++i)
-        {
-            if (startEdgesArr[i] == currentEdge)
-            {
-                startEdgeIdx = i;
-                break;
-            }
-        }
-        if (startEdgeIdx != -1)
-        {
-            int parallelIdx = -1;
-            for (int i = 0; i < 4; ++i)
-            {
-                if (i == startEdgeIdx)
-                {
-                    continue;
-                }
-                glm::vec3 testDir = getEdgeDir(startEdgesArr[i]);
-                float dot = glm::dot(glm::normalize(testDir), refDirA);
-                if (std::abs(dot) > 0.99f)
-                {
-                    parallelIdx = i;
-                    break;
-                }
-            }
-            if (parallelIdx != -1)
-            {
-                Edge* parallelEdge = startEdgesArr[parallelIdx];
-                Quad* nextQuad = nullptr;
-                for (Quad* q : meshQuads)
-                {
-                    if (q == currentQuad)
-                    {
-                        continue;
-                    }
-                    const auto& qEdges = q->getEdgesArray();
-                    for (int i = 0; i < 4; ++i)
-                    {
-                        if (qEdges[i] == parallelEdge)
-                        {
-                            nextQuad = q;
-                            break;
-                        }
-                    }
-                    if (nextQuad)
-                    {
-                        break;
-                    }
-                }
-                if (nextQuad)
-                {
-                    traverse(parallelEdge, nextQuad, -1);
-                }
-            }
-        }
+			std::vector<Edge*> direction;
+			direction.push_back(selectedEdge);
 
-        if (!loop.empty() && scene)
-        {
-            CreatePerpendicularEdgeLoopGhost(loop, scene, oglChildPos, oglChildSize);
-        }
+			if (opposite) direction.push_back(opposite);
 
-        if (ImGui::IsKeyPressed(ImGuiKey_E))
-        {
-            MeshEdit::CutQuad(loop, mesh, traversedQuads);
-            traversedQuads.clear();
-            selectedEdge = nullptr;
-        }
+			directions.push_back(direction);
+			visitedQuads.push_back(quad);
+		}
+		
+		DirectionA.clear();
+		DirectionB.clear();
+		DirectionA.push_back(selectedEdge);
+		DirectionB.push_back(selectedEdge);
+		
+		if (exitEdges.size() >= 1) 
+		{
+			Edge* currentA = exitEdges[0];
+			Edge* currentB = exitEdges.size() >= 2 ? exitEdges[1] : nullptr;
+			std::unordered_set<Quad*> visitedA;
+			std::unordered_set<Quad*> visitedB;
+			int maxSteps = 20; 
+			
+			for (int step = 0; step < maxSteps; ++step) 
+			{
+				bool continueA = false;
+				bool continueB = false;
+				
+				if (currentA) 
+				{
+					DirectionA.push_back(currentA);
+					
+					const auto& sharedFacesA = currentA->getSharedFaces();
+					Edge* nextA = nullptr;
 
-        return loop;
-    }
+					for (Face* f : sharedFacesA) 
+					{
+						Quad* quad = dynamic_cast<Quad*>(f);
+						if (!quad) continue;
 
-    void CreatePerpendicularEdgeLoopGhost(const std::vector<Edge*>& loop, ThreeDScene* scene, const ImVec2& oglChildPos, const ImVec2& oglChildSize)
-    {
-        if (loop.empty() || !scene) return;
-        ImDrawList* drawList = ImGui::GetWindowDrawList();
-        glm::mat4 view = scene->getViewMatrix();
-        glm::mat4 proj = scene->getProjectionMatrix();
+						if (std::find(visitedQuads.begin(), visitedQuads.end(), quad) == visitedQuads.end() &&
+							visitedA.find(quad) == visitedA.end()) 
+						{
+							visitedA.insert(quad);
+							
+							for (Edge* e : quad->getEdgesArray()) 
+							{
+								if (e == currentA) continue;
+								Vertice* eStart = e->getStart();
+								Vertice* eEnd = e->getEnd();
+								Vertice* currStart = currentA->getStart();
+								Vertice* currEnd = currentA->getEnd();
+								if ((eStart != currStart && eStart != currEnd) && (eEnd != currStart && eEnd != currEnd)) {
+									nextA = e;
+									break;
+								}
+							}
+							break;
+						}
+					}
+					
+					if (nextA && currentB && std::find(DirectionB.begin(), DirectionB.end(), nextA) != DirectionB.end()) 
+					{
+						break;
+					}
+					
+					if (nextA) {
+						currentA = nextA;
+						continueA = true;
+					}
+				}
+				
+				if (currentB) 
+				{
+					DirectionB.push_back(currentB);
+					
+					const auto& sharedFacesB = currentB->getSharedFaces();
+					Edge* nextB = nullptr;
+					for (Face* f : sharedFacesB) 
+					{
+						Quad* quad = dynamic_cast<Quad*>(f);
+						if (!quad) continue;
+						if (std::find(visitedQuads.begin(), visitedQuads.end(), quad) == visitedQuads.end() &&
+							visitedB.find(quad) == visitedB.end()) {
+							visitedB.insert(quad);
+							
+							for (Edge* e : quad->getEdgesArray()) 
+							{
+								if (e == currentB) continue;
+								Vertice* eStart = e->getStart();
+								Vertice* eEnd = e->getEnd();
+								Vertice* currStart = currentB->getStart();
+								Vertice* currEnd = currentB->getEnd();
 
-        std::vector<glm::vec3> centers;
-        for (Edge* e : loop)
-        {
-            if (!e) continue;
-            Vertice* va = e->getStart();
-            Vertice* vb = e->getEnd();
-            ThreeDObject* parent = va->getMeshParent() ? va->getMeshParent() : (vb ? vb->getMeshParent() : nullptr);
-            glm::mat4 model = parent ? parent->getModelMatrix() : glm::mat4(1.0f);
-            glm::vec3 pa = glm::vec3(model * glm::vec4(va->getLocalPosition(), 1.0f));
-            glm::vec3 pb = glm::vec3(model * glm::vec4(vb->getLocalPosition(), 1.0f));
-            glm::vec3 center = 0.5f * (pa + pb);
-            centers.push_back(center);
-        }
+								if ((eStart != currStart && eStart != currEnd) && (eEnd != currStart && eEnd != currEnd)) 
+								{
+									nextB = e;
+									break;
+								}
+							}
+							break;
+						}
+					}
+					
+					if (nextB && std::find(DirectionA.begin(), DirectionA.end(), nextB) != DirectionA.end()) 
+					{
+						break;
+					}
+					
+					if (nextB) 
+					{
+						currentB = nextB;
+						continueB = true;
+					}
+				}
+				
+				if (!continueA && !continueB) break;
+			}
+		}
 
-        size_t n = centers.size();
-        for (size_t i = 0; i < n; ++i)
-        {
-            glm::vec3 cA = centers[i];
-            glm::vec3 cB = centers[(i+1)%n];
-            glm::vec4 worldA(cA, 1.0f);
-            glm::vec4 worldB(cB, 1.0f);
-            glm::vec4 clipA = proj * view * worldA;
-            glm::vec4 clipB = proj * view * worldB;
-            if (clipA.w != 0.0f && clipB.w != 0.0f)
-            {
-                ImVec2 screenA = ImVec2(
-                    oglChildPos.x + oglChildSize.x * (0.5f + 0.5f * (clipA.x / clipA.w)),
-                    oglChildPos.y + oglChildSize.y * (0.5f - 0.5f * (clipA.y / clipA.w))
-                );
-                ImVec2 screenB = ImVec2(
-                    oglChildPos.x + oglChildSize.x * (0.5f + 0.5f * (clipB.x / clipB.w)),
-                    oglChildPos.y + oglChildSize.y * (0.5f - 0.5f * (clipB.y / clipB.w))
-                );
-                drawList->AddLine(screenA, screenB, IM_COL32(255,128,0,255), 4.0f); 
-            }
-        }
+		std::vector<Edge*> entryEdges;
+		if (!DirectionA.empty()) entryEdges.push_back(DirectionA.back());
+		if (!DirectionB.empty()) entryEdges.push_back(DirectionB.back());
 
-        createGhostVertices(loop, scene, oglChildPos, oglChildSize);
-    }
+		for (Edge* entryEdge : entryEdges) 
+		{
+			const auto& entrySharedFaces = entryEdge->getSharedFaces();
 
-    void createGhostVertices(const std::vector<Edge*>& loop, ThreeDScene* scene, const ImVec2& oglChildPos, const ImVec2& oglChildSize)
-    {
-        if (loop.empty() || !scene) return;
-        ImDrawList* drawList = ImGui::GetWindowDrawList();
-        glm::mat4 view = scene->getViewMatrix();
-        glm::mat4 proj = scene->getProjectionMatrix();
+			for (Face* f : entrySharedFaces) 
+			{
+				Quad* quad = dynamic_cast<Quad*>(f);
+				if (!quad) continue;
 
-        for (Edge* e : loop)
-        {
-            if (!e) continue;
-            Vertice* va = e->getStart();
-            Vertice* vb = e->getEnd();
-            ThreeDObject* parent = va->getMeshParent() ? va->getMeshParent() : (vb ? vb->getMeshParent() : nullptr);
-            glm::mat4 model = parent ? parent->getModelMatrix() : glm::mat4(1.0f);
-            glm::vec3 pa = glm::vec3(model * glm::vec4(va->getLocalPosition(), 1.0f));
-            glm::vec3 pb = glm::vec3(model * glm::vec4(vb->getLocalPosition(), 1.0f));
-            glm::vec3 ghostPos = 0.5f * (pa + pb);
-            glm::vec4 worldGhost(ghostPos, 1.0f);
-            glm::vec4 clipGhost = proj * view * worldGhost;
-            if (clipGhost.w != 0.0f)
-            {
-                ImVec2 screenGhost = ImVec2(
-                    oglChildPos.x + oglChildSize.x * (0.5f + 0.5f * (clipGhost.x / clipGhost.w)),
-                    oglChildPos.y + oglChildSize.y * (0.5f - 0.5f * (clipGhost.y / clipGhost.w))
-                );
-                drawList->AddCircleFilled(screenGhost, 7.0f, IM_COL32(255,0,0,255));
-            }
-        }
-    }
+				for (Quad* visited : visitedQuads) 
+				{
+					if (visited == quad && alreadyPrinted.find(quad) == alreadyPrinted.end()) 
+					{
+						std::cout << "entry Edge quad has been visited " << std::endl;
+						alreadyPrinted.insert(quad);
+					}
+				}
+
+				Edge* newExit = nullptr;
+				for (Edge* e : quad->getEdgesArray()) 
+				{
+					if (e == entryEdge) continue;
+					Vertice* eStart = e->getStart();
+					Vertice* eEnd = e->getEnd();
+					Vertice* entryStart = entryEdge->getStart();
+					Vertice* entryEnd = entryEdge->getEnd();
+					if ((eStart != entryStart && eStart != entryEnd) && (eEnd != entryStart && eEnd != entryEnd)) {
+						newExit = e;
+						break;
+					}
+				}
+				if (newExit) loop.push_back(newExit);
+			}
+		}
+
+
+		if (!DirectionA.empty() && !DirectionB.empty()) 
+		{
+			Edge* lastEdgeA = DirectionA.back();  
+			Edge* lastEdgeB = DirectionB.back();  
+			
+			const auto& sharedFacesA = lastEdgeA->getSharedFaces();
+			const auto& sharedFacesB = lastEdgeB->getSharedFaces();
+			
+			for (Face* faceA : sharedFacesA) 
+			{
+				Quad* quadA = dynamic_cast<Quad*>(faceA);
+				if (!quadA) continue;
+				
+				for (Face* faceB : sharedFacesB) 
+				{
+					Quad* quadB = dynamic_cast<Quad*>(faceB);
+					if (!quadB) continue;
+					
+					if (quadA == quadB) 
+					{
+						JoiningQuad.push_back(quadA);
+						break;
+					}
+				}
+				if (!JoiningQuad.empty()) break;
+			}
+		}
+
+		CreatePerpendicularEdgeLoopGhost(DirectionA, DirectionB, scene, oglChildPos, oglChildSize);
+
+		if (ImGui::IsKeyPressed(ImGuiKey_E))
+		{
+			MeshEdit::CutQuad(loop, mesh, traversedQuads);
+			traversedQuads.clear();
+			selectedEdge = nullptr;
+		}
+
+		return loop;
+	}
+
+	void CreatePerpendicularEdgeLoopGhost(const std::vector<Edge*>& directionA, const std::vector<Edge*>& directionB, ThreeDScene* scene, const ImVec2& oglChildPos, const ImVec2& oglChildSize)
+	{
+		if ((directionA.empty() && directionB.empty()) || !scene) return;
+		ImDrawList* drawList = ImGui::GetWindowDrawList();
+		glm::mat4 view = scene->getViewMatrix();
+		glm::mat4 proj = scene->getProjectionMatrix();
+
+		if (directionA.size() > 1)
+		{
+			std::vector<glm::vec3> centersA;
+			for (Edge* e : directionA)
+			{
+				if (!e) continue;
+				Vertice* va = e->getStart();
+				Vertice* vb = e->getEnd();
+				ThreeDObject* parent = va->getMeshParent() ? va->getMeshParent() : (vb ? vb->getMeshParent() : nullptr);
+				glm::mat4 model = parent ? parent->getModelMatrix() : glm::mat4(1.0f);
+				glm::vec3 pa = glm::vec3(model * glm::vec4(va->getLocalPosition(), 1.0f));
+				glm::vec3 pb = glm::vec3(model * glm::vec4(vb->getLocalPosition(), 1.0f));
+				glm::vec3 center = 0.5f * (pa + pb);
+				centersA.push_back(center);
+			}
+
+			for (size_t i = 0; i < centersA.size() - 1; ++i)
+			{
+				glm::vec3 cA = centersA[i];
+				glm::vec3 cB = centersA[i + 1];
+				glm::vec4 worldA(cA, 1.0f);
+				glm::vec4 worldB(cB, 1.0f);
+				glm::vec4 clipA = proj * view * worldA;
+				glm::vec4 clipB = proj * view * worldB;
+				if (clipA.w != 0.0f && clipB.w != 0.0f)
+				{
+					ImVec2 screenA = ImVec2(
+						oglChildPos.x + oglChildSize.x * (0.5f + 0.5f * (clipA.x / clipA.w)),
+						oglChildPos.y + oglChildSize.y * (0.5f - 0.5f * (clipA.y / clipA.w))
+					);
+					ImVec2 screenB = ImVec2(
+						oglChildPos.x + oglChildSize.x * (0.5f + 0.5f * (clipB.x / clipB.w)),
+						oglChildPos.y + oglChildSize.y * (0.5f - 0.5f * (clipB.y / clipB.w))
+					);
+					drawList->AddLine(screenA, screenB, IM_COL32(255,165,0,255), 4.0f); 
+				}
+			}
+		}
+
+		if (directionB.size() > 1)
+		{
+			std::vector<glm::vec3> centersB;
+			for (Edge* e : directionB)
+			{
+				if (!e) continue;
+				Vertice* va = e->getStart();
+				Vertice* vb = e->getEnd();
+				ThreeDObject* parent = va->getMeshParent() ? va->getMeshParent() : (vb ? vb->getMeshParent() : nullptr);
+				glm::mat4 model = parent ? parent->getModelMatrix() : glm::mat4(1.0f);
+				glm::vec3 pa = glm::vec3(model * glm::vec4(va->getLocalPosition(), 1.0f));
+				glm::vec3 pb = glm::vec3(model * glm::vec4(vb->getLocalPosition(), 1.0f));
+				glm::vec3 center = 0.5f * (pa + pb);
+				centersB.push_back(center);
+			}
+
+			for (size_t i = 0; i < centersB.size() - 1; ++i)
+			{
+				glm::vec3 cA = centersB[i];
+				glm::vec3 cB = centersB[i + 1];
+				glm::vec4 worldA(cA, 1.0f);
+				glm::vec4 worldB(cB, 1.0f);
+				glm::vec4 clipA = proj * view * worldA;
+				glm::vec4 clipB = proj * view * worldB;
+				if (clipA.w != 0.0f && clipB.w != 0.0f)
+				{
+					ImVec2 screenA = ImVec2(
+						oglChildPos.x + oglChildSize.x * (0.5f + 0.5f * (clipA.x / clipA.w)),
+						oglChildPos.y + oglChildSize.y * (0.5f - 0.5f * (clipA.y / clipA.w))
+					);
+					ImVec2 screenB = ImVec2(
+						oglChildPos.x + oglChildSize.x * (0.5f + 0.5f * (clipB.x / clipB.w)),
+						oglChildPos.y + oglChildSize.y * (0.5f - 0.5f * (clipB.y / clipB.w))
+					);
+					drawList->AddLine(screenA, screenB, IM_COL32(255,165,0,255), 4.0f); 
+				}
+			}
+		}
+
+		if (!directionA.empty() && !directionB.empty()) 
+		{
+			Edge* lastEdgeA = directionA.back();
+			Edge* lastEdgeB = directionB.back();
+			
+			if (lastEdgeA && lastEdgeB) 
+			{
+				Vertice* joinVert = nullptr;
+				const auto& sharedFacesA = lastEdgeA->getSharedFaces();
+				const auto& sharedFacesB = lastEdgeB->getSharedFaces();
+				
+				for (Face* faceA : sharedFacesA) 
+				{
+					Quad* quadA = dynamic_cast<Quad*>(faceA);
+					if (!quadA) continue;
+					
+					for (Face* faceB : sharedFacesB) 
+					{
+						Quad* quadB = dynamic_cast<Quad*>(faceB);
+						if (!quadB) continue;
+						
+						if (quadA == quadB) 
+						{
+							const auto& vertices = quadA->getVerticesArray();
+							glm::vec3 center(0.0f);
+
+							for (Vertice* v : vertices) 
+							{
+								if (v) center += v->getLocalPosition();
+							}
+							center /= 4.0f;
+							
+							joinVert = new Vertice();
+							joinVert->setLocalPosition(center);
+							break;
+						}
+					}
+					if (joinVert) break;
+				}
+				
+				if (joinVert) 
+				{
+					ThreeDObject* parent = nullptr;
+					if (lastEdgeA->getStart()) 
+					{
+						parent = lastEdgeA->getStart()->getMeshParent();
+					} 
+					else if (lastEdgeB->getStart())
+ 					{
+						parent = lastEdgeB->getStart()->getMeshParent();
+					}
+					
+					glm::mat4 model = parent ? parent->getModelMatrix() : glm::mat4(1.0f);
+					
+					glm::vec3 centerA = 0.5f * (
+						glm::vec3(model * glm::vec4(lastEdgeA->getStart()->getLocalPosition(), 1.0f)) +
+						glm::vec3(model * glm::vec4(lastEdgeA->getEnd()->getLocalPosition(), 1.0f))
+					);
+					
+					glm::vec3 centerB = 0.5f * (
+						glm::vec3(model * glm::vec4(lastEdgeB->getStart()->getLocalPosition(), 1.0f)) +
+						glm::vec3(model * glm::vec4(lastEdgeB->getEnd()->getLocalPosition(), 1.0f))
+					);
+					
+					glm::vec3 joinPos = glm::vec3(model * glm::vec4(joinVert->getLocalPosition(), 1.0f));
+					
+					glm::vec4 clipA = proj * view * glm::vec4(centerA, 1.0f);
+					glm::vec4 clipB = proj * view * glm::vec4(centerB, 1.0f);
+					glm::vec4 clipJoin = proj * view * glm::vec4(joinPos, 1.0f);
+					
+					if (clipA.w != 0.0f && clipB.w != 0.0f && clipJoin.w != 0.0f) {
+						ImVec2 screenA = ImVec2(
+							oglChildPos.x + oglChildSize.x * (0.5f + 0.5f * (clipA.x / clipA.w)),
+							oglChildPos.y + oglChildSize.y * (0.5f - 0.5f * (clipA.y / clipA.w))
+						);
+						ImVec2 screenB = ImVec2(
+							oglChildPos.x + oglChildSize.x * (0.5f + 0.5f * (clipB.x / clipB.w)),
+							oglChildPos.y + oglChildSize.y * (0.5f - 0.5f * (clipB.y / clipB.w))
+						);
+						ImVec2 screenJoin = ImVec2(
+							oglChildPos.x + oglChildSize.x * (0.5f + 0.5f * (clipJoin.x / clipJoin.w)),
+							oglChildPos.y + oglChildSize.y * (0.5f - 0.5f * (clipJoin.y / clipJoin.w))
+						);
+						
+						drawList->AddLine(screenA, screenJoin, IM_COL32(255,165,0,255), 3.0f);
+						drawList->AddLine(screenJoin, screenB, IM_COL32(255,165,0,255), 3.0f);
+					}
+					
+					delete joinVert;
+				}
+			}
+		}
+
+		createGhostVertices(directionA, directionB, scene, oglChildPos, oglChildSize);
+	}
+
+	void createGhostVertices(const std::vector<Edge*>& directionA, const std::vector<Edge*>& directionB, ThreeDScene* scene, const ImVec2& oglChildPos, const ImVec2& oglChildSize)
+	{
+		if ((directionA.empty() && directionB.empty()) || !scene) return;
+		ImDrawList* drawList = ImGui::GetWindowDrawList();
+		glm::mat4 view = scene->getViewMatrix();
+		glm::mat4 proj = scene->getProjectionMatrix();
+
+		for (Edge* e : directionA)
+		{
+			if (!e) continue;
+			Vertice* va = e->getStart();
+			Vertice* vb = e->getEnd();
+			ThreeDObject* parent = va->getMeshParent() ? va->getMeshParent() : (vb ? vb->getMeshParent() : nullptr);
+			glm::mat4 model = parent ? parent->getModelMatrix() : glm::mat4(1.0f);
+			glm::vec3 pa = glm::vec3(model * glm::vec4(va->getLocalPosition(), 1.0f));
+			glm::vec3 pb = glm::vec3(model * glm::vec4(vb->getLocalPosition(), 1.0f));
+			glm::vec3 ghostPos = 0.5f * (pa + pb);
+			glm::vec4 worldGhost(ghostPos, 1.0f);
+			glm::vec4 clipGhost = proj * view * worldGhost;
+			if (clipGhost.w != 0.0f)
+			{
+				ImVec2 screenGhost = ImVec2(
+					oglChildPos.x + oglChildSize.x * (0.5f + 0.5f * (clipGhost.x / clipGhost.w)),
+					oglChildPos.y + oglChildSize.y * (0.5f - 0.5f * (clipGhost.y / clipGhost.w))
+				);
+				drawList->AddCircleFilled(screenGhost, 7.0f, IM_COL32(255,0,0,255)); 
+			}
+		}
+
+		for (Edge* e : directionB)
+		{
+			if (!e) continue;
+			Vertice* va = e->getStart();
+			Vertice* vb = e->getEnd();
+			ThreeDObject* parent = va->getMeshParent() ? va->getMeshParent() : (vb ? vb->getMeshParent() : nullptr);
+			glm::mat4 model = parent ? parent->getModelMatrix() : glm::mat4(1.0f);
+			glm::vec3 pa = glm::vec3(model * glm::vec4(va->getLocalPosition(), 1.0f));
+			glm::vec3 pb = glm::vec3(model * glm::vec4(vb->getLocalPosition(), 1.0f));
+			glm::vec3 ghostPos = 0.5f * (pa + pb);
+			glm::vec4 worldGhost(ghostPos, 1.0f);
+			glm::vec4 clipGhost = proj * view * worldGhost;
+			if (clipGhost.w != 0.0f)
+			{
+				ImVec2 screenGhost = ImVec2(
+					oglChildPos.x + oglChildSize.x * (0.5f + 0.5f * (clipGhost.x / clipGhost.w)),
+					oglChildPos.y + oglChildSize.y * (0.5f - 0.5f * (clipGhost.y / clipGhost.w))
+				);
+				drawList->AddCircleFilled(screenGhost, 7.0f, IM_COL32(255,0,0,255)); // Rouge pour tous les ghost vertices 
+			}
+	}
+	}
 }

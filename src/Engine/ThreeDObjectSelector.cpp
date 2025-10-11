@@ -458,4 +458,5 @@ const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObje
     }
 
     return closestEdge;
+
 }

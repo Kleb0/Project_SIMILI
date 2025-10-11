@@ -192,3 +192,20 @@ void Vertice::applyTranslationToLocal(const glm::vec3& translation, const glm::m
     localPosition += localTranslation;
 }
 
+void Vertice::addEdge(Edge* e)
+{
+    if (e && std::find(edges.begin(), edges.end(), e) == edges.end())
+        edges.push_back(e);
+}
+
+const std::vector<Edge*>& Vertice::getEdges() const
+{
+    return edges;
+}
+
+void Vertice::removeEdge(Edge* e)
+{
+    auto it = std::find(edges.begin(), edges.end(), e);
+    if (it != edges.end())
+        edges.erase(it);
+}
