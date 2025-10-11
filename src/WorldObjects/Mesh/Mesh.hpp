@@ -25,7 +25,6 @@ public:
     void initialize() override;
     void render(const glm::mat4& viewProj) override;
     void destroy() override;
-    void updateGeometry();
 
     void setMeshDNA(MeshDNA* dna, bool takeOwnership = true);
     MeshDNA* getMeshDNA() const { return meshDNA; }
@@ -34,7 +33,7 @@ public:
     Vertice* addVertice(const glm::vec3& localPos, const std::string& name = {});
     Edge* addEdge(Vertice* a, Vertice* b);
     Face* addFace(Vertice* v0, Vertice* v1, Vertice* v2, Vertice* v3,
-        Edge* e0 = nullptr, Edge* e1 = nullptr, Edge* e2 = nullptr, Edge* e3 = nullptr);
+    Edge* e0 = nullptr, Edge* e1 = nullptr, Edge* e2 = nullptr, Edge* e3 = nullptr);
 
     Quad* addQuad(const std::array<Vertice*, 4>& vertices, const std::array<Edge*, 4>& edges);
     Triangle* addTriangle(Vertice* v0, Vertice* v1, Vertice* v2, Edge* e0 = nullptr, Edge* e1 = nullptr, Edge* e2 = nullptr);
@@ -55,6 +54,10 @@ public:
     size_t vertexCount() const { return vertices.size(); }
     size_t edgeCount() const { return edges.size(); }
     size_t faceCount() const { return faces.size(); }
+
+    void destroyFaces(const std::vector<Face*>& facesToDestroy);
+    void destroyOrphanEdges();
+    void destroyOrphanVertices();
 
     void clearGeometry();
     std::vector<Edge*>& getEdgesNonConst() { return edges; }

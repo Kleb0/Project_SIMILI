@@ -144,9 +144,10 @@ int main(int argc, char **argv)
     gui.setContextualMenu(&contextualMenu);
     gui.setOptionsMenu(&optionsMenu);
     gui.setEdgeLoopControl(&edgeLoopControl);
-
     gui.setThreeDWindow(&myThreeDWindow);
     gui.setObjectInspector(&objectInspector);
+    myThreeDWindow.setMainGUI(&gui);
+    gui.SetCurrentMode(&myThreeDWindow.normalMode);
 
     // add(gui, dx12Window);
 

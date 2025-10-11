@@ -64,7 +64,17 @@ namespace MeshEdit
 			size_t exitEdgeIdx = (i + 1) % loop.size();
         
 			Edge* entryEdge = loop[entryEdgeIdx];
-			Edge* exitEdge = loop[exitEdgeIdx];
+			Edge* exitEdge = nullptr;
+			
+			if (exitEdgeIdx < loop.size())
+			{
+				exitEdge = loop[exitEdgeIdx];
+			}
+			
+			if (!exitEdge)
+			{
+				continue;
+			}
 
 			const auto& quadEdges = quad->getEdgesArray();
 			bool entryFound = false, exitFound = false;

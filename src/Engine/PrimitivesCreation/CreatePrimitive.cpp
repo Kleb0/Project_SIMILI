@@ -6,7 +6,6 @@ namespace Primitives
 {
     Mesh* CreateCubeMesh(float size, const glm::vec3& center, const std::string& name, bool attachDNA)
     {
-    
         auto* mesh = new Mesh();
         mesh->setName(name);
         mesh->setPosition(center);
@@ -48,11 +47,13 @@ namespace Primitives
         es.reserve(12);
         for (int i = 0; i < 12; ++i)
         {
-            es.push_back(mesh->addEdge(vs[edgeIndices[i][0]], vs[edgeIndices[i][1]]));
+            Edge* edge = mesh->addEdge(vs[edgeIndices[i][0]], vs[edgeIndices[i][1]]);
+            es.push_back(edge);
+            vs[edgeIndices[i][0]]->addEdge(edge);
+            vs[edgeIndices[i][1]]->addEdge(edge);
             if (attachDNA && mesh->getMeshDNA())
                 mesh->getMeshDNA()->setEdgeCount(mesh->getMeshDNA()->getEdgeCount() + 1);
         }
-
 
         const int faceVertIndices[6][4] = 
         {
@@ -74,6 +75,8 @@ namespace Primitives
             {1, 9, 5,10}
         };
 
+        std::vector<Quad*> quads;
+        quads.reserve(6);
         for (int i = 0; i < 6; ++i)
         {
             std::array<Vertice*, 4> quadVerts = 
@@ -90,9 +93,92 @@ namespace Primitives
                 es[faceEdgeIndices[i][2]],
                 es[faceEdgeIndices[i][3]]
             };
-            mesh->addQuad(quadVerts, quadEdges);
+            Quad* quad = mesh->addQuad(quadVerts, quadEdges);
+            quads.push_back(quad);
             if (attachDNA && mesh->getMeshDNA())
                 mesh->getMeshDNA()->setQuadCount(mesh->getMeshDNA()->getQuadCount() + 1);
+        }
+
+        for (Edge* edge : es)
+        {
+            std::vector<Face*> sharedFaces;
+            
+            Vertice* vertA = edge->getStart();
+            Vertice* vertB = edge->getEnd();
+            
+            std::vector<Edge*> edgesFromA;
+            for (Edge* otherEdge : es)
+            {
+                if (otherEdge != edge && 
+                    (otherEdge->getStart() == vertA || otherEdge->getEnd() == vertA))
+                {
+                    edgesFromA.push_back(otherEdge);
+                }
+            }
+            
+            std::vector<Edge*> edgesFromB;
+            for (Edge* otherEdge : es)
+            {
+                if (otherEdge != edge && 
+                    (otherEdge->getStart() == vertB || otherEdge->getEnd() == vertB))
+                {
+                    edgesFromB.push_back(otherEdge);
+                }
+            }
+            
+            for (Edge* edgeA : edgesFromA)
+            {
+                Vertice* otherVertA = (edgeA->getStart() == vertA) ? edgeA->getEnd() : edgeA->getStart();
+                
+                for (Edge* edgeB : edgesFromB)
+                {
+                    Vertice* otherVertB = (edgeB->getStart() == vertB) ? edgeB->getEnd() : edgeB->getStart();
+                    
+
+                    for (Edge* connectingEdge : es)
+                    {
+                        if ((connectingEdge->getStart() == otherVertA && connectingEdge->getEnd() == otherVertB) ||
+                            (connectingEdge->getStart() == otherVertB && connectingEdge->getEnd() == otherVertA))
+                        {
+
+                            for (Quad* quad : quads)
+                            {
+                                const auto& quadEdges = quad->getEdgesArray();
+                                bool hasEdge = false, hasEdgeA = false, hasEdgeB = false, hasConnecting = false;
+                                
+                                for (const auto& qe : quadEdges)
+                                {
+                                    if (qe == edge) hasEdge = true;
+                                    if (qe == edgeA) hasEdgeA = true;
+                                    if (qe == edgeB) hasEdgeB = true;
+                                    if (qe == connectingEdge) hasConnecting = true;
+                                }
+                                
+                                if (hasEdge && hasEdgeA && hasEdgeB && hasConnecting)
+                                {
+                                    bool alreadyAdded = false;
+                                    for (Face* existingFace : sharedFaces)
+                                    {
+                                        if (existingFace == quad)
+                                        {
+                                            alreadyAdded = true;
+                                            break;
+                                        }
+                                    }
+                                    
+                                    if (!alreadyAdded)
+                                    {
+                                        sharedFaces.push_back(quad);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            edge->setSharedFaces(sharedFaces);
+        
         }
 
         mesh->finalize();

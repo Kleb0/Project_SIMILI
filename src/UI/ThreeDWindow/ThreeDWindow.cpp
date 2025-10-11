@@ -5,6 +5,7 @@
 #include <ImGuizmo.h>
 
 #include "UI/ThreeDWindow/ThreeDWindow.hpp"
+#include "UI/MainSoftwareGUI.hpp"
 #include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
 #include "UI/ObjectInspectorLogic/ObjectInspector.hpp"
 
@@ -57,6 +58,12 @@ ThreeDObject *ThreeDWindow::getSelectedObject() const
 
 // the threeDWindow use external components, we set them in the main script
 
+void ThreeDWindow::setMainGUI(MainSoftwareGUI* gui)
+{
+    mainGUI = gui;
+}
+
+
 void ThreeDWindow::setHierarchy(HierarchyInspector *inspector)
 {
     hierarchy = inspector;
@@ -65,6 +72,13 @@ void ThreeDWindow::setHierarchy(HierarchyInspector *inspector)
 void ThreeDWindow::setObjectInspector(ObjectInspector *inspector)
 {
     objectInspector = inspector;
+}
+
+// ----- Clearing ------ //
+
+void ThreeDWindow::clearSelectedFaces()
+{
+    multipleSelectedFaces.clear();
 }
 
 // ------- Rendering the ThreeDWindow ------- //
@@ -292,21 +306,26 @@ void ThreeDWindow::onChangeMod()
     if (isPressed1  && !lastKeyState_1)
     {
         setModelingMode(&normalMode);
+        this->mainGUI->SetCurrentMode(currentMode);
     }
 
     if (isPressed2 && !lastKeyState_2)
     {
         setModelingMode(&verticeMode);
+        this->mainGUI->SetCurrentMode(currentMode);
     }
 
     if (isPressed3 && !lastKeyState_3)
     {
         setModelingMode(&faceMode);
+        this->mainGUI->SetCurrentMode(currentMode);
     }
 
     if (isPressed4 && !lastKeyState_4)
     {
         setModelingMode(&edgeMode);
+        this->mainGUI->SetCurrentMode(currentMode);
+
     }
 
     lastKeyState_1 = isPressed1;
@@ -340,6 +359,7 @@ void ThreeDWindow::ThreeDWorldInteractions()
             oglChildSize,
             wasUsingGizmoLastFrame
         );
+        
     }
 
     if(currentMode == &faceMode)
@@ -366,7 +386,7 @@ void ThreeDWindow::ThreeDWorldInteractions()
             oglChildSize,
             wasUsingGizmoLastFrame,
             this
-        );
+        );    
     }
 }
 

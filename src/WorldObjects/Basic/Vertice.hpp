@@ -35,6 +35,10 @@ public:
     void setMeshParent(ThreeDObject* parent);
     ThreeDObject* getMeshParent() const;
 
+    void addEdge(class Edge* e);
+    const std::vector<class Edge*>& getEdges() const;
+    void removeEdge(class Edge* e);
+
 private:
     ThreeDObject* meshParent = nullptr;
     unsigned int vao = 0;
@@ -44,6 +48,8 @@ private:
     glm::vec4 color = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
     std::string name;
      glm::vec3 localPosition;
+
+    std::vector<class Edge*> edges;
 
     void compileShaders();
     bool VerticeSelected = false;

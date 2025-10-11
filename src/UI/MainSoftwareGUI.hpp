@@ -10,6 +10,8 @@
 #include "UI/ContextualMenu/ContextualMenu.hpp"
 #include "Engine/SaveLoadSystem/Save_Scene.hpp"
 #include "UI/EdgeLoopControl/EdgeLoopControl.hpp"
+#include "UI/ThreeDModes/ThreeDMode.hpp"
+#include "UI/ThreeDModes/Edge_Mode.hpp"
 
 class OptionsMenuContent;
 class EdgeLoopControl;
@@ -38,6 +40,14 @@ public:
 	void setEdgeLoopControl(EdgeLoopControl* control);
 	void DisplayEdgeLoopControl(ThreeDWindow *window);
 
+	void SetCurrentMode(ThreeDMode *mode);
+	const ThreeDMode* GetCurrentMode() const { return currentMode; }
+
+	void SetCurrentSelectedEntity(ThreeDObject* obj);
+	ThreeDObject* GetCurrentSelectedEntity() const { return threedObject; }
+
+	
+
 private:
 	GLFWwindow *window = nullptr;
 	std::vector<GUIWindow *> windows;
@@ -57,5 +67,7 @@ private:
 	OptionsMenuContent *optionsMenu = nullptr;
 	EdgeLoopControl *edgeLoopControl = nullptr;
 	ThreeDScene* sceneRef = nullptr;
+	ThreeDMode *currentMode = nullptr;
+
 	
 };

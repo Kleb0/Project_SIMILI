@@ -67,6 +67,8 @@ Face::Face(Vertice* v0, Vertice* v1, Vertice* v2, Vertice* v3,
 {
     vertices = {v0, v1, v2, v3};
     edges = {e0, e1, e2, e3};
+    parentMesh = nullptr;
+
 }
 
 Face::~Face()
@@ -141,22 +143,16 @@ void Face::render(const glm::mat4& viewProj, const glm::mat4& modelMatrix)
 
     if (selected)
     {
-     
         const glm::vec4 orange(1.0f, 0.5f, 0.0f, 1.0f);
         glUniform1i(locSelected, GL_TRUE);
         glUniform4fv(locBaseColor, 1, glm::value_ptr(orange));
-
         glUniform2f(locStripeScale, 3.0f, 3.0f);
         glUniform1f(locStripeWidth, 0.25f);      
     }
     else
     {
-
-        const glm::vec4 white(1.0f);
         glUniform1i(locSelected, GL_FALSE);
-        glUniform4fv(locBaseColor, 1, glm::value_ptr(white));
-
-    
+        glUniform4fv(locBaseColor, 1, glm::value_ptr(getColor()));
         glUniform2f(locStripeScale, 1.0f, 1.0f);
         glUniform1f(locStripeWidth, 0.5f);
     }
@@ -203,6 +199,16 @@ const std::vector<Edge*>& Face::getEdges() const
     return edges;
 }
 
+void Face::setParentMesh(Mesh* mesh)
+{
+    parentMesh = mesh;
+}
+
+Mesh* Face::getParentMesh() const
+{
+    return parentMesh;
+}
+
 void Face::applyWorldDelta(const glm::mat4& deltaWorld, const glm::mat4& parentModel, bool bakeToVertices)
 {
     if (!bakeToVertices)
@@ -227,3 +233,12 @@ void Face::applyWorldDelta(const glm::mat4& deltaWorld, const glm::mat4& parentM
     faceTransform = glm::mat4(1.0f);
 }
 
+void Face::setColor(const glm::vec4& c)
+{
+    color = c;
+}
+
+const glm::vec4& Face::getColor() const
+{
+    return color;
+}

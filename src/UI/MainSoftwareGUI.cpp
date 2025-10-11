@@ -29,6 +29,7 @@ namespace fs = std::filesystem;
 
 extern std::filesystem::path gExecutableDir;
 
+
 GLFWwindow *MainSoftwareGUI::getWindow()
 {
 	return window;
@@ -38,6 +39,18 @@ MainSoftwareGUI &MainSoftwareGUI::add(GUIWindow &w)
 {
 	windows.push_back(&w);
 	return *this;
+}
+
+void MainSoftwareGUI::SetCurrentMode(ThreeDMode *mode)
+{
+	this->currentMode = mode;
+	this->contextualMenu->setMode(mode);
+}
+
+void MainSoftwareGUI::SetCurrentSelectedEntity(ThreeDObject* obj)
+{
+	this->threedObject = obj;
+	this->contextualMenu->setSelectedObject(obj);
 }
 
 void MainSoftwareGUI::setContextualMenu(ContextualMenu* menu)
@@ -192,15 +205,20 @@ void MainSoftwareGUI::run()
 		auto *hierarchy = dynamic_cast<HierarchyInspector *>(win);
 	}
 
+
 	static bool showSaveLayoutPopup = false;
+
+	static bool isFaceModeActive = false;
+
 
 	while (!glfwWindowShouldClose(window))
 	{
-
 		glfwPollEvents();
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
+
+
 
 		if (contextualMenu)
 		{
