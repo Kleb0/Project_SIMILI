@@ -5,6 +5,9 @@
 #include <glad/glad.h>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
+#include <random>
+#include <sstream>
+#include <iostream>
 
 
 const char* edgeVertexShaderSrc = R"(
@@ -30,6 +33,21 @@ void main()
 Edge::Edge(Vertice* start, Vertice* end)
     : v1(start), v2(end)
 {
+    id = generateEdgeID();
+}
+
+std::string Edge::generateEdgeID()
+{
+    std::cout << "[EDGE - Creation ] Generating new Edge ID" << std::endl;
+    static const char charset[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    static const size_t idLength = 12;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, sizeof(charset) - 2);
+    std::stringstream ss;
+    for (size_t i = 0; i < idLength; ++i)
+        ss << charset[dis(gen)];
+    return ss.str();
 }
 
 Edge::~Edge()
@@ -131,10 +149,7 @@ void Edge::setSharedFaces(const std::vector<Face*>& faces)
     }
 }
 
-bool Edge::isQuadEdge() const
-{
-    return quadEdge;
-}
+
 
 const std::vector<Face*>& Edge::getSharedFaces() const
 {

@@ -3,6 +3,7 @@
 #pragma once
 #include <glm/glm.hpp>
 #include <vector>
+#include <string>
 
 // Forward declarations
 class Vertice;
@@ -31,7 +32,7 @@ public:
 
     void splitEdge(Vertice* newVertice, Mesh* parentMesh);
 
-    bool isQuadEdge() const;
+    std::string getID() const { return id; }
     void setSharedFaces(const std::vector<class Face*>& faces);
     const std::vector<class Face*>& getSharedFaces() const;
 
@@ -50,4 +51,7 @@ private:
     bool edgeSelected = false;
 
     void compileShaders();
+
+    std::string id;
+    static std::string generateEdgeID();
 };

@@ -11,11 +11,14 @@
 
 namespace MeshEdit 
 {
-	std::vector<Quad*> traversedQuads;
-
-
+	
 	std::vector<Edge*> FindLoop(Vertice* startVert, Edge* selectedEdge, Mesh* mesh, ThreeDScene* scene, const ImVec2& oglChildPos, const ImVec2& oglChildSize)		
 	{
+
+		if(selectedEdge == nullptr)
+			return {};
+
+
 		std::vector<Edge*> DirectionA;
 		std::vector<Edge*> DirectionB;
 		std::vector<Quad*> JoiningQuad;
@@ -26,6 +29,7 @@ namespace MeshEdit
 		static Edge* lastSelectedEdge = nullptr;
 		static std::unordered_set<Quad*> alreadyPrinted;
 		static bool prevCtrlLeft = false;
+		static bool hasJoinedQuad = false;
 		
 		bool ctrlLeftPressed = ImGui::IsKeyDown(ImGuiKey_LeftCtrl);
 		bool ctrlLeftJustPressed = ctrlLeftPressed && !prevCtrlLeft;
@@ -34,10 +38,10 @@ namespace MeshEdit
 		if (lastSelectedEdge != selectedEdge || ctrlLeftJustPressed) 
 		{
 			alreadyPrinted.clear();
+			hasJoinedQuad = false;  // Reset the static bool when edge changes
 			lastSelectedEdge = selectedEdge;
 		}
 
-		loop.push_back(selectedEdge);
 
 		// ---- selected edge part ---- //
 		const auto& sharedFaces = selectedEdge->getSharedFaces();
@@ -84,11 +88,14 @@ namespace MeshEdit
 		DirectionB.clear();
 		DirectionA.push_back(selectedEdge);
 		DirectionB.push_back(selectedEdge);
+		loop.push_back(selectedEdge);
 		
+		// ----- Determine the two directions as selected edge is shared by two quads ---- //
 		if (exitEdges.size() >= 1) 
 		{
 			Edge* currentA = exitEdges[0];
 			Edge* currentB = exitEdges.size() >= 2 ? exitEdges[1] : nullptr;
+
 			std::unordered_set<Quad*> visitedA;
 			std::unordered_set<Quad*> visitedB;
 			int maxSteps = 20; 
@@ -98,6 +105,7 @@ namespace MeshEdit
 				bool continueA = false;
 				bool continueB = false;
 				
+				// ---- Direction A ---- //
 				if (currentA) 
 				{
 					DirectionA.push_back(currentA);
@@ -114,15 +122,19 @@ namespace MeshEdit
 							visitedA.find(quad) == visitedA.end()) 
 						{
 							visitedA.insert(quad);
+							visitedQuads.push_back(quad);
 							
 							for (Edge* e : quad->getEdgesArray()) 
 							{
 								if (e == currentA) continue;
+
 								Vertice* eStart = e->getStart();
 								Vertice* eEnd = e->getEnd();
 								Vertice* currStart = currentA->getStart();
 								Vertice* currEnd = currentA->getEnd();
-								if ((eStart != currStart && eStart != currEnd) && (eEnd != currStart && eEnd != currEnd)) {
+
+								if ((eStart != currStart && eStart != currEnd) && (eEnd != currStart && eEnd != currEnd)) 
+								{
 									nextA = e;
 									break;
 								}
@@ -136,29 +148,37 @@ namespace MeshEdit
 						break;
 					}
 					
-					if (nextA) {
+					if (nextA) 
+					{
 						currentA = nextA;
 						continueA = true;
 					}
 				}
 				
+				// ---- Direction B ---- //
+
 				if (currentB) 
 				{
 					DirectionB.push_back(currentB);
 					
 					const auto& sharedFacesB = currentB->getSharedFaces();
 					Edge* nextB = nullptr;
+
 					for (Face* f : sharedFacesB) 
 					{
 						Quad* quad = dynamic_cast<Quad*>(f);
 						if (!quad) continue;
-						if (std::find(visitedQuads.begin(), visitedQuads.end(), quad) == visitedQuads.end() &&
-							visitedB.find(quad) == visitedB.end()) {
+
+						if (std::find(visitedQuads.begin(), visitedQuads.end(), quad) == visitedQuads.end()
+						&& visitedB.find(quad) == visitedB.end()) 
+						{
 							visitedB.insert(quad);
+							visitedQuads.push_back(quad);							
 							
 							for (Edge* e : quad->getEdgesArray()) 
 							{
 								if (e == currentB) continue;
+
 								Vertice* eStart = e->getStart();
 								Vertice* eEnd = e->getEnd();
 								Vertice* currStart = currentB->getStart();
@@ -186,11 +206,13 @@ namespace MeshEdit
 					}
 				}
 				
+
 				if (!continueA && !continueB) break;
 			}
 		}
 
 		std::vector<Edge*> entryEdges;
+
 		if (!DirectionA.empty()) entryEdges.push_back(DirectionA.back());
 		if (!DirectionB.empty()) entryEdges.push_back(DirectionB.back());
 
@@ -216,20 +238,23 @@ namespace MeshEdit
 				for (Edge* e : quad->getEdgesArray()) 
 				{
 					if (e == entryEdge) continue;
+
 					Vertice* eStart = e->getStart();
 					Vertice* eEnd = e->getEnd();
 					Vertice* entryStart = entryEdge->getStart();
 					Vertice* entryEnd = entryEdge->getEnd();
-					if ((eStart != entryStart && eStart != entryEnd) && (eEnd != entryStart && eEnd != entryEnd)) {
+
+					if ((eStart != entryStart && eStart != entryEnd) && (eEnd != entryStart && eEnd != entryEnd)) 
+					{
 						newExit = e;
 						break;
 					}
 				}
-				if (newExit) loop.push_back(newExit);
 			}
 		}
 
 
+		// ---- at the end of the loop we add the joining quad if it exists so that we can close the loop and cut the quads traversed ---- //
 		if (!DirectionA.empty() && !DirectionB.empty()) 
 		{
 			Edge* lastEdgeA = DirectionA.back();  
@@ -258,13 +283,53 @@ namespace MeshEdit
 			}
 		}
 
-		CreatePerpendicularEdgeLoopGhost(DirectionA, DirectionB, scene, oglChildPos, oglChildSize);
 
-		if (ImGui::IsKeyPressed(ImGuiKey_E))
+		// ---- push in the loop ---- //
+
+		auto edgeExistsInLoop = [&](Edge* edge) 
 		{
-			MeshEdit::CutQuad(loop, mesh, traversedQuads);
-			traversedQuads.clear();
+			for (Edge* e : loop) 
+			{
+				if (e && edge && e->getID() == edge->getID()) return true;
+			}
+			return false;
+		};
+
+		for (Edge* eA : DirectionA) 
+		{
+			if (eA && !edgeExistsInLoop(eA)) 
+			{
+				loop.push_back(eA);
+			}
+		}
+	
+		for (Edge* eB : DirectionB) 
+		{
+			if (eB && !edgeExistsInLoop(eB)) 
+			{
+				loop.push_back(eB);
+			}
+		}
+
+		// ---- Draw the ghost loop ---- //
+
+		CreatePerpendicularEdgeLoopGhost(DirectionA, DirectionB, scene, oglChildPos, oglChildSize);
+	
+		if (ImGui::IsKeyPressed(ImGuiKey_E) && JoiningQuad.size() == 1)
+		{
+			JoiningQuad.clear();
+
+			for (Edge* e : loop)
+			{
+				e->setColor(glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+			}
+
+			std::cout << "[EDGE LOOP] Cutting quads ! " << std::endl;
+			MeshEdit::CutQuad(loop, mesh, visitedQuads);
+			visitedQuads.clear();
+			loop.clear();
 			selectedEdge = nullptr;
+
 		}
 
 		return loop;
