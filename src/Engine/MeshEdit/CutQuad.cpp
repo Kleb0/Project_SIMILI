@@ -55,13 +55,14 @@ namespace MeshEdit
                 centerVert->addEdge(edge);
                 Vertice* v1 = edge->getStart();
                 Vertice* v2 = edge->getEnd();
-                if (v1) v1->addEdge(edge);
-                if (v2) v2->addEdge(edge);
+                v1->addEdge(edge);
+               	v2->addEdge(edge);
 			}
 		}
 
 		std::vector<Edge*> centerEdges;
 
+		// draw the centers to connect the center vertices
 		if (mesh && centers.size() > 1) 
 		{
 			for (size_t i = 0; i < centers.size() - 1; ++i)
@@ -92,34 +93,25 @@ namespace MeshEdit
 			Vertice* vFirst = centers.front();
 
 			// vLast is the not the first center and has 3 edges (meaning it's not connect yet to the first center)
-			Vertice* vLast = nullptr;
-			if (!centers.empty()) 
-			{
-				Vertice* vFirst = centers.front();
-				for (Vertice* v : centers) {
-					if (v != vFirst && v->getEdges().size() == 3) 
-					{
-						vLast = v;
-						break;
-					}
-				}
-			}
+			Vertice* vLast = centers.back();
 
-			vFirst->setColor(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
-			vLast->setColor(glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
+			// here i set the color of the first and last center vertices for debug
+			// vFirst->setColor(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+			// vLast->setColor(glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
 			
 
-			// if (vFirst && vLast) 
-			// {
-			// 	Edge* closingEdge = mesh->addEdge(vLast, vFirst);
-			// 	if (closingEdge) 
-			// 	{
-			// 		closingEdge->initialize();
-			// 		centerEdges.push_back(closingEdge);
-			// 		std::cout << "[CutQuad] Created closing edge between first and last center" << std::endl;
-			// 		std::cout << "[cutQuad]  from center vert ID: " << vLast->getID() << " to center vert ID: " << vFirst->getID() << std::endl;
-			// 	}
-			// }
+			if (vFirst && vLast) 
+			{
+				Edge* closingEdge = mesh->addEdge(vLast, vFirst);
+				if (closingEdge) 
+				{
+					closingEdge->initialize();
+					centerEdges.push_back(closingEdge);
+					vLast->addEdge(closingEdge);
+					vFirst->addEdge(closingEdge);	
+
+				}
+			}
 		}
 
 		for (Quad* quad : traversedQuads)

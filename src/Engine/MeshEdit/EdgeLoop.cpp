@@ -381,9 +381,9 @@ namespace MeshEdit
 			MeshEdit::CutQuad(loop, mesh, visitedQuads);
 
 			visitedQuads.clear();
-			JoiningQuad.clear();
-			
+			JoiningQuad.clear();			
 			loop.clear();
+
 			selectedEdge = nullptr;
 
 		}		
