@@ -39,6 +39,8 @@ public:
     const std::vector<class Edge*>& getEdges() const;
     void removeEdge(class Edge* e);
 
+    std::string getID() const { return id; }
+
 private:
     ThreeDObject* meshParent = nullptr;
     unsigned int vao = 0;
@@ -47,9 +49,12 @@ private:
     glm::vec3 position = glm::vec3(0.0f);
     glm::vec4 color = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
     std::string name;
-     glm::vec3 localPosition;
+    glm::vec3 localPosition;
 
     std::vector<class Edge*> edges;
+
+    std::string id;
+    static std::string generateVerticeID();
 
     void compileShaders();
     bool VerticeSelected = false;

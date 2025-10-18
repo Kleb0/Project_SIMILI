@@ -2,6 +2,7 @@
 
 #include <glm/glm.hpp>
 #include <vector>
+#include <string>
 
 class Vertice;
 class Edge;
@@ -9,6 +10,7 @@ class Edge;
 class Face
 {
 public:
+
     Face(Vertice* v0, Vertice* v1, Vertice* v2, Vertice* v3,
         Edge* e0, Edge* e1, Edge* e2, Edge* e3);
     virtual ~Face();
@@ -34,6 +36,9 @@ public:
     void setColor(const glm::vec4& c);
     const glm::vec4& getColor() const;
 
+    std::string getID() const { return id; }
+    bool isJoiningQuad = false;
+
 protected:
     std::vector<Vertice*> vertices;
     std::vector<Edge*> edges;
@@ -49,6 +54,9 @@ private:
     Mesh* parentMesh = nullptr;
 
     glm::vec4 color = glm::vec4(1.0f); 
+
+    std::string id;
+    static std::string generateFaceID();
 
     void compileShaders();
     void uploadFromVertices();

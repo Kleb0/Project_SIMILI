@@ -10,6 +10,7 @@
 #include "Engine/ErrorBox.hpp"
 #include <iostream>
 #include <algorithm>
+#include <unordered_map>
 
 void ContextualMenu::setScene(ThreeDScene* s)
 {
@@ -90,35 +91,27 @@ void ContextualMenu::render()
 						const std::list<Face*>& selectedFaces = threeDWindow->getmultipleSelectedFace();
 						if (!selectedFaces.empty() && scene)
 						{
-							for (Face* selectedFace : selectedFaces)
-							{
-								Mesh* parentMesh = selectedFace->getParentMesh();
-								if (parentMesh)
-								{
-									const auto& faceEdges = selectedFace->getEdges();
-									
-									for (Edge* edge : faceEdges)
-									{
-										if (edge)
-										{
-											std::vector<Face*> currentSharedFaces = edge->getSharedFaces();
-											
-											auto it = std::find(currentSharedFaces.begin(), currentSharedFaces.end(), selectedFace);
-											if (it != currentSharedFaces.end())
-											{
-												currentSharedFaces.erase(it);
-												edge->setSharedFaces(currentSharedFaces);
-											}
-										}
-									}
-									
-									parentMesh->destroyFaces({ selectedFace });									
-									parentMesh->destroyOrphanEdges();
-									parentMesh->destroyOrphanVertices();
-								}
-							}
+							// Regrouper les faces par mesh parent
+							std::unordered_map<Mesh*, std::vector<Face*>> facesByMesh;
 							
-							if (threeDWindow)
+						for (Face* selectedFace : selectedFaces)
+						{
+							Mesh* parentMesh = selectedFace->getParentMesh();
+							if (parentMesh)
+							{
+								facesByMesh[parentMesh].push_back(selectedFace);
+							}
+						}
+						
+						// Détruire les faces groupées par mesh
+					for (auto& pair : facesByMesh)
+					{
+						Mesh* mesh = pair.first;
+						std::vector<Face*>& faces = pair.second;
+					mesh->destroySelectedFaces(faces);
+				}
+				
+				if (threeDWindow)
 							{
 							    threeDWindow->clearSelectedFaces();
 							}

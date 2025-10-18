@@ -3,6 +3,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
+#include <sstream>
+#include <random>
 
 const char* verticeVertexShader = R"(
 #version 330 core
@@ -35,7 +37,22 @@ void main()
 }
 )";
 
-Vertice::Vertice() {}
+Vertice::Vertice() {
+    id = generateVerticeID();
+}
+
+std::string Vertice::generateVerticeID()
+{
+    static const char charset[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    static const size_t idLength = 12;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, sizeof(charset) - 2);
+    std::stringstream ss;
+    for (size_t i = 0; i < idLength; ++i)
+        ss << charset[dis(gen)];
+    return ss.str();
+}
 
 Vertice::~Vertice()
 {

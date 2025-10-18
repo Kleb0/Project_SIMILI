@@ -55,9 +55,9 @@ public:
     size_t edgeCount() const { return edges.size(); }
     size_t faceCount() const { return faces.size(); }
 
-    void destroyFaces(const std::vector<Face*>& facesToDestroy);
     void destroyOrphanEdges();
     void destroyOrphanVertices();
+    void destroySelectedFaces(const std::vector<Face*>& facesToDestroy);
 
     void clearGeometry();
     std::vector<Edge*>& getEdgesNonConst() { return edges; }

@@ -266,28 +266,37 @@ void Mesh::clearGeometry()
 {
     destroyVertices();
     destroyEdges();
-    destroyFaces();
 }
 
-void Mesh::destroyFaces(const std::vector<Face*>& facesToDestroy)
+void Mesh::destroySelectedFaces(const std::vector<Face*>& facesToDestroy)
 {
-    for (Face* f : facesToDestroy)
+    for (Face* selectedFace : facesToDestroy)
     {
-        if (!f) continue;
+        if (!selectedFace) continue;
         
-        // Retirer la face du vecteur faces
-        auto it = std::find(faces.begin(), faces.end(), f);
-        if (it != faces.end())
+        const auto& faceEdges = selectedFace->getEdges();
+        for (Edge* edge : faceEdges)
         {
-            faces.erase(it);
+            if (edge)
+            {
+                std::vector<Face*> currentSharedFaces = edge->getSharedFaces();
+                auto it = std::find(currentSharedFaces.begin(), currentSharedFaces.end(), selectedFace);
+                if (it != currentSharedFaces.end())
+                {
+                    currentSharedFaces.erase(it);
+                    edge->setSharedFaces(currentSharedFaces);
+                }
+            }
         }
         
-        // Détruire la face
-        f->destroy();
-        delete f;
+        selectedFace->destroy();
+        delete selectedFace;
     }
     
-    std::cout << "[Mesh] Specified faces destroyed. Remaining faces: " << faces.size() << std::endl;
+    destroyOrphanEdges();
+    destroyOrphanVertices();
+    
+    std::cout << "[Mesh] Selected faces destroyed. Remaining faces: " << faces.size() << std::endl;
 }
 
 void Mesh::destroyOrphanEdges()
@@ -298,7 +307,6 @@ void Mesh::destroyOrphanEdges()
         Edge* edge = *it;
         if (edge && edge->getSharedFaces().empty())
         {
-            // Retirer l'edge des vertices qui le référencent
             if (edge->getStart())
                 edge->getStart()->removeEdge(edge);
             if (edge->getEnd())

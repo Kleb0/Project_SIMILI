@@ -1,9 +1,12 @@
 #include "WorldObjects/Basic/Face.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
 #include "WorldObjects/Basic/Edge.hpp"
+#include "WorldObjects/Mesh/Mesh.hpp"
 #include <glad/glad.h>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
+#include <random>
+#include <sstream>
 
 // === SHADERS ===
 static const char* faceVertexShaderSrc = R"(
@@ -68,7 +71,20 @@ Face::Face(Vertice* v0, Vertice* v1, Vertice* v2, Vertice* v3,
     vertices = {v0, v1, v2, v3};
     edges = {e0, e1, e2, e3};
     parentMesh = nullptr;
+    id = generateFaceID();
+}
 
+std::string Face::generateFaceID()
+{
+    static const char charset[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    static const size_t idLength = 12;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, sizeof(charset) - 2);
+    std::stringstream ss;
+    for (size_t i = 0; i < idLength; ++i)
+        ss << charset[dis(gen)];
+    return ss.str();
 }
 
 Face::~Face()
@@ -169,6 +185,7 @@ void Face::render(const glm::mat4& viewProj, const glm::mat4& modelMatrix)
 
 void Face::destroy()
 {
+    
     if (vao != 0)
     {
         glDeleteVertexArrays(1, &vao);
