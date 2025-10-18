@@ -25,21 +25,6 @@ const std::array<Edge*, 4>& Quad::getEdgesArray() const
     return m_edges;
 }
 
-Quad* Quad::createQuadFromVertices(Vertice* v0, Vertice* v1, Vertice* v2, Vertice* v3, Mesh* mesh)
-{
-    if (!v0 || !v1 || !v2 || !v3 || !mesh) return nullptr;
-    std::array<Vertice*, 4> quadVerts = {v0, v1, v2, v3};
-    std::array<Edge*, 4> quadEdges = {
-        mesh->addEdge(v0, v1),
-        mesh->addEdge(v1, v2),
-        mesh->addEdge(v2, v3),
-        mesh->addEdge(v3, v0)
-    };
-    Quad* newQuad = new Quad(quadVerts, quadEdges);
-    newQuad->initialize();
-    mesh->getFacesNonConst().push_back(newQuad);
-    return newQuad;
-}
 
 void Quad::setCutVertices(const std::array<Vertice*, 3>& vertsA, const std::array<Vertice*, 3>& vertsB)
 {
@@ -47,13 +32,15 @@ void Quad::setCutVertices(const std::array<Vertice*, 3>& vertsA, const std::arra
     cutVerticesB = vertsB;
 }
 
-void Quad::splitQuadFromCut(Mesh* mesh)
-{
+// void Quad::splitQuadFromCut(Mesh* mesh)
+// {
 
-    Quad* quad1 = Quad::createQuadFromVertices(
-        cutVerticesA[1], // A2
-        cutVerticesA[2], // A3  
-        cutVerticesB[2], // B3
-        cutVerticesB[1], // B2
-        mesh);
-}
+//     // -------- old method --------- //
+
+//     //  Blablabla use with the passed vertices (
+//     //     cutVerticesA[1], // A2
+//     //     cutVerticesA[2], // A3  
+//     //     cutVerticesB[2], // B3
+//     //     cutVerticesB[1], // B2
+//     //     mesh);
+// }

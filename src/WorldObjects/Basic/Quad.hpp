@@ -20,13 +20,8 @@ public:
     const std::array<Edge*, 4>& getEdgesArray() const;
     std::array<Edge*, 4>& getEdgesNonConst() { return m_edges; }
 
-    std::pair<Quad*, Quad*> splitQuad(Edge* edgeToSplit, Vertice* newVertex, Mesh* mesh);
-
-    static Quad* createQuadFromVertices(Vertice* v0, Vertice* v1, Vertice* v2, Vertice* v3, Mesh* mesh);
-
-    // Remplit les deux listes cutVerticesA et cutVerticesB à partir de 6 vertices
     void setCutVertices(const std::array<Vertice*, 3>& vertsA, const std::array<Vertice*, 3>& vertsB);
-    void splitQuadFromCut(Mesh* mesh);
+    // void splitQuadFromCut(Mesh* mesh);
 
 private:
     std::array<Vertice*, 4> m_vertices;

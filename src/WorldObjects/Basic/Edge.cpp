@@ -38,7 +38,6 @@ Edge::Edge(Vertice* start, Vertice* end)
 
 std::string Edge::generateEdgeID()
 {
-    std::cout << "[EDGE - Creation ] Generating new Edge ID" << std::endl;
     static const char charset[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
     static const size_t idLength = 12;
     std::random_device rd;
@@ -179,7 +178,6 @@ void Edge::splitEdge(Vertice* newVertice, Mesh* parentMesh)
 
     Edge* e1 = parentMesh->addEdge(v1, newVertice);
     Edge* e2 = parentMesh->addEdge(newVertice, v2);
-
     for (Face* f : parentMesh->getFaces())
     {
         if (!f) continue;
@@ -191,8 +189,12 @@ void Edge::splitEdge(Vertice* newVertice, Mesh* parentMesh)
                 faceEdges[i] = e1;
                 break;
             }
+        
         }
     }
+
+    e1->initialize();
+    e2->initialize();
 
     auto& meshEdges = parentMesh->getEdgesNonConst();
     auto it = std::find(meshEdges.begin(), meshEdges.end(), this);

@@ -4,6 +4,7 @@
 #include "WorldObjects/Basic/Edge.hpp"
 #include "WorldObjects/Basic/Quad.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
+#include "WorldObjects/Mesh_DNA/Mesh_DNA.hpp"
 #include "Engine/ThreeDScene.hpp"
 #include <vector>
 #include <unordered_set>
@@ -20,10 +21,10 @@ namespace MeshEdit
 
 
 		std::vector<Edge*> DirectionA;
-		std::vector<Edge*> DirectionB;
-		std::vector<Quad*> JoiningQuad;
-
+		std::vector<Edge*> DirectionB;		
 		std::vector<Edge*> loop;
+
+		std::vector<Quad*> JoiningQuad;
 		std::vector<Quad*> visitedQuads;
 
 		static Edge* lastSelectedEdge = nullptr;
@@ -109,6 +110,7 @@ namespace MeshEdit
 				if (currentA) 
 				{
 					DirectionA.push_back(currentA);
+
 					
 					const auto& sharedFacesA = currentA->getSharedFaces();
 					Edge* nextA = nullptr;
@@ -122,7 +124,22 @@ namespace MeshEdit
 							visitedA.find(quad) == visitedA.end()) 
 						{
 							visitedA.insert(quad);
-							visitedQuads.push_back(quad);
+
+							bool idAlreadyPresent = false;
+
+							for (Quad* qTest : visitedQuads) 
+							{
+								if (qTest && qTest->getID() == quad->getID()) 
+								{
+										idAlreadyPresent = true;
+										break;
+								}
+							}
+							if (!idAlreadyPresent) 
+							{
+								visitedQuads.push_back(quad);
+							}
+
 							
 							for (Edge* e : quad->getEdgesArray()) 
 							{
@@ -169,20 +186,35 @@ namespace MeshEdit
 						Quad* quad = dynamic_cast<Quad*>(f);
 						if (!quad) continue;
 
-						if (std::find(visitedQuads.begin(), visitedQuads.end(), quad) == visitedQuads.end()
-						&& visitedB.find(quad) == visitedB.end()) 
+						if (std::find(visitedQuads.begin(), visitedQuads.end(), quad) == visitedQuads.end() && 
+							visitedB.find(quad) == visitedB.end()) 
 						{
 							visitedB.insert(quad);
-							visitedQuads.push_back(quad);							
-							
-							for (Edge* e : quad->getEdgesArray()) 
-							{
-								if (e == currentB) continue;
 
-								Vertice* eStart = e->getStart();
-								Vertice* eEnd = e->getEnd();
-								Vertice* currStart = currentB->getStart();
-								Vertice* currEnd = currentB->getEnd();
+							bool idAlreadyPresent = false;
+
+							for (Quad* qTest : visitedQuads) 
+							{
+								if (qTest && qTest->getID() == quad->getID()) 
+								{
+									idAlreadyPresent = true;
+									break;
+								}
+							}
+
+							if (!idAlreadyPresent) 
+							{
+								visitedQuads.push_back(quad);
+							}
+						
+						for (Edge* e : quad->getEdgesArray()) 
+						{
+							if (e == currentB) continue;	
+
+							Vertice* eStart = e->getStart();
+							Vertice* eEnd = e->getEnd();
+							Vertice* currStart = currentB->getStart();
+							Vertice* currEnd = currentB->getEnd();
 
 								if ((eStart != currStart && eStart != currEnd) && (eEnd != currStart && eEnd != currEnd)) 
 								{
@@ -190,6 +222,7 @@ namespace MeshEdit
 									break;
 								}
 							}
+
 							break;
 						}
 					}
@@ -275,7 +308,9 @@ namespace MeshEdit
 					
 					if (quadA == quadB) 
 					{
+						quadA->isJoiningQuad = true;
 						JoiningQuad.push_back(quadA);
+						visitedQuads.push_back(quadA);
 						break;
 					}
 				}
@@ -286,6 +321,8 @@ namespace MeshEdit
 
 		// ---- push in the loop ---- //
 
+
+		// ---- Helper that checks if an edge is already in the loop ---- //
 		auto edgeExistsInLoop = [&](Edge* edge) 
 		{
 			for (Edge* e : loop) 
@@ -295,19 +332,23 @@ namespace MeshEdit
 			return false;
 		};
 
-		for (Edge* eA : DirectionA) 
+	
+
+		// fill the loop with DirectionA and DirectionB edges
+		for (Edge* edge : DirectionA)
 		{
-			if (eA && !edgeExistsInLoop(eA)) 
+			if (edge && !edgeExistsInLoop(edge))
 			{
-				loop.push_back(eA);
+				loop.push_back(edge);
 			}
 		}
-	
-		for (Edge* eB : DirectionB) 
+
+		for (auto it = DirectionB.rbegin(); it != DirectionB.rend(); ++it)
 		{
-			if (eB && !edgeExistsInLoop(eB)) 
+			Edge* edge = *it;
+			if (edge && !edgeExistsInLoop(edge))
 			{
-				loop.push_back(eB);
+				loop.push_back(edge);
 			}
 		}
 
@@ -317,20 +358,35 @@ namespace MeshEdit
 	
 		if (ImGui::IsKeyPressed(ImGuiKey_E) && JoiningQuad.size() == 1)
 		{
-			JoiningQuad.clear();
+			
 
-			for (Edge* e : loop)
+			for (int i = 0; i < visitedQuads.size(); ++i)
 			{
-				e->setColor(glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+				if (!visitedQuads[i] || !visitedQuads[i]->isJoiningQuad) continue;
+				
+				for (int j = i + 1; j < visitedQuads.size(); )
+				{
+					if (visitedQuads[j] && visitedQuads[j]->isJoiningQuad && visitedQuads[i]->getID() == visitedQuads[j]->getID())
+					{
+						std::cout << "[EDGE LOOP] Removing duplicate joining quad with ID: " << visitedQuads[j]->getID() << std::endl;
+						visitedQuads.erase(visitedQuads.begin() + j);
+					}
+					else
+					{
+						++j;
+					}
+				}
 			}
 
-			std::cout << "[EDGE LOOP] Cutting quads ! " << std::endl;
 			MeshEdit::CutQuad(loop, mesh, visitedQuads);
+
 			visitedQuads.clear();
+			JoiningQuad.clear();
+			
 			loop.clear();
 			selectedEdge = nullptr;
 
-		}
+		}		
 
 		return loop;
 	}

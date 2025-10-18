@@ -35,6 +35,7 @@ public:
     std::string getID() const { return id; }
     void setSharedFaces(const std::vector<class Face*>& faces);
     const std::vector<class Face*>& getSharedFaces() const;
+    std::vector<class Face*>& getSharedFacesNonConst() { return sharedFaces; }
 
 private:
     Vertice* v1;
