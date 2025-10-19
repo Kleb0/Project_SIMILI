@@ -21,7 +21,7 @@ namespace MeshEdit
 	{
 
 		std::vector<Vertice*> centers;
-
+		std::vector<Vertice*> firstRing;
 
 		// Create the center vertices
 		for (Edge* edge : loop) 
@@ -51,18 +51,39 @@ namespace MeshEdit
 			Vertice* centerVert = centers[i];
 			if (edge && centerVert && mesh)
 			{
+				Vertice* v1 = edge->getStart();
+				Vertice* v2 = edge->getEnd();
+				
 				edge->splitEdge(centerVert, mesh);
-                centerVert->addEdge(edge);
-                Vertice* v1 = edge->getStart();
-                Vertice* v2 = edge->getEnd();
-                v1->addEdge(edge);
-               	v2->addEdge(edge);
+				
+				Edge* e1 = nullptr;
+				Edge* e2 = nullptr;
+				for (Edge* e : mesh->getEdges())
+				{
+					if (!e) continue;
+					if ((e->getStart() == v1 && e->getEnd() == centerVert) || 
+						(e->getStart() == centerVert && e->getEnd() == v1))
+					{
+						e1 = e;
+					}
+					if ((e->getStart() == centerVert && e->getEnd() == v2) || 
+						(e->getStart() == v2 && e->getEnd() == centerVert))
+					{
+						e2 = e;
+					}
+				}
+				
+				if (e1) centerVert->addEdge(e1);
+				if (e2) centerVert->addEdge(e2);
+				
+				if (e1) v1->addEdge(e1);
+				if (e2) v2->addEdge(e2);
 			}
-		}
+		}		
 
 		std::vector<Edge*> centerEdges;
 
-		// draw the centers to connect the center vertices
+		// draw the centers edges to connect the center vertices
 		if (mesh && centers.size() > 1) 
 		{
 			for (size_t i = 0; i < centers.size() - 1; ++i)
@@ -79,27 +100,20 @@ namespace MeshEdit
 						newEdge->initialize();
 
 						centerEdges.push_back(newEdge);
-                        vStart->addEdge(newEdge);
-                        vEnd->addEdge(newEdge);
-
-						std::cout << "\n [CutQuad] Created center edge " << i << " connecting centers" << std::endl;
-						std::cout << "[cutQuad]  from center vert ID: " << vStart->getID() << " to center vert ID: " << vEnd->getID() << std::endl;
-						std::cout << "[cutQuad] the vertice at " << i << " with ID " << vStart->getID() << " has " << vStart->getEdges().size() << " edges connected to it." << std::endl;
+						vStart->addEdge(newEdge);
+						vEnd->addEdge(newEdge);
 
 					}
 				}
 			}
 
 			Vertice* vFirst = centers.front();
-
-			// vLast is the not the first center and has 3 edges (meaning it's not connect yet to the first center)
 			Vertice* vLast = centers.back();
 
 			// here i set the color of the first and last center vertices for debug
 			// vFirst->setColor(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
 			// vLast->setColor(glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
 			
-
 			if (vFirst && vLast) 
 			{
 				Edge* closingEdge = mesh->addEdge(vLast, vFirst);
@@ -108,11 +122,25 @@ namespace MeshEdit
 					closingEdge->initialize();
 					centerEdges.push_back(closingEdge);
 					vLast->addEdge(closingEdge);
-					vFirst->addEdge(closingEdge);	
-
+					vFirst->addEdge(closingEdge);
 				}
 			}
 		}
+
+		// std::cout << "\n[cutQuad] Final summary of edges per centerVert :" << std::endl;
+		// std::cout << "----------------------------------------" << std::endl;
+
+		// for (size_t i = 0; i < centers.size(); ++i) 
+		// {
+		// 	Vertice* v = centers[i];
+		// 	std::cout << "\n [cutQuad] the vertice at " << i << " with ID " << v->getID() << " has " << v->getEdges().size() << " edges connected to it. IDs : ";
+		// 	const auto& edges = v->getEdges();
+		// 	for (const auto& e : edges) 
+		// 	{
+		// 		std::cout << e->getID() << " ";
+		// 	}
+		// 	std::cout << std::endl;
+		// }
 
 		for (Quad* quad : traversedQuads)
 		{
@@ -130,42 +158,9 @@ namespace MeshEdit
 			quad->destroy();
 		}
 
+		// e->setColor(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)); // rouge
 		// ---------------- 
-		if (mesh) 
-		{
-			const auto& edges = mesh->getEdges();
-			for (Edge* edge : edges) 
-			{
-				if (!edge) continue;
-				// On ne s'intéresse qu'aux edges qui ont au moins une sharedFace
-				if (!edge->getSharedFaces().empty()) 
-				{
-					// Pour chaque sommet de cet edge, on regarde ses edges sortants
-					Vertice* v1 = edge->getStart();
-					Vertice* v2 = edge->getEnd();
-
-					if (v1) 
-					{
-						for (Edge* e : v1->getEdges()) 
-						{
-							if (e && e->getSharedFaces().empty()) {
-								e->setColor(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)); // rouge
-							}
-						}
-					}
-					if (v2) 
-					{
-						for (Edge* e : v2->getEdges()) 
-						{
-							if (e && e->getSharedFaces().empty()) 
-							{
-								e->setColor(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)); // rouge
-							}
-						}
-					}
-				}
-			}
-		}
+		
 
 		// here we create the faces 
 
