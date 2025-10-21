@@ -127,20 +127,91 @@ namespace MeshEdit
 			}
 		}
 
-		// std::cout << "\n[cutQuad] Final summary of edges per centerVert :" << std::endl;
-		// std::cout << "----------------------------------------" << std::endl;
+		// ---- colorier en rouge les edges dont l'adjacent face est de 0
 
-		// for (size_t i = 0; i < centers.size(); ++i) 
-		// {
-		// 	Vertice* v = centers[i];
-		// 	std::cout << "\n [cutQuad] the vertice at " << i << " with ID " << v->getID() << " has " << v->getEdges().size() << " edges connected to it. IDs : ";
-		// 	const auto& edges = v->getEdges();
-		// 	for (const auto& e : edges) 
-		// 	{
-		// 		std::cout << e->getID() << " ";
-		// 	}
-		// 	std::cout << std::endl;
-		// }
+		for (Edge* edge : centerEdges)
+		{
+			if (!edge) continue;
+			auto& sharedFaces = edge->getSharedFacesNonConst();
+			if (sharedFaces.empty())
+			{
+				edge->setColor(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)); 
+			}
+		}
+
+		// ---- First, set in a list the IDs of center edges
+		std::unordered_set<std::string> centerEdgeIDs;
+		for (Edge* edge : centerEdges)
+		{
+			if (edge) centerEdgeIDs.insert(edge->getID());
+		}
+
+
+		glm::vec3 cutDir = glm::normalize(centers.back()->getLocalPosition() - centers.front()->getLocalPosition());
+		
+		glm::vec3 refDir = glm::vec3(0.0f);
+		for (Vertice* cv : centers)
+		{
+			if (!cv) continue;
+
+			for (Edge* e : cv->getEdges())
+			{
+				if (!e || centerEdgeIDs.find(e->getID()) != centerEdgeIDs.end()) continue;
+
+				Vertice* other = (e->getStart() == cv) ? e->getEnd() : e->getStart();
+
+				if (other)
+				{
+					refDir = glm::normalize(other->getLocalPosition() - cv->getLocalPosition());
+					break;
+				}
+			}
+			if (glm::length(refDir) > 0.01f) break;
+		}
+		
+		// Normal perpendicular au cut pour séparer les deux côtés
+		glm::vec3 normalDir = glm::normalize(glm::cross(cutDir, refDir));
+
+		std::cout << "\n ---- [CutQuad] ---- Directions used for coloring edges :" << std::endl;
+		std::cout << "[CutQuad] cutDir: (" << cutDir.x << ", " << cutDir.y << ", " << cutDir.z << ")" << std::endl;
+		std::cout << "[CutQuad] refDir: (" << refDir.x << ", " << refDir.y << ", " << refDir.z << ")" << std::endl;
+
+		for (Vertice* centerVert : centers)
+		{
+			if (!centerVert) continue;
+
+			// in a loop, edge vertice created has 4 edges, we need to filter them
+			const auto& connectedEdges = centerVert->getEdges();
+
+			for (Edge* edge : connectedEdges)
+			{
+				if (!edge) continue;
+
+				if (centerEdgeIDs.find(edge->getID()) != centerEdgeIDs.end())
+				{
+					// these are the center edges 
+					edge->setColor(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)); 
+				}
+				else
+				{
+
+					Vertice* otherVert = (edge->getStart() == centerVert) ? edge->getEnd() : edge->getStart();
+					glm::vec3 edgeDir = glm::normalize(otherVert->getLocalPosition() - centerVert->getLocalPosition());
+					float dot = glm::dot(edgeDir, refDir);
+
+					std::cout << "[CutQuad] Edge ID: " << edge->getID() << " dot : " << dot << " | this edge can't be colored in blue " << std::endl;
+
+					if (dot < 0.0f)
+					{
+						edge->setColor(glm::vec4(0.0f, 0.0f, 1.0f, 1.0f)); 
+						std::cout << "[CutQuad] -> Colored BLUE" << std::endl;
+
+						// ---- here we create the faces
+
+					}
+				}
+			}
+		}
 
 		for (Quad* quad : traversedQuads)
 		{
@@ -157,25 +228,6 @@ namespace MeshEdit
 			}
 			quad->destroy();
 		}
-
-		// e->setColor(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)); // rouge
-		// ---------------- 
-		
-
-		// here we create the faces 
-
-
-		// glm::vec3 startPos = start->getLocalPosition();
-		// glm::vec3 endPos = end->getLocalPosition();
-		// glm::vec3 dir = glm::normalize(endPos - startPos);
-		// edge->setColor(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)); // rouge
-
-		// 1 - On colore en rouge les edges qui s'arrêtent au centerVert
-		//     mais uniquement une moitié sur deux (alternance par centerVert)
-		// -2 ils s'arrêtent au centered vertice qu'on a positionné 
-		// -3 les edges reliant les centered vertices n'ont aucune shared face. *
-		// - 4 Pour le test on va set en rouge nos edges qui forment l'ossature des futurs quads
-
 
 		// // ------------------------------
 		// // Update MeshDNA quad count
