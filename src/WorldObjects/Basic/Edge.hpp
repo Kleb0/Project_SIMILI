@@ -37,6 +37,8 @@ public:
     const std::vector<class Face*>& getSharedFaces() const;
     std::vector<class Face*>& getSharedFacesNonConst() { return sharedFaces; }
 
+    bool hasbeenMarkedOnceInCutQuad = false;
+
 private:
     Vertice* v1;
     Vertice* v2;
