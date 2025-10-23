@@ -22,8 +22,11 @@ namespace MeshEdit
 
 		std::vector<Vertice*> centers;
 		std::vector<Vertice*> firstRing;
+		std::vector<Edge*> firstQuadEdges;
+		std::vector<Edge*> firstRowEdges;
+		std::string currentCenterEdgeID = "";
 
-		// Create the center vertices
+		// First step : Create the center vertices
 		for (Edge* edge : loop) 
 		{
 			if (!edge || !mesh) continue;
@@ -44,7 +47,7 @@ namespace MeshEdit
 			}
 		}
 
-		// split the edges
+		// Second step : split the edges
 		for (size_t i = 0; i < loop.size() && i < centers.size(); ++i)
 		{
 			Edge* edge = loop[i];
@@ -83,7 +86,7 @@ namespace MeshEdit
 
 		std::vector<Edge*> centerEdges;
 
-		// draw the centers edges to connect the center vertices
+		// Third step : draw the centers edges to connect the center vertices
 		if (mesh && centers.size() > 1) 
 		{
 			for (size_t i = 0; i < centers.size() - 1; ++i)
@@ -114,6 +117,7 @@ namespace MeshEdit
 			// vFirst->setColor(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
 			// vLast->setColor(glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
 			
+			// close the loop of center edges
 			if (vFirst && vLast) 
 			{
 				Edge* closingEdge = mesh->addEdge(vLast, vFirst);
@@ -127,8 +131,9 @@ namespace MeshEdit
 			}
 		}
 
-		// ---- colorier en rouge les edges dont l'adjacent face est de 0
+		std::unordered_set<std::string> centerEdgeIDs;
 
+		// --- color in red the center edges that have no shared faces
 		for (Edge* edge : centerEdges)
 		{
 			if (!edge) continue;
@@ -136,20 +141,15 @@ namespace MeshEdit
 			if (sharedFaces.empty())
 			{
 				edge->setColor(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)); 
+				centerEdgeIDs.insert(edge->getID());
 			}
 		}
 
-		// ---- First, set in a list the IDs of center edges
-		std::unordered_set<std::string> centerEdgeIDs;
-		for (Edge* edge : centerEdges)
-		{
-			if (edge) centerEdgeIDs.insert(edge->getID());
-		}
 
-
-		glm::vec3 cutDir = glm::normalize(centers.back()->getLocalPosition() - centers.front()->getLocalPosition());
-		
+		// ------- find the other vertice
+		glm::vec3 cutDir = glm::normalize(centers.back()->getLocalPosition() - centers.front()->getLocalPosition());		
 		glm::vec3 refDir = glm::vec3(0.0f);
+
 		for (Vertice* cv : centers)
 		{
 			if (!cv) continue;
@@ -169,49 +169,114 @@ namespace MeshEdit
 			if (glm::length(refDir) > 0.01f) break;
 		}
 		
-		// Normal perpendicular au cut pour séparer les deux côtés
+		
 		glm::vec3 normalDir = glm::normalize(glm::cross(cutDir, refDir));
 
-		std::cout << "\n ---- [CutQuad] ---- Directions used for coloring edges :" << std::endl;
-		std::cout << "[CutQuad] cutDir: (" << cutDir.x << ", " << cutDir.y << ", " << cutDir.z << ")" << std::endl;
-		std::cout << "[CutQuad] refDir: (" << refDir.x << ", " << refDir.y << ", " << refDir.z << ")" << std::endl;
 
-		for (Vertice* centerVert : centers)
+		// operation fo the current center vertice
+		for (int i = 0; i < centers.size(); ++i)
 		{
-			if (!centerVert) continue;
+			Edge* currentPerpendiculaireEdge = nullptr;
+			Vertice* currentVert = centers[i];			
+			if (!currentVert) continue;
 
-			// in a loop, edge vertice created has 4 edges, we need to filter them
-			const auto& connectedEdges = centerVert->getEdges();
+			const auto& connectedEdges = currentVert->getEdges();
 
 			for (Edge* edge : connectedEdges)
 			{
 				if (!edge) continue;
 
-				if (centerEdgeIDs.find(edge->getID()) != centerEdgeIDs.end())
-				{
-					// these are the center edges 
-					edge->setColor(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)); 
-				}
-				else
+				bool isNotCenterEdge = (centerEdgeIDs.find(edge->getID()) == centerEdgeIDs.end());
+				if (isNotCenterEdge)
 				{
 
-					Vertice* otherVert = (edge->getStart() == centerVert) ? edge->getEnd() : edge->getStart();
-					glm::vec3 edgeDir = glm::normalize(otherVert->getLocalPosition() - centerVert->getLocalPosition());
+					Vertice* otherVert = (edge->getStart() == currentVert) ? edge->getEnd() : edge->getStart();
+					glm::vec3 edgeDir = glm::normalize(otherVert->getLocalPosition() - currentVert->getLocalPosition());
 					float dot = glm::dot(edgeDir, refDir);
-
-					std::cout << "[CutQuad] Edge ID: " << edge->getID() << " dot : " << dot << " | this edge can't be colored in blue " << std::endl;
 
 					if (dot < 0.0f)
 					{
-						edge->setColor(glm::vec4(0.0f, 0.0f, 1.0f, 1.0f)); 
-						std::cout << "[CutQuad] -> Colored BLUE" << std::endl;
+						if(edge->hasbeenMarkedOnceInCutQuad == false)
+						{
+							edge->setColor(glm::vec4(0.0f, 0.0f, 1.0f, 1.0f)); 
+							firstRowEdges.push_back(edge);
+						}
 
-						// ---- here we create the faces
-
+						if (i == 0)
+						{
+							edge->setColor(glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+							edge->hasbeenMarkedOnceInCutQuad = true;
+							currentPerpendiculaireEdge = edge;
+							firstQuadEdges.push_back(currentPerpendiculaireEdge);							
+						}
 					}
 				}
 			}
+			
+			// here we check for the next vertice and we find the edge connecting current vert and next center vert
+			if (i == 0)
+			{
+				size_t nextIndex = (i + 1) % centers.size();
+				Vertice* nextVert = centers[nextIndex];
+				Edge* nextPerpendiculaireEdge = nullptr;
+				Vertice* nextPerendiculaireEdgeEndVertice = nullptr;
+
+				// -------------- Find the edge perpendicular to the vertice marqued by the next index
+				for (Edge* e : nextVert->getEdges())
+				{
+
+					if (!e || centerEdgeIDs.find(e->getID()) != centerEdgeIDs.end()) 
+					continue;
+					
+					Vertice* other = (e->getStart() == nextVert) ? e->getEnd() : e->getStart();
+					
+					if (!other) continue;
+						
+					glm::vec3 edgeDir = glm::normalize(other->getLocalPosition() - nextVert->getLocalPosition());
+					float dot = glm::dot(edgeDir, refDir);
+
+					if (dot < 0.0f)
+					{
+						e->setColor(glm::vec4(0.0f, 1.0f, 0.0f, 1.0f)); 
+						e->hasbeenMarkedOnceInCutQuad = true;
+						nextPerpendiculaireEdge = e;
+						firstQuadEdges.push_back(nextPerpendiculaireEdge);
+						break;
+					}
+
+				}
+
+				// ------------------ Find the connected edge
+				Edge* connectingEdge = nullptr;
+
+				for (Edge* e : centerEdges)
+				{
+					if (!e) continue;
+					Vertice* start = e->getStart();
+					Vertice* end = e->getEnd();
+
+					if ((start == currentVert && end == centers[nextIndex]) || (start == centers[nextIndex] && end == currentVert))
+					{
+						connectingEdge = e;
+						break;
+					}
+				}
+
+				// for the debug, we color in green the center edge connecting the first and second center vertice
+				if (connectingEdge && connectingEdge->hasbeenMarkedOnceInCutQuad == false)
+				{
+					currentCenterEdgeID = connectingEdge->getID();
+					connectingEdge->setColor(glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+					connectingEdge->hasbeenMarkedOnceInCutQuad = true;
+
+					// now we have the second edge of the first quad
+					firstQuadEdges.push_back(connectingEdge);
+
+				}
+			}
 		}
+
+		// ------------- End of the operation for the vertice
 
 		for (Quad* quad : traversedQuads)
 		{
