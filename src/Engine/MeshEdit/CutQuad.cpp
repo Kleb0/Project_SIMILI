@@ -173,10 +173,10 @@ namespace MeshEdit
 		glm::vec3 normalDir = glm::normalize(glm::cross(cutDir, refDir));
 
 
-		// operation fo the current center vertice
+		// operation fo the current center vertice, the the current vert will be the departure point to build the quad
 		for (int i = 0; i < centers.size(); ++i)
 		{
-			Edge* currentPerpendiculaireEdge = nullptr;
+			Edge* currentPerpendicularEdge = nullptr;
 			Vertice* currentVert = centers[i];			
 			if (!currentVert) continue;
 
@@ -186,14 +186,18 @@ namespace MeshEdit
 			{
 				if (!edge) continue;
 
+
+				// i decided to start finding the perpendicular edges using centerEdgs as reference
 				bool isNotCenterEdge = (centerEdgeIDs.find(edge->getID()) == centerEdgeIDs.end());
 				if (isNotCenterEdge)
 				{
 
+					// the vector 3 edgeDir give us the the direction of the edge connected to the current center vertice
 					Vertice* otherVert = (edge->getStart() == currentVert) ? edge->getEnd() : edge->getStart();
 					glm::vec3 edgeDir = glm::normalize(otherVert->getLocalPosition() - currentVert->getLocalPosition());
 					float dot = glm::dot(edgeDir, refDir);
 
+					// i decided to start from the part that inferior to zero, remember we have found the perpendicular edges to the cut direction
 					if (dot < 0.0f)
 					{
 						if(edge->hasbeenMarkedOnceInCutQuad == false)
@@ -201,13 +205,14 @@ namespace MeshEdit
 							edge->setColor(glm::vec4(0.0f, 0.0f, 1.0f, 1.0f)); 
 							firstRowEdges.push_back(edge);
 						}
-
+						
+						// ----------- here we find the first edge of the quad
 						if (i == 0)
 						{
 							edge->setColor(glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
 							edge->hasbeenMarkedOnceInCutQuad = true;
-							currentPerpendiculaireEdge = edge;
-							firstQuadEdges.push_back(currentPerpendiculaireEdge);							
+							currentPerpendicularEdge = edge;
+							firstQuadEdges.push_back(currentPerpendicularEdge);							
 						}
 					}
 				}
@@ -218,35 +223,11 @@ namespace MeshEdit
 			{
 				size_t nextIndex = (i + 1) % centers.size();
 				Vertice* nextVert = centers[nextIndex];
-				Edge* nextPerpendiculaireEdge = nullptr;
-				Vertice* nextPerendiculaireEdgeEndVertice = nullptr;
+				Edge* nextPerpendicularEdge = nullptr;
+				Vertice* nextPerpendicularEdgeEndVertice = nullptr;
 
-				// -------------- Find the edge perpendicular to the vertice marqued by the next index
-				for (Edge* e : nextVert->getEdges())
-				{
 
-					if (!e || centerEdgeIDs.find(e->getID()) != centerEdgeIDs.end()) 
-					continue;
-					
-					Vertice* other = (e->getStart() == nextVert) ? e->getEnd() : e->getStart();
-					
-					if (!other) continue;
-						
-					glm::vec3 edgeDir = glm::normalize(other->getLocalPosition() - nextVert->getLocalPosition());
-					float dot = glm::dot(edgeDir, refDir);
-
-					if (dot < 0.0f)
-					{
-						e->setColor(glm::vec4(0.0f, 1.0f, 0.0f, 1.0f)); 
-						e->hasbeenMarkedOnceInCutQuad = true;
-						nextPerpendiculaireEdge = e;
-						firstQuadEdges.push_back(nextPerpendiculaireEdge);
-						break;
-					}
-
-				}
-
-				// ------------------ Find the connected edge
+				// ------------------ 2 Find the connected edge witch is also a center edge, the second edge
 				Edge* connectingEdge = nullptr;
 
 				for (Edge* e : centerEdges)
@@ -273,11 +254,113 @@ namespace MeshEdit
 					firstQuadEdges.push_back(connectingEdge);
 
 				}
+
+				// -------------- 3 : Find the  perpendicular edge to the vertice marqued by the next index
+				for (Edge* e : nextVert->getEdges())
+				{
+
+					if (!e || centerEdgeIDs.find(e->getID()) != centerEdgeIDs.end()) 
+					continue;
+					
+					Vertice* other = (e->getStart() == nextVert) ? e->getEnd() : e->getStart();
+					
+					if (!other) continue;
+						
+					glm::vec3 edgeDir = glm::normalize(other->getLocalPosition() - nextVert->getLocalPosition());
+					float dot = glm::dot(edgeDir, refDir);
+
+					if (dot < 0.0f)
+					{
+						e->setColor(glm::vec4(0.0f, 1.0f, 0.0f, 1.0f)); 
+						e->hasbeenMarkedOnceInCutQuad = true;
+						nextPerpendicularEdge = e;
+						firstQuadEdges.push_back(nextPerpendicularEdge);
+						break;
+					}
+				}
+
+				//--------- 4 : find the fourth edge of the quad
+				if(currentPerpendicularEdge != nullptr && nextPerpendicularEdge != nullptr)
+				{
+
+					Vertice* vA = (currentPerpendicularEdge->getStart() == currentVert) ? currentPerpendicularEdge->getEnd() : currentPerpendicularEdge->getStart();
+					Vertice* vB = (nextPerpendicularEdge->getStart() == nextVert) ? nextPerpendicularEdge->getEnd() : nextPerpendicularEdge->getStart();
+
+					Edge* fourthEdge = nullptr;
+
+					for (Edge* e : vA->getEdges()) 
+					{
+						if (!e || centerEdgeIDs.find(e->getID()) != centerEdgeIDs.end()) continue;
+						if ((e->getStart() == vA && e->getEnd() == vB) || (e->getStart() == vB && e->getEnd() == vA)) {
+							fourthEdge = e;
+							break;
+						}
+					}
+
+					if (fourthEdge) 
+					{
+						fourthEdge->setColor(glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+						fourthEdge->hasbeenMarkedOnceInCutQuad = true;
+						firstQuadEdges.push_back(fourthEdge);
+					}
+				}
+
+				// -------- create the quad
+				if(!firstQuadEdges.empty())
+				{
+
+					if (firstQuadEdges.size() == 4) 
+					{					
+						std::array<Edge*, 4> quadEdges;
+						std::array<Vertice*, 4> quadVertices;
+						
+						// for now, i decided to assume arbitrarily the order of the edges in firstQuadEdges
+						Edge* perpEdge1 = firstQuadEdges[0];
+						Edge* centerEdge = firstQuadEdges[1];
+						Edge* perpEdge2 = firstQuadEdges[2];
+						Edge* parallelEdge = firstQuadEdges[3];
+						
+						Vertice* v0 = currentVert;
+						Vertice* v3 = nextVert;
+						
+						Vertice* v1 = (perpEdge1->getStart() == v0) ? perpEdge1->getEnd() : perpEdge1->getStart();
+						Vertice* v2 = (perpEdge2->getStart() == v3) ? perpEdge2->getEnd() : perpEdge2->getStart();
+						
+						quadVertices[0] = v0;
+						quadVertices[1] = v1;
+						quadVertices[2] = v2;
+						quadVertices[3] = v3;
+						
+						quadEdges[0] = perpEdge1;
+						quadEdges[1] = parallelEdge;
+						quadEdges[2] = perpEdge2; 
+						quadEdges[3] = centerEdge;
+						
+					
+						Quad* newQuad = mesh->addQuad(quadVertices, quadEdges);
+						
+						if (newQuad)
+						{
+							newQuad->initialize();
+							
+							for (int k = 0; k < 4; ++k) 
+							{
+								auto& sharedFaces = quadEdges[k]->getSharedFacesNonConst();
+								sharedFaces.push_back(newQuad);
+							}
+							
+							newQuad->setParentMesh(mesh);							
+							std::cout << "[CutQuad] New quad created, initialized and added to mesh!" << std::endl;
+						}
+					}
+				}
+
 			}
 		}
 
 		// ------------- End of the operation for the vertice
 
+		// Clean up : remove the traversed quads from the mesh and from the edges shared faces
 		for (Quad* quad : traversedQuads)
 		{
 			const std::array<Edge*, 4>& quadEdges = quad->getEdgesArray();
@@ -291,9 +374,27 @@ namespace MeshEdit
 					sharedFaces.erase(itFace);
 				}
 			}
-			quad->destroy();
+		}
+		
+		// Retire the quads from the mesh
+		if (mesh)
+		{
+			auto& meshFaces = mesh->getFacesNonConst();
+			for (Quad* quad : traversedQuads)
+			{
+				auto it = std::find(meshFaces.begin(), meshFaces.end(), quad);
+				if (it != meshFaces.end())
+				{
+					meshFaces.erase(it);
+				}
+				quad->destroy();
+				delete quad;
+			}
 		}
 
+		// ----------------------------
+
+	
 		// // ------------------------------
 		// // Update MeshDNA quad count
 		// if (mesh && mesh->getMeshDNA())
