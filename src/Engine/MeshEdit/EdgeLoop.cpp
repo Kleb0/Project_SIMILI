@@ -359,7 +359,6 @@ namespace MeshEdit
 		if (ImGui::IsKeyPressed(ImGuiKey_E) && JoiningQuad.size() == 1)
 		{
 			
-
 			for (int i = 0; i < visitedQuads.size(); ++i)
 			{
 				if (!visitedQuads[i] || !visitedQuads[i]->isJoiningQuad) continue;
