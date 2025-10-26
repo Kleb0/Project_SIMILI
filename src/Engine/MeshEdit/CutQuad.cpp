@@ -24,7 +24,6 @@ namespace MeshEdit
 		std::vector<Vertice*> firstRing;
 		std::vector<Edge*> firstQuadEdges;
 		std::vector<Edge*> firstRowEdges;
-		std::string currentCenterEdgeID = "";
 
 		// First step : Create the center vertices
 		for (Edge* edge : loop) 
@@ -140,12 +139,64 @@ namespace MeshEdit
 			auto& sharedFaces = edge->getSharedFacesNonConst();
 			if (sharedFaces.empty())
 			{
-				edge->setColor(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)); 
 				centerEdgeIDs.insert(edge->getID());
 			}
 		}
 
 
+		buildQuadfromVertice(centers, centerEdgeIDs, centerEdges, mesh, firstRowEdges, firstQuadEdges);
+
+		// Clean up : remove the traversed quads from the mesh and from the edges shared faces
+		for (Quad* quad : traversedQuads)
+		{
+			const std::array<Edge*, 4>& quadEdges = quad->getEdgesArray();
+			for (Edge* edge : quadEdges)
+			{
+				if (!edge) continue;
+				auto& sharedFaces = edge->getSharedFacesNonConst();
+				auto itFace = std::find(sharedFaces.begin(), sharedFaces.end(), quad);
+				if (itFace != sharedFaces.end())
+				{
+					sharedFaces.erase(itFace);
+				}
+			}
+		}
+		
+		// Retire the quads from the mesh
+		if (mesh)
+		{
+			auto& meshFaces = mesh->getFacesNonConst();
+			for (Quad* quad : traversedQuads)
+			{
+				auto it = std::find(meshFaces.begin(), meshFaces.end(), quad);
+				if (it != meshFaces.end())
+				{
+					meshFaces.erase(it);
+				}
+				quad->destroy();
+				delete quad;
+			}
+		}
+
+		// ----------------------------
+
+	
+		// // ------------------------------
+		// // Update MeshDNA quad count
+		// if (mesh && mesh->getMeshDNA())
+		// {
+		// 	MeshDNA* mdna = mesh->getMeshDNA();
+		// 	int currentQuadCount = mesh->getQuads().size();
+			
+		// 	std::cout << "[CutQuad] Updated MeshDNA quad count to: " << currentQuadCount << std::endl;
+		// 	mdna->setQuadCount(currentQuadCount);	
+		// }
+	}
+
+
+	void buildQuadfromVertice(const std::vector<Vertice*>& centers, const std::unordered_set<std::string>& centerEdgeIDs, 
+	const std::vector<Edge*>& centerEdges, Mesh* mesh, std::vector<Edge*>& firstRowEdges, std::vector<Edge*>& firstQuadEdges)
+	{
 		// ------- find the other vertice
 		glm::vec3 cutDir = glm::normalize(centers.back()->getLocalPosition() - centers.front()->getLocalPosition());		
 		glm::vec3 refDir = glm::vec3(0.0f);
@@ -226,7 +277,6 @@ namespace MeshEdit
 				Edge* nextPerpendicularEdge = nullptr;
 				Vertice* nextPerpendicularEdgeEndVertice = nullptr;
 
-
 				// ------------------ 2 Find the connected edge witch is also a center edge, the second edge
 				Edge* connectingEdge = nullptr;
 
@@ -246,7 +296,6 @@ namespace MeshEdit
 				// for the debug, we color in green the center edge connecting the first and second center vertice
 				if (connectingEdge && connectingEdge->hasbeenMarkedOnceInCutQuad == false)
 				{
-					currentCenterEdgeID = connectingEdge->getID();
 					connectingEdge->setColor(glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
 					connectingEdge->hasbeenMarkedOnceInCutQuad = true;
 
@@ -359,51 +408,5 @@ namespace MeshEdit
 		}
 
 		// ------------- End of the operation for the vertice
-
-		// Clean up : remove the traversed quads from the mesh and from the edges shared faces
-		for (Quad* quad : traversedQuads)
-		{
-			const std::array<Edge*, 4>& quadEdges = quad->getEdgesArray();
-			for (Edge* edge : quadEdges)
-			{
-				if (!edge) continue;
-				auto& sharedFaces = edge->getSharedFacesNonConst();
-				auto itFace = std::find(sharedFaces.begin(), sharedFaces.end(), quad);
-				if (itFace != sharedFaces.end())
-				{
-					sharedFaces.erase(itFace);
-				}
-			}
-		}
-		
-		// Retire the quads from the mesh
-		if (mesh)
-		{
-			auto& meshFaces = mesh->getFacesNonConst();
-			for (Quad* quad : traversedQuads)
-			{
-				auto it = std::find(meshFaces.begin(), meshFaces.end(), quad);
-				if (it != meshFaces.end())
-				{
-					meshFaces.erase(it);
-				}
-				quad->destroy();
-				delete quad;
-			}
-		}
-
-		// ----------------------------
-
-	
-		// // ------------------------------
-		// // Update MeshDNA quad count
-		// if (mesh && mesh->getMeshDNA())
-		// {
-		// 	MeshDNA* mdna = mesh->getMeshDNA();
-		// 	int currentQuadCount = mesh->getQuads().size();
-			
-		// 	std::cout << "[CutQuad] Updated MeshDNA quad count to: " << currentQuadCount << std::endl;
-		// 	mdna->setQuadCount(currentQuadCount);	
-		// }
 	}
 }
