@@ -11,7 +11,12 @@ namespace MeshEdit
 {
 	void CutQuad(const std::vector<Edge*>& loop, Mesh* mesh, const std::vector<Quad*>& traversedQuads);
 
-	void buildQuadfromVertice(const std::vector<class Vertice*>& centers, const std::unordered_set<std::string>& centerEdgeIDs, 
+	void findFirstQuadEdgesWithVertice(const std::vector<class Vertice*>& centers, const std::unordered_set<std::string>& centerEdgeIDs, 
 	 const std::vector<Edge*>& centerEdges, Mesh* mesh, std::vector<Edge*>& firstRowEdges, std::vector<Edge*>& firstQuadEdges);
+
+	void findNextQuadEdgesForFirstRow(const std::vector<class Vertice*>& centers, const std::unordered_set<std::string>& centerEdgeIDs, 
+	const std::vector<Edge*>& centerEdges, Mesh* mesh, std::vector<Edge*>& QuadEdges, const glm::vec3& refDir, int currentIndex);
+
+	void buildQuadFromEdges(const std::vector<Edge*>& QuadEdges, class Vertice* currentVert, class Vertice* nextVert, Mesh* mesh);
 	
 }
