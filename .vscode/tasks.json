@@ -18,7 +18,37 @@
         "kind": "build",
         "isDefault": true
       },
-      "detail": "Initialise vcvars64 et build le projet SIMILI en Release"
+      "detail": "Initialise vcvars64 et build le projet SIMILI en Release",
+      "dependsOn": ["Deploy UI"]
     },
+    {
+      "label": "Build SIMILI_UI",
+      "type": "shell",
+      "command": "${workspaceFolder}\\build_ui.bat",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "shell": {
+          "executable": "cmd.exe",
+          "args": ["/d", "/c"]
+        }
+      },
+      "problemMatcher": [],
+      "detail": "Compile SIMILI_UI.exe (CEF interface web)"
+    },
+    {
+      "label": "Deploy UI",
+      "type": "shell",
+      "command": "${workspaceFolder}\\deploy_ui.bat",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "shell": {
+          "executable": "cmd.exe",
+          "args": ["/d", "/c"]
+        }
+      },
+      "problemMatcher": [],
+      "detail": "Déploie SIMILI_UI.exe et les dépendances CEF dans build/Release",
+      "dependsOn": ["Build SIMILI_UI"]
+    }
   ]  
 }
