@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hello CEF - SIMILI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: white;
+        }
+        
+        .container {
+            text-align: center;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            max-width: 600px;
+        }
+        
+        h1 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            animation: fadeInDown 1s ease;
+        }
+        
+        p {
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            opacity: 0.9;
+            animation: fadeIn 1.5s ease;
+        }
+        
+        .tech-stack {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            animation: fadeInUp 2s ease;
+        }
+        
+        .tech-stack h2 {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+        }
+        
+        .tech-list {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .tech-item {
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            font-weight: bold;
+            transition: transform 0.3s ease;
+        }
+        
+        .tech-item:hover {
+            transform: scale(1.1);
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 255, 0, 0.2);
+            border-radius: 8px;
+            border-left: 4px solid #00ff00;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Hello CEF!</h1>
+        <p>Bienvenue dans SIMILI avec Chromium Embedded Framework</p>
+        <p>Interface moderne HTML5 + CSS3 + JavaScript</p>
+        
+        <div class="status">
+            <strong>✅ CEF initialisé avec succès</strong>
+        </div>
+        
+        <div class="tech-stack">
+            <h2>Stack Technique</h2>
+            <div class="tech-list">
+                <div class="tech-item">HTML5</div>
+                <div class="tech-item">CSS3</div>
+                <div class="tech-item">JavaScript</div>
+                <div class="tech-item">CEF</div>
+                <div class="tech-item">C++17</div>
+                <div class="tech-item">OpenGL</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        console.log('CEF Browser initialized successfully!');
+        console.log('SIMILI UI ready!');
+        
+        // Animation au chargement
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded at: ' + new Date().toLocaleTimeString());
+        });
+    </script>
+</body>
+</html>

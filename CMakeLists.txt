@@ -4,6 +4,23 @@ add_definitions(-DUNICODE -D_UNICODE)
 
 set(CMAKE_CXX_STANDARD 17)
 
+# Option pour activer/désactiver CEF
+option(USE_CEF "Enable Chromium Embedded Framework for UI" OFF)  # ← Désactivé temporairement
+
+if(USE_CEF)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    
+    foreach(flag_var
+        CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+        CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO
+        CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
+        CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO)
+        if(${flag_var} MATCHES "/MD")
+            string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
+        endif()
+    endforeach()
+endif()
+
 
 #please download the SDL3-devel-3.2.14-VC.zip from its official github page and create on your C drive the following folder configuration:
 #set SDl3
@@ -68,6 +85,7 @@ list(FILTER SOURCES EXCLUDE REGEX "src/ThirdParty/imgui/examples/.*\\.cpp$")
 list(FILTER SOURCES EXCLUDE REGEX "src/ThirdParty/imgui/misc/.*\\.cpp$")
 list(FILTER SOURCES EXCLUDE REGEX "src/ThirdParty/glm/.*\\.cpp$")
 list(FILTER SOURCES EXCLUDE REGEX "/([Tt]ests?|[Uu]nit[Tt]ests?)/.*\\.cpp$")
+list(FILTER SOURCES EXCLUDE REGEX "src/SIMILI_UI/.*\\.cpp$")
 
 
 file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS src/*.hpp)
@@ -113,6 +131,11 @@ set(GLFW_BUILD_TESTS OFF CACHE INTERNAL "GLFW: Build the tests" FORCE)
 set(GLFW_BUILD_DOCS OFF CACHE INTERNAL "GLFW: Build the docs" FORCE)
 set(GLFW_INSTALL OFF CACHE INTERNAL "GLFW: Disable install" FORCE)
 add_subdirectory(src/ThirdParty/GLFW)
+
+# CEF (Chromium Embedded Framework)
+if(USE_CEF)
+    add_subdirectory(src/ThirdParty/CEF)
+endif()
 
 # tinyfiledialogs
 add_library(tinyfiledialogs STATIC
@@ -229,3 +252,13 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     ${D3DCOMPILER_LIBRARY}
     ${SDL3_LIBRARY}
 )
+
+# Link CEF if enabled
+if(USE_CEF)
+    target_link_libraries(${PROJECT_NAME} PRIVATE CEF_Interface)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE USE_CEF)
+    
+    target_link_libraries(${PROJECT_NAME} PRIVATE 
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/CEF/cef_binary/Release/libcef.lib"
+    )
+endif()
