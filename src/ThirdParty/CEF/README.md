@@ -1,20 +1,19 @@
-# Readme temporaire pour integration CEF
 # Chromium Embedded Framework (CEF) Integration
 
 ## Installation
 
-1. **Télécharger CEF**
-   - Aller sur: https://cef-builds.spotifycdn.com/index.html
-   - Choisir la version Windows 64-bit (Standard Distribution)
-   - Version recommandée: 120.x ou supérieur
+1. **Download CEF**
+   - Go to: https://cef-builds.spotifycdn.com/index.html
+   - Choose Windows 64-bit version (Standard Distribution)
+   - Recommended version: 120.x or higher
 
-2. **Extraire CEF**
+2. **Extract CEF**
    ```
-   Extraire le contenu dans:
+   Extract contents to:
    e:\Project_SIMILI\Project\src\ThirdParty\CEF\cef_binary\
    ```
 
-3. **Structure attendue**
+3. **Expected structure**
    ```
    CEF/
    ├── CMakeLists.txt
@@ -34,12 +33,12 @@
        └── CMakeLists.txt
    ```
 
-## Configuration CMake
+## CMake Configuration
 
-Pour activer CEF dans le projet principal, ajouter dans le CMakeLists.txt racine:
+To enable CEF in the main project, add to the root CMakeLists.txt:
 
 ```cmake
-# Option pour activer CEF
+# Option to enable CEF
 option(USE_CEF "Enable Chromium Embedded Framework" OFF)
 
 if(USE_CEF)
@@ -48,24 +47,25 @@ if(USE_CEF)
 endif()
 ```
 
-## Utilisation
+## Usage
 
-Exemple d'intégration basique:
+Basic integration example:
 
 ```cpp
 #include "include/cef_app.h"
 #include "include/cef_client.h"
 #include "include/cef_render_handler.h"
 
-// Voir exemples dans la documentation CEF
+// See examples in CEF documentation
 ```
 
-## Licence
+## License
 
-CEF est sous licence BSD. Voir: https://bitbucket.org/chromiumembedded/cef/src/master/LICENSE.txt
+CEF is licensed under BSD. See: https://bitbucket.org/chromiumembedded/cef/src/master/LICENSE.txt
 
-## Taille approximative
+## Approximate Size
 
 - Binary distribution: ~500 MB
 - Runtime: ~200 MB
-- Pas de connexion internet requise pour le fonctionnement local
+- No internet connection required for local operation
+

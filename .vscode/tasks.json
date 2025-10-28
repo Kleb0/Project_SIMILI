@@ -3,7 +3,7 @@
   "tasks": 
   [
     {
-      "label": "Native Build SIMILI x64 (Release)",
+      "label": "Build SIMILI (UI + Main)",
       "type": "shell",
       "command": "${workspaceFolder}\\build_simili.bat",
       "options": {
@@ -18,8 +18,7 @@
         "kind": "build",
         "isDefault": true
       },
-      "detail": "Initialise vcvars64 et build le projet SIMILI en Release",
-      "dependsOn": ["Deploy UI"]
+      "detail": "Fast incremental build: UI + SIMILI with parallel compilation (10-20s)"
     },
     {
       "label": "Build SIMILI_UI",
@@ -33,7 +32,8 @@
         }
       },
       "problemMatcher": [],
-      "detail": "Compile SIMILI_UI.exe (CEF interface web)"
+      "group": "build",
+      "detail": "Compile SIMILI_UI.exe only"
     },
     {
       "label": "Deploy UI",
@@ -47,8 +47,9 @@
         }
       },
       "problemMatcher": [],
-      "detail": "Déploie SIMILI_UI.exe et les dépendances CEF dans build/Release",
-      "dependsOn": ["Build SIMILI_UI"]
+      "group": "build",
+      "detail": "Deploy SIMILI_UI.exe and CEF dependencies to build/Release"
     }
   ]  
 }
+

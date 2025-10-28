@@ -1,13 +1,10 @@
-# SIMILI_UI - Processus CEF séparé pour l'interface web
 cmake_minimum_required(VERSION 3.16)
 project(SIMILI_UI)
 
 set(CMAKE_CXX_STANDARD 17)
 
-# Force runtime statique pour CEF
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
-# Ajouter CEF
 set(CEF_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../ThirdParty/CEF/cef_binary")
 if(NOT EXISTS "${CEF_ROOT}")
     message(FATAL_ERROR "CEF not found at ${CEF_ROOT}")
@@ -15,7 +12,6 @@ endif()
 
 add_subdirectory(${CEF_ROOT} ${CMAKE_CURRENT_BINARY_DIR}/cef_binary)
 
-# Sources du processus UI
 set(SIMILI_UI_SOURCES
     main_ui.cpp
     ui_app.cpp
@@ -29,7 +25,6 @@ set(SIMILI_UI_HEADERS
     ipc_client.hpp
 )
 
-# Exécutable CEF
 add_executable(SIMILI_UI WIN32
     ${SIMILI_UI_SOURCES}
     ${SIMILI_UI_HEADERS}
@@ -46,17 +41,15 @@ target_include_directories(SIMILI_UI PRIVATE
     ${CEF_ROOT}/include
 )
 
-# Définir les macros CEF requises
 target_compile_definitions(SIMILI_UI PRIVATE
     UNICODE
     _UNICODE
 )
 
-# Copier les DLLs CEF
+
 set(CEF_BINARY_DIR "${CEF_ROOT}/Release")
 set(CEF_RESOURCE_DIR "${CEF_ROOT}/Resources")
 
-# Installation
 install(TARGETS SIMILI_UI DESTINATION bin)
 install(DIRECTORY ${CEF_BINARY_DIR}/ DESTINATION bin FILES_MATCHING PATTERN "*.dll")
 install(DIRECTORY ${CEF_RESOURCE_DIR}/ DESTINATION bin)
