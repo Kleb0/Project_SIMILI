@@ -48,29 +48,30 @@ public:
 private:
     void serverLoop() {
         while (running_) {
-            // Créer le named pipe
+
             HANDLE pipe = CreateNamedPipeA(
                 pipe_name_.c_str(),
                 PIPE_ACCESS_DUPLEX,
                 PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
-                1, // Max instances
-                4096, // Output buffer
-                4096, // Input buffer
+                1,
+                4096,
+                4096,
                 0,
                 nullptr
             );
 
-            if (pipe == INVALID_HANDLE_VALUE) {
+            if (pipe == INVALID_HANDLE_VALUE) 
+            {
                 Sleep(100);
                 continue;
             }
 
-            // Attendre connexion
-            if (ConnectNamedPipe(pipe, nullptr) || GetLastError() == ERROR_PIPE_CONNECTED) {
+            if (ConnectNamedPipe(pipe, nullptr) || GetLastError() == ERROR_PIPE_CONNECTED) 
+            {
                 client_handle_ = pipe;
 
-                // Lire les messages
-                while (running_) {
+                while (running_) 
+                {
                     char buffer[4096];
                     DWORD read;
                     
@@ -79,8 +80,10 @@ private:
                         if (callback_) {
                             callback_(std::string(buffer));
                         }
-                    } else {
-                        break; // Client déconnecté
+                    } 
+                    else 
+                    {
+                        break; 
                     }
                 }
 

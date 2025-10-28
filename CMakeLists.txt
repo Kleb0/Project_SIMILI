@@ -4,8 +4,20 @@ add_definitions(-DUNICODE -D_UNICODE)
 
 set(CMAKE_CXX_STANDARD 17)
 
-# Option pour activer/désactiver CEF
-option(USE_CEF "Enable Chromium Embedded Framework for UI" OFF)  # ← Désactivé temporairement
+# Enable compiler cache if available (ccache/sccache)
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    message(STATUS "Using ccache for compilation: ${CCACHE_PROGRAM}")
+endif()
+
+# Optimize build performance
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MP /O2")
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MP /O2")
+
+
+option(USE_CEF "Enable Chromium Embedded Framework for UI" OFF) 
 
 if(USE_CEF)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -125,6 +137,12 @@ list(APPEND SOURCES ${IMGUIZMO_SOURCES})
 # Glad sources
 file(GLOB_RECURSE GLAD_SOURCES CONFIGURE_DEPENDS src/ThirdParty/glad/*.c)
 
+# Exclude GLAD from Unity builds (C files, not C++)
+set_source_files_properties(${GLAD_SOURCES} PROPERTIES
+    SKIP_PRECOMPILE_HEADERS ON
+    SKIP_UNITY_BUILD_INCLUSION ON
+)
+
 # GLFW
 set(GLFW_BUILD_EXAMPLES OFF CACHE INTERNAL "GLFW: Build the examples" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE INTERNAL "GLFW: Build the tests" FORCE)
@@ -193,6 +211,18 @@ add_executable(${PROJECT_NAME}
     ${HEADERS}
     ${UIS}
     ${GLAD_SOURCES}
+)
+
+# Unity builds for faster compilation (optional - can be disabled if causing issues)
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    UNITY_BUILD ON
+    UNITY_BUILD_BATCH_SIZE 16
+)
+
+# Precompiled Headers (PCH) for faster compilation
+# Only for C++ files, exclude C files like GLAD
+target_precompile_headers(${PROJECT_NAME} PRIVATE
+    "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/src/pch.hpp>"
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
