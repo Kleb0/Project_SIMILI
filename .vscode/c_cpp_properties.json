@@ -36,6 +36,7 @@
         "${workspaceFolder}/src/ThirdParty/glad/include",
         "${workspaceFolder}/src/ThirdParty/glm",
         "${workspaceFolder}/src/ThirdParty/GLFW/include",
+        "${workspaceFolder}/src/ThirdParty/CEF/cef_binary",
         "C:/libs/SDL3/include",
         "C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/um",
         "C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/shared",

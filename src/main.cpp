@@ -45,12 +45,22 @@ fs::path gExecutableDir;
 #include "UI/EdgeLoopControl/EdgeLoopControl.hpp"
 #include "Engine/SimiliSelector.hpp"
 #include "Engine/ErrorBox.hpp"
+#include "Engine/ui_process_manager.hpp"
 
 // #include "UI/DirectX12TestWindow.hpp"
 
 int main(int argc, char **argv)
 {
     gExecutableDir = fs::path(argv[0]).parent_path();
+
+    // Lancer le processus CEF pour l'interface web
+    UIProcessManager uiManager;
+    
+    if (!uiManager.start()) {
+        std::cerr << "Erreur: Impossible de lancer SIMILI_UI.exe" << std::endl;
+    } else {
+        std::cout << "SIMILI_UI.exe lancé avec succès!" << std::endl;
+    }
 
     MainSoftwareGUI gui(1280, 720, "Main GUI");
     SimiliSelector mySimiliSelector;
@@ -105,9 +115,10 @@ int main(int argc, char **argv)
     myThreeDScene.addObject(cubeMesh1);
     myThreeDScene.addObject(&mainCamera);
     
-    myThreeDScene.render();
 
     myThreeDScene.setActiveCamera(&mainCamera);
+    
+    myThreeDScene.render();
     myThreeDWindow.setModelingMode(&myThreeDWindow.normalMode);
     myThreeDWindow.setSimiliSelector(&mySimiliSelector);
 
@@ -155,4 +166,8 @@ int main(int argc, char **argv)
 
     gui.run();
     UiCreator::saveCurrentLayoutToDefault();
+    
+    // Fermer proprement le processus CEF
+    uiManager.stop();
+    std::cout << "SIMILI_UI.exe fermé." << std::endl;
 }

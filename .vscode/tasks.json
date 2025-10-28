@@ -3,7 +3,7 @@
   "tasks": 
   [
     {
-      "label": "Native Build SIMILI x64 (Release)",
+      "label": "Build SIMILI (UI + Main)",
       "type": "shell",
       "command": "${workspaceFolder}\\build_simili.bat",
       "options": {
@@ -18,7 +18,53 @@
         "kind": "build",
         "isDefault": true
       },
-      "detail": "Initialise vcvars64 et build le projet SIMILI en Release"
+      "detail": "Fast incremental build: UI + SIMILI with parallel compilation (10-20s)"
     },
+    {
+      "label": "Build SIMILI_UI",
+      "type": "shell",
+      "command": "${workspaceFolder}\\build_ui.bat",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "shell": {
+          "executable": "cmd.exe",
+          "args": ["/d", "/c"]
+        }
+      },
+      "problemMatcher": [],
+      "group": "build",
+      "detail": "Compile SIMILI_UI.exe only"
+    },
+    {
+      "label": "Deploy UI",
+      "type": "shell",
+      "command": "${workspaceFolder}\\deploy_ui.bat",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "shell": {
+          "executable": "cmd.exe",
+          "args": ["/d", "/c"]
+        }
+      },
+      "problemMatcher": [],
+      "group": "build",
+      "detail": "Deploy SIMILI_UI.exe and CEF dependencies to build/Release"
+    },
+    {
+      "label": "Download CEF",
+      "type": "shell",
+      "command": "${workspaceFolder}\\download_cef.bat",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "shell": {
+          "executable": "cmd.exe",
+          "args": ["/d", "/c"]
+        }
+      },
+      "problemMatcher": [],
+      "group": "none",
+      "detail": "Download and extract CEF binary distribution"
+    }
   ]  
 }
+

@@ -384,7 +384,6 @@ namespace MeshEdit
 
 		if (currentIndex < 0 || currentIndex >= static_cast<int>(centers.size())) 
 		{
-			std::cout << "[findNextQuadEdgesForFirstRow] Invalid currentIndex: " << currentIndex << std::endl;
 			return;
 		}
 
@@ -394,15 +393,14 @@ namespace MeshEdit
 
 		if (!currentVert || !nextVert) 
 		{
-			std::cout << "[findNextQuadEdgesForFirstRow] Invalid vertices" << std::endl;
 			return;
 		}
 
-		std::cout << "[findNextQuadEdgesForFirstRow] Processing quad between center vertex " 
-				  << currentIndex << " and " << nextIndex << std::endl;
+
 
 		// ---------- 1: Find the first perpendicular edge (connected to currentVert)
 		// This edge can already be marked because it's shared with the previous quad
+
 		Edge* currentPerpendicularEdge = nullptr;
 		const auto& connectedEdges = currentVert->getEdges();
 
@@ -422,19 +420,15 @@ namespace MeshEdit
 
 			if (dot < 0.0f)
 			{
-				// Accept this edge even if already marked (it's shared with previous quad)
-				edge->setColor(glm::vec4(0.0f, 1.0f, 0.0f, 1.0f)); // Green for debug
+				edge->setColor(glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
 				currentPerpendicularEdge = edge;
 				QuadEdges.push_back(currentPerpendicularEdge);
-				std::cout << "[findNextQuadEdgesForFirstRow] Found first perpendicular edge (green) - already marked: " 
-						  << (edge->hasbeenMarkedOnceInCutQuad ? "YES" : "NO") << std::endl;
 				break;
 			}
 		}
 
 		if (!currentPerpendicularEdge)
 		{
-			std::cout << "[findNextQuadEdgesForFirstRow] Could not find current perpendicular edge" << std::endl;
 			return;
 		}
 
@@ -461,11 +455,9 @@ namespace MeshEdit
 				connectingEdge->hasbeenMarkedOnceInCutQuad = true;
 			}
 			QuadEdges.push_back(connectingEdge);
-			std::cout << "[findNextQuadEdgesForFirstRow] Found connecting center edge (green)" << std::endl;
 		}
 		else
 		{
-			std::cout << "[findNextQuadEdgesForFirstRow] Could not find connecting edge" << std::endl;
 			return;
 		}
 
@@ -491,7 +483,6 @@ namespace MeshEdit
 					e->hasbeenMarkedOnceInCutQuad = true;
 					nextPerpendicularEdge = e;
 					QuadEdges.push_back(nextPerpendicularEdge);
-					std::cout << "[findNextQuadEdgesForFirstRow] Found next perpendicular edge (green)" << std::endl;
 					break;
 				}
 			}
@@ -499,7 +490,6 @@ namespace MeshEdit
 
 		if (!nextPerpendicularEdge)
 		{
-			std::cout << "[findNextQuadEdgesForFirstRow] Could not find next perpendicular edge" << std::endl;
 			return;
 		}
 
@@ -529,6 +519,10 @@ namespace MeshEdit
 		{
 			return;
 		}
+
+		// -------- Create the quad from the found edges
+		buildQuadFromEdges(QuadEdges, currentVert, nextVert, mesh);
+
 	}
 
 	void buildQuadFromEdges(const std::vector<Edge*>& QuadEdges, Vertice* currentVert, Vertice* nextVert, Mesh* mesh)
