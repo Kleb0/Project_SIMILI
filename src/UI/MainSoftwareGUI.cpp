@@ -177,6 +177,10 @@ void MainSoftwareGUI::initGLFW(int width, int height, const char *title)
 	std::cout << "OpenGL version: " << glGetString(GL_VERSION) << std::endl;
 	std::cout << "Renderer: " << glGetString(GL_RENDERER) << std::endl;
 	glfwSwapInterval(1);
+	
+	glfwSetWindowCloseCallback(window, [](GLFWwindow* win) {
+		std::cout << "[GLFW] Window close requested." << std::endl;
+	});
 }
 
 void MainSoftwareGUI::initImGui()
@@ -217,8 +221,6 @@ void MainSoftwareGUI::run()
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
-
-
 
 		if (contextualMenu)
 		{

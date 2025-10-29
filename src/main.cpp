@@ -49,17 +49,37 @@ fs::path gExecutableDir;
 
 // #include "UI/DirectX12TestWindow.hpp"
 
+UIProcessManager* g_uiManager = nullptr;
+
+BOOL WINAPI ConsoleCtrlHandler(DWORD dwCtrlType) {
+    if (dwCtrlType == CTRL_CLOSE_EVENT || dwCtrlType == CTRL_C_EVENT || 
+        dwCtrlType == CTRL_BREAK_EVENT || dwCtrlType == CTRL_LOGOFF_EVENT || 
+        dwCtrlType == CTRL_SHUTDOWN_EVENT) {
+        
+        std::cout << "[ConsoleCtrl] Cleanup signal received, stopping UI process..." << std::endl;
+        
+        if (g_uiManager) {
+            g_uiManager->stop();
+        }
+        
+        return TRUE;
+    }
+    return FALSE;
+}
+
 int main(int argc, char **argv)
 {
     gExecutableDir = fs::path(argv[0]).parent_path();
 
-    // Lancer le processus CEF pour l'interface web
+    SetConsoleCtrlHandler(ConsoleCtrlHandler, TRUE);
+
     UIProcessManager uiManager;
+    g_uiManager = &uiManager;
     
     if (!uiManager.start()) {
-        std::cerr << "Erreur: Impossible de lancer SIMILI_UI.exe" << std::endl;
+        std::cerr << "Error: Failed to launch SIMILI_UI.exe" << std::endl;
     } else {
-        std::cout << "SIMILI_UI.exe lancé avec succès!" << std::endl;
+        std::cout << "SIMILI_UI.exe launched successfully!" << std::endl;
     }
 
     MainSoftwareGUI gui(1280, 720, "Main GUI");
@@ -165,10 +185,12 @@ int main(int argc, char **argv)
     gui.setScene(&myThreeDScene);
 
     gui.run();
+    
     UiCreator::saveCurrentLayoutToDefault();
     
-    // Fermer proprement le processus CEF
+    std::cout << "Shutting down SIMILI_UI.exe..." << std::endl;
     uiManager.stop();
-    std::cout << "SIMILI_UI.exe fermé." << std::endl;
+    
+    return 0;
 }
     
