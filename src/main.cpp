@@ -17,6 +17,8 @@ fs::path gExecutableDir;
 #include <sstream>
 #include <fstream>
 #include <iostream>
+#include <thread>
+#include <chrono>
 
 #include "Engine/OpenGLContext.hpp"
 #include "Engine/ThreeDScene.hpp"
@@ -137,6 +139,9 @@ int main(int argc, char **argv)
     
 
     myThreeDScene.setActiveCamera(&mainCamera);
+    
+    // Connect UI Manager to scene for IPC communication
+    uiManager.setScene(&myThreeDScene);
     
     myThreeDScene.render();
     myThreeDWindow.setModelingMode(&myThreeDWindow.normalMode);

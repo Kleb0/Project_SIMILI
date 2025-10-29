@@ -381,3 +381,35 @@ nlohmann::json ThreeDScene::getSceneData() const
     sceneData["scene_id"] = sceneDNA->getSceneID(); 
     return sceneData;
 }
+
+nlohmann::json ThreeDScene::getObjectsListAsJson() const
+{
+    nlohmann::json objectsList = nlohmann::json::array();
+    
+    for (const auto* obj : objects)
+    {
+        if (!obj) continue;
+        
+        nlohmann::json objData;
+        objData["id"] = obj->getID();
+        objData["name"] = obj->getName();
+        
+        // Déterminer le type d'objet
+        if (dynamic_cast<const Camera*>(obj))
+        {
+            objData["type"] = "Camera";
+        }
+        else if (obj->getIsMesh())
+        {
+            objData["type"] = "Mesh";
+        }
+        else
+        {
+            objData["type"] = "Object";
+        }
+        
+        objectsList.push_back(objData);
+    }
+    
+    return objectsList;
+}
