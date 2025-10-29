@@ -1,11 +1,29 @@
 # Chromium Embedded Framework (CEF) Integration
 
-## Installation
+## Quick Installation (Automated)
+
+Run the automated download script from the project root:
+
+```cmd
+download_cef.bat
+```
+
+This script will:
+1. Download CEF from Spotify CDN
+2. Extract the archive (requires 7-Zip)
+3. Install to the correct location
+
+**Requirements:**
+- Windows 10+ (for curl)
+- [7-Zip](https://www.7-zip.org/download.html) installed
+
+## Manual Installation
 
 1. **Download CEF**
    - Go to: https://cef-builds.spotifycdn.com/index.html
    - Choose Windows 64-bit version (Standard Distribution)
-   - Recommended version: 120.x or higher
+   - Recommended version: **141.0.11+g7e73ac4+chromium-141.0.7390.123**
+   - Direct link: https://cef-builds.spotifycdn.com/cef_binary_141.0.11+g7e73ac4+chromium-141.0.7390.123_windows64.tar.bz2
 
 2. **Extract CEF**
    ```

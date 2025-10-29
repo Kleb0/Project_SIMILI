@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Object List - SIMILI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1e1e1e;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        
+        .header h1 {
+            font-size: 1.8em;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 0.9em;
+        }
+        
+        .object-list {
+            background: #2d2d2d;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        
+        .object-item {
+            background: #3d3d3d;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            transition: all 0.3s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .object-item:hover {
+            background: #4d4d4d;
+            transform: translateX(5px);
+            border-left-color: #764ba2;
+        }
+        
+        .object-name {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        
+        .object-type {
+            color: #888;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        
+        .object-id {
+            background: rgba(102, 126, 234, 0.2);
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.85em;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #888;
+        }
+        
+        .empty-state h2 {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+        
+        .refresh-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            margin-top: 15px;
+            transition: transform 0.2s ease;
+        }
+        
+        .refresh-btn:hover {
+            transform: scale(1.05);
+        }
+        
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            flex: 1;
+            background: #2d2d2d;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            color: #888;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📋 Liste des Objets</h1>
+        <p>Gestion de la scène 3D SIMILI</p>
+    </div>
+    
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-value" id="total-objects">0</div>
+            <div class="stat-label">Objets</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="total-meshes">0</div>
+            <div class="stat-label">Meshes</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="total-cameras">0</div>
+            <div class="stat-label">Caméras</div>
+        </div>
+    </div>
+    
+    <button class="refresh-btn" onclick="refreshObjectList()">🔄 Rafraîchir</button>
+    
+    <div class="object-list" id="object-list">
+        <div class="empty-state">
+            <h2>Aucun objet dans la scène</h2>
+            <p>Les objets apparaîtront ici automatiquement</p>
+        </div>
+    </div>
+    
+    <script>
+
+    let sceneObjects = [
+            { id: 1, name: "Cube", type: "Mesh" },
+            { id: 2, name: "MainCamera", type: "Camera" },
+        ];
+        
+        function renderObjectList(objects) {
+            const container = document.getElementById('object-list');
+            
+            if (!objects || objects.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h2>Aucun objet dans la scène</h2>
+                        <p>Les objets apparaîtront ici automatiquement</p>
+                    </div>
+                `;
+                updateStats(0, 0, 0);
+                return;
+            }
+            
+            let html = '';
+            let meshCount = 0;
+            let cameraCount = 0;
+            
+            objects.forEach(obj => {
+                if (obj.type === 'Mesh') meshCount++;
+                if (obj.type === 'Camera') cameraCount++;
+                
+                html += `
+                    <div class="object-item" onclick="selectObject(${obj.id})">
+                        <div>
+                            <div class="object-name">${obj.name}</div>
+                            <div class="object-type">${obj.type}</div>
+                        </div>
+                        <div class="object-id">ID: ${obj.id}</div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+            updateStats(objects.length, meshCount, cameraCount);
+        }
+        
+        function updateStats(total, meshes, cameras) {
+            document.getElementById('total-objects').textContent = total;
+            document.getElementById('total-meshes').textContent = meshes;
+            document.getElementById('total-cameras').textContent = cameras;
+        }
+        
+        function selectObject(objectId) {
+            console.log('Object selected:', objectId);
+            // TODO: Envoyer message IPC pour sélectionner l'objet dans la scène
+        }
+        
+        function refreshObjectList() {
+            console.log('Refreshing object list...');
+            // TODO: Demander la liste via IPC
+            renderObjectList(sceneObjects);
+        }
+        
+        // Initialiser l'affichage
+        renderObjectList(sceneObjects);
+        
+        console.log('Object List UI initialized');
+    </script>
+</body>
+</html>

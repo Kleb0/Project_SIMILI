@@ -49,6 +49,21 @@
       "problemMatcher": [],
       "group": "build",
       "detail": "Deploy SIMILI_UI.exe and CEF dependencies to build/Release"
+    },
+    {
+      "label": "Download CEF",
+      "type": "shell",
+      "command": "${workspaceFolder}\\download_cef.bat",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "shell": {
+          "executable": "cmd.exe",
+          "args": ["/d", "/c"]
+        }
+      },
+      "problemMatcher": [],
+      "group": "none",
+      "detail": "Download and extract CEF binary distribution"
     }
   ]  
 }
