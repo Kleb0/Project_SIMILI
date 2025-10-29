@@ -4,10 +4,14 @@
 #include <windows.h>
 #include <string>
 #include <iostream>
+#include <thread>
+#include <chrono>
+
+class ThreeDScene;
 
 class UIProcessManager {
 public:
-    UIProcessManager() : process_handle_(nullptr), ipc_server_("SIMILI_IPC") {}
+    UIProcessManager() : process_handle_(nullptr), ipc_server_("SIMILI_IPC"), scene_(nullptr) {}
 
     ~UIProcessManager() {
         stop();
@@ -45,8 +49,10 @@ public:
         return true;
     }
 
-    void stop() {
-        if (!process_handle_) {
+    void stop() 
+    {
+        if (!process_handle_) 
+        {
             return;
         }
 
@@ -61,21 +67,41 @@ public:
         std::cout << "[UIProcessManager] UI process stopped." << std::endl;
     }
 
-    void sendToUI(const std::string& message) {
+    void sendToUI(const std::string& message) 
+    {
         ipc_server_.sendToUI(message);
     }
+
+    void setScene(ThreeDScene* scene) 
+    {
+        scene_ = scene;
+    }
+
+    void sendObjectsListToUI();
 
 private:
     void onMessageFromUI(const std::string& message) {
         std::cout << "[IPC] Message from UI: " << message << "\n";
 
-        if (message == "browser_created") {
+        if (message == "browser_created") 
+        {
             std::cout << "UI browser created\n";
-        } else if (message == "browser_closed") {
+            // Envoyer la liste des objets dès que le navigateur est créé
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            sendObjectsListToUI();
+        } 
+        else if (message == "browser_closed") 
+        {
             std::cout << "UI browser closed\n";
+        } 
+        else if (message == "request_objects_list") 
+        {
+            std::cout << "UI requested objects list\n";
+            sendObjectsListToUI();
         }
     }
 
     HANDLE process_handle_;
     IPCServer ipc_server_;
+    ThreeDScene* scene_;
 };

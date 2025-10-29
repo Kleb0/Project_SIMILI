@@ -37,12 +37,24 @@ public:
 
     bool sendToUI(const std::string& message) {
         // Envoyer au client connecté
-        if (client_handle_ == INVALID_HANDLE_VALUE) return false;
+        if (client_handle_ == INVALID_HANDLE_VALUE) {
+            std::cerr << "[IPC Server] No client connected, cannot send message\n";
+            return false;
+        }
 
         DWORD written;
-        return WriteFile(client_handle_, message.c_str(), 
+        bool result = WriteFile(client_handle_, message.c_str(), 
                         static_cast<DWORD>(message.size()), 
                         &written, nullptr) != 0;
+        
+        if (result) {
+            FlushFileBuffers(client_handle_); // Force l'envoi immédiat
+            std::cout << "[IPC Server] Sent " << written << " bytes to UI\n";
+        } else {
+            std::cerr << "[IPC Server] Failed to send message: " << GetLastError() << "\n";
+        }
+        
+        return result;
     }
 
 private:

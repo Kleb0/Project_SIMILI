@@ -166,12 +166,30 @@
     
     <script>
 
-    let sceneObjects = [
-            { id: 1, name: "Cube", type: "Mesh" },
-            { id: 2, name: "MainCamera", type: "Camera" },
-        ];
+    let sceneObjects = [];
+    
+    function sendLog(message) {
+        if (window.cefQuery) {
+            window.cefQuery({
+                request: 'log:' + message,
+                onSuccess: function(response) {},
+                onFailure: function(error_code, error_message) {}
+            });
+        }
+    }
+    
+    window.handleIPCMessage = function(message) {
+        sendLog('[HTML] handleIPCMessage called');
+        
+        if (message.type === 'objects_list') {
+            sendLog('[HTML] Received objects_list with ' + (message.data ? message.data.length : 0) + ' objects');
+            sceneObjects = message.data || [];
+            renderObjectList(sceneObjects);
+        }
+    };
         
         function renderObjectList(objects) {
+            sendLog('[HTML] renderObjectList called with ' + objects.length + ' objects');
             const container = document.getElementById('object-list');
             
             if (!objects || objects.length === 0) {
@@ -215,20 +233,34 @@
         }
         
         function selectObject(objectId) {
-            console.log('Object selected:', objectId);
             // TODO: Envoyer message IPC pour sélectionner l'objet dans la scène
         }
         
         function refreshObjectList() {
-            console.log('Refreshing object list...');
-            // TODO: Demander la liste via IPC
-            renderObjectList(sceneObjects);
+            sendLog('[HTML] refreshObjectList called');
+            
+            if (window.cefQuery) {
+                sendLog('[HTML] Sending request_objects_list via cefQuery');
+                window.cefQuery({
+                    request: 'request_objects_list',
+                    onSuccess: function(response) {
+                        sendLog('[HTML] request_objects_list SUCCESS: ' + response);
+                    },
+                    onFailure: function(error_code, error_message) {
+                        sendLog('[HTML] request_objects_list FAILED: ' + error_message);
+                    }
+                });
+            } else {
+                sendLog('[HTML] cefQuery not available!');
+                renderObjectList(sceneObjects);
+            }
         }
         
         // Initialiser l'affichage
         renderObjectList(sceneObjects);
         
-        console.log('Object List UI initialized');
+        // Pas besoin d'appeler refreshObjectList() au chargement
+        // car le serveur envoie automatiquement les données sur "browser_created"
     </script>
 </body>
 </html>

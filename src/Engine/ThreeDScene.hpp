@@ -77,6 +77,7 @@ public:
 
     std::string getSceneID() const { return sceneDNA->getSceneID(); }
     nlohmann::json getSceneData() const;
+    nlohmann::json getObjectsListAsJson() const;
 
 private:
     friend class HistoryLogic;

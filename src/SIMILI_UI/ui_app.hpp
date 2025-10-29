@@ -2,21 +2,30 @@
 #pragma once
 
 #include "include/cef_app.h"
+#include "include/wrapper/cef_message_router.h"
 
-class UIApp : public CefApp, public CefBrowserProcessHandler {
+class UIApp : public CefApp, 
+			  public CefBrowserProcessHandler,
+			  public CefRenderProcessHandler {
 public:
-    UIApp() = default;
+	UIApp();
 
-    // CefApp methods
-    virtual CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler() override {
-        return this;
-    }
+	virtual CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler() override;
+	virtual CefRefPtr<CefRenderProcessHandler> GetRenderProcessHandler() override;
 
-    // CefBrowserProcessHandler methods
-    virtual void OnContextInitialized() override {
-        // Appelé quand CEF est initialisé
-    }
+	virtual void OnContextInitialized() override;
+
+	virtual void OnContextCreated(CefRefPtr<CefBrowser> browser,
+	CefRefPtr<CefFrame> frame, CefRefPtr<CefV8Context> context) override;
+
+	virtual void OnContextReleased(CefRefPtr<CefBrowser> browser,
+ 	CefRefPtr<CefFrame> frame, CefRefPtr<CefV8Context> context) override;
+
+	virtual bool OnProcessMessageReceived(CefRefPtr<CefBrowser> browser,
+	CefRefPtr<CefFrame> frame, CefProcessId source_process, CefRefPtr<CefProcessMessage> message) override;
 
 private:
-    IMPLEMENT_REFCOUNTING(UIApp);
+	CefRefPtr<CefMessageRouterRendererSide> render_message_router_;
+	
+	IMPLEMENT_REFCOUNTING(UIApp);
 };

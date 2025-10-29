@@ -12,18 +12,9 @@ endif()
 
 add_subdirectory(${CEF_ROOT} ${CMAKE_CURRENT_BINARY_DIR}/cef_binary)
 
-set(SIMILI_UI_SOURCES
-    main_ui.cpp
-    ui_app.cpp
-    ui_handler.cpp
-    ipc_client.cpp
-)
-
-set(SIMILI_UI_HEADERS
-    ui_app.hpp
-    ui_handler.hpp
-    ipc_client.hpp
-)
+# Collecter automatiquement tous les fichiers sources et headers
+file(GLOB SIMILI_UI_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
+file(GLOB SIMILI_UI_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp")
 
 add_executable(SIMILI_UI WIN32
     ${SIMILI_UI_SOURCES}

@@ -4,94 +4,55 @@
 #include "include/cef_client.h"
 #include "include/cef_app.h"
 #include "include/wrapper/cef_helpers.h"
+#include "include/wrapper/cef_message_router.h"
 #include "ipc_client.hpp"
+#include "message_handler.hpp"
 #include <list>
 #include <sstream>
+#include <thread>
+#include <atomic>
 
-class UIHandler : public CefClient,
-                  public CefDisplayHandler,
-                  public CefLifeSpanHandler,
-                  public CefLoadHandler {
+class UIHandler : public CefClient, public CefDisplayHandler,
+				  public CefLifeSpanHandler, public CefLoadHandler, public CefRequestHandler 
+{
 public:
-    explicit UIHandler() : ipc_client_("SIMILI_IPC") {}
+	explicit UIHandler();
+	~UIHandler();
 
-    // CefClient methods
-    virtual CefRefPtr<CefDisplayHandler> GetDisplayHandler() override { return this; }
-    virtual CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override { return this; }
-    virtual CefRefPtr<CefLoadHandler> GetLoadHandler() override { return this; }
+	// CefClient methods
+	virtual CefRefPtr<CefDisplayHandler> GetDisplayHandler() override;
+	virtual CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override;
+	virtual CefRefPtr<CefLoadHandler> GetLoadHandler() override;
+	virtual CefRefPtr<CefRequestHandler> GetRequestHandler() override;
 
-    // CefDisplayHandler methods
-    virtual void OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) override {
-        // Titre de la fenêtre changé
-    }
+	// CefDisplayHandler methods
+	virtual void OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) override;
 
-    // CefLifeSpanHandler methods
-    virtual void OnAfterCreated(CefRefPtr<CefBrowser> browser) override {
-        CEF_REQUIRE_UI_THREAD();
-        browser_list_.push_back(browser);
-        
-        // Notifier le processus principal
-        ipc_client_.send("browser_created");
-    }
+	// CefLifeSpanHandler methods
+	virtual void OnAfterCreated(CefRefPtr<CefBrowser> browser) override;
+	virtual bool DoClose(CefRefPtr<CefBrowser> browser) override;
+	virtual void OnBeforeClose(CefRefPtr<CefBrowser> browser) override;
 
-    virtual bool DoClose(CefRefPtr<CefBrowser> browser) override {
-        CEF_REQUIRE_UI_THREAD();
-        return false;
-    }
+	// CefLoadHandler methods
+	virtual void OnLoadError(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, ErrorCode errorCode, 
+	const CefString& errorText, const CefString& failedUrl) override;
 
-    virtual void OnBeforeClose(CefRefPtr<CefBrowser> browser) override {
-        CEF_REQUIRE_UI_THREAD();
+	// CefRequestHandler methods
+	virtual bool OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame,
+	 CefProcessId source_process, CefRefPtr<CefProcessMessage> message) override;
 
-        // Retirer de la liste
-        for (auto it = browser_list_.begin(); it != browser_list_.end(); ++it) {
-            if ((*it)->IsSame(browser)) {
-                browser_list_.erase(it);
-                break;
-            }
-        }
-
-        // Quitter si plus de browsers
-        if (browser_list_.empty()) {
-            ipc_client_.send("browser_closed");
-            // Quitter la boucle de messages CEF
-            CefQuitMessageLoop();
-        }
-    }
-
-    // CefLoadHandler methods
-    virtual void OnLoadError(CefRefPtr<CefBrowser> browser,
-                            CefRefPtr<CefFrame> frame,
-                            ErrorCode errorCode,
-                            const CefString& errorText,
-                            const CefString& failedUrl) override {
-        CEF_REQUIRE_UI_THREAD();
-
-        if (errorCode == ERR_ABORTED)
-            return;
-
-        // Afficher une page d'erreur
-        std::stringstream ss;
-        ss << "<html><body bgcolor=\"white\">"
-              "<h2>Failed to load URL "
-           << std::string(failedUrl) << " with error " << std::string(errorText)
-           << " (" << errorCode << ").</h2></body></html>";
-        frame->LoadURL(CefString("data:text/html," + ss.str()));
-    }
-
-    void CloseAllBrowsers(bool force_close) {
-        if (!CefCurrentlyOn(TID_UI)) {
-            return;
-        }
-
-        for (auto it = browser_list_.begin(); it != browser_list_.end(); ++it) {
-            (*it)->GetHost()->CloseBrowser(force_close);
-        }
-    }
+	void CloseAllBrowsers(bool force_close);
+	void startIPCListener(CefRefPtr<CefBrowser> browser);
+	void stopIPCListener();
 
 private:
-    typedef std::list<CefRefPtr<CefBrowser>> BrowserList;
-    BrowserList browser_list_;
-    IPCClient ipc_client_;
+	typedef std::list<CefRefPtr<CefBrowser>> BrowserList;
+	BrowserList browser_list_;
+	IPCClient ipc_client_;
+	CefRefPtr<CefMessageRouterBrowserSide> message_router_;
+	MessageHandler* message_handler_;
+	std::thread ipc_thread_;
+	std::atomic<bool> ipc_running_;
 
-    IMPLEMENT_REFCOUNTING(UIHandler);
+	IMPLEMENT_REFCOUNTING(UIHandler);
 };
