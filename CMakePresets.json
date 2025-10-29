@@ -6,24 +6,40 @@
     },
     "configurePresets": [
       {
-        "name": "msys2-mingw64-debug",
-        "displayName": "MSYS2 MinGW64 (Debug)",
-        "generator": "MinGW Makefiles",
-        "description": "Utilise le toolchain MSYS2 mingw64",
+        "name": "msvc-x64-debug",
+        "displayName": "MSVC x64 (Debug)",
+        "generator": "Visual Studio 17 2022",
+        "architecture": "x64",
+        "description": "Utilise Visual Studio 2022 avec MSVC",
         "binaryDir": "${sourceDir}/build",
         "cacheVariables": {
           "CMAKE_BUILD_TYPE": "Debug",
-          "CMAKE_C_COMPILER": "C:/msys64/mingw64/bin/gcc.exe",
-          "CMAKE_CXX_COMPILER": "C:/msys64/mingw64/bin/g++.exe",
-          "CMAKE_PREFIX_PATH": "C:/msys64/mingw64/lib/cmake",
+          "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+        }
+      },
+      {
+        "name": "msvc-x64-release",
+        "displayName": "MSVC x64 (Release)",
+        "generator": "Visual Studio 17 2022",
+        "architecture": "x64",
+        "description": "Utilise Visual Studio 2022 avec MSVC en mode Release",
+        "binaryDir": "${sourceDir}/build",
+        "cacheVariables": {
+          "CMAKE_BUILD_TYPE": "Release",
           "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
         }
       }
     ],
     "buildPresets": [
       {
-        "name": "msys2-mingw64-build",
-        "configurePreset": "msys2-mingw64-debug"
+        "name": "msvc-x64-debug-build",
+        "configurePreset": "msvc-x64-debug",
+        "configuration": "Debug"
+      },
+      {
+        "name": "msvc-x64-release-build",
+        "configurePreset": "msvc-x64-release",
+        "configuration": "Release"
       }
     ]
   }

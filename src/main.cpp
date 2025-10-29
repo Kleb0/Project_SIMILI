@@ -171,3 +171,4 @@ int main(int argc, char **argv)
     uiManager.stop();
     std::cout << "SIMILI_UI.exe fermé." << std::endl;
 }
+    
