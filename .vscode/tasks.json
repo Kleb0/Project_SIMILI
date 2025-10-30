@@ -64,6 +64,27 @@
       "problemMatcher": [],
       "group": "none",
       "detail": "Download and extract CEF binary distribution"
+    },
+    {
+      "label": "Generate SIMILI_UI CMake",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "-S",
+        ".",
+        "-B",
+        "build",
+        "-G",
+        "Visual Studio 17 2022",
+        "-A",
+        "x64"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/src/SIMILI_UI"
+      },
+      "problemMatcher": [],
+      "group": "build",
+      "detail": "Generate CMake build files for SIMILI_UI in src/SIMILI_UI/build"
     }
   ]  
 }

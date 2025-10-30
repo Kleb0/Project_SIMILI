@@ -3,6 +3,7 @@
 #include "include/views/cef_browser_view.h"
 #include "include/views/cef_window.h"
 #include "include/base/cef_callback.h"
+#include <iostream>
 
 class SimpleWindowDelegate : public CefWindowDelegate {
 public:

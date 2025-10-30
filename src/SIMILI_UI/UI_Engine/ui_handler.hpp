@@ -8,10 +8,12 @@
 #include "include/views/cef_window.h"
 #include "ipc_client.hpp"
 #include "message_handler.hpp"
+#include "overlay_viewport.hpp"
 #include <list>
 #include <sstream>
 #include <thread>
 #include <atomic>
+#include <memory>
 
 class UIHandler : public CefClient, public CefDisplayHandler,
 				  public CefLifeSpanHandler, public CefLoadHandler, public CefRequestHandler 
@@ -45,6 +47,15 @@ public:
 	void CloseAllBrowsers(bool force_close);
 	void startIPCListener(CefRefPtr<CefBrowser> browser);
 	void stopIPCListener();
+	void createOverlayViewport(HWND parent_hwnd);
+	void updateOverlayPosition();
+	void startRenderTimer();
+	void stopRenderTimer();
+	OverlayViewport* getOverlay() { return overlay_viewport_.get(); }
+	HWND getParentHWND() const { return parent_hwnd_; }
+	
+	// Window procedure hook for resize handling
+	static LRESULT CALLBACK ParentWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
 
 private:
 	typedef std::list<CefRefPtr<CefBrowser>> BrowserList;
@@ -54,6 +65,9 @@ private:
 	MessageHandler* message_handler_;
 	std::thread ipc_thread_;
 	std::atomic<bool> ipc_running_;
+	std::unique_ptr<OverlayViewport> overlay_viewport_;
+	HWND parent_hwnd_;
+	UINT_PTR timer_id_;
 
 	IMPLEMENT_REFCOUNTING(UIHandler);
 };

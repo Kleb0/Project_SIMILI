@@ -7,6 +7,7 @@
 #include "ui_handler.hpp"
 #include "simple_window_delegate.hpp"
 #include "simple_browser_view_delegate.hpp"
+#include <iostream>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -27,21 +28,34 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
         return exit_code;
     }
 
+    static bool console_allocated = false;
+    if (!console_allocated) {
+        AllocConsole();
+        FILE* fp;
+        freopen_s(&fp, "CONOUT$", "w", stdout);
+        freopen_s(&fp, "CONOUT$", "w", stderr);
+        console_allocated = true;
+        std::cout << "[Main] Console allocated for debugging" << std::endl;
+    }
+
     CefSettings settings;
     settings.no_sandbox = true;
     settings.multi_threaded_message_loop = false;
     
     CefString(&settings.log_file).FromASCII("simili_ui.log");
-    settings.log_severity = LOGSEVERITY_WARNING;
+    settings.log_severity = LOGSEVERITY_ERROR;  // Only show critical errors
 
-    CefInitialize(main_args, settings, app, nullptr);
+    if (!CefInitialize(main_args, settings, app, nullptr)) {
+        std::cerr << "[Main] Failed to initialize CEF" << std::endl;
+        return -1;
+    }
 
     CefRefPtr<UIHandler> handler(new UIHandler);
 
     CefBrowserSettings browser_settings;
     browser_settings.windowless_frame_rate = 60;
 
-    std::string url = "file:///e:/Project_SIMILI/Project/ui/object_list.html";
+    std::string url = "file:///ui/main_layout.html";
 
     CefRefPtr<SimpleBrowserViewDelegate> browser_view_delegate(new SimpleBrowserViewDelegate());
     
@@ -58,4 +72,5 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
 
     return 0;
 }
-#endif 
+#endif
+ 

@@ -14,6 +14,9 @@ public:
 	virtual CefRefPtr<CefRenderProcessHandler> GetRenderProcessHandler() override;
 
 	virtual void OnContextInitialized() override;
+	
+	// Add command line switches before CEF initialization
+	virtual void OnBeforeCommandLineProcessing(const CefString& process_type, CefRefPtr<CefCommandLine> command_line) override;
 
 	virtual void OnContextCreated(CefRefPtr<CefBrowser> browser,
 	CefRefPtr<CefFrame> frame, CefRefPtr<CefV8Context> context) override;
