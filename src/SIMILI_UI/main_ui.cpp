@@ -1,9 +1,12 @@
 #include "include/cef_app.h"
 #include "include/cef_client.h"
 #include "include/cef_sandbox_win.h"
+#include "include/views/cef_browser_view.h"
+#include "include/views/cef_window.h"
 #include "ui_app.hpp"
 #include "ui_handler.hpp"
-#include "borderless_window.hpp"
+#include "simple_window_delegate.hpp"
+#include "simple_browser_view_delegate.hpp"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -14,8 +17,6 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
                       int nCmdShow) {
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
-
-
 
     CefMainArgs main_args(hInstance);
     
@@ -35,29 +36,21 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
 
     CefInitialize(main_args, settings, app, nullptr);
 
-    BorderlessWindow window("SIMILI - Object List", 800, 600, 100, 100);
-    HWND hwnd = window.create();
-
-    if (!hwnd) {
-        CefShutdown();
-        return -1;
-    }
-
-    CefWindowInfo window_info;
-    RECT rect;
-    GetClientRect(hwnd, &rect);
-    
-    CefRect cef_rect(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
-    window_info.SetAsChild(hwnd, cef_rect);
+    CefRefPtr<UIHandler> handler(new UIHandler);
 
     CefBrowserSettings browser_settings;
-    browser_settings.windowless_frame_rate = 60; 
-
-    CefRefPtr<UIHandler> handler(new UIHandler);
+    browser_settings.windowless_frame_rate = 60;
 
     std::string url = "file:///e:/Project_SIMILI/Project/ui/object_list.html";
 
-    CefBrowserHost::CreateBrowser(window_info, handler, url, browser_settings, nullptr, nullptr);
+    CefRefPtr<SimpleBrowserViewDelegate> browser_view_delegate(new SimpleBrowserViewDelegate());
+    
+    CefRefPtr<CefBrowserView> browser_view = CefBrowserView::CreateBrowserView(
+        handler, url, browser_settings, nullptr, nullptr, browser_view_delegate);
+
+    CefRefPtr<SimpleWindowDelegate> window_delegate(new SimpleWindowDelegate(browser_view));
+    
+    CefWindow::CreateTopLevelWindow(window_delegate);
 
     CefRunMessageLoop();
 

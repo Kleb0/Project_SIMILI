@@ -43,8 +43,7 @@ bool persistent, CefRefPtr<Callback> callback)
 }
 
 void MessageHandler::OnQueryCanceled(CefRefPtr<CefBrowser> browser,
-									 CefRefPtr<CefFrame> frame, 
-									 int64_t query_id)
+CefRefPtr<CefFrame> frame, int64_t query_id)
 {
 	std::cout << "[MessageHandler] Query canceled: " << query_id << std::endl;
 }
