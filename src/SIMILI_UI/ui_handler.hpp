@@ -1,10 +1,11 @@
-// ui_handler.hpp - Gestionnaire d'événements CEF
 #pragma once
 
 #include "include/cef_client.h"
 #include "include/cef_app.h"
 #include "include/wrapper/cef_helpers.h"
 #include "include/wrapper/cef_message_router.h"
+#include "include/views/cef_browser_view.h"
+#include "include/views/cef_window.h"
 #include "ipc_client.hpp"
 #include "message_handler.hpp"
 #include <list>
