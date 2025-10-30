@@ -2,7 +2,7 @@
 
 echo Deploying SIMILI_UI.exe...
 
-copy /Y "src\SIMILI_UI\build\Release\SIMILI_UI.exe" "build\Release\" >nul
+copy /Y "src\SIMILI_UI\build\UI_Engine\Release\SIMILI_UI.exe" "build\Release\" >nul
 if %errorlevel% neq 0 (
     echo ERROR: Unable to copy SIMILI_UI.exe
     exit /b 1
@@ -33,6 +33,15 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+echo Copying UI HTML files...
+if not exist "build\Release\ui" mkdir "build\Release\ui"
+copy /Y "ui\*.html" "build\Release\ui\" >nul
+copy /Y "ui\*.css" "build\Release\ui\" >nul
+if %errorlevel% neq 0 (
+    echo ERROR: Unable to copy UI HTML files
+    exit /b 1
+)
+
 echo.
 echo Deployment completed successfully!
 echo.
@@ -40,4 +49,5 @@ echo Files copied to build\Release\ :
 echo   - SIMILI_UI.exe
 echo   - CEF DLLs (libcef.dll, etc.)
 echo   - CEF Resources (*.pak, locales/)
+echo   - UI HTML files (ui/*.html)
 echo.

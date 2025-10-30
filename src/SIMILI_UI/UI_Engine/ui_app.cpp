@@ -19,6 +19,19 @@ void UIApp::OnContextInitialized()
 {
 }
 
+void UIApp::OnBeforeCommandLineProcessing(const CefString& process_type, CefRefPtr<CefCommandLine> command_line) 
+{
+	// Disable GPU process completely to avoid Vulkan/OpenGL errors from CEF
+	// Our native OpenGL overlay is still fully hardware accelerated
+	command_line->AppendSwitch("disable-gpu");
+	command_line->AppendSwitch("disable-gpu-compositing");
+	command_line->AppendSwitch("disable-software-rasterizer");
+	command_line->AppendSwitch("disable-gpu-shader-disk-cache");
+	command_line->AppendSwitch("disable-gpu-sandbox");
+	command_line->AppendSwitch("in-process-gpu");  // Run GPU in main process (less errors)
+	command_line->AppendSwitch("disable-features=VizDisplayCompositor");
+}
+
 void UIApp::OnContextCreated(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefV8Context> context) 
 {
 	CefMessageRouterConfig config;

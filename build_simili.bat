@@ -47,7 +47,7 @@ if not exist "src\ThirdParty\CEF\cef_binary\Release\libcef.dll" (
     exit /b 1
 )
 
-copy /Y "src\SIMILI_UI\build\Release\SIMILI_UI.exe" "build\Release\" >nul 2>nul
+copy /Y "src\SIMILI_UI\build\UI_Engine\Release\SIMILI_UI.exe" "build\Release\" >nul 2>nul
 if %errorlevel% neq 0 (
     echo WARNING: Failed to copy SIMILI_UI.exe
 )
@@ -67,6 +67,14 @@ copy /Y "src\ThirdParty\CEF\cef_binary\Resources\*.dat" "build\Release\" >nul 2>
 
 if not exist "build\Release\locales" mkdir "build\Release\locales"
 xcopy /Y /Q "src\ThirdParty\CEF\cef_binary\Resources\locales\*" "build\Release\locales\" >nul 2>nul
+
+echo Copying UI HTML files...
+if not exist "build\Release\ui" mkdir "build\Release\ui"
+xcopy /Y /Q "ui\*.html" "build\Release\ui\" >nul 2>nul
+xcopy /Y /Q "ui\*.css" "build\Release\ui\" >nul 2>nul
+if %errorlevel% neq 0 (
+    echo WARNING: Failed to copy UI HTML files
+)
 
 echo   + SIMILI_UI deployed with CEF dependencies
 

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIMILI UI</title>
+    <link rel="stylesheet" href="main_layout.css">
+</head>
+<body>
+    <div class="main-container">
+
+        <!-- Hierarchy Inspector -->
+        <div class="panel hierarchy-panel">
+            <iframe src="hierarchy_inspector.html"></iframe>
+        </div>
+        
+        <!-- Viewport (OpenGL overlay will be positioned here) -->
+        <div class="panel viewport-panel">
+            <!-- Native OpenGL window overlays this div -->
+        </div>
+        
+        <!-- Right Column -->
+        <div class="right-column">
+            <!-- Object Inspector -->
+            <div class="panel object-inspector-panel">
+                <iframe src="object_inspector.html"></iframe>
+            </div>
+            
+            <!-- History Logger -->
+            <div class="panel history-panel">
+                <iframe src="history_logger.html"></iframe>
+            </div>
+        </div>
+        
+        <!-- Project Viewer -->
+        <div class="panel project-viewer-panel">
+            <iframe src="project_viewer.html"></iframe>
+        </div>
+    </div>
+</body>
+</html>
