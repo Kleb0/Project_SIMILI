@@ -162,13 +162,11 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	
 	std::cout << "[UIHandler] Creating overlay with parent HWND: " << parent_hwnd << std::endl;
 	
-	if (!overlay_viewport_) {
+	if (!overlay_viewport_) 
+	{
 		overlay_viewport_ = std::make_unique<OverlayViewport>();
 	}
-	
-	// Calculate viewport position (center area of the layout)
-	// These values should match the CSS grid layout
-	// For now, using estimated values - will be refined
+
 	RECT client_rect;
 	GetClientRect(parent_hwnd, &client_rect);
 	
@@ -177,19 +175,21 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	
 	std::cout << "[UIHandler] Parent window size: " << window_width << "x" << window_height << std::endl;
 	
-	// Grid: 15% | 1fr | 15%, Rows: 60% | 40%
 	int left_panel_width = (int)(window_width * 0.15f);
 	int right_panel_width = (int)(window_width * 0.15f);
 	int viewport_width = window_width - left_panel_width - right_panel_width;
 	int viewport_height = (int)(window_height * 0.60f);
 	
-	std::cout << "[UIHandler] Overlay position: (" << left_panel_width << ", 0) size: " 
-	          << viewport_width << "x" << viewport_height << std::endl;
+
+	const int inset = 5;
+	int overlay_x = left_panel_width + inset;
+	int overlay_y = inset;
+	int overlay_w = viewport_width - (2 * inset);
+	int overlay_h = viewport_height - (2 * inset);
 	
-	overlay_viewport_->create(parent_hwnd, left_panel_width, 0, viewport_width, viewport_height);
+	overlay_viewport_->create(parent_hwnd, overlay_x, overlay_y, overlay_w, overlay_h);
 	overlay_viewport_->show(true);
 	
-	std::cout << "[UIHandler] Overlay viewport created" << std::endl;
 	
 	// Install window subclass to handle resize
 	SetWindowSubclass(parent_hwnd, ParentWindowProc, 0, reinterpret_cast<DWORD_PTR>(this));
@@ -212,7 +212,14 @@ void UIHandler::updateOverlayPosition()
 		int viewport_width = window_width - left_panel_width - right_panel_width;
 		int viewport_height = (int)(window_height * 0.60f);
 		
-		overlay_viewport_->setPosition(left_panel_width, 0, viewport_width, viewport_height);
+		// Add 5px inset on all sides
+		const int inset = 5;
+		overlay_viewport_->setPosition(
+			left_panel_width + inset, 
+			inset, 
+			viewport_width - (2 * inset), 
+			viewport_height - (2 * inset)
+		);
 	}
 }
 
@@ -248,6 +255,18 @@ LRESULT CALLBACK UIHandler::ParentWindowProc(HWND hwnd, UINT msg, WPARAM wParam,
 		case WM_SIZE:
 			if (handler && handler->overlay_viewport_) {
 				handler->updateOverlayPosition();
+				// Critical: After resize, bring overlay to front (last child = topmost Z-order)
+				SetWindowPos(handler->overlay_viewport_->getHandle(), HWND_TOP, 0, 0, 0, 0,
+				             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+			}
+			break;
+		
+		case WM_ACTIVATE:
+		case WM_WINDOWPOSCHANGED:
+			// When window state changes (e.g. fullscreen), ensure overlay stays on top
+			if (handler && handler->overlay_viewport_) {
+				SetWindowPos(handler->overlay_viewport_->getHandle(), HWND_TOP, 0, 0, 0, 0,
+				             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 			}
 			break;
 			
