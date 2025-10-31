@@ -78,10 +78,10 @@ bool OverlayViewport::create(HWND parent, int x, int y, int width, int height) {
               << " at (" << x << "," << y << ") size " << width << "x" << height << std::endl;
     
     hwnd_ = CreateWindowExW(
-        0,  // No extended styles for now
+        0, 
         kOverlayClassName,
         L"OpenGL Overlay",
-        WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
+        WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
         x, y, width, height,
         parent,
         nullptr,
@@ -96,19 +96,15 @@ bool OverlayViewport::create(HWND parent, int x, int y, int width, int height) {
     }
     
     std::cout << "[OverlayViewport] Window created successfully: " << hwnd_ << std::endl;
-    
-    // Force Z-order to be on top of CEF content
+
     SetWindowPos(hwnd_, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
     
-    // Log actual position
     RECT window_rect;
     GetWindowRect(hwnd_, &window_rect);
     POINT top_left = {window_rect.left, window_rect.top};
     ScreenToClient(parent, &top_left);
     std::cout << "[OverlayViewport] Actual client position: (" << top_left.x << ", " << top_left.y << ")" << std::endl;
-    
-    // No layered window attributes needed (not using WS_EX_LAYERED)
-    
+        
     initializeOpenGL();
     
     std::cout << "[OverlayViewport] Created at (" << x << "," << y << ") size " << width << "x" << height << std::endl;
@@ -216,7 +212,7 @@ void OverlayViewport::initializeOpenGL()
 
 void OverlayViewport::setPosition(int x, int y, int width, int height) {
     if (hwnd_) {
-        SetWindowPos(hwnd_, nullptr, x, y, width, height, SWP_NOZORDER);
+        SetWindowPos(hwnd_, HWND_TOP, x, y, width, height, 0);
         width_ = width;
         height_ = height;
         
@@ -492,7 +488,7 @@ void OverlayViewport::initializeModernRendering()
         8,  9,  10,  10, 11, 8,   // Top
         12, 13, 14,  14, 15, 12,  // Bottom
         16, 17, 18,  18, 19, 16,  // Right
-        20, 21, 22,  22, 23, 20   // Left
+        20, 21, 22,  22, 23, 20  
     };
     
     glGenVertexArrays(1, &vao_);
