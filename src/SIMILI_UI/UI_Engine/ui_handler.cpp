@@ -247,6 +247,20 @@ void UIHandler::stopRenderTimer() {
 	}
 }
 
+void UIHandler::enableOverlayRendering(bool enable) {
+	if (overlay_viewport_) {
+		overlay_viewport_->enableRendering(enable);
+		std::cout << "[UIHandler] Overlay rendering " << (enable ? "enabled" : "disabled") << std::endl;
+	}
+}
+
+bool UIHandler::isOverlayRenderingEnabled() const {
+	if (overlay_viewport_) {
+		return overlay_viewport_->isRenderingEnabled();
+	}
+	return false;
+}
+
 LRESULT CALLBACK UIHandler::ParentWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData) 
 {
 	UIHandler* handler = reinterpret_cast<UIHandler*>(dwRefData);

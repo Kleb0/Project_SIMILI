@@ -72,6 +72,7 @@ echo Copying UI HTML files...
 if not exist "build\Release\ui" mkdir "build\Release\ui"
 xcopy /Y /Q "ui\*.html" "build\Release\ui\" >nul 2>nul
 xcopy /Y /Q "ui\*.css" "build\Release\ui\" >nul 2>nul
+xcopy /Y /Q "ui\*.js" "build\Release\ui\" >nul 2>nul
 if %errorlevel% neq 0 (
     echo WARNING: Failed to copy UI HTML files
 )

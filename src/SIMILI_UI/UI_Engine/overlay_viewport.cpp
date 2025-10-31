@@ -40,6 +40,7 @@ OverlayViewport::OverlayViewport()
     , camera_rotation_x_(20.0f)   // Initial rotation for better view
     , camera_rotation_y_(30.0f)
     , camera_distance_(3.5f)      // Closer to fill more screen space
+    , rendering_enabled_(true)    // Rendering enabled by default
 {
 }
 
