@@ -1,8 +1,10 @@
 #include "message_handler.hpp"
+#include "ui_handler.hpp"
 #include <iostream>
+#include <sstream>
 
 MessageHandler::MessageHandler(IPCClient* ipc_client) 
-	: ipc_client_(ipc_client) 
+	: ipc_client_(ipc_client), ui_handler_(nullptr)
 {
 }
 
@@ -12,12 +14,40 @@ bool persistent, CefRefPtr<Callback> callback)
 {
 	std::string req = request.ToString();
 	
-	std::cout << "[MessageHandler] Received query: " << req << std::endl;
+	if (req.find("viewport_resize:") == 0) 
+	{
+		std::string data = req.substr(16); 
+		
+		std::istringstream ss(data);
+		int x = 0, y = 0, width = 800, height = 600;
+		char comma;
+		
+		if (ss >> x >> comma >> y >> comma >> width >> comma >> height) 
+		{
+			std::cout << "[MessageHandler] Viewport resize: x=" << x 
+			          << " y=" << y << " width=" << width << " height=" << height << std::endl;
+			
+			if (ui_handler_ && ui_handler_->getOverlay()) 
+			{
+				ui_handler_->getOverlay()->setPosition(x, y, width, height);
+				std::cout << "[MessageHandler] Overlay position updated!" << std::endl;
+			}
+			else
+			{
+				std::cout << "[MessageHandler] WARNING: No overlay available!" << std::endl;
+			}
+		}
+		else
+		{
+			std::cout << "[MessageHandler] ERROR: Failed to parse viewport dimensions: " << data << std::endl;
+		}
+		
+		callback->Success("OK");
+		return true;
+	}
 	
 	if (req == "force_repaint")
 	{
-		// Force CEF to repaint
-		std::cout << "[MessageHandler] Forcing browser repaint..." << std::endl;
 		browser->GetHost()->WasResized();
 		browser->GetHost()->Invalidate(PET_VIEW);
 		callback->Success("OK");
@@ -27,7 +57,7 @@ bool persistent, CefRefPtr<Callback> callback)
 	if (req.substr(0, 4) == "log:") 
 	{
 		std::string logMessage = req.substr(4);
-		std::cout << "[HTML LOG] " << logMessage << std::endl;
+		std::cout << logMessage << std::endl;
 		callback->Success("OK");
 		return true;
 	}
@@ -36,14 +66,12 @@ bool persistent, CefRefPtr<Callback> callback)
 	{
 		if (ipc_client_) 
 		{
-			std::cout << "[MessageHandler] Sending request to main process..." << std::endl;
 			ipc_client_->send(req);
 			callback->Success("OK");
 			return true;
 		}
 		else
 		{
-			std::cerr << "[MessageHandler] ERROR: No IPC client available!" << std::endl;
 			callback->Failure(0, "No IPC client");
 			return true;
 		}

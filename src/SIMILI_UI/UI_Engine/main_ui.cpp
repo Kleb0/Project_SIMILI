@@ -42,8 +42,8 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
     settings.no_sandbox = true;
     settings.multi_threaded_message_loop = false;
     
-    CefString(&settings.log_file).FromASCII("simili_ui.log");
-    settings.log_severity = LOGSEVERITY_ERROR;  // Only show critical errors
+    // Disable logging to avoid errors
+    settings.log_severity = LOGSEVERITY_DISABLE;
 
     if (!CefInitialize(main_args, settings, app, nullptr)) {
         std::cerr << "[Main] Failed to initialize CEF" << std::endl;

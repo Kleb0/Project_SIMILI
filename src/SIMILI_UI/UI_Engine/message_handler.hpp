@@ -4,6 +4,9 @@
 #include "ipc_client.hpp"
 #include <string>
 
+// Forward declaration to avoid circular dependency
+class UIHandler;
+
 class MessageHandler : public CefMessageRouterBrowserSide::Handler 
 {
 public:
@@ -15,7 +18,10 @@ public:
 
 	virtual void OnQueryCanceled(CefRefPtr<CefBrowser> browser,
 	CefRefPtr<CefFrame> frame, int64_t query_id) override;
+	
+	void setUIHandler(UIHandler* handler) { ui_handler_ = handler; }
 
 private:
 	IPCClient* ipc_client_;
+	UIHandler* ui_handler_;
 };

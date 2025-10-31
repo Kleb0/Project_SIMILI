@@ -70,6 +70,13 @@ private:
 	std::unique_ptr<OverlayViewport> overlay_viewport_;
 	HWND parent_hwnd_;
 	UINT_PTR timer_id_;
+	
+	// Throttling for viewport updates
+	DWORD last_viewport_update_time_;
+	int last_viewport_x_;
+	int last_viewport_y_;
+	int last_viewport_width_;
+	int last_viewport_height_;
 
 	IMPLEMENT_REFCOUNTING(UIHandler);
 };
