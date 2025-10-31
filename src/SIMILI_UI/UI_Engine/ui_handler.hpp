@@ -51,6 +51,8 @@ public:
 	void updateOverlayPosition();
 	void startRenderTimer();
 	void stopRenderTimer();
+	void enableOverlayRendering(bool enable);
+	bool isOverlayRenderingEnabled() const;
 	OverlayViewport* getOverlay() { return overlay_viewport_.get(); }
 	HWND getParentHWND() const { return parent_hwnd_; }
 	

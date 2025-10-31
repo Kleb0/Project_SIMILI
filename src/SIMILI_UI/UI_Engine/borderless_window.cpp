@@ -62,11 +62,21 @@ LRESULT CALLBACK BorderlessWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wPara
 {
 	BorderlessWindow* window = reinterpret_cast<BorderlessWindow*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
 	
-	switch (uMsg) {
+	switch (uMsg) 
+	{
+		case WM_GETMINMAXINFO:
+		{
+			// Set minimum window size
+			MINMAXINFO* mmi = (MINMAXINFO*)lParam;
+			mmi->ptMinTrackSize.x = 800;
+			mmi->ptMinTrackSize.y = 600;
+			return 0;
+		}
 		case WM_SIZING:
 			return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 		case WM_SIZE:
-			if (window && window->browser_) {
+			if (window && window->browser_) 
+			{
 				HWND browser_hwnd = window->browser_->GetHost()->GetWindowHandle();
 				if (browser_hwnd) {
 					RECT rect;
@@ -77,10 +87,13 @@ LRESULT CALLBACK BorderlessWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wPara
 					
 					SetWindowPos(browser_hwnd, nullptr, 
 							   0, 0, width, height,
-							   SWP_NOZORDER | SWP_NOMOVE | SWP_NOACTIVATE);
+							   SWP_NOZORDER | SWP_NOACTIVATE);
 					
+					// Notify CEF of resize
 					window->browser_->GetHost()->WasResized();
 					window->browser_->GetHost()->Invalidate(PET_VIEW);
+					
+					UpdateWindow(browser_hwnd);
 				}
 			}
 			return 0;
@@ -133,10 +146,12 @@ LRESULT CALLBACK BorderlessWindow::WindowProc(HWND hwnd, UINT uMsg, WPARAM wPara
 	return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 }
 
-BorderlessWindow* BorderlessWindow::GetInstance() {
+BorderlessWindow* BorderlessWindow::GetInstance() 
+{
 	return g_instance;
 }
 
-void BorderlessWindow::SetInstance(BorderlessWindow* instance) {
+void BorderlessWindow::SetInstance(BorderlessWindow* instance) 
+{
 	g_instance = instance;
 }

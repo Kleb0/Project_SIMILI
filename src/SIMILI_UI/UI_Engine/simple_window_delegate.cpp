@@ -14,7 +14,6 @@ void SimpleWindowDelegate::OnWindowCreated(CefRefPtr<CefWindow> window) {
     
     browser_view_->RequestFocus();
     
-    // Get native window handle and create OpenGL overlay
     HWND hwnd = window->GetWindowHandle();
     std::cout << "[SimpleWindowDelegate] Window HWND: " << hwnd << std::endl;
     
@@ -27,6 +26,15 @@ void SimpleWindowDelegate::OnWindowCreated(CefRefPtr<CefWindow> window) {
                 std::cout << "[SimpleWindowDelegate] Creating overlay viewport..." << std::endl;
                 handler->createOverlayViewport(hwnd);
                 std::cout << "[SimpleWindowDelegate] Overlay created!" << std::endl;
+                
+                handler->stopRenderTimer();
+                handler->enableOverlayRendering(false);
+                
+                if (handler->getOverlay()) {
+                    handler->getOverlay()->show(false);
+                }
+                
+                std::cout << "[SimpleWindowDelegate] OpenGL rendering STOPPED and overlay HIDDEN" << std::endl;
             } else {
                 std::cout << "[SimpleWindowDelegate] Handler is NULL!" << std::endl;
             }

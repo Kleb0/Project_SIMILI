@@ -15,6 +15,10 @@ public:
     void show(bool visible);
     void render();
     
+    // Control rendering
+    void enableRendering(bool enable) { rendering_enabled_ = enable; }
+    bool isRenderingEnabled() const { return rendering_enabled_; }
+    
     HWND getHandle() const { return hwnd_; }
 
 private:
@@ -53,4 +57,7 @@ private:
     float camera_rotation_x_;
     float camera_rotation_y_;
     float camera_distance_;
+    
+    // Rendering control
+    bool rendering_enabled_;
 };

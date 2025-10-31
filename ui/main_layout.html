@@ -8,34 +8,56 @@
 </head>
 <body>
     <div class="main-container">
+        <!-- Top Row -->
+        <div class="top-row">
+            <!-- Left Section -->
+            <div class="left-section">
+                <!-- Hierarchy Inspector -->
+                <div class="panel hierarchy-panel">
+                    <iframe src="hierarchy_inspector.html"></iframe>
+                </div>
+            </div>
 
-        <!-- Hierarchy Inspector -->
-        <div class="panel hierarchy-panel">
-            <iframe src="hierarchy_inspector.html"></iframe>
-        </div>
-        
-        <!-- Viewport (OpenGL overlay will be positioned here) -->
-        <div class="panel viewport-panel">
-            <!-- Native OpenGL window overlays this div -->
-        </div>
-        
-        <!-- Right Column -->
-        <div class="right-column">
-            <!-- Object Inspector -->
-            <div class="panel object-inspector-panel">
-                <iframe src="object_inspector.html"></iframe>
-            </div>
+            <!-- Vertical Splitter 1 (between Hierarchy and Viewport) -->
+            <div class="splitter splitter-vertical" data-direction="horizontal"></div>
             
-            <!-- History Logger -->
-            <div class="panel history-panel">
-                <iframe src="history_logger.html"></iframe>
+            <!-- Center Section -->
+            <div class="center-section">
+                <!-- Viewport (OpenGL overlay will be positioned here) -->
+                <div class="panel viewport-panel">
+                    <iframe src="Viewport_docking.html"></iframe>
+                </div>
+            </div>
+
+            <!-- Vertical Splitter 2 (between Center and Right) -->
+            <div class="splitter splitter-vertical" data-direction="horizontal"></div>
+            
+            <!-- Right Section -->
+            <div class="right-section">
+                <!-- Object Inspector -->
+                <div class="panel object-inspector-panel">
+                    <iframe src="object_inspector.html"></iframe>
+                </div>
+                
+                <!-- Right Horizontal Splitter (between Inspector and History) -->
+                <div class="splitter splitter-horizontal" data-direction="vertical"></div>
+                
+                <!-- History Logger -->
+                <div class="panel history-panel">
+                    <iframe src="history_logger.html"></iframe>
+                </div>
             </div>
         </div>
         
-        <!-- Project Viewer -->
+        <!-- Horizontal Splitter (between top row and project viewer) -->
+        <div class="splitter splitter-horizontal" data-direction="vertical"></div>
+        
+        <!-- Project Viewer (full width at bottom) -->
         <div class="panel project-viewer-panel">
             <iframe src="project_viewer.html"></iframe>
         </div>
     </div>
+
+    <script src="layout_resizer.js"></script>
 </body>
 </html>

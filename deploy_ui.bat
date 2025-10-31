@@ -36,9 +36,20 @@ if %errorlevel% neq 0 (
 echo Copying UI HTML files...
 if not exist "build\Release\ui" mkdir "build\Release\ui"
 copy /Y "ui\*.html" "build\Release\ui\" >nul
-copy /Y "ui\*.css" "build\Release\ui\" >nul
 if %errorlevel% neq 0 (
     echo ERROR: Unable to copy UI HTML files
+    exit /b 1
+)
+
+copy /Y "ui\*.css" "build\Release\ui\" >nul
+if %errorlevel% neq 0 (
+    echo ERROR: Unable to copy UI CSS files
+    exit /b 1
+)
+
+copy /Y "ui\*.js" "build\Release\ui\" >nul
+if %errorlevel% neq 0 (
+    echo ERROR: Unable to copy UI JS files
     exit /b 1
 )
 
@@ -50,4 +61,6 @@ echo   - SIMILI_UI.exe
 echo   - CEF DLLs (libcef.dll, etc.)
 echo   - CEF Resources (*.pak, locales/)
 echo   - UI HTML files (ui/*.html)
+echo   - UI CSS files (ui/*.css)
+echo   - UI JS files (ui/*.js)
 echo.

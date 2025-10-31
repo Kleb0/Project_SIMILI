@@ -14,6 +14,16 @@ bool persistent, CefRefPtr<Callback> callback)
 	
 	std::cout << "[MessageHandler] Received query: " << req << std::endl;
 	
+	if (req == "force_repaint")
+	{
+		// Force CEF to repaint
+		std::cout << "[MessageHandler] Forcing browser repaint..." << std::endl;
+		browser->GetHost()->WasResized();
+		browser->GetHost()->Invalidate(PET_VIEW);
+		callback->Success("OK");
+		return true;
+	}
+	
 	if (req.substr(0, 4) == "log:") 
 	{
 		std::string logMessage = req.substr(4);
