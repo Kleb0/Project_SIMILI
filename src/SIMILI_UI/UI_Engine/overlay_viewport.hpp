@@ -13,6 +13,7 @@ public:
     
     void setPosition(int x, int y, int width, int height);
     void show(bool visible);
+    bool isVisible() const;
     void render();
     
     // Control rendering

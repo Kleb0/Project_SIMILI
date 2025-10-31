@@ -231,8 +231,15 @@ void OverlayViewport::show(bool visible) {
     }
 }
 
+bool OverlayViewport::isVisible() const {
+    if (hwnd_) {
+        return IsWindowVisible(hwnd_) != 0;
+    }
+    return false;
+}
+
 void OverlayViewport::render() {
-    if (!hwnd_ || !gl_context_) {
+    if (!hwnd_ || !gl_context_ || !rendering_enabled_) {
         return;
     }
     
@@ -241,6 +248,9 @@ void OverlayViewport::render() {
     renderScene();
     
     SwapBuffers(hdc_);
+    
+    // Don't call wglMakeCurrent(nullptr, nullptr) - it's expensive
+    // The context will be properly released when needed
 }
 
 void OverlayViewport::renderScene() {

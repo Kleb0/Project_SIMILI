@@ -36,24 +36,43 @@
         // Check window state change
         checkWindowState();
         
+        // Notify viewport resize immediately
+        notifyViewportResize();
+        
         // Debounce resize events
         if (resizeTimeout) {
             clearTimeout(resizeTimeout);
         }
         
         resizeTimeout = setTimeout(() => {
-            // Reset all sections to use default flex
+            // Reset horizontal sections (left, center, right)
             const sections = document.querySelectorAll('.left-section, .center-section, .right-section');
             sections.forEach(section => {
                 section.style.width = '';
                 section.style.flex = '';
             });
             
+            // Reset vertical sections (top-row, project-viewer)
+            const topRow = document.querySelector('.top-row');
+            const projectViewer = document.querySelector('.project-viewer-panel');
+            if (topRow) {
+                topRow.style.height = '';
+                topRow.style.flex = '';
+            }
+            if (projectViewer) {
+                projectViewer.style.height = '';
+                projectViewer.style.flex = '';
+            }
+            
+            // Reset all panels inside sections
             const panels = document.querySelectorAll('.panel');
             panels.forEach(panel => {
                 panel.style.height = '';
                 panel.style.flex = '';
             });
+            
+            // Notify again after reset
+            notifyViewportResize();
         }, 150); // Wait 150ms after last resize event
     }
 
@@ -148,24 +167,44 @@
             let newPrevHeight = startSizes[0] + delta;
             let newNextHeight = startSizes[1] - delta;
             
-            // Set minimum heights (100px)
-            if (newPrevHeight < 100) {
-                const diff = 100 - newPrevHeight;
-                newPrevHeight = 100;
+            // Determine minimum heights based on element type
+            let minPrevHeight = 100;
+            let minNextHeight = 100;
+            
+            // If prev element is top-row, it needs more space
+            if (prevElement.classList.contains('top-row')) {
+                minPrevHeight = 200;
+            }
+            
+            // Clamp to minimums
+            if (newPrevHeight < minPrevHeight) {
+                const diff = minPrevHeight - newPrevHeight;
+                newPrevHeight = minPrevHeight;
                 newNextHeight -= diff;
             }
-            if (newNextHeight < 100) {
-                const diff = 100 - newNextHeight;
-                newNextHeight = 100;
+            if (newNextHeight < minNextHeight) {
+                const diff = minNextHeight - newNextHeight;
+                newNextHeight = minNextHeight;
                 newPrevHeight -= diff;
             }
             
-            if (newPrevHeight >= 100 && newNextHeight >= 100) {
-                // Use fixed pixel heights for precise control
-                prevElement.style.height = newPrevHeight + 'px';
-                prevElement.style.flex = '0 0 auto';
-                nextElement.style.height = newNextHeight + 'px';
-                nextElement.style.flex = '0 0 auto';
+            if (newPrevHeight >= minPrevHeight && newNextHeight >= minNextHeight) {
+                // Check if this is the main splitter (between top-row and project-viewer)
+                const isMainSplitter = prevElement.classList.contains('top-row');
+                
+                if (isMainSplitter) {
+                    // Main splitter: control top-row and project-viewer heights
+                    prevElement.style.height = newPrevHeight + 'px';
+                    prevElement.style.flex = '0 0 auto';
+                    nextElement.style.height = newNextHeight + 'px';
+                    nextElement.style.flex = '0 0 auto';
+                } else {
+                    // Internal splitter (e.g., in right-section): only affect panels
+                    prevElement.style.height = newPrevHeight + 'px';
+                    prevElement.style.flex = '0 0 auto';
+                    nextElement.style.height = newNextHeight + 'px';
+                    nextElement.style.flex = '0 0 auto';
+                }
                 
                 // Force browser repaint
                 forceBrowserRepaint();
@@ -174,29 +213,47 @@
     }
     
     function forceBrowserRepaint() {
-        // Notify C++ to force CEF repaint via IPC
-        try {
-            if (window.chrome && window.chrome.cefQuery) {
-                window.chrome.cefQuery({
-                    request: 'force_repaint',
-                    persistent: false,
-                    onSuccess: function(response) {},
-                    onFailure: function(error_code, error_message) {}
-                });
-            }
-        } catch (e) {
-            // Fallback if CEF query not available
-        }
+        // Notify C++ to update viewport overlay dimensions
+        notifyViewportResize();
         
-        // Force reflow by accessing offsetHeight
+        // Force reflow by accessing offsetHeight (lightweight)
         document.body.offsetHeight;
-        
-        // Trigger paint
-        if (window.requestAnimationFrame) {
-            window.requestAnimationFrame(() => {
-                // Force another reflow
-                document.documentElement.scrollTop;
-            });
+    }
+    
+    function notifyViewportResize() {
+        const viewportPanel = document.querySelector('.viewport-panel');
+        if (viewportPanel) {
+            const rect = viewportPanel.getBoundingClientRect();
+            
+            // Get the actual dimensions without any adjustment
+            // getBoundingClientRect() already includes borders in the coordinates
+            // The overlay should be positioned at the INNER area of the panel (excluding border)
+            
+            // Panel border: 3px on each side
+            const borderWidth = 3;
+            
+            // Position: add border to get to inner area
+            const adjustedX = Math.round(rect.left + borderWidth);
+            const adjustedY = Math.round(rect.top + borderWidth);
+            
+            // Size: subtract borders from both sides
+            const adjustedWidth = Math.round(rect.width - (2 * borderWidth));
+            const adjustedHeight = Math.round(rect.height - (2 * borderWidth));
+            
+            // Get DPI scaling factor (devicePixelRatio)
+            // e.g., 1.0 for 100%, 1.5 for 150%, 2.0 for 200%
+            const dpiScale = window.devicePixelRatio || 1.0;
+            
+            // Send viewport dimensions by setting a special document title
+            // Format: "VIEWPORT_RESIZE:x,y,width,height,dpiScale"
+            const message = 'VIEWPORT_RESIZE:' + 
+                adjustedX + ',' + 
+                adjustedY + ',' + 
+                adjustedWidth + ',' + 
+                adjustedHeight + ',' +
+                dpiScale;
+            
+            document.title = message;
         }
     }
 
@@ -224,4 +281,11 @@
     } else {
         initSplitters();
     }
+    
+    // Send initial viewport dimensions after page loads
+    window.addEventListener('load', function() {
+        setTimeout(function() {
+            notifyViewportResize();
+        }, 200);
+    });
 })();

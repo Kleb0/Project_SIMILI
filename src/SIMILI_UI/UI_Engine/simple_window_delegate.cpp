@@ -14,27 +14,23 @@ void SimpleWindowDelegate::OnWindowCreated(CefRefPtr<CefWindow> window) {
     
     browser_view_->RequestFocus();
     
-    HWND hwnd = window->GetWindowHandle();
-    std::cout << "[SimpleWindowDelegate] Window HWND: " << hwnd << std::endl;
+    HWND window_hwnd = window->GetWindowHandle();
+    std::cout << "[SimpleWindowDelegate] Window HWND: " << window_hwnd << std::endl;
     
-    if (hwnd) {
+    if (window_hwnd) {
         CefRefPtr<CefBrowser> browser = browser_view_->GetBrowser();
         if (browser) {
+            // Get the browser's HWND (the actual HTML rendering window)
+            HWND browser_hwnd = browser->GetHost()->GetWindowHandle();
+            std::cout << "[SimpleWindowDelegate] Browser HWND: " << browser_hwnd << std::endl;
+            
             CefRefPtr<CefClient> client = browser->GetHost()->GetClient();
             UIHandler* handler = static_cast<UIHandler*>(client.get());
             if (handler) {
                 std::cout << "[SimpleWindowDelegate] Creating overlay viewport..." << std::endl;
-                handler->createOverlayViewport(hwnd);
-                std::cout << "[SimpleWindowDelegate] Overlay created!" << std::endl;
-                
-                handler->stopRenderTimer();
-                handler->enableOverlayRendering(false);
-                
-                if (handler->getOverlay()) {
-                    handler->getOverlay()->show(false);
-                }
-                
-                std::cout << "[SimpleWindowDelegate] OpenGL rendering STOPPED and overlay HIDDEN" << std::endl;
+                // Use the browser HWND as parent for pixel-perfect alignment
+                handler->createOverlayViewport(browser_hwnd);
+                std::cout << "[SimpleWindowDelegate] Overlay created and ENABLED!" << std::endl;
             } else {
                 std::cout << "[SimpleWindowDelegate] Handler is NULL!" << std::endl;
             }

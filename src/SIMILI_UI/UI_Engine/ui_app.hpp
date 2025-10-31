@@ -1,8 +1,8 @@
-// ui_app.hpp - Application CEF
 #pragma once
 
 #include "include/cef_app.h"
 #include "include/wrapper/cef_message_router.h"
+#include "iostream"
 
 class UIApp : public CefApp, 
 			  public CefBrowserProcessHandler,
