@@ -68,23 +68,62 @@
     {
       "label": "Generate SIMILI_UI CMake",
       "type": "shell",
-      "command": "cmake",
-      "args": [
-        "-S",
-        ".",
-        "-B",
-        "build",
-        "-G",
-        "Visual Studio 17 2022",
-        "-A",
-        "x64"
-      ],
+      "command": "${workspaceFolder}\\generate_ui_cmake.bat",
       "options": {
-        "cwd": "${workspaceFolder}/src/SIMILI_UI"
+        "cwd": "${workspaceFolder}",
+        "shell": {
+          "executable": "cmd.exe",
+          "args": ["/d", "/c"]
+        }
       },
       "problemMatcher": [],
       "group": "build",
-      "detail": "Generate CMake build files for SIMILI_UI in src/SIMILI_UI/build"
+      "detail": "Generate CMake build files for SIMILI_UI with vcpkg toolchain"
+    },
+    {
+      "label": "Install Boost",
+      "type": "shell",
+      "command": "${workspaceFolder}\\install_boost.bat",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "shell": {
+          "executable": "cmd.exe",
+          "args": ["/d", "/c"]
+        }
+      },
+      "problemMatcher": [],
+      "group": "none",
+      "detail": "Install Boost.Beast and Boost.Asio via vcpkg (static linking)"
+    },
+    {
+      "label": "Install vcpkg",
+      "type": "shell",
+      "command": "${workspaceFolder}\\install_vcpkg.bat",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "shell": {
+          "executable": "cmd.exe",
+          "args": ["/d", "/c"]
+        }
+      },
+      "problemMatcher": [],
+      "group": "none",
+      "detail": "Install vcpkg package manager to C:\\vcpkg"
+    },
+    {
+      "label": "Install OpenSSL",
+      "type": "shell",
+      "command": "${workspaceFolder}\\install_openssl.bat",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "shell": {
+          "executable": "cmd.exe",
+          "args": ["/d", "/c"]
+        }
+      },
+      "problemMatcher": [],
+      "group": "none",
+      "detail": "Install OpenSSL via vcpkg (required for HTTPS)"
     }
   ]  
 }

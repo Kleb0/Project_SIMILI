@@ -38,6 +38,7 @@
         "${workspaceFolder}/src/ThirdParty/GLFW/include",
         "${workspaceFolder}/src/ThirdParty/CEF/cef_binary",
         "C:/libs/SDL3/include",
+        "C:/vcpkg/installed/x64-windows-static/include",
         "C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/um",
         "C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/shared",
         "C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0/winrt",

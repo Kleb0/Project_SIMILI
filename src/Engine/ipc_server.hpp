@@ -5,6 +5,7 @@
 #include <functional>
 #include <thread>
 #include <atomic>
+#include <iostream>
 #include <windows.h>
 
 class IPCServer {
