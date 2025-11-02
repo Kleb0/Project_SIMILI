@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Console / Server</title>
+    <link rel="stylesheet" href="ribbon_menu.css">
+    <link rel="stylesheet" href="console_server.css">
+</head>
+<body>
+    <div class="ribbon-menu">
+        <button class="ribbon-tab" onclick="navigateToPage('project_viewer.html')">Project Viewer</button>
+        <button class="ribbon-tab active" onclick="navigateToPage('console_server.html')">Console / Server</button>
+    </div>
+    <div class="content">
+        <div class="console-container">
+            <div class="console-header">
+                <span>SIMILI Console & Server Logs</span>
+                <button class="clear-btn" onclick="clearConsole()">Clear</button>
+                <button class="clear-btn" onclick="sendTestMessage()" style="margin-left: 10px;">Send Test Message</button>
+            </div>
+            <div class="console-output" id="consoleOutput"></div>
+        </div>
+    </div>
+
+    <script src="console_server.js"></script>
+</body>
+</html>

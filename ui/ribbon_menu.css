@@ -1,0 +1,26 @@
+.ribbon-menu {
+    background-color: #2c3e50;
+    padding: 10px 20px;
+    display: flex;
+    gap: 10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.ribbon-tab {
+    padding: 8px 20px;
+    background-color: #34495e;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s;
+}
+
+.ribbon-tab:hover {
+    background-color: #4a6278;
+}
+
+.ribbon-tab.active {
+    background-color: #3498db;
+}
