@@ -59,27 +59,6 @@
     </div>
 
     <script src="layout_resizer.js"></script>
-    <script>
-        // Test HTTP Server connection with ping-pong
-        window.addEventListener('DOMContentLoaded', () => {
-            // Send POST request with message to server
-            fetch('http://localhost:8080', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'text/plain'
-                },
-                body: 'hello from javascript test test test'
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data && data.message) {
-                        console.log('[MainLayout] Received response from server:', data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('[MainLayout] Failed to connect to server:', error);
-                });
-        });
-    </script>
+    <script src="main_layout_manager.js"></script>
 </body>
 </html>

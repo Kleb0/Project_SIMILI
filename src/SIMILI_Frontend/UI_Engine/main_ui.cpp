@@ -41,9 +41,9 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
         std::cout << "[Main] Console allocated for debugging" << std::endl;
     }
 
-    // Start HTTP/HTTPS Server
-    SIMILI::Server::SimpleHttpServer http_server;
-    http_server.start(8080, 8443);
+    // Start HTTP/HTTPS Server (singleton - will only start once)
+    SIMILI::Server::SimpleHttpServer::getInstance().start(8080, 8443);
+    std::cout << "[Main] HTTP Server singleton initialized" << std::endl;
 
     SIMILI::Router::RouterSim router;
     router.setDebugMode(true);
