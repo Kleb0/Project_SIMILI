@@ -2,7 +2,7 @@
 
 echo Deploying SIMILI_UI.exe...
 
-copy /Y "src\SIMILI_UI\build\UI_Engine\Release\SIMILI_UI.exe" "build\Release\" >nul
+copy /Y "src\SIMILI_Frontend\build\UI_Engine\Release\SIMILI_UI.exe" "build\Release\" >nul
 if %errorlevel% neq 0 (
     echo ERROR: Unable to copy SIMILI_UI.exe
     exit /b 1

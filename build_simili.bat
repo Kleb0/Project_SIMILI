@@ -13,9 +13,9 @@ for /f %%A in ('powershell -NoProfile -Command "(Get-Date).ToString('o')"') do s
 
 echo.
 echo [1/3] Building SIMILI_UI...
-cd /d "%~dp0src\SIMILI_UI\build"
+cd /d "%~dp0src\SIMILI_Frontend\build"
 if %errorlevel% neq 0 (
-    echo ERROR: Folder src\SIMILI_UI\build not found
+    echo ERROR: Folder src\SIMILI_Frontend\build not found
     exit /b 1
 )
 
@@ -47,7 +47,7 @@ if not exist "src\ThirdParty\CEF\cef_binary\Release\libcef.dll" (
     exit /b 1
 )
 
-copy /Y "src\SIMILI_UI\build\UI_Engine\Release\SIMILI_UI.exe" "build\Release\" >nul 2>nul
+copy /Y "src\SIMILI_Frontend\build\UI_Engine\Release\SIMILI_UI.exe" "build\Release\" >nul 2>nul
 if %errorlevel% neq 0 (
     echo WARNING: Failed to copy SIMILI_UI.exe
 )

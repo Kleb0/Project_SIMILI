@@ -11,9 +11,9 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-cd /d "%~dp0src\SIMILI_UI\build"
+cd /d "%~dp0src\SIMILI_Frontend\build"
 if %errorlevel% neq 0 (
-    echo ERROR: Folder src\SIMILI_UI\build not found
+    echo ERROR: Folder src\SIMILI_Frontend\build not found
     exit /b 1
 )
 
@@ -31,7 +31,7 @@ echo.
 echo ========================================
 echo  SIMILI_UI successfully compiled!
 echo ========================================
-echo Location: src\SIMILI_UI\build\Release\SIMILI_UI.exe
+echo Location: src\SIMILI_Frontend\build\Release\SIMILI_UI.exe
 echo.
 
 cd /d "%~dp0"
