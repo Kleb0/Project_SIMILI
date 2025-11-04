@@ -1,12 +1,19 @@
 #include "ui_handler.hpp"
+#include "../../Engine/ThreeDScene.hpp"
+#include "../../Engine/OpenGLContext.hpp"
+#include "../../WorldObjects/Camera/Camera.hpp"
+#include "../../WorldObjects/Mesh/Mesh.hpp"
+#include "../../Engine/PrimitivesCreation/CreatePrimitive.hpp"
 #include <iostream>
 #include <commctrl.h>  
+#include <glm/glm.hpp>
 
 #pragma comment(lib, "comctl32.lib")
 
 UIHandler::UIHandler() : parent_hwnd_(nullptr), timer_id_(0),
 	last_viewport_update_time_(0), last_viewport_x_(0), last_viewport_y_(0), 
-	last_viewport_width_(0), last_viewport_height_(0)
+	last_viewport_width_(0), last_viewport_height_(0), three_d_scene_(nullptr),
+	renderer_(nullptr), main_camera_(nullptr), cube_mesh_ptr_(nullptr), scene_initialized_(false)
 {
 }
 
@@ -173,6 +180,15 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	// Hide overlay until JavaScript sends proper dimensions
 	overlay_viewport_->show(false);
 	
+	// Pass 3D scene to overlay
+	if (three_d_scene_) {
+		overlay_viewport_->setThreeDScene(three_d_scene_);
+		std::cout << "[UIHandler] 3D Scene passed to overlay viewport" << std::endl;
+	}
+	
+	// CRITICAL: Initialize scene objects NOW that we have an OpenGL context
+	initializeSceneObjects();
+	
 	std::cout << "[UIHandler] Overlay created but hidden - waiting for JavaScript dimensions" << std::endl;
 	
 	// Install window subclass to handle resize
@@ -275,4 +291,61 @@ LRESULT CALLBACK UIHandler::ParentWindowProc(HWND hwnd, UINT msg, WPARAM wParam,
 	}
 	
 	return DefSubclassProc(hwnd, msg, wParam, lParam);
+}
+
+void UIHandler::setSceneObjects(OpenGLContext* renderer, ThreeDScene* scene, Camera* camera, Mesh** cubeMesh) {
+	renderer_ = renderer;
+	three_d_scene_ = scene;
+	main_camera_ = camera;
+	cube_mesh_ptr_ = cubeMesh;
+	scene_initialized_ = false;
+	
+	std::cout << "[UIHandler] Scene objects stored for deferred initialization" << std::endl;
+}
+
+void UIHandler::initializeSceneObjects() {
+	if (scene_initialized_ || !three_d_scene_ || !main_camera_) {
+		std::cout << "[UIHandler] Scene already initialized or missing objects" << std::endl;
+		return;
+	}
+	
+	if (!overlay_viewport_) {
+		std::cerr << "[UIHandler] ERROR: Overlay viewport not created yet!" << std::endl;
+		return;
+	}
+	
+	std::cout << "[UIHandler] Initializing scene objects with OpenGL context..." << std::endl;
+	
+	try {
+		// CRITICAL: Make overlay's OpenGL context current before any GL calls
+		overlay_viewport_->makeContextCurrent();
+		
+		// Initialize scene (will compile shaders, create grid VAO, etc.)
+		// NOTE: We DON'T initialize renderer_ because overlay renders directly, no FBO needed
+		three_d_scene_->initizalize();
+		
+		main_camera_->initialize();
+		
+		// Create cube mesh if pointer is provided
+		if (cube_mesh_ptr_) {
+			*cube_mesh_ptr_ = Primitives::CreateCubeMesh(1.0f, glm::vec3(0.0f, 0.0f, 0.0f), "Cube", true);
+			(*cube_mesh_ptr_)->initialize();
+			
+			three_d_scene_->addObject(*cube_mesh_ptr_);
+			std::cout << "[UIHandler] Cube mesh created and added to scene" << std::endl;
+		}
+		
+		three_d_scene_->addObject(main_camera_);
+		three_d_scene_->setActiveCamera(main_camera_);
+		
+		scene_initialized_ = true;
+		std::cout << "[UIHandler] Scene objects initialized successfully!" << std::endl;
+		
+		// Context will remain current for rendering
+		
+	} catch (const std::exception& e) {
+		std::cerr << "[UIHandler] ERROR during scene initialization: " << e.what() << std::endl;
+	} catch (...) {
+		std::cerr << "[UIHandler] UNKNOWN ERROR during scene initialization" << std::endl;
+	}
 }

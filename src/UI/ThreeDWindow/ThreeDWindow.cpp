@@ -14,7 +14,7 @@
 
 #include "WorldObjects/Mesh/Mesh.hpp"
 
-#include <SDL3/SDL.h>
+// #include <SDL3/SDL.h>  // Not used in CEF UI project
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/matrix_decompose.hpp>

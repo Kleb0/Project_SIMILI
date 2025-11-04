@@ -12,6 +12,12 @@ OpenGLContext::OpenGLContext()
 
 void OpenGLContext::initialize()
 {
+    // Check if already initialized (avoid double initialization)
+    if (fbo != 0) {
+        std::cout << "[OpenGLContext] Already initialized, skipping..." << std::endl;
+        return;
+    }
+    
     if (!fbo) glGenFramebuffers(1, &fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 

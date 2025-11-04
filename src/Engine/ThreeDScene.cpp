@@ -4,7 +4,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include "Engine/ThreeDScene.hpp"
+#include "ThreeDScene.hpp"
+#include "OpenGLContext.hpp"
 #include <iostream>
 #include <filesystem>
 #include <vector>
@@ -287,6 +288,53 @@ void ThreeDScene::render()
     }
 
     glctx->unbind();
+}
+
+void ThreeDScene::renderDirect(int width, int height)
+{
+    // Direct rendering without FBO - for overlay viewports
+    // Assumes OpenGL context is already current
+    
+    if (!activeCamera) 
+    {
+        std::cerr << "[ThreeDScene] ERROR: No active camera set.\n";
+        return;
+    }
+
+    // Already cleared by caller, but ensure depth test is on
+    glEnable(GL_DEPTH_TEST);
+    glViewport(0, 0, width, height);
+
+    const float aspect = (height > 0) ? float(width) / float(height) : 1.0f;
+
+    glm::mat4 view = activeCamera->getViewMatrix();
+    glm::mat4 proj = activeCamera->getProjectionMatrix(aspect);
+    glm::mat4 viewProj = proj * view;
+
+    if (!ownsViewproj) 
+    {
+        lastViewProj = viewProj;
+        ownsViewproj = true;
+    }
+
+    glDisable(GL_DEPTH_TEST);
+    drawBackgroundGradient();
+    glEnable(GL_DEPTH_TEST);
+
+    glUseProgram(shaderProgram);
+    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
+
+    // Render grid
+    glBindVertexArray(gridVAO);
+    glm::mat4 model(1.0f);
+    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
+    glDrawArrays(GL_LINES, 0, 44);
+    glBindVertexArray(0);
+
+    // Render all objects
+    for (auto *obj : objects) {
+        if (obj) obj->render(viewProj);
+    }
 }
 
 
