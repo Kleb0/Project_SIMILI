@@ -28,10 +28,8 @@ fs::path gExecutableDir;
 #ifdef _WIN32
 #include <windows.h>
 
-int APIENTRY wWinMain(HINSTANCE hInstance,
-					  HINSTANCE hPrevInstance,
-					  LPTSTR lpCmdLine,
-					  int nCmdShow) {
+int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine, int nCmdShow) 
+{
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
@@ -40,12 +38,14 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
 	CefRefPtr<UIApp> app(new UIApp);
 
 	int exit_code = CefExecuteProcess(main_args, app, nullptr);
-	if (exit_code >= 0) {
+	if (exit_code >= 0) 
+	{
 		return exit_code;
 	}
 
 	static bool console_allocated = false;
-	if (!console_allocated) {
+	if (!console_allocated) 
+	{
 		AllocConsole();
 		FILE* fp;
 		freopen_s(&fp, "CONOUT$", "w", stdout);
@@ -85,21 +85,15 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
 	std::cout << "[Main] Router SIMILI Initialized" << std::endl;
 
 	// ===== 3D Scene Setup - Will be initialized in overlay viewport =====
-	// NOTE: The OpenGL context will be created by overlay_viewport.cpp
-	// We create the scene objects here but initialization happens after
-	// the overlay window is created with its own OpenGL context.
+
 	
 	std::cout << "[Main] Preparing 3D Scene (pre-initialization)..." << std::endl;
 	
-	// Allocate scene objects on the heap so they persist
 	static ThreeDScene* myThreeDScene = new ThreeDScene();
 	static Camera* mainCamera = new Camera();
 	static Mesh* cubeMesh1 = nullptr;
 	
 	mainCamera->setName("MainCamera");
-	
-	// DON'T set OpenGLContext - overlay will render directly without FBO
-	// myThreeDScene->setOpenGLContext(renderer);
 	
 	std::cout << "[Main] 3D Scene objects created (waiting for OpenGL context)" << std::endl;
 	
@@ -123,7 +117,6 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
 	handler->setThreeDScene(myThreeDScene);
 	std::cout << "[Main] 3D Scene linked to UIHandler" << std::endl;
 	
-	// Store pointers for later initialization (no renderer needed for overlay)
 	handler->setSceneObjects(nullptr, myThreeDScene, mainCamera, &cubeMesh1);
 
 	CefBrowserSettings browser_settings;
