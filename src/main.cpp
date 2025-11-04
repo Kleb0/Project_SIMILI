@@ -140,8 +140,6 @@ int main(int argc, char **argv)
 
     myThreeDScene.setActiveCamera(&mainCamera);
     
-    // Connect UI Manager to scene for IPC communication
-    uiManager.setScene(&myThreeDScene);
     
     myThreeDScene.render();
     myThreeDWindow.setModelingMode(&myThreeDWindow.normalMode);
