@@ -46,9 +46,9 @@ private:
     int width_;
     int height_;
     
-    ThreeDScene* three_d_scene_;  // Non-owning pointer to 3D scene
-    
-    // Rendering control
-    bool rendering_enabled_;
+    ThreeDScene* three_d_scene_;      
+    bool rendering_enabled_;    
+    bool is_dragging_;
+    POINT last_mouse_pos_;
 };
 
