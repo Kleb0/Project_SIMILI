@@ -3,11 +3,9 @@
 #include <vector>
 #include <glad/glad.h>
 #include <glm/glm.hpp>
-#include "Engine/OpenGLContext.hpp"
-#include "Engine/Guizmo.hpp"
 #include <WorldObjects/Entities/ThreeDObject.hpp>
 #include "WorldObjects/Camera/Camera.hpp"
-#include "Engine/ThreeDScene_DNA/ThreeDScene_DNA.hpp"
+#include "ThreeDScene_DNA/ThreeDScene_DNA.hpp"
 #include <iostream>
 #include <list>
 #include <json.hpp>
@@ -17,6 +15,9 @@ class OpenGLContext;
 class Camera;
 class HierarchyInspector;
 class ThreeDWindow;
+class Vertice;
+class Edge;
+class Face;
 
 struct GraveyardEntry {
     ThreeDObject* object;
@@ -41,6 +42,7 @@ public:
     void initizalize();
     void resize(int w, int h);
     void render();
+    void renderDirect(int width, int height);  // Direct rendering without FBO (for overlay)
     void drawBackgroundGradient();
 
     GLuint getTexture() const; 

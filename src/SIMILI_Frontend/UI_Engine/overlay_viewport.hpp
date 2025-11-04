@@ -1,7 +1,9 @@
 #pragma once
 
 #include <windows.h>
-// Don't include gl/GL.h - GLAD will provide OpenGL headers
+
+// Forward declarations
+class ThreeDScene;
 
 class OverlayViewport {
 public:
@@ -20,17 +22,21 @@ public:
     void enableRendering(bool enable) { rendering_enabled_ = enable; }
     bool isRenderingEnabled() const { return rendering_enabled_; }
     
+    // 3D Scene management
+    void setThreeDScene(ThreeDScene* scene) { three_d_scene_ = scene; }
+    ThreeDScene* getThreeDScene() const { return three_d_scene_; }
+    
+    // OpenGL context management
+    void makeContextCurrent();
+    void releaseContext();
+    
     HWND getHandle() const { return hwnd_; }
 
 private:
     static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
     
     void initializeOpenGL();
-    void initializeModernRendering();
     void renderScene();
-    void handleMouseInput(UINT msg, WPARAM wParam, LPARAM lParam);
-    unsigned int compileShader(unsigned int type, const char* source);
-    unsigned int createShaderProgram(const char* vertex_src, const char* fragment_src);
     
     HWND hwnd_;
     HWND parent_;
@@ -40,25 +46,9 @@ private:
     int width_;
     int height_;
     
-    // Modern OpenGL resources
-    unsigned int vao_;
-    unsigned int vbo_;
-    unsigned int ebo_;
-    unsigned int shader_program_;
-    
-    // Background gradient
-    unsigned int bg_vao_;
-    unsigned int bg_vbo_;
-    unsigned int bg_shader_;
-    
-    // Camera control
-    bool mouse_dragging_;
-    int last_mouse_x_;
-    int last_mouse_y_;
-    float camera_rotation_x_;
-    float camera_rotation_y_;
-    float camera_distance_;
+    ThreeDScene* three_d_scene_;  // Non-owning pointer to 3D scene
     
     // Rendering control
     bool rendering_enabled_;
 };
+

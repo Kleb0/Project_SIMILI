@@ -1,7 +1,6 @@
 #pragma once
 #include <glad/glad.h>
 #include <glm/glm.hpp>
-#include "WorldObjects/Camera/Camera.hpp"
 #include <iostream>
 
 class OpenGLContext

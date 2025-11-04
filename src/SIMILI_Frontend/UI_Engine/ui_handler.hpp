@@ -10,6 +10,12 @@
 #include <sstream>
 #include <memory>
 
+// Forward declarations
+class ThreeDScene;
+class OpenGLContext;
+class Camera;
+class Mesh;
+
 class UIHandler : public CefClient, public CefDisplayHandler,
 				  public CefLifeSpanHandler, public CefLoadHandler 
 {
@@ -44,6 +50,14 @@ public:
 	OverlayViewport* getOverlay() { return overlay_viewport_.get(); }
 	HWND getParentHWND() const { return parent_hwnd_; }
 	
+	// 3D Scene management
+	void setThreeDScene(ThreeDScene* scene) { three_d_scene_ = scene; }
+	ThreeDScene* getThreeDScene() const { return three_d_scene_; }
+	
+	// Store scene objects for deferred initialization
+	void setSceneObjects(OpenGLContext* renderer, ThreeDScene* scene, Camera* camera, Mesh** cubeMesh);
+	void initializeSceneObjects();  // Called when overlay is ready
+	
 	// Window procedure hook for resize handling
 	static LRESULT CALLBACK ParentWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
 
@@ -53,6 +67,13 @@ private:
 	std::unique_ptr<OverlayViewport> overlay_viewport_;
 	HWND parent_hwnd_;
 	UINT_PTR timer_id_;
+	ThreeDScene* three_d_scene_;  // Non-owning pointer to 3D scene
+	
+	// Scene initialization objects
+	OpenGLContext* renderer_;
+	Camera* main_camera_;
+	Mesh** cube_mesh_ptr_;
+	bool scene_initialized_;
 	
 	// Throttling for viewport updates
 	DWORD last_viewport_update_time_;
