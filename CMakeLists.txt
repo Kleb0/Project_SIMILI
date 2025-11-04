@@ -17,7 +17,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MP /O2")
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MP /O2")
 
 
-option(USE_CEF "Enable Chromium Embedded Framework for UI" OFF) 
+option(USE_CEF "Enable Chromium Embedded Framework for UI" ON) 
 
 if(USE_CEF)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -264,6 +264,14 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${SDL3_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/tinyfiledialogs
 )
+
+# Add CEF include directories if enabled
+if(USE_CEF)
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/CEF/cef_binary
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/CEF/cef_binary/include
+    )
+endif()
 
 target_include_directories(imgui PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
