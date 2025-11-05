@@ -1,9 +1,13 @@
 #pragma once
 
 #include <windows.h>
+#include <vector>
 
 // Forward declarations
 class ThreeDScene;
+class ThreeDObject;
+class ThreeDObjectSelector;
+class Camera;
 
 class OverlayViewport {
 public:
@@ -31,11 +35,16 @@ public:
     void releaseContext();
     
     HWND getHandle() const { return hwnd_; }
+    
+    // Raycast & Selection
+    void performRaycast(int mouseX, int mouseY);
 
 private:
     static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
     
     void initializeOpenGL();
+    void initializeImGui();
+    void shutdownImGui();
     void renderScene();
     
     HWND hwnd_;
@@ -50,5 +59,9 @@ private:
     bool rendering_enabled_;    
     bool is_dragging_;
     POINT last_mouse_pos_;
+    bool imgui_initialized_;
+    
+    // Raycast & Selection
+    ThreeDObjectSelector* selector_;
 };
 

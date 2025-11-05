@@ -50,8 +50,7 @@ public:
 
     std::list<ThreeDObject*>& getObjectsRef() 
     { 
-        static std::list<ThreeDObject*> emptyList;
-        return glctx ? objects : emptyList; 
+        return objects; 
     }
     void addObject(ThreeDObject* object);
     bool removeObject(ThreeDObject* object);
