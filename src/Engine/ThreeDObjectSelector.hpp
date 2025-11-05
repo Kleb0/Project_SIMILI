@@ -7,46 +7,52 @@
 #include <vector>
 #include <iostream>
 #include <list>
+#include <sstream>
 
 class ThreeDObjectSelector
 {
 public:
-    ThreeDObjectSelector();
+	ThreeDObjectSelector();
+	
+	// Print raycast debug header
+	void printRaycastDebugHeader(int mouseX, int mouseY, int screenWidth, int screenHeight, 
+	const glm::vec3& cameraPos, const std::vector<ThreeDObject*>& objects);
 
 // -------- Mesh Picking --------
 
-    void pickUpMesh(int mouseX, int mouseY, int screenWidth, int screenHeight, const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObject *> &objects);
-    void clearTarget();
-    void select(ThreeDObject *object);
+	void pickUpMesh(int mouseX, int mouseY, int screenWidth, int screenHeight, const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObject *> &objects);
+	void clearTarget();
+	void select(ThreeDObject *object);
 
-    ThreeDObject *getSelectedObject() const { return selectedObject; }
+	ThreeDObject *getSelectedObject() const { return selectedObject; }
 
-    void clearMultipleSelection();
+	void clearMultipleSelection();
 
 
 // -------- Vertice picking --------
 
-    Vertice* pickUpVertice(int mouseX, int mouseY, int screenWidth, int screenHeight, const glm::mat4 &view, const glm::mat4 &projection, 
-    const std::vector<ThreeDObject *> &objects, bool clearPrevious = true);
+	Vertice* pickUpVertice(int mouseX, int mouseY, int screenWidth, int screenHeight, const glm::mat4 &view, const glm::mat4 &projection, 
+	const std::vector<ThreeDObject *> &objects, bool clearPrevious = true);
 
 // ------- Face picking ------
 
-    Face* pickupFace(int mouseX, int mouseY, int screenWidth, int screenHeight, const glm::mat4 &view, const glm::mat4 &projection,
-    const std::vector<ThreeDObject *> &objects, bool clearPrevious = true);
+	Face* pickupFace(int mouseX, int mouseY, int screenWidth, int screenHeight, const glm::mat4 &view, const glm::mat4 &projection,
+	const std::vector<ThreeDObject *> &objects, bool clearPrevious = true);
 
 // ------- Edge Picking ----
 
-    Edge* pickupEdge(int mouseX, int mouseY, int screenWidth, int screenHeight, const glm::mat4 &view, const glm::mat4 &projection,
-    const std::vector<ThreeDObject *> &objects, bool clearPrevious = true);
+	Edge* pickupEdge(int mouseX, int mouseY, int screenWidth, int screenHeight, const glm::mat4 &view, const glm::mat4 &projection,
+	const std::vector<ThreeDObject *> &objects, bool clearPrevious = true);
 
 private:
-    ThreeDObject *selectedObject = nullptr;
-    std::list<ThreeDObject *> multipleSelectedObjects;
+	ThreeDObject *selectedObject = nullptr;
+	std::list<ThreeDObject *> multipleSelectedObjects;
 
-    bool rayIntersectsMesh(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object);
-    bool rayIntersectsVertice(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object, const Vertice &vertice);
-    bool rayIntersectsFace(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object, const Face &face);
-    bool rayIntersectsEdge(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object, const Edge &edge);
-    
+	bool rayIntersectsMesh(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object);
+	bool rayIntersectsBoundingBox(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object);
+	bool rayIntersectsVertice(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object, const Vertice &vertice);
+	bool rayIntersectsFace(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object, const Face &face);
+	bool rayIntersectsEdge(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object, const Edge &edge);
+	
 
 };

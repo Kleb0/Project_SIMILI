@@ -3,9 +3,20 @@
 #include "overlay_viewport.hpp"
 #include "../../Engine/ThreeDScene.hpp"
 #include "../../Engine/OpenGLContext.hpp"
+#include "../../Engine/ThreeDObjectSelector.hpp"
 #include "../../WorldObjects/Camera/Camera.hpp"
+#include "../../WorldObjects/Entities/ThreeDObject.hpp"
 #include <iostream>
 #include <glad/glad.h>
+#include <imgui.h>
+#include <imgui_impl_opengl3.h>
+#include <imgui_impl_win32.h>
+#include <ImGuizmo.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
+// Forward declare message handler from imgui_impl_win32.cpp
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 #ifndef WGL_CONTEXT_MAJOR_VERSION_ARB
 #define WGL_CONTEXT_MAJOR_VERSION_ARB 0x2091
@@ -20,8 +31,7 @@ namespace {
 	const wchar_t* kOverlayClassName = L"SIMILI_OpenGL_Overlay";
 }
 
-OverlayViewport::OverlayViewport()
-	: hwnd_(nullptr)
+OverlayViewport::OverlayViewport() : hwnd_(nullptr) 
 	, parent_(nullptr)
 	, hdc_(nullptr)
 	, gl_context_(nullptr)
@@ -30,12 +40,19 @@ OverlayViewport::OverlayViewport()
 	, three_d_scene_(nullptr)
 	, rendering_enabled_(true)
 	, is_dragging_(false)
+	, imgui_initialized_(false)
+	, selector_(nullptr)
 {
 	last_mouse_pos_.x = 0;
 	last_mouse_pos_.y = 0;
+	selector_ = new ThreeDObjectSelector();
 }
 
 OverlayViewport::~OverlayViewport() {
+	if (selector_) {
+		delete selector_;
+		selector_ = nullptr;
+	}
 	destroy();
 }
 
@@ -105,6 +122,8 @@ bool OverlayViewport::create(HWND parent, int x, int y, int width, int height) {
 }
 
 void OverlayViewport::destroy() {
+	shutdownImGui();
+	
 	if (gl_context_) {
 		wglMakeCurrent(hdc_, gl_context_);
 		wglMakeCurrent(nullptr, nullptr);
@@ -152,7 +171,8 @@ void OverlayViewport::initializeOpenGL()
 	}
 	
 	// Create OpenGL 4.6 core profile context
-	int attribs[] = {
+	int attribs[] = 
+	{
 		WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
 		WGL_CONTEXT_MINOR_VERSION_ARB, 6,
 		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
@@ -188,6 +208,55 @@ void OverlayViewport::initializeOpenGL()
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	
 	std::cout << "[OverlayViewport] OpenGL initialized for 3D scene rendering" << std::endl;
+	
+	// Initialize ImGui after OpenGL context is ready
+	initializeImGui();
+}
+
+void OverlayViewport::initializeImGui() 
+{
+	if (imgui_initialized_) {
+		std::cout << "[OverlayViewport] ImGui already initialized" << std::endl;
+		return;
+	}
+	
+	std::cout << "[OverlayViewport] Initializing ImGui..." << std::endl;
+	
+	// Setup Dear ImGui context
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+	
+	// Setup Dear ImGui style
+	ImGui::StyleColorsDark();
+	
+	// Setup Platform/Renderer backends
+	ImGui_ImplWin32_Init(hwnd_);
+	ImGui_ImplOpenGL3_Init("#version 460");
+	
+	// Initialize ImGuizmo
+	ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
+	
+	imgui_initialized_ = true;
+	std::cout << "[OverlayViewport] ImGui and ImGuizmo initialized successfully" << std::endl;
+}
+
+void OverlayViewport::shutdownImGui() 
+{
+	if (!imgui_initialized_) {
+		return;
+	}
+	
+	std::cout << "[OverlayViewport] Shutting down ImGui..." << std::endl;
+	
+	ImGui_ImplOpenGL3_Shutdown();
+	ImGui_ImplWin32_Shutdown();
+	ImGui::DestroyContext();
+	
+	imgui_initialized_ = false;
+	std::cout << "[OverlayViewport] ImGui shutdown complete" << std::endl;
 }
 
 void OverlayViewport::makeContextCurrent() {
@@ -234,7 +303,21 @@ void OverlayViewport::render() {
 	
 	wglMakeCurrent(hdc_, gl_context_);
 	
+	// Start ImGui frame
+	if (imgui_initialized_) {
+		ImGui_ImplOpenGL3_NewFrame();
+		ImGui_ImplWin32_NewFrame();
+		ImGui::NewFrame();
+		ImGuizmo::BeginFrame();
+	}
+	
 	renderScene();
+	
+	// Render ImGui
+	if (imgui_initialized_) {
+		ImGui::Render();
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+	}
 	
 	SwapBuffers(hdc_);
 	
@@ -257,8 +340,15 @@ void OverlayViewport::renderScene() {
 	std::cout << "[OverlayViewport] WARNING: No 3D scene set" << std::endl;
 }
 
+
+// ------------- Viewport mode management -------------
+
+// -------------- Camera Controls --------------
 LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 {
+	// Pass events to ImGui first
+	if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam))
+		return true;
 
 	OverlayViewport* overlay = nullptr;
 	
@@ -289,6 +379,18 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 			case WM_ERASEBKGND:
 				return 1;
 			
+			// ===== RAYCAST & SELECTION =====
+			
+			case WM_LBUTTONDOWN:
+			{
+				POINT cursor_pos;
+				GetCursorPos(&cursor_pos);
+				ScreenToClient(hwnd, &cursor_pos);
+				
+				overlay->performRaycast(cursor_pos.x, cursor_pos.y);
+				return 0;
+			}
+			
 			// ===== CAMERA CONTROLS =====
 			
 			case WM_MOUSEWHEEL: 
@@ -296,9 +398,11 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				int delta = GET_WHEEL_DELTA_WPARAM(wParam);
 				float wheel = delta / 120.0f; // Normalize
 				
-				if (overlay->three_d_scene_) {
+				if (overlay->three_d_scene_) 
+				{
 					Camera* cam = overlay->three_d_scene_->getActiveCamera();
-					if (cam && cam->isSoftwareCamera()) {
+					if (cam && cam->isSoftwareCamera()) 
+					{
 						cam->moveForward(wheel * 0.5f);
 						InvalidateRect(hwnd, nullptr, FALSE);
 					}
@@ -318,7 +422,8 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 			case WM_MBUTTONUP: 
 			{
 
-				if (overlay->is_dragging_) {
+				if (overlay->is_dragging_) 
+				{
 					overlay->is_dragging_ = false;
 					ReleaseCapture();
 				}
@@ -327,7 +432,8 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 			
 			case WM_MOUSEMOVE: 
 			{
-				if (overlay->is_dragging_ && overlay->three_d_scene_) {
+				if (overlay->is_dragging_ && overlay->three_d_scene_) 
+				{
 					Camera* cam = overlay->three_d_scene_->getActiveCamera();
 					if (cam && cam->isSoftwareCamera()) {
 						POINT current_pos;
@@ -340,10 +446,13 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 						if (deltaX != 0.0f || deltaY != 0.0f) {
 							bool shiftPressed = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
 							
-							if (!shiftPressed) {
+							if (!shiftPressed) 
+							{
 								cam->prepareOrbit();
 								cam->orbitAroundTarget(deltaX, deltaY);
-							} else {
+							} 
+							else 
+						{
 								cam->lateralMovement(deltaX, deltaY);
 							}
 							
@@ -361,3 +470,82 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 	return DefWindowProc(hwnd, msg, wParam, lParam);
 }
 
+// ===== Raycast & Selection Implementation =====
+
+void OverlayViewport::performRaycast(int mouseX, int mouseY) 
+{
+	if (!three_d_scene_ || !selector_) 
+	{
+		std::cout << "[OverlayViewport] Raycast impossible: scene or selector not initialized" << std::endl;
+		return;
+	}
+	
+	Camera* camera = three_d_scene_->getActiveCamera();
+	if (!camera) 
+	{
+		std::cout << "[OverlayViewport] No active camera for raycast" << std::endl;
+		return;
+	}
+	
+	std::cout << "\n========== RAYCAST DEBUG ==========" << std::endl;
+	std::cout << "[OverlayViewport] Mouse: (" << mouseX << ", " << mouseY << ")" << std::endl;
+	std::cout << "[OverlayViewport] Viewport: " << width_ << "x" << height_ << std::endl;
+	
+	// Get view and projection matrices
+	glm::mat4 view = three_d_scene_->getViewMatrix();
+	glm::mat4 projection = three_d_scene_->getProjectionMatrix();
+	
+	std::cout << "[OverlayViewport] Camera position: (" 
+	          << camera->getPosition().x << ", " 
+	          << camera->getPosition().y << ", " 
+	          << camera->getPosition().z << ")" << std::endl;
+	
+	// Get all objects in the scene
+	const auto& listRef = three_d_scene_->getObjectsRef();
+	
+	std::vector<ThreeDObject*> objects;
+	objects.reserve(listRef.size());
+	
+	for (auto* obj : listRef) 
+	{
+		if (obj) 
+		{
+			std::cout << "[OverlayViewport] Object: " << obj->getName() 
+			          << " | Selectable: " << (obj->isSelectable() ? "YES" : "NO")
+			          << " | Pos: (" << obj->getPosition().x << ", " 
+			          << obj->getPosition().y << ", " 
+			          << obj->getPosition().z << ")" << std::endl;
+			objects.push_back(obj);
+		}
+	}
+	
+	if (objects.empty()) 
+	{
+		std::cout << "[OverlayViewport] ERROR: No objects in the scene" << std::endl;
+		return;
+	}
+	
+	// Perform raycast
+	std::cout << "[OverlayViewport] Starting raycast with " << objects.size() << " objects..." << std::endl;
+	selector_->pickUpMesh(mouseX, mouseY, width_, height_, view, projection, objects);
+	
+	ThreeDObject* selected = selector_->getSelectedObject();
+	
+	if (selected) 
+	{
+		std::cout << "\n*** OBJECT CLICKED ***" << std::endl;
+		std::cout << "  Name: " << selected->getName() << std::endl;
+		std::cout << "  Position: (" 
+				  << selected->getPosition().x << ", " 
+				  << selected->getPosition().y << ", " 
+				  << selected->getPosition().z << ")" << std::endl;
+	} 
+	else 
+	{
+		std::cout << "Clicked empty space (no object selected)" << std::endl;
+	}
+	std::cout << "===================================\n" << std::endl;
+	
+	// Clear selection for next click
+	selector_->clearTarget();
+}

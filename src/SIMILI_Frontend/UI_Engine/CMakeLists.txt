@@ -35,8 +35,9 @@ file(GLOB IMGUI_SOURCES
 	"${CMAKE_CURRENT_SOURCE_DIR}/../../ThirdParty/imgui/imgui_draw.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../../ThirdParty/imgui/imgui_tables.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../../ThirdParty/imgui/imgui_widgets.cpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/../../ThirdParty/imgui/backends/imgui_impl_glfw.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../../ThirdParty/imgui/backends/imgui_impl_opengl3.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../../ThirdParty/imgui/backends/imgui_impl_glfw.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../../ThirdParty/imgui/backends/imgui_impl_win32.cpp"
 )
 add_library(imgui STATIC ${IMGUI_SOURCES})
 target_include_directories(imgui PUBLIC
@@ -45,11 +46,18 @@ target_include_directories(imgui PUBLIC
 	"${CMAKE_CURRENT_SOURCE_DIR}/../../ThirdParty/GLFW/include"
 )
 target_compile_definitions(imgui PRIVATE IMGUI_USER_CONFIG="my_imgui_config.h")
+target_link_libraries(imgui PUBLIC glfw)
 
 # ImGuizmo library
 file(GLOB IMGUIZMO_SOURCES
 	"${CMAKE_CURRENT_SOURCE_DIR}/../../ThirdParty/ImGuizmo/ImGuizmo.cpp"
 )
+add_library(imguizmo STATIC ${IMGUIZMO_SOURCES})
+target_include_directories(imguizmo PUBLIC
+	"${CMAKE_CURRENT_SOURCE_DIR}/../../ThirdParty/ImGuizmo"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../../ThirdParty/imgui"
+)
+target_link_libraries(imguizmo PRIVATE imgui)
 
 # Tinyfiledialogs library
 set(TINYFILEDIALOGS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../ThirdParty/tinyfiledialogs")
@@ -152,7 +160,6 @@ set(ENGINE_SOURCES
 	"${CMAKE_CURRENT_SOURCE_DIR}/../../UI/EdgeLoopControl/EdgeLoopControl.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../../UI/UIdocking/Uidocking.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../../UI/OptionMenu/OptionsMenu.cpp"
-	${IMGUIZMO_SOURCES}
 )
 set(ENGINE_HEADERS
 	"${CMAKE_CURRENT_SOURCE_DIR}/../../Engine/ThreeDScene.hpp"
@@ -218,6 +225,7 @@ target_link_libraries(SIMILI_UI PRIVATE
 	opengl32
 	glfw
 	imgui
+	imguizmo
 	tinyfiledialogs
 	Boost::system
 	OpenSSL::SSL

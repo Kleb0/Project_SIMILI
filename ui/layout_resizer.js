@@ -220,7 +220,8 @@
         document.body.offsetHeight;
     }
     
-    function notifyViewportResize() {
+    function notifyViewportResize() 
+    {
         const viewportPanel = document.querySelector('.viewport-panel');
         if (viewportPanel) {
             const rect = viewportPanel.getBoundingClientRect();
@@ -257,7 +258,8 @@
         }
     }
 
-    function handleMouseUp(e) {
+    function handleMouseUp(e) 
+    {
         if (!isDragging) return;
         
         isDragging = false;
