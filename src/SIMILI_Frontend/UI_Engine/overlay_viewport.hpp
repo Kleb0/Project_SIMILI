@@ -4,6 +4,11 @@
 #include <vector>
 
 // Forward declarations
+namespace ImGuizmo {
+    enum OPERATION;
+    enum MODE;
+}
+
 class ThreeDScene;
 class ThreeDObject;
 class ThreeDObjectSelector;
@@ -38,6 +43,12 @@ public:
     
     // Raycast & Selection
     void performRaycast(int mouseX, int mouseY);
+    
+    // Guizmo management
+    void setGuizmoOperation(ImGuizmo::OPERATION operation) { current_guizmo_operation_ = operation; }
+    ImGuizmo::OPERATION getGuizmoOperation() const { return current_guizmo_operation_; }
+    void setGuizmoMode(ImGuizmo::MODE mode) { current_guizmo_mode_ = mode; }
+    ImGuizmo::MODE getGuizmoMode() const { return current_guizmo_mode_; }
 
 private:
     static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -46,6 +57,7 @@ private:
     void initializeImGui();
     void shutdownImGui();
     void renderScene();
+    void renderGuizmo();
     
     HWND hwnd_;
     HWND parent_;
@@ -63,5 +75,9 @@ private:
     
     // Raycast & Selection
     ThreeDObjectSelector* selector_;
+    
+    // Guizmo state
+    ImGuizmo::OPERATION current_guizmo_operation_;
+    ImGuizmo::MODE current_guizmo_mode_;
 };
 

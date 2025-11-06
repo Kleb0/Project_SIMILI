@@ -19,7 +19,8 @@ class Vertice;
 class Edge;
 class Face;
 
-struct GraveyardEntry {
+struct GraveyardEntry 
+{
     ThreeDObject* object;
     std::vector<Vertice*> vertices;
     std::vector<Edge*> edges;

@@ -1,5 +1,6 @@
 #include "HttpSession.hpp"
 #include "ConsoleLogger.hpp"
+#include "SimpleHttpServer.hpp"
 #include <iostream>
 #include <sstream>
 #include <random>
@@ -197,7 +198,6 @@ void HttpSession::send_response()
         return;
     }
     
-    // Log the received message from JavaScript (for all other endpoints)
     std::ostringstream logMsg;
     logMsg << "[HttpSession] " << req_.method_string() << " " << req_.target();
     std::cout << logMsg.str() << std::endl;
@@ -211,20 +211,28 @@ void HttpSession::send_response()
         ConsoleLogger::getInstance().addLog(bodyMsg.str(), "server");
     }
     
+    auto& router = SimpleHttpServer::getInstance().getRouter();
+    
+    Router::Message routerMsg;
+    routerMsg.route = std::string(req_.target());
+    routerMsg.method = std::string(req_.method_string());
+    routerMsg.body = req_.body();
+    routerMsg.requestId = sessionId_;
+    
+    Router::Response routerRes = router.handleMessage(routerMsg);
+    
     auto response = std::make_shared<http::response<http::string_body>>(
-        http::status::ok, req_.version());
+        static_cast<http::status>(routerRes.statusCode), req_.version());
     
     response->set(http::field::server, "SIMILI/1.0");
     response->set(http::field::content_type, "application/json");
-    response->set(http::field::access_control_allow_origin, "*"); // Enable CORS
+    response->set(http::field::access_control_allow_origin, "*");
     response->keep_alive(req_.keep_alive());
-    
-    std::string response_message = "Get message from HTML hello world";
-    response->body() = R"({"status":"ok","message":")" + response_message + R"("})";
+    response->body() = routerRes.body;
     response->prepare_payload();
 
     std::ostringstream responseMsg;
-    responseMsg << "[HttpSession] Sending response: " << response_message;
+    responseMsg << "[HttpSession] Sending response: " << routerRes.body;
     std::cout << responseMsg.str() << std::endl;
     ConsoleLogger::getInstance().addLog(responseMsg.str(), "server");
 

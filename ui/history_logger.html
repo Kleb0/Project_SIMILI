@@ -15,18 +15,96 @@
             height: 100vh;
             background-color: #FF00FF;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             font-family: Arial, sans-serif;
+            padding: 20px;
         }
         h1 {
             color: #000000;
             font-size: 48px;
             font-weight: normal;
+            margin-bottom: 30px;
+        }
+        .scene-info {
+            background-color: rgba(0, 0, 0, 0.3);
+            border: 2px solid #000000;
+            border-radius: 8px;
+            padding: 20px;
+            min-width: 400px;
+        }
+        .info-row {
+            display: flex;
+            margin-bottom: 10px;
+            color: #000000;
+            font-size: 14px;
+        }
+        .info-label {
+            font-weight: bold;
+            margin-right: 10px;
+            min-width: 120px;
+        }
+        .info-value {
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+        }
+        .loading {
+            color: #000000;
+            font-style: italic;
+        }
+        .error {
+            color: #ff0000;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
     <h1>History<br>Logger</h1>
+    
+    <div class="scene-info">
+        <div class="info-row">
+            <span class="info-label">Scene ID:</span>
+            <span class="info-value" id="sceneID">Loading...</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Context ID:</span>
+            <span class="info-value" id="contextID">Loading...</span>
+        </div>
+    </div>
+    
+    <script>
+        // Fetch scene info from the UI process router (port 8081)
+        async function fetchSceneInfo() {
+            try {
+                const response = await fetch('http://localhost:8081/api/scene-info');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Update DOM with scene info
+                document.getElementById('sceneID').textContent = data.sceneID || 'N/A';
+                document.getElementById('contextID').textContent = data.contextID || 'N/A';
+                
+                console.log('[History Logger] Scene info loaded:', data);
+                
+            } catch (error) {
+                console.error('[History Logger] Failed to fetch scene info:', error);
+                document.getElementById('sceneID').textContent = 'Error: ' + error.message;
+                document.getElementById('sceneID').classList.add('error');
+                document.getElementById('contextID').textContent = 'Error: ' + error.message;
+                document.getElementById('contextID').classList.add('error');
+            }
+        }
+        
+        // Fetch on page load
+        fetchSceneInfo();
+        
+        // Refresh every 5 seconds to detect changes
+        setInterval(fetchSceneInfo, 5000);
+    </script>
 </body>
 </html>

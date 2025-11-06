@@ -80,6 +80,8 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Entities
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Mesh_DNA
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Resources
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/example
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glad
@@ -99,6 +101,15 @@ list(FILTER SOURCES EXCLUDE REGEX "src/ThirdParty/glm/.*\\.cpp$")
 list(FILTER SOURCES EXCLUDE REGEX "/([Tt]ests?|[Uu]nit[Tt]ests?)/.*\\.cpp$")
 list(FILTER SOURCES EXCLUDE REGEX "src/SIMILI_Frontend/.*\\.cpp$")
 list(FILTER SOURCES EXCLUDE REGEX "src/SIMILI_Services/middleware/.*\\.cpp$")
+
+# Add SIMILI_Services/middleware sources explicitly
+list(APPEND SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware/SimpleHttpServer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware/ConsoleLogger.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware/HttpSession.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware/HttpListener.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware/ContextRegistry.cpp
+)
 
 
 file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS src/*.hpp)
@@ -169,6 +180,27 @@ target_include_directories(tinyfiledialogs PUBLIC
 # OpenGL
 find_package(OpenGL REQUIRED)
 find_library(GLU_LIBRARY NAMES GLU glu32)
+
+# Boost libraries - Static linking for HTTP server
+set(Boost_USE_STATIC_LIBS ON)          # Link statically
+set(Boost_USE_MULTITHREADED ON)        # Use multithreaded version
+if(USE_CEF)
+    set(Boost_USE_STATIC_RUNTIME ON)   # Static runtime (matches CEF's /MT)
+endif()
+find_package(Boost REQUIRED COMPONENTS system)
+if(NOT Boost_FOUND)
+    message(FATAL_ERROR "Boost not found. Please install via vcpkg: vcpkg install boost-beast:x64-windows-static")
+endif()
+message(STATUS "Boost found: ${Boost_INCLUDE_DIRS}")
+message(STATUS "Boost libraries: ${Boost_LIBRARIES}")
+
+# OpenSSL - Required for HTTPS support
+find_package(OpenSSL REQUIRED)
+if(NOT OPENSSL_FOUND)
+    message(FATAL_ERROR "OpenSSL not found. Please install via vcpkg: vcpkg install openssl:x64-windows-static")
+endif()
+message(STATUS "OpenSSL found: ${OPENSSL_INCLUDE_DIR}")
+message(STATUS "OpenSSL libraries: ${OPENSSL_LIBRARIES}")
 
 #find DirectX 12
 
@@ -259,10 +291,13 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/backends
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/example
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glad/include  
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/GLFW/include  
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/ImGuizmo
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glad/include
     ${SDL3_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/tinyfiledialogs
+    ${Boost_INCLUDE_DIRS}
+    ${OPENSSL_INCLUDE_DIR}
 )
 
 # Add CEF include directories if enabled
@@ -290,6 +325,11 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     ${DXGI_LIBRARY}
     ${D3DCOMPILER_LIBRARY}
     ${SDL3_LIBRARY}
+    Boost::system
+    OpenSSL::SSL
+    OpenSSL::Crypto
+    ws2_32
+    crypt32
 )
 
 # Link CEF if enabled
