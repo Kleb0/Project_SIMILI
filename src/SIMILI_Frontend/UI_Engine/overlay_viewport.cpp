@@ -1,19 +1,25 @@
 #define GLM_ENABLE_EXPERIMENTAL
 
+#include <iostream>
+#include <glad/glad.h>
+
+// ImGui MUST be included BEFORE ImGuizmo
+#include <imgui.h>
+#include <imgui_impl_opengl3.h>
+#include <imgui_impl_win32.h>
+#include <ImGuizmo.h>
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/matrix_decompose.hpp>
+
 #include "overlay_viewport.hpp"
 #include "../../Engine/ThreeDScene.hpp"
 #include "../../Engine/OpenGLContext.hpp"
 #include "../../Engine/ThreeDObjectSelector.hpp"
 #include "../../WorldObjects/Camera/Camera.hpp"
 #include "../../WorldObjects/Entities/ThreeDObject.hpp"
-#include <iostream>
-#include <glad/glad.h>
-#include <imgui.h>
-#include <imgui_impl_opengl3.h>
-#include <imgui_impl_win32.h>
-#include <ImGuizmo.h>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 
 // Forward declare message handler from imgui_impl_win32.cpp
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -42,6 +48,8 @@ OverlayViewport::OverlayViewport() : hwnd_(nullptr)
 	, is_dragging_(false)
 	, imgui_initialized_(false)
 	, selector_(nullptr)
+	, current_guizmo_operation_(ImGuizmo::TRANSLATE)
+	, current_guizmo_mode_(ImGuizmo::WORLD)
 {
 	last_mouse_pos_.x = 0;
 	last_mouse_pos_.y = 0;
@@ -304,7 +312,8 @@ void OverlayViewport::render() {
 	wglMakeCurrent(hdc_, gl_context_);
 	
 	// Start ImGui frame
-	if (imgui_initialized_) {
+	if (imgui_initialized_) 
+	{
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
@@ -314,15 +323,14 @@ void OverlayViewport::render() {
 	renderScene();
 	
 	// Render ImGui
-	if (imgui_initialized_) {
+	if (imgui_initialized_) 
+	{
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 	}
 	
 	SwapBuffers(hdc_);
 	
-	// Don't call wglMakeCurrent(nullptr, nullptr) - it's expensive
-	// The context will be properly released when needed
 }
 
 void OverlayViewport::renderScene() {
@@ -333,6 +341,10 @@ void OverlayViewport::renderScene() {
 	if (three_d_scene_) 
 	{
 		three_d_scene_->renderDirect(width_, height_);
+		
+		// Render Guizmo for selected object
+		renderGuizmo();
+		
 		return;
 	}
 	
@@ -342,6 +354,69 @@ void OverlayViewport::renderScene() {
 
 
 // ------------- Viewport mode management -------------
+
+void OverlayViewport::renderGuizmo() 
+{
+	if (!selector_ || !three_d_scene_ || !imgui_initialized_) 
+	{
+		return;
+	}
+	
+	ThreeDObject* selectedObject = selector_->getSelectedObject();
+	if (!selectedObject) {
+		return; // No object selected, no gizmo to render
+	}
+	
+	Camera* camera = three_d_scene_->getActiveCamera();
+	if (!camera) {
+		return;
+	}
+	
+	// Get view and projection matrices
+	glm::mat4 view = three_d_scene_->getViewMatrix();
+	glm::mat4 projection = three_d_scene_->getProjectionMatrix();
+	
+	// Get object's current model matrix
+	glm::mat4 model = selectedObject->getModelMatrix();
+	
+	// Setup ImGuizmo
+	ImGuizmo::SetOrthographic(false);
+	ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
+	
+	// Set the rect to match the entire viewport
+	ImGuizmo::SetRect(0, 0, static_cast<float>(width_), static_cast<float>(height_));
+	
+	// Render the gizmo
+	glm::mat4 delta = glm::mat4(1.0f);
+	
+	ImGuizmo::Manipulate(
+		glm::value_ptr(view),
+		glm::value_ptr(projection),
+		current_guizmo_operation_,
+		current_guizmo_mode_,
+		glm::value_ptr(model),
+		glm::value_ptr(delta),
+		nullptr  // No snap for now
+	);
+	
+	if (ImGuizmo::IsUsing()) 
+	{
+		glm::vec3 position, scale, skew;
+		glm::vec4 perspective;
+		glm::quat rotation;
+		
+		glm::decompose(model, scale, rotation, position, skew, perspective);
+		
+		selectedObject->setPosition(position);
+		selectedObject->setScale(scale);
+		selectedObject->rotation = rotation;
+		
+		std::cout << "[OverlayViewport] Guizmo manipulation: " 
+				  << selectedObject->getName() 
+				  << " Pos(" << position.x << ", " << position.y << ", " << position.z << ")"
+				  << std::endl;
+	}
+}
 
 // -------------- Camera Controls --------------
 LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
@@ -389,6 +464,41 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				
 				overlay->performRaycast(cursor_pos.x, cursor_pos.y);
 				return 0;
+			}
+			
+			// ===== GUIZMO CONTROLS (Keyboard shortcuts) =====
+			
+			case WM_KEYDOWN:
+			{
+				switch (wParam)
+				{
+					case 'G':  // Translate mode
+						overlay->setGuizmoOperation(ImGuizmo::TRANSLATE);
+						std::cout << "[OverlayViewport] Guizmo mode: TRANSLATE" << std::endl;
+						InvalidateRect(hwnd, nullptr, FALSE);
+						return 0;
+						
+					case 'R':  // Rotate mode
+						overlay->setGuizmoOperation(ImGuizmo::ROTATE);
+						std::cout << "[OverlayViewport] Guizmo mode: ROTATE" << std::endl;
+						InvalidateRect(hwnd, nullptr, FALSE);
+						return 0;
+						
+					case 'S':  // Scale mode
+						overlay->setGuizmoOperation(ImGuizmo::SCALE);
+						std::cout << "[OverlayViewport] Guizmo mode: SCALE" << std::endl;
+						InvalidateRect(hwnd, nullptr, FALSE);
+						return 0;
+						
+					case VK_ESCAPE:  // Clear selection
+						if (overlay->selector_) {
+							overlay->selector_->clearTarget();
+							std::cout << "[OverlayViewport] Selection cleared" << std::endl;
+							InvalidateRect(hwnd, nullptr, FALSE);
+						}
+						return 0;
+				}
+				break;
 			}
 			
 			// ===== CAMERA CONTROLS =====
@@ -525,7 +635,6 @@ void OverlayViewport::performRaycast(int mouseX, int mouseY)
 		return;
 	}
 	
-	// Perform raycast
 	std::cout << "[OverlayViewport] Starting raycast with " << objects.size() << " objects..." << std::endl;
 	selector_->pickUpMesh(mouseX, mouseY, width_, height_, view, projection, objects);
 	
@@ -539,6 +648,9 @@ void OverlayViewport::performRaycast(int mouseX, int mouseY)
 				  << selected->getPosition().x << ", " 
 				  << selected->getPosition().y << ", " 
 				  << selected->getPosition().z << ")" << std::endl;
+		
+		// Trigger a redraw to show the gizmo
+		InvalidateRect(hwnd_, nullptr, FALSE);
 	} 
 	else 
 	{
@@ -546,6 +658,6 @@ void OverlayViewport::performRaycast(int mouseX, int mouseY)
 	}
 	std::cout << "===================================\n" << std::endl;
 	
-	// Clear selection for next click
-	selector_->clearTarget();
+	// Note: Do NOT clear selection here - we want to keep it for the gizmo
+	// selector_->clearTarget();
 }

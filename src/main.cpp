@@ -23,6 +23,8 @@ fs::path gExecutableDir;
 #include "Engine/OpenGLContext.hpp"
 #include "Engine/ThreeDScene.hpp"
 #include "Engine/ThreeDObjectSelector.hpp"
+#include "SIMILI_Services/middleware/SimpleHttpServer.hpp"
+#include "SIMILI_Services/router/RouterSim.hpp"
 
 #include "WorldObjects/Entities/ThreedObject.hpp"
 #include "WorldObjects/Camera/Camera.hpp"
@@ -74,6 +76,16 @@ int main(int argc, char **argv)
     gExecutableDir = fs::path(argv[0]).parent_path();
 
     SetConsoleCtrlHandler(ConsoleCtrlHandler, TRUE);
+    
+    std::cout << "[Main] About to start HTTP Server..." << std::endl;
+    try {
+        SIMILI::Server::SimpleHttpServer::getInstance().start(8080);
+        std::cout << "[Main] HTTP Server started successfully" << std::endl;
+    }
+    catch (const std::exception& e) {
+        std::cerr << "[Main] ERROR starting HTTP Server: " << e.what() << std::endl;
+        return -1;
+    }
 
     UIProcessManager uiManager;
     g_uiManager = &uiManager;
@@ -120,6 +132,8 @@ int main(int argc, char **argv)
 
     // Create OpenGL context AFTER GLFW is initialized
     OpenGLContext renderer;
+    std::cout << "[Main] OpenGL Context ID: " << renderer.getContextID() << std::endl;
+    
     myThreeDWindow.setRenderer(renderer);
     myThreeDWindow.setHierarchy(&myHierarchy);
     myThreeDWindow.setObjectInspector(&objectInspector);
@@ -127,7 +141,56 @@ int main(int argc, char **argv)
     
     // Set OpenGL context BEFORE initializing the scene
     myThreeDScene.setOpenGLContext(&renderer);
-    myThreeDScene.initizalize(); 
+    myThreeDScene.initizalize();
+    
+    // ===== Register context and scene in ECS for sharing with UI process =====
+    std::cout << "[Main] Registering OpenGL context and scene in ECS..." << std::endl;
+    auto& registry = SIMILI::Server::SimpleHttpServer::getInstance().getContextRegistry();
+    
+    // Create an entity for the main process context
+    auto mainEntity = registry.createEntity();
+    
+    // Add components to the entity
+    registry.addOpenGLContextComponent(mainEntity, &renderer, renderer.getContextID());
+    registry.addSceneComponent(mainEntity, &myThreeDScene, myThreeDScene.getSceneID());
+    registry.addMetadataComponent(mainEntity, "SIMILI_Main", "2025-11-06");
+    
+    std::cout << "[Main] Registered entity " << mainEntity << " with:" << std::endl;
+    std::cout << "  - OpenGL Context ID: " << renderer.getContextID() << std::endl;
+    std::cout << "  - Scene ID: " << myThreeDScene.getSceneID() << std::endl;
+    std::cout << "[Main] Context and scene are now shareable via HTTP server" << std::endl;
+    
+    auto& router = SIMILI::Server::SimpleHttpServer::getInstance().getRouter();
+    router.get("/api/context", [&registry](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response {
+        SIMILI::Router::Response res;
+        res.statusCode = 200;
+        res.headers["Content-Type"] = "application/json";
+        
+        auto mainEntityOpt = registry.findEntityByProcessName("SIMILI_Main");
+        if (!mainEntityOpt.has_value()) {
+            res.statusCode = 404;
+            res.body = "{\"error\": \"Main process context not found\"}";
+            return res;
+        }
+        
+        auto entity = mainEntityOpt.value();
+        std::string contextID = "unknown";
+        std::string sceneID = "unknown";
+        
+        auto contextComp = registry.getOpenGLContextComponent(entity);
+        if (contextComp.has_value()) {
+            contextID = contextComp.value().contextID;
+        }
+        
+        auto sceneComp = registry.getSceneComponent(entity);
+        if (sceneComp.has_value()) {
+            sceneID = sceneComp.value().sceneID;
+        }
+        
+        res.body = "{\"contextID\": \"" + contextID + "\", \"sceneID\": \"" + sceneID + "\"}";
+        return res;
+    }, "Expose OpenGL context and scene info");
+    std::cout << "[Main] Route /api/context registered in HTTP server" << std::endl;
     
     mainCamera.initialize();
     cubeMesh1->initialize();

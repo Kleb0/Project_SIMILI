@@ -108,12 +108,14 @@ set(SIMILI_SERVER_SOURCES
 	"${CMAKE_CURRENT_SOURCE_DIR}/../../SIMILI_Services/middleware/ConsoleLogger.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../../SIMILI_Services/middleware/HttpSession.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../../SIMILI_Services/middleware/HttpListener.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../../SIMILI_Services/middleware/ContextRegistry.cpp"
 )
 set(SIMILI_SERVER_HEADERS
 	"${CMAKE_CURRENT_SOURCE_DIR}/../../SIMILI_Services/middleware/SimpleHttpServer.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../../SIMILI_Services/middleware/ConsoleLogger.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../../SIMILI_Services/middleware/HttpSession.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../../SIMILI_Services/middleware/HttpListener.hpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../../SIMILI_Services/middleware/ContextRegistry.hpp"
 )
 
 # Add Engine sources needed for 3D scene rendering

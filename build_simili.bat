@@ -85,9 +85,14 @@ echo [3/3] Building SIMILI...
 if not exist build mkdir build
 cd build
 
+if exist "CMakeCache.txt" (
+    echo Removing old CMake cache...
+    del /F /Q "CMakeCache.txt"
+)
+
 if not exist "CMakeCache.txt" (
     echo Generating CMake configuration...
-    cmake -G "Visual Studio 17 2022" -A x64 ..
+    cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static ..
     if %errorlevel% neq 0 (
         echo ERROR: CMake generation failed
         exit /b 1

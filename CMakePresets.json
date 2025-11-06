@@ -14,7 +14,8 @@
         "binaryDir": "${sourceDir}/build",
         "cacheVariables": {
           "CMAKE_BUILD_TYPE": "Debug",
-          "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+          "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+          "CMAKE_TOOLCHAIN_FILE": "C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
         }
       },
       {
@@ -26,7 +27,8 @@
         "binaryDir": "${sourceDir}/build",
         "cacheVariables": {
           "CMAKE_BUILD_TYPE": "Release",
-          "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+          "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+          "CMAKE_TOOLCHAIN_FILE": "C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
         }
       }
     ],

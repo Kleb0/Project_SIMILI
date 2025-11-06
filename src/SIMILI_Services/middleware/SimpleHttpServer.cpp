@@ -15,8 +15,13 @@ using tcp = boost::asio::ip::tcp;
 // SimpleHttpServer Implementation
 // =================================
 
-SimpleHttpServer::SimpleHttpServer() : running_(false) 
+SimpleHttpServer::SimpleHttpServer() 
+    : running_(false), 
+      contextRegistry_(std::make_unique<ContextRegistry>()),
+      router_(std::make_unique<Router::RouterSim>())
 {
+    std::cout << "[SimpleHttpServer] Initialized with ECS ContextRegistry" << std::endl;
+    router_->setDebugMode(true);
 }
 
 SimpleHttpServer& SimpleHttpServer::getInstance() 
