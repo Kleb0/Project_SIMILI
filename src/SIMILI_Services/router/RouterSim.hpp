@@ -91,8 +91,11 @@ private:
 	std::vector<MiddlewareHandler> middlewares_;
 	RouterContext context_;
 	bool debugMode_;
-	mutable std::mutex routesMutex_;  // Thread safety
+	mutable std::mutex routesMutex_;  
 	mutable std::mutex contextMutex_;
+	
+	std::unordered_map<std::string, std::chrono::steady_clock::time_point> lastLogTime_;
+	std::mutex logMutex_;
 };
 
 } // namespace Router

@@ -200,8 +200,30 @@ void HttpSession::send_response()
     
     std::ostringstream logMsg;
     logMsg << "[HttpSession] " << req_.method_string() << " " << req_.target();
-    std::cout << logMsg.str() << std::endl;
-    ConsoleLogger::getInstance().addLog(logMsg.str(), "server");
+    
+    std::string target = std::string(req_.target());
+    static std::unordered_map<std::string, bool> loggedRoutes;
+    static std::mutex logMutex;
+    
+    bool shouldLog = true;
+    {
+        std::lock_guard<std::mutex> lock(logMutex);
+        
+        if (target.find("/api/") != std::string::npos) 
+        {
+            if (loggedRoutes[target]) {
+                shouldLog = false;
+            } else {
+                loggedRoutes[target] = true;
+            }
+        }
+    }
+    
+    if (shouldLog) 
+    {
+        std::cout << logMsg.str() << std::endl;
+        ConsoleLogger::getInstance().addLog(logMsg.str(), "server");
+    }
     
     if (!req_.body().empty()) 
     {
@@ -231,10 +253,13 @@ void HttpSession::send_response()
     response->body() = routerRes.body;
     response->prepare_payload();
 
-    std::ostringstream responseMsg;
-    responseMsg << "[HttpSession] Sending response: " << routerRes.body;
-    std::cout << responseMsg.str() << std::endl;
-    ConsoleLogger::getInstance().addLog(responseMsg.str(), "server");
+    if (shouldLog) 
+    {
+        std::ostringstream responseMsg;
+        responseMsg << "[HttpSession] Response " << routerRes.statusCode << " for " << req_.target();
+        std::cout << responseMsg.str() << std::endl;
+        ConsoleLogger::getInstance().addLog(responseMsg.str(), "server");
+    }
 
     auto self = shared_from_this();
 
