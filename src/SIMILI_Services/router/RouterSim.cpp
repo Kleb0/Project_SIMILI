@@ -2,6 +2,7 @@
 #include "../ThirdParty/json.hpp"
 #include <algorithm>
 #include <sstream>
+#include <chrono>
 
 using json = nlohmann::json;
 
@@ -282,8 +283,17 @@ const std::string& message)
 
 void RouterSim::log(const std::string& message) 
 {
-	if (debugMode_) {
-		std::cout << "[RouterSim] " << message << std::endl;
+	if (debugMode_) 
+	{
+		std::lock_guard<std::mutex> lock(logMutex_);
+		
+		std::string logKey = message;
+		
+		if (lastLogTime_.find(logKey) == lastLogTime_.end()) 
+		{
+			std::cout << "[RouterSim] " << message << std::endl;
+			lastLogTime_[logKey] = std::chrono::steady_clock::now();
+		}
 	}
 }
 
