@@ -161,13 +161,16 @@ int main(int argc, char **argv)
     std::cout << "[Main] Context and scene are now shareable via HTTP server" << std::endl;
     
     auto& router = SIMILI::Server::SimpleHttpServer::getInstance().getRouter();
-    router.get("/api/context", [&registry](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response {
+
+    router.get("/api/context", [&registry](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response
+    {
         SIMILI::Router::Response res;
         res.statusCode = 200;
         res.headers["Content-Type"] = "application/json";
         
         auto mainEntityOpt = registry.findEntityByProcessName("SIMILI_Main");
-        if (!mainEntityOpt.has_value()) {
+        if (!mainEntityOpt.has_value()) 
+        {
             res.statusCode = 404;
             res.body = "{\"error\": \"Main process context not found\"}";
             return res;
@@ -178,19 +181,46 @@ int main(int argc, char **argv)
         std::string sceneID = "unknown";
         
         auto contextComp = registry.getOpenGLContextComponent(entity);
-        if (contextComp.has_value()) {
+        if (contextComp.has_value()) 
+        {
             contextID = contextComp.value().contextID;
         }
         
         auto sceneComp = registry.getSceneComponent(entity);
-        if (sceneComp.has_value()) {
+        if (sceneComp.has_value()) 
+        {
             sceneID = sceneComp.value().sceneID;
         }
         
         res.body = "{\"contextID\": \"" + contextID + "\", \"sceneID\": \"" + sceneID + "\"}";
         return res;
-    }, "Expose OpenGL context and scene info");
+    }, 
+    "Expose OpenGL context and scene info");
+    
+
     std::cout << "[Main] Route /api/context registered in HTTP server" << std::endl;
+    
+    router.get("/api/scene/objects", [&myThreeDScene](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response 
+    {
+        SIMILI::Router::Response res;
+        res.statusCode = 200;
+        res.headers["Content-Type"] = "application/json";
+        
+        try {
+            nlohmann::json objectsJson = myThreeDScene.getObjectsListAsJson();
+            res.body = objectsJson.dump();
+        } catch (const std::exception& e) {
+            res.statusCode = 500;
+            res.body = "{\"error\": \"Failed to retrieve objects: " + std::string(e.what()) + "\"}";
+        }
+        
+        return res;
+    }, 
+    "Get list of all objects in the scene");
+    std::cout << "[Main] Route /api/scene/objects registered in HTTP server" << std::endl;
+
+
+    // -------- GUI SETUP -------- //
     
     mainCamera.initialize();
     cubeMesh1->initialize();

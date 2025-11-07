@@ -164,7 +164,8 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 			size_t contextPos = jsonResponse.find("\"contextID\": \"");
 			size_t scenePos = jsonResponse.find("\"sceneID\": \"");
 			
-			if (contextPos != std::string::npos && scenePos != std::string::npos) {
+			if (contextPos != std::string::npos && scenePos != std::string::npos) 
+			{
 				contextPos += 14;
 				size_t contextEnd = jsonResponse.find("\"", contextPos);
 				sharedContextID = jsonResponse.substr(contextPos, contextEnd - contextPos);
