@@ -17,7 +17,8 @@ class Camera;
 class Mesh;
 
 class UIHandler : public CefClient, public CefDisplayHandler,
-				  public CefLifeSpanHandler, public CefLoadHandler 
+				  public CefLifeSpanHandler, public CefLoadHandler, 
+				  public CefKeyboardHandler
 {
 public:
 	explicit UIHandler();
@@ -27,6 +28,7 @@ public:
 	virtual CefRefPtr<CefDisplayHandler> GetDisplayHandler() override;
 	virtual CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override;
 	virtual CefRefPtr<CefLoadHandler> GetLoadHandler() override;
+	virtual CefRefPtr<CefKeyboardHandler> GetKeyboardHandler() override;
 
 	// CefDisplayHandler methods
 	virtual void OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) override;
@@ -39,6 +41,12 @@ public:
 	// CefLoadHandler methods
 	virtual void OnLoadError(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, ErrorCode errorCode, 
 	const CefString& errorText, const CefString& failedUrl) override;
+
+	// CefKeyboardHandler methods
+	virtual bool OnPreKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& event,
+		CefEventHandle os_event, bool* is_keyboard_shortcut) override;
+	virtual bool OnKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& event,
+		CefEventHandle os_event) override;
 
 	void CloseAllBrowsers(bool force_close);
 	void createOverlayViewport(HWND parent_hwnd);

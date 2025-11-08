@@ -15,6 +15,8 @@ class ThreeDObjectSelector;
 class Camera;
 class CameraControl;
 class RaycastPerform;
+class TextureRendererTest;
+class HtmlTextureRenderer;
 
 class OverlayViewport {
 public:
@@ -54,6 +56,9 @@ public:
     ImGuizmo::OPERATION getGuizmoOperation() const { return current_guizmo_operation_; }
     void setGuizmoMode(ImGuizmo::MODE mode) { current_guizmo_mode_ = mode; }
     ImGuizmo::MODE getGuizmoMode() const { return current_guizmo_mode_; }
+    
+    // HTML texture access
+    HtmlTextureRenderer* getHtmlTextureRenderer() const { return html_texture_renderer_; }
 
 private:
     static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -85,5 +90,15 @@ private:
     ImGuizmo::MODE current_guizmo_mode_;
     class CameraControl* camera_control_;
     class RaycastPerform* raycast_performer_;
+    
+    // Red texture overlay test
+    TextureRendererTest* texture_renderer_test_;
+    HtmlTextureRenderer* html_texture_renderer_;
+    
+    // HTML texture dimensions and position
+    int html_texture_x_ = 10;
+    int html_texture_y_ = 10;
+    int html_texture_width_ = 350;
+    int html_texture_height_ = 100;
 };
 
