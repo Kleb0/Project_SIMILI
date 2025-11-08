@@ -33,7 +33,8 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 typedef HGLRC (WINAPI * PFNWGLCREATECONTEXTATTRIBSARBPROC)(HDC hDC, HGLRC hShareContext, const int *attribList);
 
-namespace {
+namespace 
+{
 	const wchar_t* kOverlayClassName = L"SIMILI_OpenGL_Overlay";
 }
 
@@ -49,7 +50,7 @@ OverlayViewport::OverlayViewport() : hwnd_(nullptr)
 	, imgui_initialized_(false)
 	, selector_(nullptr)
 	, current_guizmo_operation_(ImGuizmo::TRANSLATE)
-	, current_guizmo_mode_(ImGuizmo::WORLD)
+	, current_guizmo_mode_(ImGuizmo::LOCAL)
 {
 	last_mouse_pos_.x = 0;
 	last_mouse_pos_.y = 0;
@@ -223,7 +224,8 @@ void OverlayViewport::initializeOpenGL()
 
 void OverlayViewport::initializeImGui() 
 {
-	if (imgui_initialized_) {
+	if (imgui_initialized_) 
+	{
 		std::cout << "[OverlayViewport] ImGui already initialized" << std::endl;
 		return;
 	}
@@ -318,6 +320,21 @@ void OverlayViewport::render() {
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
 		ImGuizmo::BeginFrame();
+		
+		// Create an invisible fullscreen window for ImGuizmo
+		ImGui::SetNextWindowPos(ImVec2(0, 0));
+		ImGui::SetNextWindowSize(ImVec2(static_cast<float>(width_), static_cast<float>(height_)));
+		ImGui::Begin("ViewportOverlay", nullptr, 
+			ImGuiWindowFlags_NoTitleBar | 
+			ImGuiWindowFlags_NoResize | 
+			ImGuiWindowFlags_NoMove | 
+			ImGuiWindowFlags_NoScrollbar | 
+			ImGuiWindowFlags_NoScrollWithMouse | 
+			ImGuiWindowFlags_NoCollapse | 
+			ImGuiWindowFlags_NoBackground | 
+			ImGuiWindowFlags_NoBringToFrontOnFocus |
+			ImGuiWindowFlags_NoFocusOnAppearing |
+			ImGuiWindowFlags_NoDocking);
 	}
 	
 	renderScene();
@@ -325,6 +342,7 @@ void OverlayViewport::render() {
 	// Render ImGui
 	if (imgui_initialized_) 
 	{
+		ImGui::End();
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 	}
@@ -363,25 +381,30 @@ void OverlayViewport::renderGuizmo()
 	}
 	
 	ThreeDObject* selectedObject = selector_->getSelectedObject();
-	if (!selectedObject) {
+	if (!selectedObject) 
+	{
 		return; // No object selected, no gizmo to render
 	}
 	
 	Camera* camera = three_d_scene_->getActiveCamera();
-	if (!camera) {
+	if (!camera) 
+	{
 		return;
 	}
 	
-	// Get view and projection matrices
-	glm::mat4 view = three_d_scene_->getViewMatrix();
-	glm::mat4 projection = three_d_scene_->getProjectionMatrix();
+	// Calculate aspect ratio for this viewport
+	float aspect = (height_ > 0) ? static_cast<float>(width_) / static_cast<float>(height_) : 1.0f;
+	
+	// Get view and projection matrices with correct aspect ratio
+	glm::mat4 view = camera->getViewMatrix();
+	glm::mat4 projection = camera->getProjectionMatrix(aspect);
 	
 	// Get object's current model matrix
 	glm::mat4 model = selectedObject->getModelMatrix();
 	
 	// Setup ImGuizmo
 	ImGuizmo::SetOrthographic(false);
-	ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
+	ImGuizmo::SetDrawlist();  // Use background drawlist for global overlay
 	
 	// Set the rect to match the entire viewport
 	ImGuizmo::SetRect(0, 0, static_cast<float>(width_), static_cast<float>(height_));
@@ -590,6 +613,13 @@ void OverlayViewport::performRaycast(int mouseX, int mouseY)
 		return;
 	}
 	
+	// Check if we're clicking on ImGuizmo - if so, don't raycast
+	if (ImGuizmo::IsOver() || ImGuizmo::IsUsing()) 
+	{
+		std::cout << "[OverlayViewport] Click on ImGuizmo, ignoring raycast" << std::endl;
+		return;
+	}
+	
 	Camera* camera = three_d_scene_->getActiveCamera();
 	if (!camera) 
 	{
@@ -632,6 +662,7 @@ void OverlayViewport::performRaycast(int mouseX, int mouseY)
 	if (objects.empty()) 
 	{
 		std::cout << "[OverlayViewport] ERROR: No objects in the scene" << std::endl;
+		selector_->clearTarget();  // Clear selection if no objects
 		return;
 	}
 	
@@ -654,10 +685,9 @@ void OverlayViewport::performRaycast(int mouseX, int mouseY)
 	} 
 	else 
 	{
-		std::cout << "Clicked empty space (no object selected)" << std::endl;
+		std::cout << "Clicked empty space (no object selected) - clearing selection" << std::endl;
+		selector_->clearTarget();  // Clear selection when clicking empty space
+		InvalidateRect(hwnd_, nullptr, FALSE);  // Redraw to hide gizmo
 	}
 	std::cout << "===================================\n" << std::endl;
-	
-	// Note: Do NOT clear selection here - we want to keep it for the gizmo
-	// selector_->clearTarget();
 }
