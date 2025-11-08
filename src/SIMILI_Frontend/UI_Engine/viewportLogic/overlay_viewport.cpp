@@ -17,11 +17,14 @@
 #include "overlay_viewport.hpp"
 #include "CameraControl.hpp"
 #include "RaycastPerform.hpp"
+#include "TextureRendererTest.hpp"
+#include "HtmlTextureRenderer.hpp"
 #include "../../Engine/ThreeDScene.hpp"
 #include "../../Engine/OpenGLContext.hpp"
 #include "../../Engine/ThreeDObjectSelector.hpp"
 #include "../../WorldObjects/Camera/Camera.hpp"
 #include "../../WorldObjects/Entities/ThreeDObject.hpp"
+#include "../../ThirdParty/CEF/cef_binary/include/cef_app.h"
 
 // Forward declare message handler from imgui_impl_win32.cpp
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -52,10 +55,13 @@ OverlayViewport::OverlayViewport() : hwnd_(nullptr)
 	, selector_(nullptr)
 	, current_guizmo_operation_(ImGuizmo::TRANSLATE)
 	, current_guizmo_mode_(ImGuizmo::LOCAL)
+	, texture_renderer_test_(nullptr)
+	, html_texture_renderer_(nullptr)
 {
 	selector_ = new ThreeDObjectSelector();
 	camera_control_ = new CameraControl(this);
 	raycast_performer_ = new RaycastPerform(this, selector_);
+	texture_renderer_test_ = new TextureRendererTest();
 }
 
 OverlayViewport::~OverlayViewport() {
@@ -71,10 +77,18 @@ OverlayViewport::~OverlayViewport() {
 		delete raycast_performer_;
 		raycast_performer_ = nullptr;
 	}
+	if (texture_renderer_test_) {
+		delete texture_renderer_test_;
+		texture_renderer_test_ = nullptr;
+	}
+	if (html_texture_renderer_) {
+		html_texture_renderer_ = nullptr; // CefRefPtr handles deletion
+	}
 	destroy();
 }
 
-bool OverlayViewport::create(HWND parent, int x, int y, int width, int height) {
+bool OverlayViewport::create(HWND parent, int x, int y, int width, int height) 
+{
 	parent_ = parent;
 	width_ = width;
 	height_ = height;
@@ -90,25 +104,24 @@ bool OverlayViewport::create(HWND parent, int x, int y, int width, int height) {
 	wc.lpszClassName = kOverlayClassName;
 	
 	static bool class_registered = false;
-	if (!class_registered) {
-		if (!RegisterClassExW(&wc)) {
+
+	if (!class_registered) 
+	{
+		if (!RegisterClassExW(&wc)) 
+		{
 			DWORD err = GetLastError();
-			std::cerr << "[OverlayViewport] Failed to register window class. Error: " << err << std::endl;
 			return false;
 		}
 		class_registered = true;
-		std::cout << "[OverlayViewport] Window class registered" << std::endl;
 	}
 	
-	// Create as child window
-	std::cout << "[OverlayViewport] Creating child window with parent: " << parent 
-			  << " at (" << x << "," << y << ") size " << width << "x" << height << std::endl;
-	
+	// the hwnd is the child window
+	// hwnd = handke to 
 	hwnd_ = CreateWindowExW(
 		0, 
 		kOverlayClassName,
 		L"OpenGL Overlay",
-		WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
+		WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_TABSTOP,
 		x, y, width, height,
 		parent,
 		nullptr,
@@ -116,15 +129,18 @@ bool OverlayViewport::create(HWND parent, int x, int y, int width, int height) {
 		this
 	);
 	
-	if (!hwnd_) {
+	if (!hwnd_) 
+	{
 		DWORD error = GetLastError();
-		std::cerr << "[OverlayViewport] Failed to create overlay window. Error: " << error << std::endl;
 		return false;
 	}
 	
-	std::cout << "[OverlayViewport] Window created successfully: " << hwnd_ << std::endl;
-
 	SetWindowPos(hwnd_, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+	
+	// DO NOT set focus to overlay - keep focus on parent CEF window
+	// so keyboard events continue to be processed by CEF's OnPreKeyEvent
+	// SetFocus(hwnd_);
+	// std::cout << "[OverlayViewport] Focus set to overlay window" << std::endl;
 	
 	RECT window_rect;
 	GetWindowRect(hwnd_, &window_rect);
@@ -229,17 +245,36 @@ void OverlayViewport::initializeOpenGL()
 	
 	// Initialize ImGui after OpenGL context is ready
 	initializeImGui();
+	
+	// Initialize texture renderer test
+	if (texture_renderer_test_) {
+		texture_renderer_test_->initialize(width_, height_);
+		
+		// Create HTML renderer for test.html - full viewport height, 350px width
+		html_texture_width_ = 350;
+		html_texture_height_ = height_;
+		html_texture_x_ = 10;
+		html_texture_y_ = 10;
+		
+		// Configure render rectangle for the texture
+		texture_renderer_test_->setRenderRect(html_texture_x_, html_texture_y_, 
+		                                       html_texture_width_, html_texture_height_);
+		
+		html_texture_renderer_ = new HtmlTextureRenderer(texture_renderer_test_);
+		html_texture_renderer_->createBrowser("file:///ui/test.html", html_texture_width_, html_texture_height_);
+		
+		// CRITICAL: Pass viewport HWND so renderer can trigger immediate redraws
+		html_texture_renderer_->setViewportWindow(hwnd_);
+	
+	}
 }
 
 void OverlayViewport::initializeImGui() 
 {
 	if (imgui_initialized_) 
 	{
-		std::cout << "[OverlayViewport] ImGui already initialized" << std::endl;
 		return;
 	}
-	
-	std::cout << "[OverlayViewport] Initializing ImGui..." << std::endl;
 	
 	// Setup Dear ImGui context
 	IMGUI_CHECKVERSION();
@@ -247,11 +282,8 @@ void OverlayViewport::initializeImGui()
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-	
-	// Setup Dear ImGui style
+
 	ImGui::StyleColorsDark();
-	
-	// Setup Platform/Renderer backends
 	ImGui_ImplWin32_Init(hwnd_);
 	ImGui_ImplOpenGL3_Init("#version 460");
 	
@@ -259,7 +291,6 @@ void OverlayViewport::initializeImGui()
 	ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
 	
 	imgui_initialized_ = true;
-	std::cout << "[OverlayViewport] ImGui and ImGuizmo initialized successfully" << std::endl;
 }
 
 void OverlayViewport::shutdownImGui() 
@@ -267,15 +298,12 @@ void OverlayViewport::shutdownImGui()
 	if (!imgui_initialized_) {
 		return;
 	}
-	
-	std::cout << "[OverlayViewport] Shutting down ImGui..." << std::endl;
-	
+		
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
 	
 	imgui_initialized_ = false;
-	std::cout << "[OverlayViewport] ImGui shutdown complete" << std::endl;
 }
 
 void OverlayViewport::makeContextCurrent() {
@@ -299,11 +327,16 @@ void OverlayViewport::setPosition(int x, int y, int width, int height) {
 			glViewport(0, 0, width, height);
 			wglMakeCurrent(nullptr, nullptr);
 		}
+		
+		if (texture_renderer_test_) {
+			texture_renderer_test_->resize(width, height);
+		}
 	}
 }
 
 void OverlayViewport::show(bool visible) {
-	if (hwnd_) {
+	if (hwnd_) 
+	{
 		ShowWindow(hwnd_, visible ? SW_SHOW : SW_HIDE);
 	}
 }
@@ -319,6 +352,9 @@ void OverlayViewport::render() {
 	if (!hwnd_ || !gl_context_ || !rendering_enabled_) {
 		return;
 	}
+	
+	// Process CEF message loop for off-screen rendering
+	CefDoMessageLoopWork();
 	
 	wglMakeCurrent(hdc_, gl_context_);
 	
@@ -348,7 +384,10 @@ void OverlayViewport::render() {
 	
 	renderScene();
 	
-	// Render ImGui
+	if (texture_renderer_test_) {
+		texture_renderer_test_->render();
+	}
+	
 	if (imgui_initialized_) 
 	{
 		ImGui::End();
@@ -369,7 +408,6 @@ void OverlayViewport::renderScene() {
 	{
 		three_d_scene_->renderDirect(width_, height_);
 		
-		// Render Guizmo for selected object
 		renderGuizmo();
 		
 		return;
@@ -404,21 +442,15 @@ void OverlayViewport::renderGuizmo()
 	// Calculate aspect ratio for this viewport
 	float aspect = (height_ > 0) ? static_cast<float>(width_) / static_cast<float>(height_) : 1.0f;
 	
-	// Get view and projection matrices with correct aspect ratio
 	glm::mat4 view = camera->getViewMatrix();
 	glm::mat4 projection = camera->getProjectionMatrix(aspect);
 	
-	// Get object's current model matrix
 	glm::mat4 model = selectedObject->getModelMatrix();
 	
-	// Setup ImGuizmo
 	ImGuizmo::SetOrthographic(false);
-	ImGuizmo::SetDrawlist();  // Use background drawlist for global overlay
-	
-	// Set the rect to match the entire viewport
+	ImGuizmo::SetDrawlist();
 	ImGuizmo::SetRect(0, 0, static_cast<float>(width_), static_cast<float>(height_));
 	
-	// Render the gizmo
 	glm::mat4 delta = glm::mat4(1.0f);
 	
 	ImGuizmo::Manipulate(
@@ -428,7 +460,7 @@ void OverlayViewport::renderGuizmo()
 		current_guizmo_mode_,
 		glm::value_ptr(model),
 		glm::value_ptr(delta),
-		nullptr  // No snap for now
+		nullptr
 	);
 	
 	if (ImGuizmo::IsUsing()) 
@@ -450,7 +482,7 @@ void OverlayViewport::renderGuizmo()
 	}
 }
 
-// -------------- Camera Controls --------------
+// -------------- Camera and overlay controls --------------
 LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 {
 	// Pass events to ImGui first
@@ -490,18 +522,31 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 			
 			case WM_LBUTTONDOWN:
 			{
+				// DO NOT set focus here - keep focus on parent CEF window
+				// so keyboard events continue to be processed by CEF
+				// SetFocus(hwnd);
+				
 				POINT cursor_pos;
 				GetCursorPos(&cursor_pos);
 				ScreenToClient(hwnd, &cursor_pos);
 				
 				overlay->performRaycast(cursor_pos.x, cursor_pos.y);
 				return 0;
-			}			
+			}
+			
+			case WM_LBUTTONUP:
+			{
+				return 0;
+			}
 					
 			// ===== CAMERA CONTROLS =====
 			
 			case WM_MOUSEWHEEL: 
 			{
+				POINT cursor_pos;
+				GetCursorPos(&cursor_pos);
+				ScreenToClient(hwnd, &cursor_pos);
+				
 				overlay->camera_control_->onMouseWheel(wParam);
 				return 0;
 			}
