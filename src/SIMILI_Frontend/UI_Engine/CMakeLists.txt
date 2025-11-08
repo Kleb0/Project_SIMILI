@@ -88,9 +88,11 @@ message(STATUS "OpenSSL libraries: ${OPENSSL_LIBRARIES}")
 # Force CMake to detect new files
 file(GLOB SIMILI_UI_SOURCES 
 	"${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/*.cpp"
 )
 file(GLOB SIMILI_UI_HEADERS 
 	"${CMAKE_CURRENT_SOURCE_DIR}/*.hpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/*.hpp"
 )
 
 # Add SIMILI Services (Router) sources - specific files only, not examples
@@ -268,6 +270,7 @@ target_include_directories(SIMILI_UI PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}/../../UI/OptionMenu
 	${CMAKE_CURRENT_SOURCE_DIR}/../../Engine/MeshEdit
 	${CMAKE_CURRENT_SOURCE_DIR}/../../Engine/SaveLoadSystem
+	${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic
 	${Boost_INCLUDE_DIRS}
 	${OPENSSL_INCLUDE_DIR}
 )
