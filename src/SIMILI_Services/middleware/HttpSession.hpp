@@ -22,15 +22,13 @@ namespace beast = boost::beast;
 namespace http = beast::http;
 using tcp = boost::asio::ip::tcp;
 
-// Simple HTTP session handler
 class HttpSession : public std::enable_shared_from_this<HttpSession> 
 {
 	beast::tcp_stream stream_;
 	beast::flat_buffer buffer_;
 	http::request<http::string_body> req_;
-	std::string sessionId_; // Unique session ID
+	std::string sessionId_;
 
-	// Generate a random session ID
 	static std::string generateSessionId();
 
 public:
@@ -46,5 +44,5 @@ private:
 	void do_close();
 };
 
-} // namespace Server
-} // namespace SIMILI
+} 
+} 

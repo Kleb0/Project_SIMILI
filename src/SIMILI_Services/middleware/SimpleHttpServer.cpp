@@ -63,15 +63,6 @@ void SimpleHttpServer::start(unsigned short http_port, unsigned short https_port
 
     // Setup SSL context for HTTPS (self-signed certificate for POC)
     ssl_ctx_ = std::make_unique<ssl::context>(ssl::context::tlsv12_server);
-    
-    // For a simple POC, we'll skip SSL certificate setup
-    // In production, you would load certificates here
-    // ssl_ctx_->use_certificate_chain_file("server.crt");
-    // ssl_ctx_->use_private_key_file("server.key", ssl::context::pem);
-    
-    // Start HTTPS listener (commented out as it needs certificates)
-    // std::make_shared<HttpsListener>(ioc_, *ssl_ctx_, tcp::endpoint{http_address, https_port})->run();
-
     running_ = true;
 
     // Run the I/O context in a separate thread
