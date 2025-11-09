@@ -25,6 +25,11 @@
 #include "../../WorldObjects/Camera/Camera.hpp"
 #include "../../WorldObjects/Entities/ThreeDObject.hpp"
 #include "../../ThirdParty/CEF/cef_binary/include/cef_app.h"
+#include "../../../UI/ThreeDModes/ThreeDMode.hpp"
+#include "../../../UI/ThreeDModes/Normal_Mode.hpp"
+#include "../../../UI/ThreeDModes/Vertice_Mode.hpp"
+#include "../../../UI/ThreeDModes/Face_Mode.hpp"
+#include "../../../UI/ThreeDModes/Edge_Mode.hpp"
 
 // Forward declare message handler from imgui_impl_win32.cpp
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -43,6 +48,9 @@ namespace
 	const wchar_t* kOverlayClassName = L"SIMILI_OpenGL_Overlay";
 }
 
+
+// --------- Window and scene rendering ------------- 
+
 OverlayViewport::OverlayViewport() : hwnd_(nullptr) 
 	, parent_(nullptr)
 	, hdc_(nullptr)
@@ -57,11 +65,25 @@ OverlayViewport::OverlayViewport() : hwnd_(nullptr)
 	, current_guizmo_mode_(ImGuizmo::LOCAL)
 	, texture_renderer_test_(nullptr)
 	, html_texture_renderer_(nullptr)
+	, normal_mode_(nullptr)
+	, vertice_mode_(nullptr)
+	, face_mode_(nullptr)
+	, edge_mode_(nullptr)
+	, current_mode_(nullptr)
 {
 	selector_ = new ThreeDObjectSelector();
 	camera_control_ = new CameraControl(this);
 	raycast_performer_ = new RaycastPerform(this, selector_);
 	texture_renderer_test_ = new TextureRendererTest();
+	
+	// Initialize 3D modes
+	normal_mode_ = new Normal_Mode();
+	vertice_mode_ = new Vertice_Mode();
+	face_mode_ = new Face_Mode();
+	edge_mode_ = new Edge_Mode();
+	
+	// Initialize default mode to Normal Mode
+	current_mode_ = normal_mode_;
 }
 
 OverlayViewport::~OverlayViewport() {
@@ -84,6 +106,25 @@ OverlayViewport::~OverlayViewport() {
 	if (html_texture_renderer_) {
 		html_texture_renderer_ = nullptr; // CefRefPtr handles deletion
 	}
+	
+	// Clean up 3D modes
+	if (normal_mode_) {
+		delete normal_mode_;
+		normal_mode_ = nullptr;
+	}
+	if (vertice_mode_) {
+		delete vertice_mode_;
+		vertice_mode_ = nullptr;
+	}
+	if (face_mode_) {
+		delete face_mode_;
+		face_mode_ = nullptr;
+	}
+	if (edge_mode_) {
+		delete edge_mode_;
+		edge_mode_ = nullptr;
+	}
+	
 	destroy();
 }
 
@@ -416,7 +457,7 @@ void OverlayViewport::renderScene() {
 	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 	std::cout << "[OverlayViewport] WARNING: No 3D scene set" << std::endl;
 }
-
+// ----------- end of window and scene rendering ------------
 
 // ------------- Viewport mode management -------------
 
@@ -453,33 +494,6 @@ void OverlayViewport::renderGuizmo()
 	
 	glm::mat4 delta = glm::mat4(1.0f);
 	
-	ImGuizmo::Manipulate(
-		glm::value_ptr(view),
-		glm::value_ptr(projection),
-		current_guizmo_operation_,
-		current_guizmo_mode_,
-		glm::value_ptr(model),
-		glm::value_ptr(delta),
-		nullptr
-	);
-	
-	if (ImGuizmo::IsUsing()) 
-	{
-		glm::vec3 position, scale, skew;
-		glm::vec4 perspective;
-		glm::quat rotation;
-		
-		glm::decompose(model, scale, rotation, position, skew, perspective);
-		
-		selectedObject->setPosition(position);
-		selectedObject->setScale(scale);
-		selectedObject->rotation = rotation;
-		
-		std::cout << "[OverlayViewport] Guizmo manipulation: " 
-				  << selectedObject->getName() 
-				  << " Pos(" << position.x << ", " << position.y << ", " << position.z << ")"
-				  << std::endl;
-	}
 }
 
 // -------------- Camera and overlay controls --------------
@@ -580,5 +594,16 @@ void OverlayViewport::performRaycast(int mouseX, int mouseY)
 {
 	if (raycast_performer_) {
 		raycast_performer_->performRaycast(mouseX, mouseY);
+	}
+}
+
+// --------- 3D mode management ---------
+
+void OverlayViewport::setModelingMode(ThreeDMode* mode)
+{
+	if (mode)
+	{
+		current_mode_ = mode;
+		std::cout << "[OverlayViewport] Switched to mode: " << mode->getName() << std::endl;
 	}
 }
