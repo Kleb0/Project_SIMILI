@@ -13,6 +13,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
+#include <glm/gtx/quaternion.hpp>
 
 #include "overlay_viewport.hpp"
 #include "CameraControl.hpp"
@@ -492,8 +493,14 @@ void OverlayViewport::renderGuizmo()
 	ImGuizmo::SetDrawlist();
 	ImGuizmo::SetRect(0, 0, static_cast<float>(width_), static_cast<float>(height_));
 	
-	glm::mat4 delta = glm::mat4(1.0f);
-	
+	// Render the Gizmo manipulator
+	ImGuizmo::Manipulate(
+		glm::value_ptr(view),
+		glm::value_ptr(projection),
+		current_guizmo_operation_,
+		current_guizmo_mode_,
+		glm::value_ptr(model)
+	);
 }
 
 // -------------- Camera and overlay controls --------------
