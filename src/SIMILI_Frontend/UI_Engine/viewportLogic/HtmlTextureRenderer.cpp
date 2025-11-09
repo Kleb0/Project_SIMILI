@@ -89,17 +89,13 @@ void HtmlTextureRenderer::OnTitleChange(CefRefPtr<CefBrowser> browser, const Cef
 {
 	std::string title_str = title.ToString();
 	
-	// Check if this is a repaint request from JavaScript
 	if (title_str.find("REPAINT_REQUEST:") == 0) 
-	{
-		std::cout << "[HtmlTextureRenderer] Repaint request received from JavaScript" << std::endl;
-		
+	{		
 		if (browser_->GetHost()) {
 			browser_->GetHost()->Invalidate(PET_VIEW);
 			std::cout << "[HtmlTextureRenderer] Invalidate() called" << std::endl;
 		}
 		
-		// CRITICAL: Force immediate viewport redraw to trigger OnPaint callback
 		if (viewport_hwnd_) 
 		{
 			InvalidateRect(viewport_hwnd_, nullptr, FALSE);

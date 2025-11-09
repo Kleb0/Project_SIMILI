@@ -59,11 +59,7 @@ void UIHandler::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& ti
 		
 		if (iss >> js_x >> comma >> js_y >> comma >> width >> comma >> height) 
 		{
-			if (iss >> comma >> dpiScale) 
-			{
-				// DPI scale read successfully
-			}
-			
+		
 			if (overlay_viewport_ && parent_hwnd_ && browser) 
 			{
 				int final_x = static_cast<int>(js_x * dpiScale);
