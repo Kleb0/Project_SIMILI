@@ -5,6 +5,11 @@
 #include "../../WorldObjects/Camera/Camera.hpp"
 #include "../../WorldObjects/Mesh/Mesh.hpp"
 #include "../../Engine/PrimitivesCreation/CreatePrimitive.hpp"
+#include "../../UI/ThreeDModes/ThreeDMode.hpp"
+#include "../../UI/ThreeDModes/Normal_Mode.hpp"
+#include "../../UI/ThreeDModes/Vertice_Mode.hpp"
+#include "../../UI/ThreeDModes/Face_Mode.hpp"
+#include "../../UI/ThreeDModes/Edge_Mode.hpp"
 #include <iostream>
 #include <commctrl.h>  
 #include <glm/glm.hpp>
@@ -59,6 +64,12 @@ void UIHandler::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& ti
 		
 		if (iss >> js_x >> comma >> js_y >> comma >> width >> comma >> height) 
 		{
+
+			if (iss >> comma >> dpiScale) 
+			{
+				// Successfully read dpiScale
+				std::cout << "[UIHandler] DPI scale successfully read ! Received viewport resize with DPI scale: " << dpiScale << std::endl;
+			}
 		
 			if (overlay_viewport_ && parent_hwnd_ && browser) 
 			{
@@ -187,6 +198,10 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	{
 		overlay_viewport_->setThreeDScene(three_d_scene_);
 	}
+	
+	// Initialize default 3D mode to Normal Mode (AFTER scene is set)
+	overlay_viewport_->setModelingMode(overlay_viewport_->getNormalMode());
+	std::cout << "[UIHandler] Overlay viewport initialized with Normal Mode" << std::endl;
 	
 	// CRITICAL: Initialize scene objects NOW that we have an OpenGL context
 	initializeSceneObjects();

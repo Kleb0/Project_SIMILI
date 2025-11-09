@@ -17,6 +17,11 @@ class CameraControl;
 class RaycastPerform;
 class TextureRendererTest;
 class HtmlTextureRenderer;
+class ThreeDMode;
+class Normal_Mode;
+class Vertice_Mode;
+class Face_Mode;
+class Edge_Mode;
 
 class OverlayViewport {
 public:
@@ -59,6 +64,16 @@ public:
     
     // HTML texture access
     HtmlTextureRenderer* getHtmlTextureRenderer() const { return html_texture_renderer_; }
+    
+    // 3D Mode management
+    void setModelingMode(ThreeDMode* mode);
+    ThreeDMode* getCurrentMode() const { return current_mode_; }
+    
+    // Access to individual modes
+    Normal_Mode* getNormalMode() { return normal_mode_; }
+    Vertice_Mode* getVerticeMode() { return vertice_mode_; }
+    Face_Mode* getFaceMode() { return face_mode_; }
+    Edge_Mode* getEdgeMode() { return edge_mode_; }
 
 private:
     static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -100,5 +115,11 @@ private:
     int html_texture_y_ = 10;
     int html_texture_width_ = 350;
     int html_texture_height_ = 100;
+    
+    Normal_Mode* normal_mode_;
+    Vertice_Mode* vertice_mode_;
+    Face_Mode* face_mode_;
+    Edge_Mode* edge_mode_;
+    ThreeDMode* current_mode_;
 };
 

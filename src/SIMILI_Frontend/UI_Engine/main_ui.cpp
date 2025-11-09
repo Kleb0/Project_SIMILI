@@ -226,6 +226,9 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 	
 	handler->setSceneObjects(nullptr, myThreeDScene, mainCamera, &cubeMesh1);
 	std::cout << "[Main_UI] Scene objects (camera, mesh) passed to UIHandler" << std::endl;
+	
+	// Note: Overlay viewport will be created later in OnAfterCreated, 
+	// and setModelingMode will be called in createOverlayViewport()
 
 	CefBrowserSettings browser_settings;
 	browser_settings.windowless_frame_rate = 60;
