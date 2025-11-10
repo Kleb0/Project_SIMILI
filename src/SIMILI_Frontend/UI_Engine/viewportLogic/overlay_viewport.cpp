@@ -292,7 +292,6 @@ void OverlayViewport::initializeOpenGL()
 	if (texture_renderer_test_) {
 		texture_renderer_test_->initialize(width_, height_);
 		
-		// Create HTML renderer for test.html - full viewport height, 350px width
 		html_texture_width_ = 350;
 		html_texture_height_ = height_;
 		html_texture_x_ = 10;
@@ -303,7 +302,7 @@ void OverlayViewport::initializeOpenGL()
 		                                       html_texture_width_, html_texture_height_);
 		
 		html_texture_renderer_ = new HtmlTextureRenderer(texture_renderer_test_);
-		html_texture_renderer_->createBrowser("file:///ui/test.html", html_texture_width_, html_texture_height_);
+		html_texture_renderer_->createBrowser("file:///ui/Mode_UI.html", html_texture_width_, html_texture_height_);
 		
 		// CRITICAL: Pass viewport HWND so renderer can trigger immediate redraws
 		html_texture_renderer_->setViewportWindow(hwnd_);
@@ -589,6 +588,20 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				overlay->camera_control_->onMouseMove(wParam, lParam);
 				return 0;
 			}
+			
+			// ===== MODE SWITCHING =====
+			
+			case WM_KEYDOWN:
+			{
+				// Check for numeric keys 1-4 to switch modes
+				if (wParam >= '1' && wParam <= '4')
+				{
+					int modeKey = static_cast<int>(wParam - '0'); // Convert '1'-'4' to 1-4
+					overlay->switchModeByKey(modeKey);
+					return 0;
+				}
+				break;
+			}
 		}
 	}
 	
@@ -611,6 +624,26 @@ void OverlayViewport::setModelingMode(ThreeDMode* mode)
 	if (mode)
 	{
 		current_mode_ = mode;
-		std::cout << "[OverlayViewport] Switched to mode: " << mode->getName() << std::endl;
+	}
+}
+
+void OverlayViewport::switchModeByKey(int keyNumber)
+{
+	switch (keyNumber)
+	{
+		case 1:
+			setModelingMode(normal_mode_);
+			break;
+		case 2:
+			setModelingMode(edge_mode_);
+			break;
+		case 3:
+			setModelingMode(vertice_mode_);
+			break;
+		case 4:
+			setModelingMode(face_mode_);
+			break;
+		default:
+			break;
 	}
 }

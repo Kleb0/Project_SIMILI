@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test HTML</title>
+</head>
+<body>
+    <div class="square">1</div>
+    <div class="square">2</div>
+    <div class="square">3</div>
+    <div class="square">4</div>
+    <div id="mode-text">normal mode</div>
+</body>
+
+<style>
+    html, body 
+    {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+    }
+    body {
+        background-color: rgba(0, 0, 252, 0);
+        display: flex;
+        flex-direction: row;
+        justify-content: flex-start;
+        align-items: center;
+        gap: 8px;
+        padding: 10px;
+        box-sizing: border-box;
+        color: white;
+        font-family: Arial, sans-serif;
+    }
+    .square {
+        width: 100%;
+        max-width: 35px;
+        aspect-ratio: 1 / 1;
+        border: 2px solid white;
+        background-color: transparent;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 18px;
+        font-weight: bold;
+        color: white;
+    }
+    
+    .square.active {
+        border-color: orange;
+        color: orange;
+    }
+    
+    #mode-text {
+        color: orange;
+    }
+    
+</style>
+<script>
+    let currentMode = 'normal';
+    const modeText = document.getElementById('mode-text');
+    const squares = document.querySelectorAll('.square');
+    
+    // Map modes to square indices
+    const modeToSquare = {
+        'normal': 0,
+        'mode 2': 1,
+        'mode 3': 2,
+        'mode 4': 3
+    };
+    
+    function updateMode(mode) 
+    {
+        console.log(`[test.html] updateMode() called with mode='${mode}'`);
+        currentMode = mode;
+        modeText.textContent = mode;
+        
+        // Reset all squares to default white
+        squares.forEach(square => {
+            square.classList.remove('active');
+        });
+        
+        // Set only the active square to orange
+        const activeIndex = modeToSquare[mode];
+        if (activeIndex !== undefined) {
+            squares[activeIndex].classList.add('active');
+        }
+    }
+    
+    // Initialize with normal mode
+    updateMode('normal');
+    
+    let keyPressCount = 0;
+    document.addEventListener('keydown', (event) => {
+        keyPressCount++;
+        
+        document.title = `Key ${keyPressCount}: ${event.key} (${event.keyCode})`;
+        
+        switch(event.key) {
+            case '1':
+                updateMode('-- Normal Mode');
+                squares.forEach((square, index) => {
+                    square.classList.remove('active');
+                    if (index === 0) square.classList.add('active');
+                });
+                break;
+            case '2':
+                updateMode('-- Edge Mode');
+                squares.forEach((square, index) => {
+                    square.classList.remove('active');
+                    if (index === 1) square.classList.add('active');
+                });
+                break;
+            case '3':
+                updateMode('-- Vertice Mode');
+                squares.forEach((square, index) => {
+                    square.classList.remove('active');
+                    if (index === 2) square.classList.add('active');
+                });
+                break;
+            case '4':
+                updateMode('-- Face Mode');
+                squares.forEach((square, index) => {
+                    square.classList.remove('active');
+                    if (index === 3) square.classList.add('active');
+                });
+                break;
+        }        
+        
+        setTimeout(() => {
+            document.title = 'REPAINT_REQUEST:' + Date.now();
+        }, 50);
+    });
+    
+    window.addEventListener('keydown', (event) => {
+        console.log(`[test.html] Window keydown: key='${event.key}'`);
+    });
+</script>
+</html>
