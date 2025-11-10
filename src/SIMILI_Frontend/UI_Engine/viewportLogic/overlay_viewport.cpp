@@ -20,6 +20,7 @@
 #include "RaycastPerform.hpp"
 #include "TextureRendererTest.hpp"
 #include "HtmlTextureRenderer.hpp"
+#include "OverlayClickHandler.hpp"
 #include "../../Engine/ThreeDScene.hpp"
 #include "../../Engine/OpenGLContext.hpp"
 #include "../../Engine/ThreeDObjectSelector.hpp"
@@ -33,6 +34,11 @@
 #include "../../../UI/ThreeDModes/Vertice_Mode.hpp"
 #include "../../../UI/ThreeDModes/Face_Mode.hpp"
 #include "../../../UI/ThreeDModes/Edge_Mode.hpp"
+
+#include "../../Engine/ThreeDInteractions/MeshTransform.hpp"
+#include "../../Engine/ThreeDInteractions/VerticeTransform.hpp"
+#include "../../Engine/ThreeDInteractions/FaceTransform.hpp"
+#include "../../Engine/ThreeDInteractions/EdgeTransform.hpp"
 
 // Forward declare message handler from imgui_impl_win32.cpp
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -79,6 +85,7 @@ OverlayViewport::OverlayViewport() : hwnd_(nullptr)
 	camera_control_ = new CameraControl(this);
 	raycast_performer_ = new RaycastPerform(this, selector_);
 	texture_renderer_test_ = new TextureRendererTest();
+	click_handler_ = new OverlayClickHandler(this);
 	
 	// Initialize 3D modes
 	normal_mode_ = new Normal_Mode();
@@ -115,6 +122,12 @@ OverlayViewport::~OverlayViewport()
 	if (html_texture_renderer_) 
 	{
 		html_texture_renderer_ = nullptr; 
+	}
+	
+	if (click_handler_) 
+	{
+		delete click_handler_;
+		click_handler_ = nullptr;
 	}
 	
 	if (normal_mode_) 
@@ -433,6 +446,9 @@ void OverlayViewport::render()
 	
 	renderScene();
 	
+	// Handle 3D world interactions (Gizmo manipulations for all modes)
+	ThreeDWorldInteractions();
+	
 	if (texture_renderer_test_) {
 		texture_renderer_test_->render();
 	}
@@ -456,9 +472,6 @@ void OverlayViewport::renderScene() {
 	if (three_d_scene_) 
 	{
 		three_d_scene_->renderDirect(width_, height_);
-		
-		renderGuizmo();
-		
 		return;
 	}
 	
@@ -471,27 +484,8 @@ void OverlayViewport::renderScene() {
 
 void OverlayViewport::renderGuizmo() 
 {
-	if (!selector_ || !three_d_scene_ || !imgui_initialized_) 
-	{
-		return;
-	}
-	
-	// Mettre à jour la liste des objets sélectionnés
-	ThreeDObject* selectedObject = selector_->getSelectedObject();
-	if (selectedObject) 
-	{
-		// Si un objet est sélectionné, l'ajouter à la liste (pour l'instant un seul objet)
-		multiple_selected_objects_.clear();
-		multiple_selected_objects_.push_back(selectedObject);
-		
-		// Appeler la fonction de manipulation d'objets
-		ThreeDWorldInteractions();
-	}
-	else 
-	{
-		// Aucun objet sélectionné, vider la liste
-		multiple_selected_objects_.clear();
-	}
+	// This function is deprecated - Guizmo rendering is now handled in ThreeDWorldInteractions()
+	// Kept for backward compatibility
 }
 
 // -------------- Camera and overlay controls --------------
@@ -538,14 +532,13 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				// so keyboard events continue to be processed by CEF
 				// SetFocus(hwnd);
 				
-				// Only perform raycast if NOT interacting with ImGuizmo
+				// Only perform click handler if NOT interacting with ImGuizmo
 				if (!ImGuizmo::IsOver() && !ImGuizmo::IsUsing())
 				{
-					POINT cursor_pos;
-					GetCursorPos(&cursor_pos);
-					ScreenToClient(hwnd, &cursor_pos);
-					
-					overlay->performRaycast(cursor_pos.x, cursor_pos.y);
+					if (overlay->click_handler_) 
+					{
+						overlay->click_handler_->handle();
+					}
 				}
 				return 0;
 			}
@@ -604,10 +597,29 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 			case WM_KEYDOWN:
 			{
 				// Check for numeric keys 1-4 to switch modes
-				if (wParam >= '1' && wParam <= '4')
+				// Mapping: 1=Normal, 2=Edge, 3=Vertice, 4=Face
+				if (wParam == '1')
 				{
-					int modeKey = static_cast<int>(wParam - '0'); // Convert '1'-'4' to 1-4
-					overlay->switchModeByKey(modeKey);
+					overlay->switchModeByKey(1); // Normal Mode
+					std::cout << "[OverlayViewport] Switched to Normal Mode" << std::endl;
+					return 0;
+				}
+				else if (wParam == '2')
+				{
+					overlay->switchModeByKey(2); // Edge Mode
+					std::cout << "[OverlayViewport] Switched to Edge Mode" << std::endl;
+					return 0;
+				}
+				else if (wParam == '3')
+				{
+					overlay->switchModeByKey(3); // Vertice Mode
+					std::cout << "[OverlayViewport] Switched to Vertice Mode" << std::endl;
+					return 0;
+				}
+				else if (wParam == '4')
+				{
+					overlay->switchModeByKey(4); // Face Mode
+					std::cout << "[OverlayViewport] Switched to Face Mode" << std::endl;
 					return 0;
 				}
 				break;
@@ -634,7 +646,15 @@ void OverlayViewport::setModelingMode(ThreeDMode* mode)
 	if (mode)
 	{
 		current_mode_ = mode;
+		std::cout << "[OverlayViewport] Mode changed to: " << mode->getName() << std::endl;
 	}
+}
+
+void OverlayViewport::setMultipleSelectedObjects(const std::list<ThreeDObject*>& objects) 
+{ 
+	multiple_selected_objects_ = objects; 
+	std::cout << "[OverlayViewport] setMultipleSelectedObjects called with " 
+	          << objects.size() << " objects" << std::endl;
 }
 
 void OverlayViewport::switchModeByKey(int keyNumber)
@@ -645,13 +665,13 @@ void OverlayViewport::switchModeByKey(int keyNumber)
 			setModelingMode(normal_mode_);
 			break;
 		case 2:
-			setModelingMode(vertice_mode_);
+			setModelingMode(edge_mode_);
 			break;
 		case 3:
-			setModelingMode(face_mode_);
+			setModelingMode(vertice_mode_);
 			break;
 		case 4:
-			setModelingMode(edge_mode_);
+			setModelingMode(face_mode_);
 			break;
 		default:
 			break;
@@ -665,19 +685,21 @@ void OverlayViewport::ThreeDWorldInteractions()
 	if (!three_d_scene_)
 		return;
 	
+	Camera* camera = three_d_scene_->getActiveCamera();
+	if (!camera)
+		return;
+	
+	float aspect = (height_ > 0) ? static_cast<float>(width_) / static_cast<float>(height_) : 1.0f;
+	
+	glm::mat4 view = camera->getViewMatrix();
+	glm::mat4 projection = camera->getProjectionMatrix(aspect);
+	
+	// For overlay, the ImGui window is fullscreen, so position is (0, 0)
+	ImVec2 oglChildPos(0.0f, 0.0f);
+	ImVec2 oglChildSize(static_cast<float>(width_), static_cast<float>(height_));
+	
 	if (current_mode_ == normal_mode_)
 	{
-		Camera* camera = three_d_scene_->getActiveCamera();
-		if (!camera)
-			return;
-		
-		float aspect = (height_ > 0) ? static_cast<float>(width_) / static_cast<float>(height_) : 1.0f;
-		
-		glm::mat4 view = camera->getViewMatrix();
-		glm::mat4 projection = camera->getProjectionMatrix(aspect);
-		
-		ImVec2 oglChildPos(0, 0);
-		ImVec2 oglChildSize(static_cast<float>(width_), static_cast<float>(height_));
 		
 		MeshTransform::manipulateMesh(
 			three_d_scene_,
@@ -687,6 +709,40 @@ void OverlayViewport::ThreeDWorldInteractions()
 			was_using_gizmo_last_frame_,
 			view,
 			projection
+		);
+	}
+	else if (current_mode_ == vertice_mode_)
+	{
+		VerticeTransform::manipulateVertices(
+			three_d_scene_,
+			multiple_selected_vertices_,
+			oglChildPos,
+			oglChildSize,
+			was_using_gizmo_last_frame_
+		);
+	}
+	else if (current_mode_ == face_mode_)
+	{
+		FaceTransform::manipulateFaces(
+			three_d_scene_,
+			multiple_selected_faces_,
+			oglChildPos,
+			oglChildSize,
+			was_using_gizmo_last_frame_,
+			true
+		);
+	}
+	else if (current_mode_ == edge_mode_)
+	{
+		// EdgeTransform needs ThreeDWindow* parameter which we don't have in overlay
+		// We'll need to adapt EdgeTransform or create an overlay-specific version
+		EdgeTransform::manipulateEdges(
+			three_d_scene_,
+			multiple_selected_edges_,
+			oglChildPos,
+			oglChildSize,
+			was_using_gizmo_last_frame_,
+			nullptr  // ThreeDWindow pointer - NULL for overlay (will need modification)
 		);
 	}
 	

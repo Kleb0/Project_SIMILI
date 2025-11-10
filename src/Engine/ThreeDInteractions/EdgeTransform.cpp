@@ -227,7 +227,9 @@ namespace EdgeTransform
         if (ctrlLeftJustPressed && selectedEdges.size() == 1) 
         {
             showEdgeLoop = !showEdgeLoop;
-            window->isEdgeLoopActive = showEdgeLoop;
+            if (window) {
+                window->isEdgeLoopActive = showEdgeLoop;
+            }
         }
 
         if (showEdgeLoop && selectedEdges.size() == 1)
@@ -241,7 +243,9 @@ namespace EdgeTransform
             if (mesh && a && selected)
             {
                 std::vector<Edge*> loop = MeshEdit::FindLoop(a, selected, mesh, scene, oglChildPos, oglChildSize);
-                window->isEdgeLoopActive = true;
+                if (window) {
+                    window->isEdgeLoopActive = true;
+                }
             }           
         }
 
