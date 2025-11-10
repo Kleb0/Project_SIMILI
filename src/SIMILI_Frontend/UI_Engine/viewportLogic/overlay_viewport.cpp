@@ -23,6 +23,8 @@
 #include "../../Engine/ThreeDScene.hpp"
 #include "../../Engine/OpenGLContext.hpp"
 #include "../../Engine/ThreeDObjectSelector.hpp"
+#include "../../Engine/ThreeDInteractions/MeshTransform.hpp"
+#include "../../Engine/Guizmo.hpp"
 #include "../../WorldObjects/Camera/Camera.hpp"
 #include "../../WorldObjects/Entities/ThreeDObject.hpp"
 #include "../../ThirdParty/CEF/cef_binary/include/cef_app.h"
@@ -71,6 +73,7 @@ OverlayViewport::OverlayViewport() : hwnd_(nullptr)
 	, face_mode_(nullptr)
 	, edge_mode_(nullptr)
 	, current_mode_(nullptr)
+	, was_using_gizmo_last_frame_(false)
 {
 	selector_ = new ThreeDObjectSelector();
 	camera_control_ = new CameraControl(this);
@@ -87,41 +90,50 @@ OverlayViewport::OverlayViewport() : hwnd_(nullptr)
 	current_mode_ = normal_mode_;
 }
 
-OverlayViewport::~OverlayViewport() {
-	if (selector_) {
+OverlayViewport::~OverlayViewport() 
+{
+	if (selector_) 
+	{
 		delete selector_;
 		selector_ = nullptr;
 	}
-	if (camera_control_) {
+	if (camera_control_) 
+	{
 		delete camera_control_;
 		camera_control_ = nullptr;
 	}
-	if (raycast_performer_) {
+	if (raycast_performer_) 
+	{
 		delete raycast_performer_;
 		raycast_performer_ = nullptr;
 	}
-	if (texture_renderer_test_) {
+	if (texture_renderer_test_) 
+	{
 		delete texture_renderer_test_;
 		texture_renderer_test_ = nullptr;
 	}
-	if (html_texture_renderer_) {
-		html_texture_renderer_ = nullptr; // CefRefPtr handles deletion
+	if (html_texture_renderer_) 
+	{
+		html_texture_renderer_ = nullptr; 
 	}
 	
-	// Clean up 3D modes
-	if (normal_mode_) {
+	if (normal_mode_) 
+	{
 		delete normal_mode_;
 		normal_mode_ = nullptr;
 	}
-	if (vertice_mode_) {
+	if (vertice_mode_) 
+	{
 		delete vertice_mode_;
 		vertice_mode_ = nullptr;
 	}
-	if (face_mode_) {
+	if (face_mode_) 
+	{
 		delete face_mode_;
 		face_mode_ = nullptr;
 	}
-	if (edge_mode_) {
+	if (edge_mode_) 
+	{
 		delete edge_mode_;
 		edge_mode_ = nullptr;
 	}
@@ -179,25 +191,17 @@ bool OverlayViewport::create(HWND parent, int x, int y, int width, int height)
 	
 	SetWindowPos(hwnd_, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 	
-	// DO NOT set focus to overlay - keep focus on parent CEF window
-	// so keyboard events continue to be processed by CEF's OnPreKeyEvent
-	// SetFocus(hwnd_);
-	// std::cout << "[OverlayViewport] Focus set to overlay window" << std::endl;
-	
+
 	RECT window_rect;
 	GetWindowRect(hwnd_, &window_rect);
 	POINT top_left = {window_rect.left, window_rect.top};
-	ScreenToClient(parent, &top_left);
-	std::cout << "[OverlayViewport] Actual client position: (" << top_left.x << ", " << top_left.y << ")" << std::endl;
-		
-	initializeOpenGL();
-	
-	std::cout << "[OverlayViewport] Created at (" << x << "," << y << ") size " << width << "x" << height << std::endl;
-	
+	ScreenToClient(parent, &top_left);	
+	initializeOpenGL();		
 	return true;
 }
 
-void OverlayViewport::destroy() {
+void OverlayViewport::destroy() 
+{
 	shutdownImGui();
 	
 	if (gl_context_) {
@@ -246,7 +250,6 @@ void OverlayViewport::initializeOpenGL()
 		return;
 	}
 	
-	// Create OpenGL 4.6 core profile context
 	int attribs[] = 
 	{
 		WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
@@ -256,7 +259,7 @@ void OverlayViewport::initializeOpenGL()
 	};
 	
 	PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = 
-		(PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
+	(PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
 	
 	if (wglCreateContextAttribsARB) 
 	{
@@ -299,7 +302,7 @@ void OverlayViewport::initializeOpenGL()
 		
 		// Configure render rectangle for the texture
 		texture_renderer_test_->setRenderRect(html_texture_x_, html_texture_y_, 
-		                                       html_texture_width_, html_texture_height_);
+		html_texture_width_, html_texture_height_);
 		
 		html_texture_renderer_ = new HtmlTextureRenderer(texture_renderer_test_);
 		html_texture_renderer_->createBrowser("file:///ui/Mode_UI.html", html_texture_width_, html_texture_height_);
@@ -322,7 +325,7 @@ void OverlayViewport::initializeImGui()
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;// Enable Gamepad Controls
 
 	ImGui::StyleColorsDark();
 	ImGui_ImplWin32_Init(hwnd_);
@@ -357,25 +360,30 @@ void OverlayViewport::releaseContext() {
 	wglMakeCurrent(nullptr, nullptr);
 }
 
-void OverlayViewport::setPosition(int x, int y, int width, int height) {
-	if (hwnd_) {
+void OverlayViewport::setPosition(int x, int y, int width, int height) 
+{
+	if (hwnd_) 
+	{
 		SetWindowPos(hwnd_, HWND_TOP, x, y, width, height, 0);
 		width_ = width;
 		height_ = height;
 		
-		if (gl_context_ && hdc_) {
+		if (gl_context_ && hdc_) 
+		{
 			wglMakeCurrent(hdc_, gl_context_);
 			glViewport(0, 0, width, height);
 			wglMakeCurrent(nullptr, nullptr);
 		}
 		
-		if (texture_renderer_test_) {
+		if (texture_renderer_test_) 
+		{
 			texture_renderer_test_->resize(width, height);
 		}
 	}
 }
 
-void OverlayViewport::show(bool visible) {
+void OverlayViewport::show(bool visible) 
+{
 	if (hwnd_) 
 	{
 		ShowWindow(hwnd_, visible ? SW_SHOW : SW_HIDE);
@@ -389,8 +397,10 @@ bool OverlayViewport::isVisible() const {
 	return false;
 }
 
-void OverlayViewport::render() {
-	if (!hwnd_ || !gl_context_ || !rendering_enabled_) {
+void OverlayViewport::render() 
+{
+	if (!hwnd_ || !gl_context_ || !rendering_enabled_) 
+	{
 		return;
 	}
 	
@@ -418,9 +428,7 @@ void OverlayViewport::render() {
 			ImGuiWindowFlags_NoScrollWithMouse | 
 			ImGuiWindowFlags_NoCollapse | 
 			ImGuiWindowFlags_NoBackground | 
-			ImGuiWindowFlags_NoBringToFrontOnFocus |
-			ImGuiWindowFlags_NoFocusOnAppearing |
-			ImGuiWindowFlags_NoDocking);
+			ImGuiWindowFlags_NoBringToFrontOnFocus);
 	}
 	
 	renderScene();
@@ -468,44 +476,28 @@ void OverlayViewport::renderGuizmo()
 		return;
 	}
 	
+	// Mettre à jour la liste des objets sélectionnés
 	ThreeDObject* selectedObject = selector_->getSelectedObject();
-	if (!selectedObject) 
+	if (selectedObject) 
 	{
-		return; // No object selected, no gizmo to render
+		// Si un objet est sélectionné, l'ajouter à la liste (pour l'instant un seul objet)
+		multiple_selected_objects_.clear();
+		multiple_selected_objects_.push_back(selectedObject);
+		
+		// Appeler la fonction de manipulation d'objets
+		ThreeDWorldInteractions();
 	}
-	
-	Camera* camera = three_d_scene_->getActiveCamera();
-	if (!camera) 
+	else 
 	{
-		return;
+		// Aucun objet sélectionné, vider la liste
+		multiple_selected_objects_.clear();
 	}
-	
-	// Calculate aspect ratio for this viewport
-	float aspect = (height_ > 0) ? static_cast<float>(width_) / static_cast<float>(height_) : 1.0f;
-	
-	glm::mat4 view = camera->getViewMatrix();
-	glm::mat4 projection = camera->getProjectionMatrix(aspect);
-	
-	glm::mat4 model = selectedObject->getModelMatrix();
-	
-	ImGuizmo::SetOrthographic(false);
-	ImGuizmo::SetDrawlist();
-	ImGuizmo::SetRect(0, 0, static_cast<float>(width_), static_cast<float>(height_));
-	
-	// Render the Gizmo manipulator
-	ImGuizmo::Manipulate(
-		glm::value_ptr(view),
-		glm::value_ptr(projection),
-		current_guizmo_operation_,
-		current_guizmo_mode_,
-		glm::value_ptr(model)
-	);
 }
 
 // -------------- Camera and overlay controls --------------
 LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 {
-	// Pass events to ImGui first
+	// Pass events to ImGui first - CRITICAL for ImGuizmo hover detection
 	if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam))
 		return true;
 
@@ -546,11 +538,15 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				// so keyboard events continue to be processed by CEF
 				// SetFocus(hwnd);
 				
-				POINT cursor_pos;
-				GetCursorPos(&cursor_pos);
-				ScreenToClient(hwnd, &cursor_pos);
-				
-				overlay->performRaycast(cursor_pos.x, cursor_pos.y);
+				// Only perform raycast if NOT interacting with ImGuizmo
+				if (!ImGuizmo::IsOver() && !ImGuizmo::IsUsing())
+				{
+					POINT cursor_pos;
+					GetCursorPos(&cursor_pos);
+					ScreenToClient(hwnd, &cursor_pos);
+					
+					overlay->performRaycast(cursor_pos.x, cursor_pos.y);
+				}
 				return 0;
 			}
 			
@@ -563,17 +559,25 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 			
 			case WM_MOUSEWHEEL: 
 			{
-				POINT cursor_pos;
-				GetCursorPos(&cursor_pos);
-				ScreenToClient(hwnd, &cursor_pos);
-				
-				overlay->camera_control_->onMouseWheel(wParam);
+				// Only handle camera zoom if NOT over ImGuizmo
+				if (!ImGuizmo::IsOver() && !ImGuizmo::IsUsing())
+				{
+					POINT cursor_pos;
+					GetCursorPos(&cursor_pos);
+					ScreenToClient(hwnd, &cursor_pos);
+					
+					overlay->camera_control_->onMouseWheel(wParam);
+				}
 				return 0;
 			}
 			
 			case WM_MBUTTONDOWN: 
 			{
-				overlay->camera_control_->onMiddleButtonDown();
+				// Only handle camera pan if NOT over ImGuizmo
+				if (!ImGuizmo::IsOver() && !ImGuizmo::IsUsing())
+				{
+					overlay->camera_control_->onMiddleButtonDown();
+				}
 				return 0;
 			}
 			
@@ -585,7 +589,13 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 			
 			case WM_MOUSEMOVE: 
 			{
-				overlay->camera_control_->onMouseMove(wParam, lParam);
+				// Always pass mouse move for hover detection, but only handle camera if not over gizmo
+				if (!ImGuizmo::IsOver() && !ImGuizmo::IsUsing())
+				{
+					overlay->camera_control_->onMouseMove(wParam, lParam);
+				}
+				// Still trigger redraw for ImGuizmo hover state update
+				InvalidateRect(hwnd, nullptr, FALSE);
 				return 0;
 			}
 			
@@ -635,15 +645,49 @@ void OverlayViewport::switchModeByKey(int keyNumber)
 			setModelingMode(normal_mode_);
 			break;
 		case 2:
-			setModelingMode(edge_mode_);
-			break;
-		case 3:
 			setModelingMode(vertice_mode_);
 			break;
-		case 4:
+		case 3:
 			setModelingMode(face_mode_);
+			break;
+		case 4:
+			setModelingMode(edge_mode_);
 			break;
 		default:
 			break;
 	}
+}
+
+// --------- Object Manipulation ----------- //
+
+void OverlayViewport::ThreeDWorldInteractions()
+{
+	if (!three_d_scene_)
+		return;
+	
+	if (current_mode_ == normal_mode_)
+	{
+		Camera* camera = three_d_scene_->getActiveCamera();
+		if (!camera)
+			return;
+		
+		float aspect = (height_ > 0) ? static_cast<float>(width_) / static_cast<float>(height_) : 1.0f;
+		
+		glm::mat4 view = camera->getViewMatrix();
+		glm::mat4 projection = camera->getProjectionMatrix(aspect);
+		
+		ImVec2 oglChildPos(0, 0);
+		ImVec2 oglChildSize(static_cast<float>(width_), static_cast<float>(height_));
+		
+		MeshTransform::manipulateMesh(
+			three_d_scene_,
+			multiple_selected_objects_,
+			oglChildPos,
+			oglChildSize,
+			was_using_gizmo_last_frame_,
+			view,
+			projection
+		);
+	}
+	
 }
