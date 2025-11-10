@@ -23,6 +23,10 @@ class Normal_Mode;
 class Vertice_Mode;
 class Face_Mode;
 class Edge_Mode;
+class OverlayClickHandler;
+class Vertice;
+class Face;
+class Edge;
 
 class OverlayViewport {
 public:
@@ -78,8 +82,16 @@ public:
     Edge_Mode* getEdgeMode() { return edge_mode_; }
     
     // Object selection management
-    void setMultipleSelectedObjects(const std::list<ThreeDObject*>& objects) { multiple_selected_objects_ = objects; }
+    void setMultipleSelectedObjects(const std::list<ThreeDObject*>& objects);
     const std::list<ThreeDObject*>& getMultipleSelectedObjects() const { return multiple_selected_objects_; }
+    
+    // Selection lists for different modes
+    std::list<Vertice*>& getMultipleSelectedVertices() { return multiple_selected_vertices_; }
+    std::list<Face*>& getMultipleSelectedFaces() { return multiple_selected_faces_; }
+    std::list<Edge*>& getMultipleSelectedEdges() { return multiple_selected_edges_; }
+    
+    // Selector access
+    ThreeDObjectSelector* getSelector() { return selector_; }
 
 private:
     static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -129,8 +141,17 @@ private:
     ThreeDMode* current_mode_;
     
     std::list<ThreeDObject*> multiple_selected_objects_;
+    std::list<Vertice*> multiple_selected_vertices_;
+    std::list<Face*> multiple_selected_faces_;
+    std::list<Edge*> multiple_selected_edges_;
     bool was_using_gizmo_last_frame_;
     
+    OverlayClickHandler* click_handler_;
+    
+public:
+    bool isEdgeLoopActive = false;
+    
+private:
     void ThreeDWorldInteractions();
 };
 
