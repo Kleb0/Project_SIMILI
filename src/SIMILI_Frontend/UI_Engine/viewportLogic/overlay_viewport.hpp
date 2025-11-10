@@ -67,6 +67,7 @@ public:
     
     // 3D Mode management
     void setModelingMode(ThreeDMode* mode);
+    void switchModeByKey(int keyNumber);
     ThreeDMode* getCurrentMode() const { return current_mode_; }
     
     // Access to individual modes

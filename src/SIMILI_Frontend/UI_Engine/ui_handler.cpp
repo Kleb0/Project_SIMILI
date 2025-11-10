@@ -67,8 +67,6 @@ void UIHandler::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& ti
 
 			if (iss >> comma >> dpiScale) 
 			{
-				// Successfully read dpiScale
-				std::cout << "[UIHandler] DPI scale successfully read ! Received viewport resize with DPI scale: " << dpiScale << std::endl;
 			}
 		
 			if (overlay_viewport_ && parent_hwnd_ && browser) 
@@ -199,9 +197,8 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 		overlay_viewport_->setThreeDScene(three_d_scene_);
 	}
 	
-	// Initialize default 3D mode to Normal Mode (AFTER scene is set)
-	overlay_viewport_->setModelingMode(overlay_viewport_->getNormalMode());
-	std::cout << "[UIHandler] Overlay viewport initialized with Normal Mode" << std::endl;
+	overlay_viewport_->switchModeByKey(1);
+	std::cout << "[UIHandler] Overlay viewport initialized with Normal Mode (key 1)" << std::endl;
 	
 	// CRITICAL: Initialize scene objects NOW that we have an OpenGL context
 	initializeSceneObjects();
@@ -395,7 +392,20 @@ bool UIHandler::OnPreKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& 
 		return false;
 	}
 	
-	// Intercept keyboard events and forward to overlay's HTML texture browser
+	if (overlay_viewport_ && event.windows_key_code >= '1' && event.windows_key_code <= '4')
+	{
+		int modeKey = event.windows_key_code - '0';
+		overlay_viewport_->switchModeByKey(modeKey);
+		
+		HtmlTextureRenderer* html_renderer = overlay_viewport_->getHtmlTextureRenderer();
+		if (html_renderer) 
+		{
+			html_renderer->sendKeyEvent(event);
+		}
+		
+		return true;
+	}
+	
 	if (overlay_viewport_) 
 	{
 		HtmlTextureRenderer* html_renderer = overlay_viewport_->getHtmlTextureRenderer();
@@ -412,7 +422,6 @@ bool UIHandler::OnPreKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& 
 		}
 	}
 	
-	std::cout << "[UIHandler] OnPreKeyEvent - no overlay, passing through" << std::endl;
 	return false;
 }
 
