@@ -2,6 +2,7 @@
 
 #include <windows.h>
 #include <vector>
+#include <list>
 
 // Forward declarations
 namespace ImGuizmo {
@@ -75,6 +76,10 @@ public:
     Vertice_Mode* getVerticeMode() { return vertice_mode_; }
     Face_Mode* getFaceMode() { return face_mode_; }
     Edge_Mode* getEdgeMode() { return edge_mode_; }
+    
+    // Object selection management
+    void setMultipleSelectedObjects(const std::list<ThreeDObject*>& objects) { multiple_selected_objects_ = objects; }
+    const std::list<ThreeDObject*>& getMultipleSelectedObjects() const { return multiple_selected_objects_; }
 
 private:
     static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -122,5 +127,10 @@ private:
     Face_Mode* face_mode_;
     Edge_Mode* edge_mode_;
     ThreeDMode* current_mode_;
+    
+    std::list<ThreeDObject*> multiple_selected_objects_;
+    bool was_using_gizmo_last_frame_;
+    
+    void ThreeDWorldInteractions();
 };
 

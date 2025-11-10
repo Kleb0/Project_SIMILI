@@ -26,7 +26,8 @@ namespace MeshTransform
     const std::list<ThreeDObject*>& selectedObjects, const ImVec2& oglChildPos, const ImVec2& oglChildSize);
 
     void manipulateMesh(ThreeDScene* scene, const std::list<ThreeDObject*>& selectedObjects,
-    const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame);
+    const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame,
+    const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
 
     void trackMeshTransformOnRelease(ThreeDScene* scene, const std::list<ThreeDObject*>& selectedObjects, const glm::mat4& totalDelta, ImGuizmo::OPERATION op);
 

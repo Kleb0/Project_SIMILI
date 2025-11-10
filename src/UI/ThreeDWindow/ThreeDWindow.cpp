@@ -340,12 +340,17 @@ void ThreeDWindow::ThreeDWorldInteractions()
 {
     if(currentMode == &normalMode)
     {
+        glm::mat4 view = scene->getViewMatrix();
+        glm::mat4 proj = scene->getProjectionMatrix();
+        
         MeshTransform::manipulateMesh(
             scene,
             multipleSelectedObjects,
             oglChildPos,
             oglChildSize,
-            wasUsingGizmoLastFrame
+            wasUsingGizmoLastFrame,
+            view,
+            proj
         );
     }
 

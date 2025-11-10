@@ -104,7 +104,8 @@ namespace MeshTransform
 	}
 
 	void MeshTransform::manipulateMesh(ThreeDScene* scene, const std::list<ThreeDObject*>& selectedObjects,
-	const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame)
+	const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame,
+	const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
 	{
 		
 		static bool firstOpDetected = false;
@@ -120,8 +121,8 @@ namespace MeshTransform
 		if (ImGui::IsKeyPressed(ImGuiKey_R)) currentGizmoOperation = ImGuizmo::ROTATE;
 		if (ImGui::IsKeyPressed(ImGuiKey_S)) currentGizmoOperation = ImGuizmo::SCALE;
 
-		glm::mat4 view = scene->getViewMatrix();
-		glm::mat4 proj = scene->getProjectionMatrix();
+		glm::mat4 view = viewMatrix;
+		glm::mat4 proj = projectionMatrix;
 
 		glm::mat4 dummyMatrix = Guizmo::renderGizmoForObject(selectedObjects, currentGizmoOperation, view, proj, oglChildPos, oglChildSize);
 
