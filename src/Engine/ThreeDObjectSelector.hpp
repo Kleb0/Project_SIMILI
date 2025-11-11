@@ -48,10 +48,10 @@ private:
 	ThreeDObject *selectedObject = nullptr;
 	std::list<ThreeDObject *> multipleSelectedObjects;
 
-	bool rayIntersectsMesh(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object);
+	bool rayIntersectsMesh(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object, float* outDistance = nullptr);
 	bool rayIntersectsBoundingBox(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object);
 	bool rayIntersectsVertice(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object, const Vertice &vertice);
-	bool rayIntersectsFace(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object, const Face &face);
+	bool rayIntersectsFace(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object, const Face &face, float* outDistance = nullptr);
 	bool rayIntersectsEdge(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object, const Edge &edge);
 	
 
