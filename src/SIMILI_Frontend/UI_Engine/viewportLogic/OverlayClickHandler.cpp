@@ -27,12 +27,10 @@ void OverlayClickHandler::handle()
         return;
     }
 
-    // Get mouse position in screen coordinates and convert to window-relative coordinates
     POINT cursor_pos;
     GetCursorPos(&cursor_pos);
     ScreenToClient(viewport->getHandle(), &cursor_pos);
     
-    // Mouse coordinates relative to the viewport (bottom-left origin for OpenGL)
     float relativeMouseX = static_cast<float>(cursor_pos.x);
     float relativeMouseY = static_cast<float>(cursor_pos.y);
 
