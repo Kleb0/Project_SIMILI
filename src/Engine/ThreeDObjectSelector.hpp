@@ -48,6 +48,9 @@ private:
 	ThreeDObject *selectedObject = nullptr;
 	std::list<ThreeDObject *> multipleSelectedObjects;
 
+	// New proximity-based selection method
+	float calculateDistanceToRay(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object);
+	
 	bool rayIntersectsMesh(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object, float* outDistance = nullptr);
 	bool rayIntersectsBoundingBox(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object);
 	bool rayIntersectsVertice(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object, const Vertice &vertice);
