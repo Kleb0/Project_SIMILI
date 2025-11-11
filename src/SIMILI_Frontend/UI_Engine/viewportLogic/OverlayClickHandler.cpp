@@ -21,34 +21,55 @@ OverlayClickHandler::OverlayClickHandler(OverlayViewport* owner) : viewport(owne
 
 void OverlayClickHandler::handle() 
 {
+
     scene = viewport->getThreeDScene();
-    if (!scene) {
+    if (!scene) 
+    {
         std::cerr << "[OVERLAY CLICK HANDLER] Error: No ThreeDScene available" << std::endl;
         return;
     }
 
     POINT cursor_pos;
-    GetCursorPos(&cursor_pos);
-    ScreenToClient(viewport->getHandle(), &cursor_pos);
+    if (!GetCursorPos(&cursor_pos)) 
+    {
+        std::cerr << "[OVERLAY CLICK HANDLER] Error: Failed to get cursor position" << std::endl;
+        return;
+    }
     
-    // Use integer coordinates for mouse position (more precise for small movements)
+    HWND hwnd = viewport->getHandle();
+    if (!hwnd) 
+    {
+        std::cerr << "[OVERLAY CLICK HANDLER] Error: Invalid window handle" << std::endl;
+        return;
+    }
+    
+    if (!ScreenToClient(hwnd, &cursor_pos)) {
+        std::cerr << "[OVERLAY CLICK HANDLER] Error: Failed to convert screen to client coords" << std::endl;
+        return;
+    }
+    
     int mouseX = cursor_pos.x;
     int mouseY = cursor_pos.y;
 
     std::cout << "[OVERLAY CLICK HANDLER] Mouse click at: (" << mouseX << ", " << mouseY 
-              << ") - Viewport size: " << viewport->getWidth() << "x" << viewport->getHeight() << std::endl;
+              << ") - Viewport size: " << viewport->getWidth() << "x" << viewport->getHeight() 
+              << " | ImGuizmo Over: " << ImGuizmo::IsOver() << std::endl;
 
-    if (mouseX >= 0 && mouseX < viewport->getWidth() &&
-        mouseY >= 0 && mouseY < viewport->getHeight())
+    if (mouseX < 0 || mouseX >= viewport->getWidth() ||
+        mouseY < 0 || mouseY >= viewport->getHeight())
     {
-        int windowWidth = viewport->getWidth();
-        int windowHeight = viewport->getHeight();
+        std::cout << "[OVERLAY CLICK HANDLER] Click outside viewport bounds - ignoring" << std::endl;
+        return;
+    }
 
-        glm::mat4 view = scene->getViewMatrix();
-        glm::mat4 proj = scene->getProjectionMatrix();
-        
-        auto& listRef = scene->getObjectsRef();
-        std::vector<ThreeDObject*> objects;
+    int windowWidth = viewport->getWidth();
+    int windowHeight = viewport->getHeight();
+
+    glm::mat4 view = scene->getViewMatrix();
+    glm::mat4 proj = scene->getProjectionMatrix();
+    
+    auto& listRef = scene->getObjectsRef();
+    std::vector<ThreeDObject*> objects;
         
         if (listRef.empty()) 
         {
@@ -77,11 +98,17 @@ void OverlayClickHandler::handle()
 
         if (currentMode == normalMode)
         {
+            // Don't perform raycast if hovering over gizmo (even if not actively using it)
             bool preventSelection = ImGuizmo::IsOver();
+            
             if (!preventSelection)
             {
                 selector->pickUpMesh(mouseX, mouseY,
                     windowWidth, windowHeight, view, proj, objects);
+            }
+            else 
+            {
+                std::cout << "[OVERLAY CLICK HANDLER] Raycast skipped - mouse over ImGuizmo" << std::endl;
             }
 
             ThreeDObject* selected = selector->getSelectedObject();
@@ -131,7 +158,7 @@ void OverlayClickHandler::handle()
                           << multipleSelected.size() << std::endl;
                 selector->clearTarget();
             }
-            else if (!ImGuizmo::IsUsing())
+            else if (!preventSelection)  // Only deselect if we weren't over gizmo
             {
                 for (auto* obj : objects) obj->setSelected(false);
                 std::list<ThreeDObject*> empty;
@@ -143,7 +170,7 @@ void OverlayClickHandler::handle()
 
         if (currentMode == verticeMode)
         {
-            if (ImGuizmo::IsUsing()) return;
+            // ImGuizmo::IsUsing() already checked at start of function
             bool shiftPressed = ImGui::GetIO().KeyShift;
 
             Vertice* selectedVertice = selector->pickUpVertice(
@@ -197,7 +224,7 @@ void OverlayClickHandler::handle()
 
         if (currentMode == faceMode)
         {
-            if (ImGuizmo::IsUsing()) return;
+            // ImGuizmo::IsUsing() already checked at start of function
             bool shiftPressed = ImGui::GetIO().KeyShift;
 
             Face* selectedFace = selector->pickupFace(
@@ -250,7 +277,7 @@ void OverlayClickHandler::handle()
 
         if (currentMode == edgeMode)
         {
-            if (ImGuizmo::IsUsing()) return;
+            // ImGuizmo::IsUsing() already checked at start of function
             bool shiftPressed = ImGui::GetIO().KeyShift;
 
             Edge* selectedEdge = selector->pickupEdge(
@@ -300,5 +327,4 @@ void OverlayClickHandler::handle()
                 }
             }
         }
-    }
 }

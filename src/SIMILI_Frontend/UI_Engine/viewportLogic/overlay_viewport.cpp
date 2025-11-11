@@ -182,10 +182,9 @@ bool OverlayViewport::create(HWND parent, int x, int y, int width, int height)
 		class_registered = true;
 	}
 	
-	// the hwnd is the child window
-	// hwnd = handke to 
+	// Create the overlay window - ensure it receives mouse input
 	hwnd_ = CreateWindowExW(
-		0, 
+		WS_EX_NOPARENTNOTIFY,  // Don't notify parent, but DO receive input
 		kOverlayClassName,
 		L"OpenGL Overlay",
 		WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_TABSTOP,
@@ -202,8 +201,18 @@ bool OverlayViewport::create(HWND parent, int x, int y, int width, int height)
 		return false;
 	}
 	
-	SetWindowPos(hwnd_, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+	// Ensure window is top-level and receives input
+	SetWindowPos(hwnd_, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
 	
+	// Verify click handler is initialized
+	if (!click_handler_) 
+	{
+		std::cerr << "[OverlayViewport] WARNING: Click handler not initialized!" << std::endl;
+	}
+	else 
+	{
+		std::cout << "[OverlayViewport] Click handler ready" << std::endl;
+	}
 
 	RECT window_rect;
 	GetWindowRect(hwnd_, &window_rect);
@@ -491,10 +500,6 @@ void OverlayViewport::renderGuizmo()
 // -------------- Camera and overlay controls --------------
 LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 {
-	// Pass events to ImGui first - CRITICAL for ImGuizmo hover detection
-	if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam))
-		return true;
-
 	OverlayViewport* overlay = nullptr;
 	
 	if (msg == WM_CREATE) 
@@ -506,6 +511,18 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 	else 
 	{
 		overlay = reinterpret_cast<OverlayViewport*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+	}
+	
+
+	ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
+	
+	bool shouldProcessEvent = true;
+	if (msg == WM_LBUTTONDOWN || msg == WM_LBUTTONUP) 
+	{
+		if (ImGuizmo::IsUsing()) 
+		{
+			shouldProcessEvent = false;
+		}
 	}
 	
 	if (overlay) 
@@ -524,31 +541,53 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 			case WM_ERASEBKGND:
 				return 1;
 			
-			// ===== RAYCAST & SELECTION =====
+			// ------ RAYCAST & SELECTION ------
 			
 			case WM_LBUTTONDOWN:
 			{
-				// DO NOT set focus here - keep focus on parent CEF window
-				// so keyboard events continue to be processed by CEF
-				// SetFocus(hwnd);
+				std::cout << "[OverlayViewport] WM_LBUTTONDOWN received" << std::endl;
 				
-				// Only perform click handler if NOT interacting with ImGuizmo
-				if (!ImGuizmo::IsOver() && !ImGuizmo::IsUsing())
+				// Capture mouse to ensure we get all mouse events
+				SetCapture(hwnd);
+				
+				// Get mouse coordinates
+				int mouseX = LOWORD(lParam);
+				int mouseY = HIWORD(lParam);
+				
+				std::cout << "[OverlayViewport] Click at: (" << mouseX << ", " << mouseY << ")" << std::endl;
+				std::cout << "[OverlayViewport] ImGuizmo state - IsOver: " << ImGuizmo::IsOver() 
+				          << " | IsUsing: " << ImGuizmo::IsUsing() << std::endl;
+				
+				// Check if we should process the click (only block when actively using gizmo)
+				if (shouldProcessEvent && !ImGuizmo::IsUsing())
 				{
+					std::cout << "[OverlayViewport] Processing click handler" << std::endl;
+					
 					if (overlay->click_handler_) 
 					{
 						overlay->click_handler_->handle();
 					}
+					else 
+					{
+						std::cerr << "[OverlayViewport] ERROR: No click handler available!" << std::endl;
+					}
 				}
+				else 
+				{
+					std::cout << "[OverlayViewport] Click blocked - ImGuizmo is being manipulated" << std::endl;
+				}
+				
 				return 0;
 			}
 			
 			case WM_LBUTTONUP:
 			{
+				// Release mouse capture
+				ReleaseCapture();
 				return 0;
 			}
 					
-			// ===== CAMERA CONTROLS =====
+			// ------ CAMERA CONTROLS ------
 			
 			case WM_MOUSEWHEEL: 
 			{
@@ -582,17 +621,18 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 			
 			case WM_MOUSEMOVE: 
 			{
-				// Always pass mouse move for hover detection, but only handle camera if not over gizmo
+				// ImGui already processed this event at the top of WndProc
+				// Only handle camera movement if not over/using gizmo
 				if (!ImGuizmo::IsOver() && !ImGuizmo::IsUsing())
 				{
 					overlay->camera_control_->onMouseMove(wParam, lParam);
 				}
-				// Still trigger redraw for ImGuizmo hover state update
+				// Always trigger redraw for ImGuizmo hover state updates
 				InvalidateRect(hwnd, nullptr, FALSE);
 				return 0;
 			}
 			
-			// ===== MODE SWITCHING =====
+			// ------ MODE SWITCHING -----
 			
 			case WM_KEYDOWN:
 			{

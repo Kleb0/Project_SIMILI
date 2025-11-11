@@ -54,8 +54,12 @@ void ThreeDObjectSelector::pickUpMesh(int mouseX, int mouseY, int screenWidth, i
 		std::cout << " [pickUpMesh] Ray origin: (" << rayOrigin.x << ", " << rayOrigin.y << ", " << rayOrigin.z << ")" << std::endl;
 		std::cout << " [pickUpMesh] Ray dir: (" << rayDir.x << ", " << rayDir.y << ", " << rayDir.z << ")" << std::endl;
 
-		float closestDistance = std::numeric_limits<float>::max();
+		// NEW APPROACH: Find closest object by proximity to ray direction
+		float bestScore = std::numeric_limits<float>::max();
 		ThreeDObject *closestObject = nullptr;
+		
+		const float MAX_SELECTION_DISTANCE = 100.0f;
+		const float MAX_PERPENDICULAR_DISTANCE = 1.5f; 
 
 		for (auto *obj : objects)
 		{
@@ -71,14 +75,45 @@ void ThreeDObjectSelector::pickUpMesh(int mouseX, int mouseY, int screenWidth, i
 					if (verts.empty() && edges.empty() && faces.empty()) continue;
 				}
 				
-				float intersectionDistance = -1.0f;
-				if (rayIntersectsMesh(rayOrigin, rayDir, *obj, &intersectionDistance))
+				// Calculate distance from ray to object center
+				float distanceToRay = calculateDistanceToRay(rayOrigin, rayDir, *obj);
+				
+				// Get distance along ray (depth from camera)
+				glm::vec3 objectCenter = obj->getPosition();
+				glm::vec3 toObject = objectCenter - rayOrigin;
+				float depthAlongRay = glm::dot(toObject, rayDir);
+				
+				// Only consider objects in front of the camera
+				if (depthAlongRay <= 0.0f) {
+					std::cout << " [pickUpMesh] Object " << obj->getName() << " is behind camera, skipping" << std::endl;
+					continue;
+				}
+				
+				// Ignore objects too far away (along ray)
+				if (depthAlongRay > MAX_SELECTION_DISTANCE) {
+					std::cout << " [pickUpMesh] Object " << obj->getName() << " is too far (" << depthAlongRay << "), skipping" << std::endl;
+					continue;
+				}
+				
+				// NEW: Ignore objects too far from the ray (perpendicular distance)
+				if (distanceToRay > MAX_PERPENDICULAR_DISTANCE) {
+					std::cout << " [pickUpMesh] Object " << obj->getName() << " is too far from ray (" << distanceToRay << " > " << MAX_PERPENDICULAR_DISTANCE << "), skipping" << std::endl;
+					continue;
+				}
+				
+				// Combined score: distance to ray + depth (prioritize closer objects in ray direction)
+				// Weight the perpendicular distance more heavily than depth
+				float score = distanceToRay * 2.0f + depthAlongRay * 0.1f;
+				
+				std::cout << " [pickUpMesh] Object: " << obj->getName() 
+						  << " | Distance to ray: " << distanceToRay 
+						  << " | Depth: " << depthAlongRay 
+						  << " | Score: " << score << std::endl;
+				
+				if (score < bestScore)
 				{
-					if (intersectionDistance >= 0.0f && intersectionDistance < closestDistance)
-					{
-						closestDistance = intersectionDistance;
-						closestObject = obj;
-					}
+					bestScore = score;
+					closestObject = obj;
 				}
 			} 
 			catch (const std::exception& e) 
@@ -92,7 +127,9 @@ void ThreeDObjectSelector::pickUpMesh(int mouseX, int mouseY, int screenWidth, i
 		if (selectedObject) 
 		{
 			std::cout << " [pickUpMesh] Selected: " << selectedObject->getName() 
-					  << " at distance " << closestDistance << std::endl;
+					  << " with best score: " << bestScore << std::endl;
+		} else {
+			std::cout << " [pickUpMesh] No object selected" << std::endl;
 		}
 	} catch (const std::exception& e) {
 		std::cerr << "[ThreeDObjectSelector] Error during pickUpMesh: " << e.what() << std::endl;
@@ -245,6 +282,29 @@ void ThreeDObjectSelector::select(ThreeDObject *object)
 	selectedObject = object;
 }
 
+float ThreeDObjectSelector::calculateDistanceToRay(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object)
+{
+	// Get the center of the object
+	glm::vec3 objectCenter = object.getPosition();
+	
+	// Vector from ray origin to object center
+	glm::vec3 toObject = objectCenter - rayOrigin;
+	
+	// Project toObject onto the ray direction to find the closest point on the ray
+	float projectionLength = glm::dot(toObject, rayDir);
+	
+	// Closest point on the ray to the object center
+	glm::vec3 closestPointOnRay = rayOrigin + rayDir * projectionLength;
+	
+	// Perpendicular distance from the ray to the object center
+	float distance = glm::length(objectCenter - closestPointOnRay);
+	
+	std::cout << " [calculateDistanceToRay] Object: " << object.getName() 
+	          << " | Center: (" << objectCenter.x << ", " << objectCenter.y << ", " << objectCenter.z << ")"
+	          << " | Distance to ray: " << distance << std::endl;
+	
+	return distance;
+}
 
 void ThreeDObjectSelector::clearMultipleSelection()
 {
