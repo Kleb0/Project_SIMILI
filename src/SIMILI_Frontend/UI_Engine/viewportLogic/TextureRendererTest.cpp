@@ -23,23 +23,19 @@ TextureRendererTest::~TextureRendererTest()
 
 void TextureRendererTest::initialize(int width, int height)
 {
-	if (initialized_) {
-		std::cout << "[TextureRendererTest] Already initialized, skipping..." << std::endl;
+	if (initialized_) 
+	{
 		return;
 	}
 
 	width_ = width;
 	height_ = height;
 
-	std::cout << "[TextureRendererTest] Initializing texture overlay (" 
-			  << width << "x" << height << ")..." << std::endl;
-
 	createTexture(texture_width_, texture_height_);
 	createQuadMesh();
 	createShaderProgram();
 
 	initialized_ = true;
-	std::cout << "[TextureRendererTest] Initialization complete!" << std::endl;
 }
 
 void TextureRendererTest::createTexture(int tex_width, int tex_height)
@@ -60,8 +56,6 @@ void TextureRendererTest::createTexture(int tex_width, int tex_height)
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	std::cout << "[TextureRendererTest] Texture created (ID: " << texture_id_ 
-			  << " - " << texture_width_ << "x" << texture_height_ << ")" << std::endl;
 }
 
 void TextureRendererTest::createQuadMesh()
@@ -96,7 +90,6 @@ void TextureRendererTest::createQuadMesh()
 
 	glBindVertexArray(0);
 
-	std::cout << "[TextureRendererTest] Quad mesh created (VAO: " << vao_ << ")" << std::endl;
 }
 
 GLuint TextureRendererTest::compileShader(GLenum type, const char* source)
@@ -108,7 +101,8 @@ GLuint TextureRendererTest::compileShader(GLenum type, const char* source)
 	// Check for compilation errors
 	GLint success;
 	glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-	if (!success) {
+	if (!success) 
+	{
 		char infoLog[512];
 		glGetShaderInfoLog(shader, 512, nullptr, infoLog);
 		std::cerr << "[TextureRendererTest] Shader compilation failed:\n" << infoLog << std::endl;
@@ -176,102 +170,98 @@ void TextureRendererTest::createShaderProgram()
 
 	glDeleteShader(vertexShader);
 	glDeleteShader(fragmentShader);
-
-	std::cout << "[TextureRendererTest] Shader program created (ID: " << shader_program_ << ")" << std::endl;
 }
 
 void TextureRendererTest::render()
 {
-    if (!initialized_) {
-        return;
-    }
+	if (!initialized_) {
+		return;
+	}
 
-    // Save current OpenGL state
-    GLboolean depthTestEnabled;
-    glGetBooleanv(GL_DEPTH_TEST, &depthTestEnabled);
-    GLboolean blendEnabled;
-    glGetBooleanv(GL_BLEND, &blendEnabled);
+	// Save current OpenGL state
+	GLboolean depthTestEnabled;
+	glGetBooleanv(GL_DEPTH_TEST, &depthTestEnabled);
+	GLboolean blendEnabled;
+	glGetBooleanv(GL_BLEND, &blendEnabled);
 
-    // Setup for overlay rendering
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	// Setup for overlay rendering
+	glDisable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    // Use shader program
-    glUseProgram(shader_program_);
+	// Use shader program
+	glUseProgram(shader_program_);
 
-    // Set uniforms for positioning
-    glUniform2f(glGetUniformLocation(shader_program_, "viewportSize"), 
-                static_cast<float>(width_), static_cast<float>(height_));
-    glUniform2f(glGetUniformLocation(shader_program_, "rectSize"), 
-                static_cast<float>(render_width_), static_cast<float>(render_height_));
-    glUniform2f(glGetUniformLocation(shader_program_, "rectPos"), 
-                static_cast<float>(render_x_), static_cast<float>(render_y_));
+	// Set uniforms for positioning
+	glUniform2f(glGetUniformLocation(shader_program_, "viewportSize"), 
+				static_cast<float>(width_), static_cast<float>(height_));
+	glUniform2f(glGetUniformLocation(shader_program_, "rectSize"), 
+				static_cast<float>(render_width_), static_cast<float>(render_height_));
+	glUniform2f(glGetUniformLocation(shader_program_, "rectPos"), 
+				static_cast<float>(render_x_), static_cast<float>(render_y_));
 
-    // Bind texture
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture_id_);
-    glUniform1i(glGetUniformLocation(shader_program_, "texture1"), 0);
+	// Bind texture
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, texture_id_);
+	glUniform1i(glGetUniformLocation(shader_program_, "texture1"), 0);
 
-    // Render quad
-    glBindVertexArray(vao_);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindVertexArray(0);
+	// Render quad
+	glBindVertexArray(vao_);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+	glBindVertexArray(0);
 
-    // Restore OpenGL state
-    if (depthTestEnabled) glEnable(GL_DEPTH_TEST);
-    if (!blendEnabled) glDisable(GL_BLEND);
+	// Restore OpenGL state
+	if (depthTestEnabled) glEnable(GL_DEPTH_TEST);
+	if (!blendEnabled) glDisable(GL_BLEND);
 }
 
 void TextureRendererTest::updateTexture(const void* buffer, int width, int height)
 {
-    if (!initialized_ || !buffer) {
-        return;
-    }
-    
-    // If size changed, recreate texture
-    if (width != texture_width_ || height != texture_height_) {
-        if (texture_id_ != 0) {
-            glDeleteTextures(1, &texture_id_);
-        }
-        createTexture(width, height);
-    }
-    
-    // Update texture data (CEF uses BGRA format)
-    glBindTexture(GL_TEXTURE_2D, texture_id_);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texture_width_, texture_height_,
-                    GL_BGRA, GL_UNSIGNED_BYTE, buffer);
-    glBindTexture(GL_TEXTURE_2D, 0);
+	if (!initialized_ || !buffer) {
+		return;
+	}
+	
+	// If size changed, recreate texture
+	if (width != texture_width_ || height != texture_height_) {
+		if (texture_id_ != 0) {
+			glDeleteTextures(1, &texture_id_);
+		}
+		createTexture(width, height);
+	}
+	
+	// Update texture data (CEF uses BGRA format)
+	glBindTexture(GL_TEXTURE_2D, texture_id_);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texture_width_, texture_height_,
+					GL_BGRA, GL_UNSIGNED_BYTE, buffer);
+	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void TextureRendererTest::resize(int width, int height)
 {
-    if (width == width_ && height == height_) {
-        return;
-    }
+	if (width == width_ && height == height_) {
+		return;
+	}
 
 
-    width_ = width;
-    height_ = height;
-    
-    static int lastLoggedWidth = 0;
-    static int lastLoggedHeight = 0;
-    if (abs(width - lastLoggedWidth) > 50 || abs(height - lastLoggedHeight) > 50) 
+	width_ = width;
+	height_ = height;
+	
+	static int lastLoggedWidth = 0;
+	static int lastLoggedHeight = 0;
+	if (abs(width - lastLoggedWidth) > 50 || abs(height - lastLoggedHeight) > 50) 
 	{
-        lastLoggedWidth = width;
-        lastLoggedHeight = height;
-    }
+		lastLoggedWidth = width;
+		lastLoggedHeight = height;
+	}
 }
 
 void TextureRendererTest::setRenderRect(int x, int y, int w, int h)
 {
-    render_x_ = x;
-    render_y_ = y;
-    render_width_ = w;
-    render_height_ = h;
-    
-    std::cout << "[TextureRendererTest] Render rect set to (" << x << "," << y 
-              << ") size " << w << "x" << h << std::endl;
+	render_x_ = x;
+	render_y_ = y;
+	render_width_ = w;
+	render_height_ = h;
+	
 }
 
 void TextureRendererTest::cleanup()
@@ -279,8 +269,6 @@ void TextureRendererTest::cleanup()
 	if (!initialized_) {
 		return;
 	}
-
-	std::cout << "[TextureRendererTest] Cleaning up resources..." << std::endl;
 
 	if (texture_id_ != 0) {
 		glDeleteTextures(1, &texture_id_);
@@ -303,5 +291,4 @@ void TextureRendererTest::cleanup()
 	}
 
 	initialized_ = false;
-	std::cout << "[TextureRendererTest] Cleanup complete!" << std::endl;
 }

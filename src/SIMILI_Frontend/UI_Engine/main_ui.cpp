@@ -92,15 +92,12 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 		freopen_s(&fp, "CONOUT$", "w", stdout);
 		freopen_s(&fp, "CONOUT$", "w", stderr);
 		console_allocated = true;
-		std::cout << "[Main] Console allocated for debugging" << std::endl;
 	}
 
-	// Initialize global executable directory path
 	{
 		wchar_t exePath[MAX_PATH];
 		GetModuleFileNameW(NULL, exePath, MAX_PATH);
 		gExecutableDir = fs::path(exePath).parent_path();
-		std::cout << "[Main] Executable directory: " << gExecutableDir.string() << std::endl;
 	}
 
 	std::cout << "[Main] About to start HTTP Server..." << std::endl;
@@ -177,18 +174,13 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 				contextRetrieved = true;
 			}
 		}
-	}
-	catch (const std::exception& e) 
-	{
+	} catch (const std::exception& e) {
 		std::cerr << "[Main_UI] HTTP request failed: " << e.what() << std::endl;
 		contextRetrieved = false;
 	}
 	
 	if (contextRetrieved) 
 	{
-		std::cout << "[Main_UI] Retrieved context from main process:" << std::endl;
-		std::cout << "  - OpenGL Context ID: " << sharedContextID << std::endl;
-		std::cout << "  - Scene ID: " << sharedSceneID << std::endl;
 		myThreeDScene = new ThreeDScene();
 	} 
 	else 
@@ -202,11 +194,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 	static Mesh* cubeMesh1 = nullptr;
 	
 	mainCamera->setName("MainCamera");
-	
-	std::cout << "[Main_UI] 3D Scene created, will be initialized after OpenGL context" << std::endl;
-	
-	// ================================================================
-
+		
 	CefSettings settings;
 	settings.no_sandbox = true;
 	settings.multi_threaded_message_loop = false;
@@ -227,9 +215,6 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 	handler->setSceneObjects(nullptr, myThreeDScene, mainCamera, &cubeMesh1);
 	std::cout << "[Main_UI] Scene objects (camera, mesh) passed to UIHandler" << std::endl;
 	
-	// Note: Overlay viewport will be created later in OnAfterCreated, 
-	// and setModelingMode will be called in createOverlayViewport()
-
 	CefBrowserSettings browser_settings;
 	browser_settings.windowless_frame_rate = 60;
 
