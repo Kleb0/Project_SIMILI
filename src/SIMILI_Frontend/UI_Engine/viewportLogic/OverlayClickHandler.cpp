@@ -31,14 +31,15 @@ void OverlayClickHandler::handle()
     GetCursorPos(&cursor_pos);
     ScreenToClient(viewport->getHandle(), &cursor_pos);
     
-    float relativeMouseX = static_cast<float>(cursor_pos.x);
-    float relativeMouseY = static_cast<float>(cursor_pos.y);
+    // Use integer coordinates for mouse position (more precise for small movements)
+    int mouseX = cursor_pos.x;
+    int mouseY = cursor_pos.y;
 
-    std::cout << "[OVERLAY CLICK HANDLER] Mouse click at: (" << relativeMouseX << ", " << relativeMouseY 
+    std::cout << "[OVERLAY CLICK HANDLER] Mouse click at: (" << mouseX << ", " << mouseY 
               << ") - Viewport size: " << viewport->getWidth() << "x" << viewport->getHeight() << std::endl;
 
-    if (relativeMouseX >= 0 && relativeMouseX <= viewport->getWidth() &&
-        relativeMouseY >= 0 && relativeMouseY <= viewport->getHeight())
+    if (mouseX >= 0 && mouseX < viewport->getWidth() &&
+        mouseY >= 0 && mouseY < viewport->getHeight())
     {
         int windowWidth = viewport->getWidth();
         int windowHeight = viewport->getHeight();
@@ -79,7 +80,7 @@ void OverlayClickHandler::handle()
             bool preventSelection = ImGuizmo::IsOver();
             if (!preventSelection)
             {
-                selector->pickUpMesh((int)relativeMouseX, (int)relativeMouseY,
+                selector->pickUpMesh(mouseX, mouseY,
                     windowWidth, windowHeight, view, proj, objects);
             }
 
@@ -146,7 +147,7 @@ void OverlayClickHandler::handle()
             bool shiftPressed = ImGui::GetIO().KeyShift;
 
             Vertice* selectedVertice = selector->pickUpVertice(
-                (int)relativeMouseX, (int)relativeMouseY,
+                mouseX, mouseY,
                 windowWidth, windowHeight, view, proj,
                 objects, shiftPressed
             );
@@ -200,7 +201,7 @@ void OverlayClickHandler::handle()
             bool shiftPressed = ImGui::GetIO().KeyShift;
 
             Face* selectedFace = selector->pickupFace(
-                static_cast<int>(relativeMouseX), static_cast<int>(relativeMouseY),
+                mouseX, mouseY,
                 windowWidth, windowHeight, view, proj, objects, shiftPressed
             );
 
@@ -253,7 +254,7 @@ void OverlayClickHandler::handle()
             bool shiftPressed = ImGui::GetIO().KeyShift;
 
             Edge* selectedEdge = selector->pickupEdge(
-                static_cast<int>(relativeMouseX), static_cast<int>(relativeMouseY),
+                mouseX, mouseY,
                 windowWidth, windowHeight, view, proj, objects, shiftPressed
             );
 

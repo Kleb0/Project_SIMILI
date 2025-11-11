@@ -71,12 +71,12 @@ void ThreeDObjectSelector::pickUpMesh(int mouseX, int mouseY, int screenWidth, i
 					if (verts.empty() && edges.empty() && faces.empty()) continue;
 				}
 				
-				if (rayIntersectsMesh(rayOrigin, rayDir, *obj))
+				float intersectionDistance = -1.0f;
+				if (rayIntersectsMesh(rayOrigin, rayDir, *obj, &intersectionDistance))
 				{
-					float distance = glm::length(obj->getPosition() - rayOrigin);
-					if (distance < closestDistance)
+					if (intersectionDistance >= 0.0f && intersectionDistance < closestDistance)
 					{
-						closestDistance = distance;
+						closestDistance = intersectionDistance;
 						closestObject = obj;
 					}
 				}
@@ -88,15 +88,24 @@ void ThreeDObjectSelector::pickUpMesh(int mouseX, int mouseY, int screenWidth, i
 		}
 
 		selectedObject = closestObject;
-	} 
-	catch (const std::exception& e) {
+		
+		if (selectedObject) 
+		{
+			std::cout << " [pickUpMesh] Selected: " << selectedObject->getName() 
+					  << " at distance " << closestDistance << std::endl;
+		}
+	} catch (const std::exception& e) {
 		std::cerr << "[ThreeDObjectSelector] Error during pickUpMesh: " << e.what() << std::endl;
 	}
 }
 
-bool ThreeDObjectSelector::rayIntersectsMesh(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object)
+bool ThreeDObjectSelector::rayIntersectsMesh(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object, float* outDistance)
 {
 	std::cout << " [rayIntersectsMesh] Testing object: " << object.getName() << std::endl;
+	
+	if (outDistance) {
+		*outDistance = -1.0f;
+	}
 	
 	try
 	{
@@ -116,26 +125,45 @@ bool ThreeDObjectSelector::rayIntersectsMesh(const glm::vec3 &rayOrigin, const g
 			
 			std::cout << " Testing " << faces.size() << " faces..." << std::endl;
 			
-			// Test each face for intersection
+			float closestDistance = std::numeric_limits<float>::max();
+			bool hitAnyFace = false;
+			
+			// Test each face for intersection and keep the closest one
 			for (const auto* face : faces) 
 			{
-				if (rayIntersectsFace(rayOrigin, rayDir, object, *face)) {
-					std::cout << "      HIT: Ray intersects face!" << std::endl;
-					return true;
+				float faceDistance = -1.0f;
+				if (rayIntersectsFace(rayOrigin, rayDir, object, *face, &faceDistance)) 
+				{
+					std::cout << "      HIT: Ray intersects face at distance " << faceDistance << std::endl;
+					hitAnyFace = true;
+					
+					if (faceDistance >= 0.0f && faceDistance < closestDistance) {
+						closestDistance = faceDistance;
+					}
 				}
 			}
 			
-			std::cout << "      MISS: No face intersection" << std::endl;
+			if (hitAnyFace) 
+			{
+				if (outDistance) 
+				{
+					*outDistance = closestDistance;
+				}
+				std::cout << " RESULT: Closest face at distance " << closestDistance << std::endl;
+				return true;
+			}
+			
+			std::cout << " MISS: No face intersection" << std::endl;
 			return false;
 		}
-		else {
+		else 
+		{
 			// Not a mesh - fallback to bounding box
-			std::cout << "      Not a mesh - using bounding box test" << std::endl;
+			std::cout << " Not a mesh - using bounding box test" << std::endl;
 			return rayIntersectsBoundingBox(rayOrigin, rayDir, object);
 		}
-	} 
-	catch (const std::exception& e) 
-	{
+	} catch (const std::exception& e) {
+	
 		std::cerr << "[ThreeDObjectSelector] Error in rayIntersectsMesh: " << e.what() << std::endl;
 		return false;
 	}
@@ -200,11 +228,8 @@ bool ThreeDObjectSelector::rayIntersectsBoundingBox(const glm::vec3 &rayOrigin, 
 						 testAxis(yAxis, halfScale.y) &&
 						 testAxis(zAxis, halfScale.z);
 
-		// Final check: tMax must be >= 0 (in front of ray origin) and tMin <= tMax
 		return axisTests && (tMax >= 0.0f) && (tMin <= tMax);
-	} 
-	catch (const std::exception& e) 
-	{
+	} catch (const std::exception& e) {
 		std::cerr << "[ThreeDObjectSelector] Error in rayIntersectsMesh: " << e.what() << std::endl;
 		return false;
 	}
@@ -232,11 +257,13 @@ void ThreeDObjectSelector::clearMultipleSelection()
 Vertice* ThreeDObjectSelector::pickUpVertice(int mouseX, int mouseY, int screenWidth, int screenHeight, 
 const glm::mat4& view, const glm::mat4& projection, const std::vector<ThreeDObject*>& objects, bool clearPrevious)
 {
+	// Convert mouse coordinates to OpenGL convention (y=0 at bottom)
+	float mouseY_GL = screenHeight - mouseY;
 
-	glm::vec3 rayStart = glm::unProject(glm::vec3(mouseX, mouseY, 0.0f),
+	glm::vec3 rayStart = glm::unProject(glm::vec3(mouseX, mouseY_GL, 0.0f),
 	view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
 
-	glm::vec3 rayEnd   = glm::unProject(glm::vec3(mouseX, mouseY, 1.0f),
+	glm::vec3 rayEnd   = glm::unProject(glm::vec3(mouseX, mouseY_GL, 1.0f),
 	view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
 
 	glm::vec3 rayDir    = glm::normalize(rayEnd - rayStart);
@@ -301,10 +328,13 @@ bool ThreeDObjectSelector::rayIntersectsVertice(const glm::vec3 &rayOrigin, cons
 Face* ThreeDObjectSelector::pickupFace(int mouseX, int mouseY, int screenWidth, int screenHeight,
 const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObject *> &objects, bool clearPrevious)
 {
-	glm::vec3 rayStart = glm::unProject(glm::vec3(mouseX, mouseY, 0.0f),
+	// Convert mouse coordinates to OpenGL convention (y=0 at bottom)
+	float mouseY_GL = screenHeight - mouseY;
+	
+	glm::vec3 rayStart = glm::unProject(glm::vec3(mouseX, mouseY_GL, 0.0f),
 	view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
 
-	glm::vec3 rayEnd   = glm::unProject(glm::vec3(mouseX, mouseY, 1.0f),
+	glm::vec3 rayEnd   = glm::unProject(glm::vec3(mouseX, mouseY_GL, 1.0f),
 	view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
 
 	glm::vec3 rayDir    = glm::normalize(rayEnd - rayStart);
@@ -367,144 +397,99 @@ const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObje
 }
 
 bool ThreeDObjectSelector::rayIntersectsFace(const glm::vec3 &rayOrigin, 
-const glm::vec3 &rayDir, const ThreeDObject &object, const Face &face)
+const glm::vec3 &rayDir, const ThreeDObject &object, const Face &face, float* outDistance)
 {
 	const glm::mat4 model = object.getModelMatrix();
 
 	const auto& verts = face.getVertices();
-	if (verts.size() < 3) return false;  // Changed from 4 to support triangles too
+	if (verts.size() < 3) return false;  // Need at least 3 vertices for a valid face
 
-	// Get face vertices in world space
 	std::vector<glm::vec3> worldVerts;
-	for (size_t i = 0; i < verts.size(); ++i) {
+	for (size_t i = 0; i < verts.size(); ++i) 
+	{
 		worldVerts.push_back(glm::vec3(model * glm::vec4(verts[i]->getLocalPosition(), 1.0f)));
 	}
 	
-	// DEBUG: compute min/max bounds of the face vertices (used later for a quick reject)
-	glm::vec3 minBounds = worldVerts[0];
-	glm::vec3 maxBounds = worldVerts[0];
-	for (size_t i = 1; i < worldVerts.size(); ++i) {
-		minBounds = glm::min(minBounds, worldVerts[i]);
-		maxBounds = glm::max(maxBounds, worldVerts[i]);
-	}
-	if (verts.size() >= 3) {
-		std::cout << "        [Face] Bounds: min(" << minBounds.x << "," << minBounds.y << "," << minBounds.z << ")"
-				  << " max(" << maxBounds.x << "," << maxBounds.y << "," << maxBounds.z << ")" << std::endl;
-	}
-
-	// Compute face normal (using first 3 vertices)
 	glm::vec3 p0 = worldVerts[0];
 	glm::vec3 p1 = worldVerts[1];
 	glm::vec3 p2 = worldVerts[2];
 	
 	glm::vec3 n = glm::normalize(glm::cross(p1 - p0, p2 - p0));
 	
-	// Check if ray is parallel to face
 	float denom = glm::dot(n, rayDir);
-	std::cout << "        [Face] Vertices: " << verts.size() 
-			  << " | Normal: (" << n.x << ", " << n.y << ", " << n.z << ")"
-			  << " | Denom: " << denom << std::endl;
 	
-	if (std::abs(denom) < 1e-6f) {
-		std::cout << "        [Face] SKIP: Ray parallel to face (|denom| < 1e-6)" << std::endl;
-		return false;  // Ray parallel to face
+	if (std::abs(denom) < 1e-6f) 
+	{
+		return false; 
 	}
 
-	// Compute intersection point with face plane
 	float t = glm::dot(n, (p0 - rayOrigin)) / denom;
-	std::cout << "        [Face] t=" << t;
 	
 	if (t < 0.0f) {
-		std::cout << " (BEHIND camera - rejected)" << std::endl;
-		return false;  // Intersection behind ray origin
-	}
-	std::cout << " (in front)" << std::endl;
-
-	glm::vec3 P = rayOrigin + t * rayDir;
-	std::cout << "        [Face] Intersection P: (" << P.x << ", " << P.y << ", " << P.z << ")" << std::endl;
-	std::cout << "        [Face] Face verts: ";
-	for (size_t i = 0; i < worldVerts.size(); ++i) {
-		std::cout << "p" << i << "(" << worldVerts[i].x << "," << worldVerts[i].y << "," << worldVerts[i].z << ")";
-		if (i < worldVerts.size() - 1) std::cout << " ";
-	}
-	std::cout << std::endl;
-
-	const float boundsEps = 1e-6f;
-	if (P.x < minBounds.x - boundsEps || P.x > maxBounds.x + boundsEps ||
-		P.y < minBounds.y - boundsEps || P.y > maxBounds.y + boundsEps ||
-		P.z < minBounds.z - boundsEps || P.z > maxBounds.z + boundsEps) {
-		std::cout << "        [Face] AABB REJECT: point outside face bounds" << std::endl;
 		return false;
 	}
 
-	// Point-in-triangle test using barycentric coordinates (more robust)
+	glm::vec3 P = rayOrigin + t * rayDir;
+
 	auto pointInTri = [](const glm::vec3& A, const glm::vec3& B, const glm::vec3& C, const glm::vec3& P) -> bool
 	{
-		// Compute vectors
 		glm::vec3 v0 = C - A;
 		glm::vec3 v1 = B - A;
 		glm::vec3 v2 = P - A;
 
-		// Compute dot products
 		float dot00 = glm::dot(v0, v0);
 		float dot01 = glm::dot(v0, v1);
 		float dot02 = glm::dot(v0, v2);
 		float dot11 = glm::dot(v1, v1);
 		float dot12 = glm::dot(v1, v2);
 
-	// Compute barycentric coordinates
-	float denom = (dot00 * dot11 - dot01 * dot01);
-	if (std::abs(denom) < 1e-10f) return false;  // Degenerate triangle
+		// Compute barycentric coordinates
+		float denom = (dot00 * dot11 - dot01 * dot01);
+		if (std::abs(denom) < 1e-10f) return false;
 		
-	float invDenom = 1.0f / denom;
-	float u = (dot11 * dot02 - dot01 * dot12) * invDenom;
-	float v = (dot00 * dot12 - dot01 * dot02) * invDenom;
+		float invDenom = 1.0f / denom;
+		float u = (dot11 * dot02 - dot01 * dot12) * invDenom;
+		float v = (dot00 * dot12 - dot01 * dot02) * invDenom;
 
-	// Check if point is in triangle (tight epsilon for pixel-precision)
-	const float eps = 1e-6f;
-	return (u >= -eps) && (v >= -eps) && (u + v <= 1.0f + eps);
+		const float eps = 1e-4f; 
+		return (u >= -eps) && (v >= -eps) && (u + v <= 1.0f + eps);
 	};
 
-	// Test all possible triangulations of the face
-	if (verts.size() == 3) {
-		// Triangle face
-		bool hit = pointInTri(worldVerts[0], worldVerts[1], worldVerts[2], P);
-		std::cout << "        [Face] Triangle test: " << (hit ? "INSIDE" : "OUTSIDE") << std::endl;
-		return hit;
+	bool hitFace = false;
+	
+	if (verts.size() == 3) 
+	{
+
+		hitFace = pointInTri(worldVerts[0], worldVerts[1], worldVerts[2], P);
 	}
-	else if (verts.size() == 4) {
-		// Quad face - test ALL possible triangulations (there are 4 ways to split a quad into 2 triangles)
-		// Diagonal 0-2: triangles (0,1,2) and (0,2,3)
+	else if (verts.size() == 4) 
+	{
 		bool tri1 = pointInTri(worldVerts[0], worldVerts[1], worldVerts[2], P);
 		bool tri2 = pointInTri(worldVerts[0], worldVerts[2], worldVerts[3], P);
 		
-		// Diagonal 1-3: triangles (1,2,3) and (1,3,0)
-		bool tri3 = pointInTri(worldVerts[1], worldVerts[2], worldVerts[3], P);
-		bool tri4 = pointInTri(worldVerts[1], worldVerts[3], worldVerts[0], P);
-		
-		std::cout << "        [Face] Quad tests: tri1=" << tri1 << " tri2=" << tri2 
-				  << " tri3=" << tri3 << " tri4=" << tri4 << std::endl;
-		
-		if (tri1 || tri2 || tri3 || tri4) {
-			return true;
-		}
-		return false;  // Point not inside quad
+		hitFace = tri1 || tri2;
 	}
 	else 
 	{
-		// N-gon: test fan triangulation from first vertex
-		std::cout << "        [Face] N-gon with " << verts.size() << " vertices" << std::endl;
 		for (size_t i = 1; i < verts.size() - 1; ++i) 
 		{
 			if (pointInTri(worldVerts[0], worldVerts[i], worldVerts[i+1], P)) 
 			{
-				std::cout << "        [Face] N-gon triangle " << i << " HIT" << std::endl;
-				return true;
+				hitFace = true;
+				break;
 			}
 		}
-		std::cout << "        [Face] N-gon ALL triangles MISS" << std::endl;
-		return false;
 	}
+	
+	if (hitFace) {
+		if (outDistance) 
+		{
+			*outDistance = t;
+		}
+		return true;
+	}
+	
+	return false;
 }
 
 
@@ -559,8 +544,10 @@ const ThreeDObject &object, const Edge &edge)
 Edge* ThreeDObjectSelector::pickupEdge(int mouseX, int mouseY, int screenWidth, int screenHeight, 
 const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObject *> &objects, bool clearPrevious)
 {
-	glm::vec3 rayStart = glm::unProject(glm::vec3(mouseX, mouseY, 0.0f), view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
-	glm::vec3 rayEnd   = glm::unProject(glm::vec3(mouseX, mouseY, 1.0f), view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
+	float mouseY_GL = screenHeight - mouseY;
+	
+	glm::vec3 rayStart = glm::unProject(glm::vec3(mouseX, mouseY_GL, 0.0f), view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
+	glm::vec3 rayEnd   = glm::unProject(glm::vec3(mouseX, mouseY_GL, 1.0f), view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
 	glm::vec3 rayDir   = glm::normalize(rayEnd - rayStart);
 	glm::vec3 rayOrigin = rayStart;
 
