@@ -101,8 +101,8 @@ namespace VerticeTransform
             previousSetHash = currentHash;
         }
 
-
-        Guizmo::renderGizmoForVertices(selectedVertices, currentGizmoOperation, view, proj, oglChildPos, oglChildSize);
+        // Prepare the gizmo (this sets up ImGuizmo state but doesn't call Manipulate yet)
+        dummyMatrix = Guizmo::renderGizmoForVertices(selectedVertices, currentGizmoOperation, view, proj, oglChildPos, oglChildSize);
 
         if (!dragActive && usingGizmo && mouseDown) 
         {

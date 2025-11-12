@@ -156,9 +156,8 @@ const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
         dragActive = false;
     }
 
-    
-
-    Guizmo::renderGizmoForFaces(selectedFaces, currentGizmoOperation, view, proj, oglChildPos, oglChildSize);
+    // Prepare the gizmo (this sets up ImGuizmo state but doesn't call Manipulate yet)
+    dummyMatrix = Guizmo::renderGizmoForFaces(selectedFaces, currentGizmoOperation, view, proj, oglChildPos, oglChildSize);
 
     if (!dragActive && usingGizmo && mouseDown)
     {

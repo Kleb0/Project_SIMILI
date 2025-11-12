@@ -121,7 +121,8 @@ namespace EdgeTransform
             previousSetHash = currentHash;
         }
 
-        Guizmo::renderGizmoForEdges(selectedEdges, currentGizmoOperation, view, proj, oglChildPos, oglChildSize);
+        // Prepare the gizmo (this sets up ImGuizmo state but doesn't call Manipulate yet)
+        dummyMatrix = Guizmo::renderGizmoForEdges(selectedEdges, currentGizmoOperation, view, proj, oglChildPos, oglChildSize);
 
         if(!dragActive && usingGizmo && mouseDown)
         {
