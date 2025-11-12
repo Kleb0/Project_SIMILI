@@ -758,7 +758,9 @@ void OverlayViewport::ThreeDWorldInteractions()
 			multiple_selected_vertices_,
 			oglChildPos,
 			oglChildSize,
-			was_using_gizmo_last_frame_
+			was_using_gizmo_last_frame_,
+			view,
+			projection
 		);
 	}
 	else if (current_mode_ == face_mode_)
@@ -769,20 +771,23 @@ void OverlayViewport::ThreeDWorldInteractions()
 			oglChildPos,
 			oglChildSize,
 			was_using_gizmo_last_frame_,
-			true
+			true,
+			view,
+			projection
 		);
 	}
 	else if (current_mode_ == edge_mode_)
 	{
-		// EdgeTransform needs ThreeDWindow* parameter which we don't have in overlay
-		// We'll need to adapt EdgeTransform or create an overlay-specific version
+		// EdgeTransform needs view and projection matrices with correct aspect ratio
 		EdgeTransform::manipulateEdges(
 			three_d_scene_,
 			multiple_selected_edges_,
 			oglChildPos,
 			oglChildSize,
 			was_using_gizmo_last_frame_,
-			nullptr  // ThreeDWindow pointer - NULL for overlay (will need modification)
+			nullptr,  // ThreeDWindow pointer - NULL for overlay
+			view,
+			projection
 		);
 	}
 	

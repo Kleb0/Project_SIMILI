@@ -39,7 +39,8 @@ const std::list<Face*>& faces, const ImVec2& oglChildPos, const ImVec2& oglChild
 }
 
 void manipulateFaces(ThreeDScene* scene, std::list<Face*>& selectedFaces, const ImVec2& oglChildPos,
-const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, bool bakeToVertices)
+const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, bool bakeToVertices,
+const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
 {
     if (selectedFaces.empty()) return;
 
@@ -50,8 +51,8 @@ const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, bool bakeToVertices)
     if (ImGui::IsKeyPressed(ImGuiKey_R)) currentGizmoOperation = ImGuizmo::ROTATE;
     if (ImGui::IsKeyPressed(ImGuiKey_S)) currentGizmoOperation = ImGuizmo::SCALE;
 
-    const glm::mat4 view = scene->getViewMatrix();
-    const glm::mat4 proj = scene->getProjectionMatrix();
+    const glm::mat4 view = viewMatrix;
+    const glm::mat4 proj = projectionMatrix;
 
     static glm::mat4 accumDelta = glm::mat4(1.0f);
     static std::vector<Vertice*> vertsSnapshot;

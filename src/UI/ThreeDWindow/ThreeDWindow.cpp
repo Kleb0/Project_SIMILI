@@ -356,19 +356,27 @@ void ThreeDWindow::ThreeDWorldInteractions()
 
     if(currentMode == &verticeMode)
     {
+        glm::mat4 view = scene->getViewMatrix();
+        glm::mat4 proj = scene->getProjectionMatrix();
+        
         VerticeTransform::manipulateVertices
         (
             scene,
             multipleSelectedVertices,
             oglChildPos,
             oglChildSize,
-            wasUsingGizmoLastFrame
+            wasUsingGizmoLastFrame,
+            view,
+            proj
         );
         
     }
 
     if(currentMode == &faceMode)
     {
+        glm::mat4 view = scene->getViewMatrix();
+        glm::mat4 proj = scene->getProjectionMatrix();
+        
         FaceTransform::manipulateFaces
         (
             scene,
@@ -376,13 +384,18 @@ void ThreeDWindow::ThreeDWorldInteractions()
             oglChildPos,
             oglChildSize,
             wasUsingGizmoLastFrame,
-            true
+            true,
+            view,
+            proj
         );
 
     }
 
     if(currentMode == &edgeMode)
     {
+        glm::mat4 view = scene->getViewMatrix();
+        glm::mat4 proj = scene->getProjectionMatrix();
+        
         EdgeTransform::manipulateEdges
         (
             scene,
@@ -390,7 +403,9 @@ void ThreeDWindow::ThreeDWorldInteractions()
             oglChildPos,
             oglChildSize,
             wasUsingGizmoLastFrame,
-            this
+            this,
+            view,
+            proj
         );    
     }
 }

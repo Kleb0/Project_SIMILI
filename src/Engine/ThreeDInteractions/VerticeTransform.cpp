@@ -36,7 +36,8 @@ namespace VerticeTransform
     }
 
     void manipulateVertices(ThreeDScene* scene, const std::list<Vertice*>& selectedVertices,
-    const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame)
+    const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame,
+    const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
     {
 
 
@@ -47,8 +48,8 @@ namespace VerticeTransform
         if (ImGui::IsKeyPressed(ImGuiKey_R)) currentGizmoOperation = ImGuizmo::ROTATE;
         if (ImGui::IsKeyPressed(ImGuiKey_S)) currentGizmoOperation = ImGuizmo::SCALE;
 
-        glm::mat4 view = scene->getViewMatrix();
-        glm::mat4 proj = scene->getProjectionMatrix();
+        glm::mat4 view = viewMatrix;
+        glm::mat4 proj = projectionMatrix;
 
         static glm::mat4 dummyMatrix = glm::mat4(1.0f);
         static glm::mat4 prevDummyMatrix = glm::mat4(1.0f);
