@@ -329,14 +329,18 @@ const glm::mat4& view, const glm::mat4& projection, const std::vector<ThreeDObje
 	glm::vec3 rayDir    = glm::normalize(rayEnd - rayStart);
 	glm::vec3 rayOrigin = rayStart;
 
-	float closestDistance = std::numeric_limits<float>::max();
+	// NEW APPROACH: Find closest vertex by proximity to ray (like mesh selection)
+	float bestScore = std::numeric_limits<float>::max();
 	Vertice* closestVertice = nullptr;
+	
+	const float MAX_SELECTION_DISTANCE = 100.0f;
+	const float MAX_PERPENDICULAR_DISTANCE = 0.2f; // Smaller threshold for vertices
 
 	for (ThreeDObject* obj : objects) 
 	{
 		if (!obj->isSelectable()) continue;
 
-		Mesh * mesh = dynamic_cast<Mesh*>(obj);
+		Mesh* mesh = dynamic_cast<Mesh*>(obj);
 		if (!mesh) continue;
 
 		if (clearPrevious) 
@@ -345,22 +349,40 @@ const glm::mat4& view, const glm::mat4& projection, const std::vector<ThreeDObje
 				v->setSelected(false);
 		}
 
+		glm::mat4 modelMatrix = obj->getModelMatrix();
+
 		for (Vertice* v : mesh->getVertices()) 
 		{
-			glm::mat4 modelMatrix = obj->getModelMatrix();
 			glm::vec3 worldPos = glm::vec3(modelMatrix * glm::vec4(v->getLocalPosition(), 1.0f));
 			v->setPosition(worldPos);
 
-			if (rayIntersectsVertice(rayOrigin, rayDir, *obj, *v)) {
-				float distance = glm::length(v->getPosition() - rayOrigin);
-				if (distance < closestDistance) {
-					closestDistance = distance;
-					closestVertice  = v;
-				}
+			// Calculate distance from ray to vertex
+			glm::vec3 toVertex = worldPos - rayOrigin;
+			float depthAlongRay = glm::dot(toVertex, rayDir);
+			
+			// Only consider vertices in front of the camera
+			if (depthAlongRay <= 0.0f) continue;
+			
+			// Ignore vertices too far away
+			if (depthAlongRay > MAX_SELECTION_DISTANCE) continue;
+			
+			// Calculate perpendicular distance to ray
+			glm::vec3 closestPointOnRay = rayOrigin + rayDir * depthAlongRay;
+			float distanceToRay = glm::length(worldPos - closestPointOnRay);
+			
+			// NEW: Ignore vertices too far from the ray
+			if (distanceToRay > MAX_PERPENDICULAR_DISTANCE) continue;
+			
+			// Combined score: distance to ray + depth (prioritize closer vertices in ray direction)
+			float score = distanceToRay * 2.0f + depthAlongRay * 0.1f;
+			
+			if (score < bestScore) 
+			{
+				bestScore = score;
+				closestVertice = v;
 			}
 		}
 	}
-
 
 	return closestVertice;
 }
@@ -400,8 +422,12 @@ const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObje
 	glm::vec3 rayDir    = glm::normalize(rayEnd - rayStart);
 	glm::vec3 rayOrigin = rayStart;
 
-	float closestDistance = std::numeric_limits<float>::max();
+	// NEW APPROACH: Find closest face by proximity to ray (like mesh selection)
+	float bestScore = std::numeric_limits<float>::max();
 	Face* closestFace = nullptr;
+	
+	const float MAX_SELECTION_DISTANCE = 100.0f;
+	const float MAX_PERPENDICULAR_DISTANCE = 0.5f; // Threshold for faces
 
 	for (ThreeDObject* obj : objects)
 	{
@@ -421,30 +447,48 @@ const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObje
 		for (Face* f : mesh->getFaces())
 		{
 			if (!f) continue;
-
-			if (!rayIntersectsFace(rayOrigin, rayDir, *obj, *f))
-				continue;
-
+			
 			const auto& verts = f->getVertices();
-			if (verts.size() < 4) continue;
-
-			glm::vec3 p0 = glm::vec3(model * glm::vec4(verts[0]->getLocalPosition(), 1.0f));
-			glm::vec3 p1 = glm::vec3(model * glm::vec4(verts[1]->getLocalPosition(), 1.0f));
-			glm::vec3 p2 = glm::vec3(model * glm::vec4(verts[2]->getLocalPosition(), 1.0f));
-
-			glm::vec3 n = glm::normalize(glm::cross(p1 - p0, p2 - p0));
-			float denom = glm::dot(n, rayDir);
-			if (std::abs(denom) < 1e-6f) continue;
-
-			float t = glm::dot(n, (p0 - rayOrigin)) / denom;
-			if (t < 0.0f) continue;
-
-			glm::vec3 hitPoint = rayOrigin + t * rayDir;
-			float distance = glm::length(hitPoint - rayOrigin);
-
-			if (distance < closestDistance)
+			if (verts.size() < 3) continue;
+			
+			// Calculate face center (average of all vertices)
+			glm::vec3 faceCenter(0.0f);
+			for (const auto* vert : verts) 
 			{
-				closestDistance = distance;
+				glm::vec3 worldPos = glm::vec3(model * glm::vec4(vert->getLocalPosition(), 1.0f));
+				faceCenter += worldPos;
+			}
+			faceCenter /= static_cast<float>(verts.size());
+			
+			// Calculate distance from ray to face center
+			glm::vec3 toFace = faceCenter - rayOrigin;
+			float depthAlongRay = glm::dot(toFace, rayDir);
+			
+			// Only consider faces in front of the camera
+			if (depthAlongRay <= 0.0f) continue;
+			
+			// Ignore faces too far away
+			if (depthAlongRay > MAX_SELECTION_DISTANCE) continue;
+			
+			// Calculate perpendicular distance to ray
+			glm::vec3 closestPointOnRay = rayOrigin + rayDir * depthAlongRay;
+			float distanceToRay = glm::length(faceCenter - closestPointOnRay);
+			
+			// NEW: Ignore faces too far from the ray
+			if (distanceToRay > MAX_PERPENDICULAR_DISTANCE) continue;
+			
+			// Optional: Verify actual intersection for more precision
+			float intersectionDistance = -1.0f;
+			bool intersects = rayIntersectsFace(rayOrigin, rayDir, *obj, *f, &intersectionDistance);
+			
+			if (!intersects) continue;
+			
+			// Combined score: distance to ray + depth (prioritize closer faces in ray direction)
+			float score = distanceToRay * 2.0f + depthAlongRay * 0.1f;
+			
+			if (score < bestScore)
+			{
+				bestScore = score;
 				closestFace = f;
 			}
 		}
@@ -611,8 +655,12 @@ const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObje
 	glm::vec3 rayDir   = glm::normalize(rayEnd - rayStart);
 	glm::vec3 rayOrigin = rayStart;
 
-	float closestS = std::numeric_limits<float>::max();
+	// NEW APPROACH: Find closest edge by proximity to ray (like mesh selection)
+	float bestScore = std::numeric_limits<float>::max();
 	Edge* closestEdge = nullptr;
+	
+	const float MAX_SELECTION_DISTANCE = 100.0f;
+	const float MAX_PERPENDICULAR_DISTANCE = 0.25f; // Threshold for edges
 
 	for (ThreeDObject* obj : objects)
 	{
@@ -627,55 +675,47 @@ const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObje
 				e->setSelected(false);
 		}
 
+		glm::mat4 model = obj->getModelMatrix();
+
 		for (Edge* e : mesh->getEdges())
 		{
 			if (!e || !e->getStart() || !e->getEnd()) continue;
 
-			if (rayIntersectsEdge(rayOrigin, rayDir, *obj, *e))
+			// Calculate edge center (midpoint)
+			glm::vec3 a0 = glm::vec3(model * glm::vec4(e->getStart()->getLocalPosition(), 1.0f));
+			glm::vec3 b0 = glm::vec3(model * glm::vec4(e->getEnd()->getLocalPosition(), 1.0f));
+			glm::vec3 edgeCenter = (a0 + b0) * 0.5f;
+			
+			// Calculate distance from ray to edge center
+			glm::vec3 toEdge = edgeCenter - rayOrigin;
+			float depthAlongRay = glm::dot(toEdge, rayDir);
+			
+			// Only consider edges in front of the camera
+			if (depthAlongRay <= 0.0f) continue;
+			
+			// Ignore edges too far away
+			if (depthAlongRay > MAX_SELECTION_DISTANCE) continue;
+			
+			// Calculate perpendicular distance to ray
+			glm::vec3 closestPointOnRay = rayOrigin + rayDir * depthAlongRay;
+			float distanceToRay = glm::length(edgeCenter - closestPointOnRay);
+			
+			// NEW: Ignore edges too far from the ray
+			if (distanceToRay > MAX_PERPENDICULAR_DISTANCE) continue;
+			
+			// Optional: Verify actual intersection for more precision
+			if (!rayIntersectsEdge(rayOrigin, rayDir, *obj, *e)) continue;
+			
+			// Combined score: distance to ray + depth (prioritize closer edges in ray direction)
+			float score = distanceToRay * 2.0f + depthAlongRay * 0.1f;
+			
+			if (score < bestScore)
 			{
-				glm::mat4 model = obj->getModelMatrix();
-				glm::vec3 a0 = glm::vec3(model * glm::vec4(e->getStart()->getLocalPosition(), 1.0f));
-				glm::vec3 b0 = glm::vec3(model * glm::vec4(e->getEnd()->getLocalPosition(),   1.0f));
-				glm::vec3 v = b0 - a0;
-				glm::vec3 u = glm::normalize(rayDir);
-				glm::vec3 w0 = rayOrigin - a0;
-
-				float a = glm::dot(u, u);
-				float b = glm::dot(u, v);
-				float c = glm::dot(v, v);
-				float d = glm::dot(u, w0);
-				float ee = glm::dot(v, w0);
-				float D = a * c - b * b;
-
-				float s, t;
-				if (D > 1e-6f)
-				{
-					s = (b * ee - c * d) / D;
-					t = (a * ee - b * d) / D;
-				}
-				else
-				{
-					s = 0.0f;
-					t = c > 0.0f ? ee / c : 0.0f;
-				}
-
-				if (s < 0.0f)
-				{
-					s = 0.0f;
-					t = c > 0.0f ? ee / c : 0.0f;
-				}
-
-				t = glm::clamp(t, 0.0f, 1.0f);
-
-				if (s >= 0.0f && s < closestS)
-				{
-					closestS = s;
-					closestEdge = e;
-				}
+				bestScore = score;
+				closestEdge = e;
 			}
 		}
 	}
 
 	return closestEdge;
-
 }
