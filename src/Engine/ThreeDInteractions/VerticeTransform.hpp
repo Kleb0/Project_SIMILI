@@ -13,6 +13,7 @@ namespace VerticeTransform
    const std::list<Vertice*>& vertices, const ImVec2& oglChildPos, const ImVec2& oglChildSize);
 
    void manipulateVertices(ThreeDScene* scene, const std::list<Vertice*>& selectedVertices,
-   const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame);
+   const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame,
+   const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
 
 }

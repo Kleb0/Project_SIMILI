@@ -14,7 +14,8 @@ namespace FaceTransform
    const std::list<Face*>& faces, const ImVec2& oglChildPos, const ImVec2& oglChildSize);
 
    void manipulateFaces(ThreeDScene* scene, std::list<Face*>& selectedFaces,
-   const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, bool bakeToVertices = true);
+   const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, bool bakeToVertices,
+   const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
 
    Face* extrudeSelectedFace(std::list<Face*>& selectedFaces, float distance);
 }

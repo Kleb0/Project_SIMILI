@@ -42,7 +42,8 @@ namespace EdgeTransform
     }
 
     void manipulateEdges(ThreeDScene* scene, std::list<Edge*>& selectedEdges,
-    const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, ThreeDWindow* threeDWindow)
+    const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, ThreeDWindow* threeDWindow,
+    const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
     {
         if (selectedEdges.empty()) return;
 
@@ -58,8 +59,8 @@ namespace EdgeTransform
         // -------- End of Edge Loop Display ----------
 
 
-        glm::mat4 view = scene->getViewMatrix();
-        glm::mat4 proj = scene->getProjectionMatrix();
+        glm::mat4 view = viewMatrix;
+        glm::mat4 proj = projectionMatrix;
 
         static glm::mat4 dummyMatrix = glm::mat4(1.0f);
         static glm::mat4 prevDummyMatrix = glm::mat4(1.0f);
