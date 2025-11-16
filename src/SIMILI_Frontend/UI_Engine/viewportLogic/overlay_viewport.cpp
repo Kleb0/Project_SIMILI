@@ -39,6 +39,7 @@
 #include "../../Engine/ThreeDInteractions/VerticeTransform.hpp"
 #include "../../Engine/ThreeDInteractions/FaceTransform.hpp"
 #include "../../Engine/ThreeDInteractions/EdgeTransform.hpp"
+#include "KeyManager.hpp"
 
 // Forward declare message handler from imgui_impl_win32.cpp
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -87,14 +88,24 @@ OverlayViewport::OverlayViewport() : hwnd_(nullptr)
 	texture_renderer_test_ = new TextureRendererTest();
 	click_handler_ = new OverlayClickHandler(this);
 	
-	// Initialize 3D modes
 	normal_mode_ = new Normal_Mode();
 	vertice_mode_ = new Vertice_Mode();
 	face_mode_ = new Face_Mode();
 	edge_mode_ = new Edge_Mode();
 	
-	// Initialize default mode to Normal Mode
 	current_mode_ = normal_mode_;
+	
+	SIMILI::Input::KeyManager::getInstance().initialize();
+	
+	SIMILI::Input::KeyManager::getInstance().bindGizmoActions(
+		[this]() { this->setGuizmoOperation(ImGuizmo::TRANSLATE); std::cout << "[OverlayViewport] Gizmo switched to TRANSLATE" << std::endl; },
+		[this]() { this->setGuizmoOperation(ImGuizmo::ROTATE); std::cout << "[OverlayViewport] Gizmo switched to ROTATE" << std::endl; },
+		[this]() { this->setGuizmoOperation(ImGuizmo::SCALE); std::cout << "[OverlayViewport] Gizmo switched to SCALE" << std::endl; }
+	);
+	
+	SIMILI::Input::KeyManager::getInstance().bindModeActions(
+		[this](int mode) { this->switchModeByKey(mode); }
+	);
 }
 
 OverlayViewport::~OverlayViewport() 
@@ -431,7 +442,6 @@ void OverlayViewport::render()
 	
 	wglMakeCurrent(hdc_, gl_context_);
 	
-	// Start ImGui frame
 	if (imgui_initialized_) 
 	{
 		ImGui_ImplOpenGL3_NewFrame();
@@ -450,13 +460,15 @@ void OverlayViewport::render()
 			ImGuiWindowFlags_NoScrollWithMouse | 
 			ImGuiWindowFlags_NoCollapse | 
 			ImGuiWindowFlags_NoBackground | 
-			ImGuiWindowFlags_NoBringToFrontOnFocus);
+			ImGuiWindowFlags_NoBringToFrontOnFocus |
+			ImGuiWindowFlags_NoFocusOnAppearing);
 	}
 	
 	renderScene();
 	
-	// Handle 3D world interactions (Gizmo manipulations for all modes)
 	ThreeDWorldInteractions();
+	
+	SIMILI::Input::KeyManager::getInstance().update();
 	
 	if (texture_renderer_test_) {
 		texture_renderer_test_->render();
@@ -635,34 +647,26 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 			// ------ MODE SWITCHING -----
 			
 			case WM_KEYDOWN:
+			case WM_KEYUP:
+			case WM_SYSKEYDOWN:
+			case WM_SYSKEYUP:
+			case WM_CHAR:
 			{
-				// Check for numeric keys 1-4 to switch modes
-				// Mapping: 1=Normal, 2=Edge, 3=Vertice, 4=Face
-				if (wParam == '1')
+				// Forward keyboard events to ImGui FIRST
+				ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
+				
+				// Process through KeyManager ECS
+				if (msg == WM_KEYDOWN)
 				{
-					overlay->switchModeByKey(1); // Normal Mode
-					std::cout << "[OverlayViewport] Switched to Normal Mode" << std::endl;
-					return 0;
+					SIMILI::Input::KeyManager::getInstance().handleKeyDown(static_cast<char>(wParam), lParam);
 				}
-				else if (wParam == '2')
+				else if (msg == WM_KEYUP)
 				{
-					overlay->switchModeByKey(2); // Edge Mode
-					std::cout << "[OverlayViewport] Switched to Edge Mode" << std::endl;
-					return 0;
+					std::cout << "[OverlayViewport WndProc] WM_KEYUP received for key: " << (char)wParam << std::endl;
+					SIMILI::Input::KeyManager::getInstance().handleKeyUp(static_cast<char>(wParam));
 				}
-				else if (wParam == '3')
-				{
-					overlay->switchModeByKey(3); // Vertice Mode
-					std::cout << "[OverlayViewport] Switched to Vertice Mode" << std::endl;
-					return 0;
-				}
-				else if (wParam == '4')
-				{
-					overlay->switchModeByKey(4); // Face Mode
-					std::cout << "[OverlayViewport] Switched to Face Mode" << std::endl;
-					return 0;
-				}
-				break;
+				
+				return 0;
 			}
 		}
 	}
@@ -778,14 +782,13 @@ void OverlayViewport::ThreeDWorldInteractions()
 	}
 	else if (current_mode_ == edge_mode_)
 	{
-		// EdgeTransform needs view and projection matrices with correct aspect ratio
 		EdgeTransform::manipulateEdges(
 			three_d_scene_,
 			multiple_selected_edges_,
 			oglChildPos,
 			oglChildSize,
 			was_using_gizmo_last_frame_,
-			nullptr,  // ThreeDWindow pointer - NULL for overlay
+			nullptr, 
 			view,
 			projection
 		);

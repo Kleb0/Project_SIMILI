@@ -10,6 +10,7 @@
 #include "WorldObjects/Basic/Vertice.hpp"
 #include "UI/ThreeDModes/ThreeDMode.hpp"
 #include "UI/ThreeDModes/Vertice_Mode.hpp"
+#include "SIMILI_Frontend/UI_Engine/viewportLogic/KeyManager.hpp"
 #include <glm/gtx/matrix_decompose.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/epsilon.hpp>
@@ -114,12 +115,37 @@ namespace MeshTransform
 		static bool hasRotatedOnce = false;
 		static std::vector<glm::vec3> initialPositions;
 
-		if (selectedObjects.empty()) return;
-
 		static ImGuizmo::OPERATION currentGizmoOperation = ImGuizmo::TRANSLATE;
-		if (ImGui::IsKeyPressed(ImGuiKey_W)) currentGizmoOperation = ImGuizmo::TRANSLATE;
-		if (ImGui::IsKeyPressed(ImGuiKey_R)) currentGizmoOperation = ImGuizmo::ROTATE;
-		if (ImGui::IsKeyPressed(ImGuiKey_S)) currentGizmoOperation = ImGuizmo::SCALE;
+		
+		// CRITICAL: Check key presses BEFORE checking if objects are selected
+		// This allows mode switching even when nothing is selected
+		auto& keyManager = SIMILI::Input::KeyManager::getInstance();
+		auto* inputSystem = keyManager.getInputSystem();
+		
+		if (inputSystem)
+		{
+			inputSystem->pollKeyStates();
+			
+			const auto* wKeyState = inputSystem->getKeyState('W');
+			const auto* rKeyState = inputSystem->getKeyState('R');
+			const auto* sKeyState = inputSystem->getKeyState('S');
+			
+			if (wKeyState && wKeyState->isFirstPress)
+			{
+				currentGizmoOperation = ImGuizmo::TRANSLATE;
+			}
+			if (rKeyState && rKeyState->isFirstPress)
+			{
+				currentGizmoOperation = ImGuizmo::ROTATE;
+			}
+			if (sKeyState && sKeyState->isFirstPress)
+			{
+				currentGizmoOperation = ImGuizmo::SCALE;
+			}
+		}
+		
+		// Early return if no objects selected - mode switching still works above
+		if (selectedObjects.empty()) return;
 
 		glm::mat4 view = viewMatrix;
 		glm::mat4 proj = projectionMatrix;
@@ -142,7 +168,6 @@ namespace MeshTransform
 			{
 				if (currentGizmoOperation == ImGuizmo::SCALE)
 				{
-					std::cout << "TEST FIRST OPERATION IS SCALE" << std::endl;
 					didPrintScaleTest = true;
 				}
 
@@ -166,7 +191,6 @@ namespace MeshTransform
 
 			if (currentGizmoOperation == ImGuizmo::ROTATE && !hasRotatedOnce)
 			{
-				std::cout << "Rotation done" << std::endl;
 				hasRotatedOnce = true;
 			}
 
@@ -229,7 +253,6 @@ namespace MeshTransform
 						dna->trackWithTransformID(totalDelta, tag, transformID);
 					else
 						dna->trackWithAutoTick(totalDelta, tag);
-
  
 				}
 			}
@@ -256,7 +279,6 @@ namespace MeshTransform
 		glm::vec3 currentScale = obj->getScale();
 		glm::vec3 newScale = currentScale * deltaScale;
 
-		// Reconstruct TRS
 		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, obj->getPosition());
 		model *= glm::toMat4(obj->rotation); 
@@ -289,8 +311,6 @@ namespace MeshTransform
 			std::cout << "  New position: (" << newPos.x << ", " << newPos.y << ", " << newPos.z << ")\n";
 			++i;
 		}
-
-		std::cout << "Comparing rotation after scale and after first rotation is done :\n";
 
 		if (hasRotatedOnce && !didPrintRotationAfterScale)
 		{

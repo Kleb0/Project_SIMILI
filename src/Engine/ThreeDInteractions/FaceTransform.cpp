@@ -6,6 +6,7 @@
 #include "Engine/OpenGLContext.hpp"
 #include "Engine/ThreeDScene.hpp"
 #include "Engine/Guizmo.hpp"
+#include "SIMILI_Frontend/UI_Engine/viewportLogic/KeyManager.hpp"
 
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
@@ -42,14 +43,38 @@ void manipulateFaces(ThreeDScene* scene, std::list<Face*>& selectedFaces, const 
 const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, bool bakeToVertices,
 const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
 {
-    if (selectedFaces.empty()) return;
-
     static ImGuizmo::OPERATION currentGizmoOperation = ImGuizmo::TRANSLATE;
     static ImGuizmo::MODE currentGizmoMode = ImGuizmo::WORLD;
-
-    if (ImGui::IsKeyPressed(ImGuiKey_W)) currentGizmoOperation = ImGuizmo::TRANSLATE;
-    if (ImGui::IsKeyPressed(ImGuiKey_R)) currentGizmoOperation = ImGuizmo::ROTATE;
-    if (ImGui::IsKeyPressed(ImGuiKey_S)) currentGizmoOperation = ImGuizmo::SCALE;
+    
+    // CRITICAL: Check key presses BEFORE checking if faces are selected
+    // This allows mode switching even when nothing is selected
+    auto& keyManager = SIMILI::Input::KeyManager::getInstance();
+    auto* inputSystem = keyManager.getInputSystem();
+    
+    if (inputSystem)
+    {
+        inputSystem->pollKeyStates();
+        
+        const auto* wKeyState = inputSystem->getKeyState('W');
+        const auto* rKeyState = inputSystem->getKeyState('R');
+        const auto* sKeyState = inputSystem->getKeyState('S');
+        
+        if (wKeyState && wKeyState->isFirstPress)
+        {
+            currentGizmoOperation = ImGuizmo::TRANSLATE;
+        }
+        if (rKeyState && rKeyState->isFirstPress)
+        {
+            currentGizmoOperation = ImGuizmo::ROTATE;
+        }
+        if (sKeyState && sKeyState->isFirstPress)
+        {
+            currentGizmoOperation = ImGuizmo::SCALE;
+        }
+    }
+    
+    // Early return if no faces selected - mode switching still works above
+    if (selectedFaces.empty()) return;
 
     const glm::mat4 view = viewMatrix;
     const glm::mat4 proj = projectionMatrix;
@@ -156,9 +181,6 @@ const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
         dragActive = false;
     }
 
-    // Prepare the gizmo (this sets up ImGuizmo state but doesn't call Manipulate yet)
-    dummyMatrix = Guizmo::renderGizmoForFaces(selectedFaces, currentGizmoOperation, view, proj, oglChildPos, oglChildSize);
-
     if (!dragActive && usingGizmo && mouseDown)
     {
         std::unordered_set<Vertice*> uniq;
@@ -172,6 +194,8 @@ const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
         dragActive = true;
     }
 
+    // Prepare the gizmo (this sets up ImGuizmo state)
+    dummyMatrix = Guizmo::renderGizmoForFaces(selectedFaces, currentGizmoOperation, view, proj, oglChildPos, oglChildSize);
 
     if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(proj),
     currentGizmoOperation, ImGuizmo::WORLD, glm::value_ptr(dummyMatrix)))

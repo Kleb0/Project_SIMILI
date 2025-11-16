@@ -8,6 +8,7 @@
 #include "UI/ThreeDWindow/ThreeDWindow.hpp"
 #include "Engine/Guizmo.hpp"
 #include "Engine/MeshEdit/EdgeLoop.hpp"
+#include "SIMILI_Frontend/UI_Engine/viewportLogic/KeyManager.hpp"
 
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
@@ -45,13 +46,36 @@ namespace EdgeTransform
     const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, ThreeDWindow* threeDWindow,
     const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
     {
-        if (selectedEdges.empty()) return;
-
-
         static ImGuizmo::OPERATION currentGizmoOperation = ImGuizmo::TRANSLATE;
-        if (ImGui::IsKeyPressed(ImGuiKey_W)) currentGizmoOperation = ImGuizmo::TRANSLATE;
-        if (ImGui::IsKeyPressed(ImGuiKey_R)) currentGizmoOperation = ImGuizmo::ROTATE;
-        if (ImGui::IsKeyPressed(ImGuiKey_S)) currentGizmoOperation = ImGuizmo::SCALE;
+        
+
+        auto& keyManager = SIMILI::Input::KeyManager::getInstance();
+        auto* inputSystem = keyManager.getInputSystem();
+        
+        if (inputSystem)
+        {
+            inputSystem->pollKeyStates();
+            
+            const auto* wKeyState = inputSystem->getKeyState('W');
+            const auto* rKeyState = inputSystem->getKeyState('R');
+            const auto* sKeyState = inputSystem->getKeyState('S');
+            
+            if (wKeyState && wKeyState->isFirstPress)
+            {
+                currentGizmoOperation = ImGuizmo::TRANSLATE;
+            }
+            if (rKeyState && rKeyState->isFirstPress)
+            {
+                currentGizmoOperation = ImGuizmo::ROTATE;
+            }
+            if (sKeyState && sKeyState->isFirstPress)
+            {
+                currentGizmoOperation = ImGuizmo::SCALE;
+            }
+        }
+        
+        // Early return if no edges selected - mode switching still works above
+        if (selectedEdges.empty()) return;
 
 
         // -------- Edge Loop Side Edges Display (toggle) ----------

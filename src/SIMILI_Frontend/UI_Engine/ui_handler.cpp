@@ -385,13 +385,35 @@ void UIHandler::initializeSceneObjects()
 bool UIHandler::OnPreKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& event,
 	CefEventHandle os_event, bool* is_keyboard_shortcut)
 {
-
+	// Handle Gizmo transformation keys (R, W, S) - BOTH press and release
+	if (event.windows_key_code == 'R' || event.windows_key_code == 'W' || event.windows_key_code == 'S')
+	{
+		if (overlay_viewport_ && overlay_viewport_->getHandle())
+		{
+			if (event.type == KEYEVENT_KEYDOWN || event.type == KEYEVENT_RAWKEYDOWN)
+			{
+				std::cout << "[UIHandler] Forwarding Gizmo key PRESS to overlay: " << (char)event.windows_key_code << std::endl;
+				// IMPORTANT: Use proper lParam to avoid repeat detection issues
+				LPARAM lParam = 1 | (event.native_key_code << 16);
+				SendMessage(overlay_viewport_->getHandle(), WM_KEYDOWN, event.windows_key_code, lParam);
+				SendMessage(overlay_viewport_->getHandle(), WM_CHAR, event.windows_key_code, 0);
+			}
+			else if (event.type == KEYEVENT_KEYUP)
+			{
+				std::cout << "[UIHandler] Forwarding Gizmo key RELEASE to overlay: " << (char)event.windows_key_code << std::endl;
+				SendMessage(overlay_viewport_->getHandle(), WM_KEYUP, event.windows_key_code, 0);
+			}
+		}
+		return true; // Consume the event in CEF
+	}
 	
+	// For all other keys, only process KEYDOWN events
 	if (event.type != KEYEVENT_RAWKEYDOWN && event.type != KEYEVENT_KEYDOWN) 
 	{
 		return false;
 	}
 	
+	// Handle mode switching keys (1-4)
 	if (overlay_viewport_ && event.windows_key_code >= '1' && event.windows_key_code <= '4')
 	{
 		int modeKey = event.windows_key_code - '0';
@@ -403,9 +425,10 @@ bool UIHandler::OnPreKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& 
 			html_renderer->sendKeyEvent(event);
 		}
 		
-		return true;
+		return true; // Consume mode switching keys
 	}
 	
+	// For all other keys, send to HTML renderer if available
 	if (overlay_viewport_) 
 	{
 		HtmlTextureRenderer* html_renderer = overlay_viewport_->getHtmlTextureRenderer();
@@ -428,6 +451,6 @@ bool UIHandler::OnPreKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& 
 bool UIHandler::OnKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& event,
 CefEventHandle os_event)
 {
-
+	// All Gizmo key handling is done in OnPreKeyEvent() now
 	return false;
 }

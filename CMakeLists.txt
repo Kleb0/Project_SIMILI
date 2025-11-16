@@ -82,6 +82,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Resources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/example
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glad
@@ -109,6 +110,11 @@ list(APPEND SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware/HttpSession.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware/HttpListener.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware/ContextRegistry.cpp
+)
+
+# Add KeyManager from SIMILI_Frontend (needed for ECS input system)
+list(APPEND SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/KeyManager.cpp
 )
 
 
@@ -296,6 +302,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glad/include
     ${SDL3_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/tinyfiledialogs
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic
     ${Boost_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
 )
