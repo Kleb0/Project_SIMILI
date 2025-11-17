@@ -559,7 +559,6 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 			{
 				std::cout << "[OverlayViewport] WM_LBUTTONDOWN received" << std::endl;
 				
-				// Capture mouse to ensure we get all mouse events
 				SetCapture(hwnd);
 				
 				// Get mouse coordinates
@@ -655,18 +654,16 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				// Forward keyboard events to ImGui FIRST
 				ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
 				
-				// Process through KeyManager ECS
-				if (msg == WM_KEYDOWN)
-				{
-					SIMILI::Input::KeyManager::getInstance().handleKeyDown(static_cast<char>(wParam), lParam);
-				}
-				else if (msg == WM_KEYUP)
-				{
-					std::cout << "[OverlayViewport WndProc] WM_KEYUP received for key: " << (char)wParam << std::endl;
-					SIMILI::Input::KeyManager::getInstance().handleKeyUp(static_cast<char>(wParam));
-				}
-				
-				return 0;
+			// Process through KeyManager ECS
+			if (msg == WM_KEYDOWN)
+			{
+				SIMILI::Input::KeyManager::getInstance().handleKeyDown(static_cast<int>(wParam), lParam);
+			}
+			else if (msg == WM_KEYUP)
+			{
+				std::cout << "[OverlayViewport WndProc] WM_KEYUP received for key: " << (char)wParam << std::endl;
+				SIMILI::Input::KeyManager::getInstance().handleKeyUp(static_cast<int>(wParam));
+			}				return 0;
 			}
 		}
 	}

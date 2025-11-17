@@ -11,6 +11,7 @@
 #include "../../../UI/ThreeDModes/Vertice_Mode.hpp"
 #include "../../../UI/ThreeDModes/Face_Mode.hpp"
 #include "../../../UI/ThreeDModes/Edge_Mode.hpp"
+#include "KeyManager.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -18,6 +19,28 @@
 #include <iostream>
 
 OverlayClickHandler::OverlayClickHandler(OverlayViewport* owner) : viewport(owner) {}
+
+static bool isShiftPressed() 
+{
+	auto& keyManager = SIMILI::Input::KeyManager::getInstance();
+	auto* inputSystem = keyManager.getInputSystem();
+	if (!inputSystem) {
+		std::cout << "[isShiftPressed] ERROR: inputSystem is nullptr" << std::endl;
+		return false;
+	}
+	
+	inputSystem->pollKeyStates();
+	
+	bool leftShift = inputSystem->isKeyPressed(VK_LSHIFT);
+	bool rightShift = inputSystem->isKeyPressed(VK_RSHIFT);
+	
+	std::cout << "[isShiftPressed] LeftShift: " << leftShift 
+	          << " | RightShift: " << rightShift 
+	          << " | VK_LSHIFT=" << VK_LSHIFT 
+	          << " | VK_RSHIFT=" << VK_RSHIFT << std::endl;
+	
+	return leftShift || rightShift;
+}
 
 void OverlayClickHandler::handle() 
 {
@@ -112,7 +135,7 @@ void OverlayClickHandler::handle()
 			}
 
 			ThreeDObject* selected = selector->getSelectedObject();
-			bool shiftPressed = ImGui::GetIO().KeyShift;
+			bool shiftPressed = isShiftPressed();
 
 			if (selected)
 			{
@@ -170,9 +193,11 @@ void OverlayClickHandler::handle()
 
 		if (currentMode == verticeMode)
 		{
-			// Don't perform raycast if hovering over gizmo (same logic as Normal mode)
-			bool preventSelection = ImGuizmo::IsOver() || ImGuizmo::IsUsing();
-			bool shiftPressed = ImGui::GetIO().KeyShift;
+			bool preventSelection = ImGuizmo::IsOver() || ImGuizmo::IsUsing();		
+			bool shiftPressed = isShiftPressed();
+
+			std::cout << "[VerticeMode] Click - Shift: " << (shiftPressed ? "YES" : "NO") 
+			          << " | Gizmo prevent: " << (preventSelection ? "YES" : "NO") << std::endl;
 
 			Vertice* selectedVertice = nullptr;
 			if (!preventSelection)
@@ -180,19 +205,21 @@ void OverlayClickHandler::handle()
 				selectedVertice = selector->pickUpVertice(
 					mouseX, mouseY,
 					windowWidth, windowHeight, view, proj,
-					objects, shiftPressed
+					objects, !shiftPressed
 				);
+				std::cout << "[VerticeMode] pickUpVertice returned: " 
+				          << (selectedVertice ? "VERTICE FOUND" : "nullptr") << std::endl;
 			}
 			else
 			{
-				// std::cout << "[OVERLAY CLICK HANDLER] Vertice raycast skipped - mouse over or using ImGuizmo" << std::endl;
+				std::cout << "[OVERLAY CLICK HANDLER] Vertice raycast skipped - mouse over or using ImGuizmo" << std::endl;
 			}
 
 			if (selectedVertice)
 			{
-				// std::cout << "[OVERLAY CLICK HANDLER] Vertice selected in Vertice Mode" << std::endl;
-				
 				auto& multipleVertices = viewport->getMultipleSelectedVertices();
+				
+				std::cout << "[VerticeMode] Before toggle - List size: " << multipleVertices.size() << std::endl;
 				
 				if (shiftPressed)
 				{
@@ -200,7 +227,14 @@ void OverlayClickHandler::handle()
 					if (it == multipleVertices.end())
 					{
 						multipleVertices.push_back(selectedVertice);
-						for (Vertice* v : multipleVertices) v->setSelected(true);
+						selectedVertice->setSelected(true);
+						std::cout << "[VerticeMode] SHIFT ADD - Vertice added to selection" << std::endl;
+					}
+					else
+					{
+						multipleVertices.erase(it);
+						selectedVertice->setSelected(false);
+						std::cout << "[VerticeMode] SHIFT REMOVE - Vertice removed from selection" << std::endl;
 					}
 				}
 				else
@@ -214,7 +248,10 @@ void OverlayClickHandler::handle()
 					multipleVertices.clear();
 					selectedVertice->setSelected(true);
 					multipleVertices.push_back(selectedVertice);
+					std::cout << "[VerticeMode] NO SHIFT - Cleared all, selected new vertice" << std::endl;
 				}
+				
+				std::cout << "[VerticeMode] After toggle - List size: " << multipleVertices.size() << std::endl;
 			}
 			else
 			{
@@ -235,7 +272,7 @@ void OverlayClickHandler::handle()
 		{
 			// Don't perform raycast if hovering over gizmo (same logic as Normal mode)
 			bool preventSelection = ImGuizmo::IsOver() || ImGuizmo::IsUsing();
-			bool shiftPressed = ImGui::GetIO().KeyShift;
+			bool shiftPressed = isShiftPressed();
 
 			Face* selectedFace = nullptr;
 			if (!preventSelection)
@@ -297,7 +334,7 @@ void OverlayClickHandler::handle()
 		{
 
 			bool preventSelection = ImGuizmo::IsOver() || ImGuizmo::IsUsing();
-			bool shiftPressed = ImGui::GetIO().KeyShift;
+			bool shiftPressed = isShiftPressed();
 
 			Edge* selectedEdge = nullptr;
 			if (!preventSelection)

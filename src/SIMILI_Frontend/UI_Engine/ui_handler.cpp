@@ -1,5 +1,6 @@
 #include "ui_handler.hpp"
 #include "viewportLogic/HtmlTextureRenderer.hpp"
+#include "viewportLogic/KeyManager.hpp"
 #include "../../Engine/ThreeDScene.hpp"
 #include "../../Engine/OpenGLContext.hpp"
 #include "../../WorldObjects/Camera/Camera.hpp"
@@ -200,7 +201,7 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	overlay_viewport_->switchModeByKey(1);
 	std::cout << "[UIHandler] Overlay viewport initialized with Normal Mode (key 1)" << std::endl;
 	
-	// CRITICAL: Initialize scene objects NOW that we have an OpenGL context
+	// Initialize scene objects NOW that we have an OpenGL context
 	initializeSceneObjects();
 		
 	// Install window subclass to handle resize
@@ -307,7 +308,7 @@ LRESULT CALLBACK UIHandler::ParentWindowProc(HWND hwnd, UINT msg, WPARAM wParam,
 			if (handler && handler->overlay_viewport_) 
 			{
 				SetWindowPos(handler->overlay_viewport_->getHandle(), HWND_TOP, 0, 0, 0, 0,
-				             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+				SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 			}
 			break;
 			
@@ -348,7 +349,6 @@ void UIHandler::initializeSceneObjects()
 	
 	try 
 	{
-		// CRITICAL: Make overlay's OpenGL context current before any GL calls
 		overlay_viewport_->makeContextCurrent();
 		
 		// Initialize scene (will compile shaders, create grid VAO, etc.)
@@ -385,64 +385,48 @@ void UIHandler::initializeSceneObjects()
 bool UIHandler::OnPreKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& event,
 	CefEventHandle os_event, bool* is_keyboard_shortcut)
 {
-	// Handle Gizmo transformation keys (R, W, S) - BOTH press and release
-	if (event.windows_key_code == 'R' || event.windows_key_code == 'W' || event.windows_key_code == 'S')
-	{
-		if (overlay_viewport_ && overlay_viewport_->getHandle())
-		{
-			if (event.type == KEYEVENT_KEYDOWN || event.type == KEYEVENT_RAWKEYDOWN)
-			{
-				std::cout << "[UIHandler] Forwarding Gizmo key PRESS to overlay: " << (char)event.windows_key_code << std::endl;
-				// IMPORTANT: Use proper lParam to avoid repeat detection issues
-				LPARAM lParam = 1 | (event.native_key_code << 16);
-				SendMessage(overlay_viewport_->getHandle(), WM_KEYDOWN, event.windows_key_code, lParam);
-				SendMessage(overlay_viewport_->getHandle(), WM_CHAR, event.windows_key_code, 0);
-			}
-			else if (event.type == KEYEVENT_KEYUP)
-			{
-				std::cout << "[UIHandler] Forwarding Gizmo key RELEASE to overlay: " << (char)event.windows_key_code << std::endl;
-				SendMessage(overlay_viewport_->getHandle(), WM_KEYUP, event.windows_key_code, 0);
-			}
-		}
-		return true; // Consume the event in CEF
-	}
-	
-	// For all other keys, only process KEYDOWN events
-	if (event.type != KEYEVENT_RAWKEYDOWN && event.type != KEYEVENT_KEYDOWN) 
-	{
+	if (!overlay_viewport_ || !overlay_viewport_->getHandle())
 		return false;
-	}
 	
-	// Handle mode switching keys (1-4)
-	if (overlay_viewport_ && event.windows_key_code >= '1' && event.windows_key_code <= '4')
-	{
-		int modeKey = event.windows_key_code - '0';
-		overlay_viewport_->switchModeByKey(modeKey);
-		
-		HtmlTextureRenderer* html_renderer = overlay_viewport_->getHtmlTextureRenderer();
-		if (html_renderer) 
-		{
-			html_renderer->sendKeyEvent(event);
-		}
-		
-		return true; // Consume mode switching keys
-	}
+	// Get KeyManager instance to handle all keyboard input
+	auto& keyManager = SIMILI::Input::KeyManager::getInstance();
 	
-	// For all other keys, send to HTML renderer if available
-	if (overlay_viewport_) 
+	if (event.type == KEYEVENT_KEYDOWN || event.type == KEYEVENT_RAWKEYDOWN)
 	{
-		HtmlTextureRenderer* html_renderer = overlay_viewport_->getHtmlTextureRenderer();
+		LPARAM lParam = 1 | (event.native_key_code << 16);
 		
-		if (html_renderer) 
+		// Forward key DOWN event to KeyManager
+		// KeyManager will handle:
+		// - Gizmo operations (W=Translate, R=Rotate, S=Scale)
+		// - Mode switching (1-4)
+		// - Modifier keys (Shift for multi-selection, Ctrl, Alt)
+		// - All other viewport-related key bindings
+		std::cout << "[UIHandler] Forwarding key " << (char)event.windows_key_code 
+		<< " to KeyManager via handleKeyDown()" << std::endl;
+		
+		keyManager.handleKeyDown(static_cast<int>(event.windows_key_code), lParam);
+		
+		// Additionally send mode keys (1-4) to HTML renderer for UI visual feedback
+		if (event.windows_key_code >= '1' && event.windows_key_code <= '4')
 		{
-			html_renderer->sendKeyEvent(event);
-			
-			return true;
+			HtmlTextureRenderer* html_renderer = overlay_viewport_->getHtmlTextureRenderer();
+			if (html_renderer) 
+			{
+				html_renderer->sendKeyEvent(event);
+				std::cout << "[UIHandler] Mode key " << (char)event.windows_key_code 
+				          << " also sent to HTML for UI update" << std::endl;
+			}
 		}
-		else 
-		{
-			std::cout << "[UIHandler] No HTML renderer available" << std::endl;
-		}
+		
+		return true; // Consume all key events - KeyManager handles them
+	}
+	else if (event.type == KEYEVENT_KEYUP)
+	{
+		std::cout << "[UIHandler] Forwarding key RELEASE " << (char)event.windows_key_code 
+		          << " to KeyManager via handleKeyUp()" << std::endl;
+		
+		keyManager.handleKeyUp(static_cast<int>(event.windows_key_code));
+		return true;
 	}
 	
 	return false;
@@ -451,6 +435,6 @@ bool UIHandler::OnPreKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& 
 bool UIHandler::OnKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& event,
 CefEventHandle os_event)
 {
-	// All Gizmo key handling is done in OnPreKeyEvent() now
+
 	return false;
 }

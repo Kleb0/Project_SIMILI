@@ -69,7 +69,6 @@ namespace VerticeTransform
             }
         }
         
-        // Early return if no vertices selected - mode switching still works above
         if (selectedVertices.empty()) return;
 
         glm::mat4 view = viewMatrix;
@@ -82,7 +81,6 @@ namespace VerticeTransform
         static glm::mat4 accumDelta = glm::mat4(1.0f);
         static std::vector<Vertice*> vertsSnapshot;
         static bool dragActive = false;
-
 
         auto hashSet = [&]() -> size_t {
             size_t h = 1469598103934665603ull;

@@ -12,7 +12,7 @@ namespace Input {
 	{
 	}
 
-	void KeyInputSystem::registerKey(char windowsKey, ImGuiKey imguiKey)
+	void KeyInputSystem::registerKey(int windowsKey, ImGuiKey imguiKey)
 	{
 		KeyStateComponent state;
 		state.windowsKey = windowsKey;
@@ -20,7 +20,7 @@ namespace Input {
 		keyStates_[windowsKey] = state;
 	}
 
-	void KeyInputSystem::processKeyDown(char windowsKey, LPARAM lParam)
+	void KeyInputSystem::processKeyDown(int windowsKey, LPARAM lParam)
 	{
 		auto it = keyStates_.find(windowsKey);
 		if (it == keyStates_.end())
@@ -33,11 +33,10 @@ namespace Input {
 		{
 			it->second.isPressed = true;
 			it->second.isFirstPress = true;
-			std::cout << "[KeyInputSystem] Key '" << windowsKey << "' pressed (first press)" << std::endl;
 		}
 	}
 
-	void KeyInputSystem::processKeyUp(char windowsKey)
+	void KeyInputSystem::processKeyUp(int windowsKey)
 	{
 		auto it = keyStates_.find(windowsKey);
 		if (it == keyStates_.end())
@@ -47,7 +46,6 @@ namespace Input {
 		{
 			it->second.isPressed = false;
 			it->second.justReleased = true;
-			std::cout << "[KeyInputSystem] Key '" << windowsKey << "' released" << std::endl;
 		}
 	}
 
@@ -84,25 +82,37 @@ namespace Input {
 		}
 	}
 
-	bool KeyInputSystem::isKeyPressed(char windowsKey) const
+	bool KeyInputSystem::isKeyPressed(int windowsKey) const
 	{
 		auto it = keyStates_.find(windowsKey);
-		return (it != keyStates_.end()) ? it->second.isPressed : false;
+		bool result = (it != keyStates_.end()) ? it->second.isPressed : false;
+		
+		if (windowsKey == VK_LSHIFT || windowsKey == VK_RSHIFT) {
+			std::cout << "\n [KeyInputSystem::isKeyPressed] TEST TEST TEST Key=" << windowsKey 
+			          << " Found=" << (it != keyStates_.end()) 
+			          << " isPressed=" << result;
+			if (it != keyStates_.end()) {
+				std::cout << " wasPressed=" << it->second.wasPressed;
+			}
+			std::cout << std::endl;
+		}
+		
+		return result;
 	}
 
-	bool KeyInputSystem::wasKeyJustPressed(char windowsKey) const
+	bool KeyInputSystem::wasKeyJustPressed(int windowsKey) const
 	{
 		auto it = keyStates_.find(windowsKey);
 		return (it != keyStates_.end()) ? it->second.isFirstPress : false;
 	}
 
-	bool KeyInputSystem::wasKeyJustReleased(char windowsKey) const
+	bool KeyInputSystem::wasKeyJustReleased(int windowsKey) const
 	{
 		auto it = keyStates_.find(windowsKey);
 		return (it != keyStates_.end()) ? it->second.justReleased : false;
 	}
 
-	const KeyStateComponent* KeyInputSystem::getKeyState(char windowsKey) const
+	const KeyStateComponent* KeyInputSystem::getKeyState(int windowsKey) const
 	{
 		auto it = keyStates_.find(windowsKey);
 		return (it != keyStates_.end()) ? &it->second : nullptr;
@@ -118,7 +128,7 @@ namespace Input {
 	{
 	}
 
-	void KeyActionSystem::bindAction(char windowsKey, const std::string& actionName, std::function<void()> callback, bool triggerOnPress)
+	void KeyActionSystem::bindAction(int windowsKey, const std::string& actionName, std::function<void()> callback, bool triggerOnPress)
 	{
 		KeyActionComponent action;
 		action.actionName = actionName;
@@ -128,7 +138,7 @@ namespace Input {
 		
 	}
 
-	void KeyActionSystem::unbindAction(char windowsKey)
+	void KeyActionSystem::unbindAction(int windowsKey)
 	{
 		auto it = keyActions_.find(windowsKey);
 		if (it != keyActions_.end())
@@ -141,7 +151,7 @@ namespace Input {
 	{
 		for (auto& pair : keyActions_)
 		{
-			char key = pair.first;
+			int key = pair.first;
 			KeyActionComponent& action = pair.second;
 			
 			if (!action.callback)
@@ -199,25 +209,26 @@ namespace Input {
 		inputSystem_->registerKey('3', ImGuiKey_3);
 		inputSystem_->registerKey('4', ImGuiKey_4);
 		
+		inputSystem_->registerKey(VK_LSHIFT, ImGuiKey_LeftShift);
+		inputSystem_->registerKey(VK_RSHIFT, ImGuiKey_RightShift);
+		
 	}
 
-	void KeyManager::handleKeyDown(char windowsKey, LPARAM lParam)
+	void KeyManager::handleKeyDown(int windowsKey, LPARAM lParam)
 	{
 		if (!initialized_)
 			return;
 		
 		inputSystem_->processKeyDown(windowsKey, lParam);
-		
 		sendToImGui(windowsKey, true);
 	}
 
-	void KeyManager::handleKeyUp(char windowsKey)
+	void KeyManager::handleKeyUp(int windowsKey)
 	{
 		if (!initialized_)
 			return;
 		
 		inputSystem_->processKeyUp(windowsKey);
-		
 		sendToImGui(windowsKey, false);
 	}
 
@@ -256,7 +267,7 @@ namespace Input {
 		std::cout << "[KeyManager] Mode switch actions bound (1-4)" << std::endl;
 	}
 
-	void KeyManager::sendToImGui(char windowsKey, bool isDown)
+	void KeyManager::sendToImGui(int windowsKey, bool isDown)
 	{
 		const KeyStateComponent* state = inputSystem_->getKeyState(windowsKey);
 		if (!state || state->imguiKey == ImGuiKey_None)
@@ -264,11 +275,6 @@ namespace Input {
 		
 		ImGuiIO& io = ImGui::GetIO();
 		io.AddKeyEvent(state->imguiKey, isDown);
-		
-		if (isDown)
-			std::cout << "[KeyManager] Sent ImGuiKey to ImGui (DOWN): " << windowsKey << std::endl;
-		else
-			std::cout << "[KeyManager] Sent ImGuiKey to ImGui (UP): " << windowsKey << std::endl;
 	}
 
 	} // namespace Input

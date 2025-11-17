@@ -16,7 +16,7 @@ namespace Input {
 struct KeyStateComponent
 {
 	ImGuiKey imguiKey;           
-	char windowsKey;             
+	int windowsKey;             
 	bool isPressed;
 	bool wasPressed;
 	bool isFirstPress;
@@ -53,22 +53,22 @@ public:
 	KeyInputSystem();
 	~KeyInputSystem();
 	
-	void processKeyDown(char windowsKey, LPARAM lParam);
-	void processKeyUp(char windowsKey);
+	void processKeyDown(int windowsKey, LPARAM lParam);
+	void processKeyUp(int windowsKey);
 	
 	void update();
 	void pollKeyStates(); // Check real Windows key states immediately
 	
-	bool isKeyPressed(char windowsKey) const;
-	bool wasKeyJustPressed(char windowsKey) const;
-	bool wasKeyJustReleased(char windowsKey) const;
+	bool isKeyPressed(int windowsKey) const;
+	bool wasKeyJustPressed(int windowsKey) const;
+	bool wasKeyJustReleased(int windowsKey) const;
 	
-	void registerKey(char windowsKey, ImGuiKey imguiKey);
+	void registerKey(int windowsKey, ImGuiKey imguiKey);
 	
-	const KeyStateComponent* getKeyState(char windowsKey) const;
+	const KeyStateComponent* getKeyState(int windowsKey) const;
 	
 private:
-	std::unordered_map<char, KeyStateComponent> keyStates_;
+	std::unordered_map<int, KeyStateComponent> keyStates_;
 };
 
 class KeyActionSystem
@@ -77,16 +77,16 @@ public:
 	KeyActionSystem(KeyInputSystem* inputSystem);
 	~KeyActionSystem();
 	
-	void bindAction(char windowsKey, const std::string& actionName, std::function<void()> callback, bool triggerOnPress = true);
+	void bindAction(int windowsKey, const std::string& actionName, std::function<void()> callback, bool triggerOnPress = true);
 	
 	// Unbind an action
-	void unbindAction(char windowsKey);
+	void unbindAction(int windowsKey);
 	
 	void processActions();
 	
 private:
 	KeyInputSystem* inputSystem_;
-	std::unordered_map<char, KeyActionComponent> keyActions_;
+	std::unordered_map<int, KeyActionComponent> keyActions_;
 };
 
 // ============= MANAGER =============
@@ -100,8 +100,8 @@ public:
 	void initialize();
 	
 	// Process Windows messages
-	void handleKeyDown(char windowsKey, LPARAM lParam);
-	void handleKeyUp(char windowsKey);
+	void handleKeyDown(int windowsKey, LPARAM lParam);
+	void handleKeyUp(int windowsKey);
 	
 	void update();
 	
@@ -115,8 +115,14 @@ public:
 	KeyInputSystem* getInputSystem() { return inputSystem_.get(); }
 	KeyActionSystem* getActionSystem() { return actionSystem_.get(); }
 	
+	// Utility: Check if Shift is pressed (for multi-selection)
+	bool isShiftPressed() const {
+		if (!initialized_ || !inputSystem_) return false;
+		return inputSystem_->isKeyPressed(VK_LSHIFT) || inputSystem_->isKeyPressed(VK_RSHIFT);
+	}
+	
 	// Send ImGui key events (for integration)
-	void sendToImGui(char windowsKey, bool isDown);
+	void sendToImGui(int windowsKey, bool isDown);
 	
 private:
 	KeyManager();

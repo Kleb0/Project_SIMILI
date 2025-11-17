@@ -329,12 +329,23 @@ const glm::mat4& view, const glm::mat4& projection, const std::vector<ThreeDObje
 	glm::vec3 rayDir    = glm::normalize(rayEnd - rayStart);
 	glm::vec3 rayOrigin = rayStart;
 
-	// NEW APPROACH: Find closest vertex by proximity to ray (like mesh selection)
 	float bestScore = std::numeric_limits<float>::max();
 	Vertice* closestVertice = nullptr;
 	
 	const float MAX_SELECTION_DISTANCE = 100.0f;
-	const float MAX_PERPENDICULAR_DISTANCE = 0.2f; // Smaller threshold for vertices
+	const float MAX_PERPENDICULAR_DISTANCE = 0.35f;
+
+	if (clearPrevious)
+	{
+		for (ThreeDObject* obj : objects)
+		{
+			if (!obj->isSelectable()) continue;
+			Mesh* mesh = dynamic_cast<Mesh*>(obj);
+			if (!mesh) continue;
+			for (Vertice* v : mesh->getVertices())
+				v->setSelected(false);
+		}
+	}
 
 	for (ThreeDObject* obj : objects) 
 	{
@@ -343,12 +354,6 @@ const glm::mat4& view, const glm::mat4& projection, const std::vector<ThreeDObje
 		Mesh* mesh = dynamic_cast<Mesh*>(obj);
 		if (!mesh) continue;
 
-		if (clearPrevious) 
-		{
-			for (Vertice* v : mesh->getVertices())
-				v->setSelected(false);
-		}
-
 		glm::mat4 modelMatrix = obj->getModelMatrix();
 
 		for (Vertice* v : mesh->getVertices()) 
@@ -356,25 +361,18 @@ const glm::mat4& view, const glm::mat4& projection, const std::vector<ThreeDObje
 			glm::vec3 worldPos = glm::vec3(modelMatrix * glm::vec4(v->getLocalPosition(), 1.0f));
 			v->setPosition(worldPos);
 
-			// Calculate distance from ray to vertex
 			glm::vec3 toVertex = worldPos - rayOrigin;
 			float depthAlongRay = glm::dot(toVertex, rayDir);
 			
-			// Only consider vertices in front of the camera
 			if (depthAlongRay <= 0.0f) continue;
-			
-			// Ignore vertices too far away
 			if (depthAlongRay > MAX_SELECTION_DISTANCE) continue;
 			
-			// Calculate perpendicular distance to ray
 			glm::vec3 closestPointOnRay = rayOrigin + rayDir * depthAlongRay;
 			float distanceToRay = glm::length(worldPos - closestPointOnRay);
 			
-			// NEW: Ignore vertices too far from the ray
 			if (distanceToRay > MAX_PERPENDICULAR_DISTANCE) continue;
 			
-			// Combined score: distance to ray + depth (prioritize closer vertices in ray direction)
-			float score = distanceToRay * 2.0f + depthAlongRay * 0.1f;
+			float score = distanceToRay * 10.0f + depthAlongRay * 0.01f;
 			
 			if (score < bestScore) 
 			{

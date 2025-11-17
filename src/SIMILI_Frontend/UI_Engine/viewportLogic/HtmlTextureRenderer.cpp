@@ -110,10 +110,8 @@ void HtmlTextureRenderer::sendKeyEvent(const CefKeyEvent& event)
 		return;
 	}
 		
-	// Method 1: Try SendKeyEvent (may not work for off-screen browsers)
 	browser_->GetHost()->SendKeyEvent(event);
 	
-	// Method 2: Inject JavaScript to simulate keydown event (more reliable)
 	CefRefPtr<CefFrame> frame = browser_->GetMainFrame();
 	if (frame) {
 		// Convert Windows key code to JavaScript key string
