@@ -4,7 +4,10 @@
 #include <vector>
 #include <list>
 
-// Forward declarations
+// ============================================================================
+// FORWARD DECLARATIONS
+// ============================================================================
+
 namespace ImGuizmo {
     enum OPERATION;
     enum MODE;
@@ -30,78 +33,82 @@ class Edge;
 
 class OverlayViewport {
 public:
+    // ----------- Lifecycle Management -----------
     OverlayViewport();
     ~OverlayViewport();
 
     bool create(HWND parent, int x, int y, int width, int height);
     void destroy();
     
+    // ----------- Window Management -----------
     void setPosition(int x, int y, int width, int height);
     void show(bool visible);
     bool isVisible() const;
-    void render();
-    
-    // Control rendering
-    void enableRendering(bool enable) { rendering_enabled_ = enable; }
-    bool isRenderingEnabled() const { return rendering_enabled_; }
-    
-    // 3D Scene management
-    void setThreeDScene(ThreeDScene* scene) { three_d_scene_ = scene; }
-    ThreeDScene* getThreeDScene() const { return three_d_scene_; }
-    
-    // OpenGL context management
-    void makeContextCurrent();
-    void releaseContext();
     
     HWND getHandle() const { return hwnd_; }
-    
     int getWidth() const { return width_; }
     int getHeight() const { return height_; }
     
-    // Raycast & Selection
-    void performRaycast(int mouseX, int mouseY);
+    // ----------- Rendering Control -----------
+    void render();
+    void enableRendering(bool enable) { rendering_enabled_ = enable; }
+    bool isRenderingEnabled() const { return rendering_enabled_; }
     
-    // Guizmo management
+    // ----------- OpenGL Context Management -----------
+    void makeContextCurrent();
+    void releaseContext();
+    
+    // ----------- 3D Scene Management -----------
+    void setThreeDScene(ThreeDScene* scene) { three_d_scene_ = scene; }
+    ThreeDScene* getThreeDScene() const { return three_d_scene_; }
+    
+    // ----------- Raycast & Object Selection -----------
+    void performRaycast(int mouseX, int mouseY);
+    ThreeDObjectSelector* getSelector() { return selector_; }
+    
+    void setMultipleSelectedObjects(const std::list<ThreeDObject*>& objects);
+    const std::list<ThreeDObject*>& getMultipleSelectedObjects() const { return multiple_selected_objects_; }
+    
+    std::list<Vertice*>& getMultipleSelectedVertices() { return multiple_selected_vertices_; }
+    std::list<Face*>& getMultipleSelectedFaces() { return multiple_selected_faces_; }
+    std::list<Edge*>& getMultipleSelectedEdges() { return multiple_selected_edges_; }
+    
+    // ----------- Gizmo Management -----------
     void setGuizmoOperation(ImGuizmo::OPERATION operation) { current_guizmo_operation_ = operation; }
     ImGuizmo::OPERATION getGuizmoOperation() const { return current_guizmo_operation_; }
     void setGuizmoMode(ImGuizmo::MODE mode) { current_guizmo_mode_ = mode; }
     ImGuizmo::MODE getGuizmoMode() const { return current_guizmo_mode_; }
     
-    // HTML texture access
-    HtmlTextureRenderer* getHtmlTextureRenderer() const { return html_texture_renderer_; }
-    
-    // 3D Mode management
+    // ----------- 3D Modeling Mode Management -----------
     void setModelingMode(ThreeDMode* mode);
     void switchModeByKey(int keyNumber);
     ThreeDMode* getCurrentMode() const { return current_mode_; }
     
-    // Access to individual modes
     Normal_Mode* getNormalMode() { return normal_mode_; }
     Vertice_Mode* getVerticeMode() { return vertice_mode_; }
     Face_Mode* getFaceMode() { return face_mode_; }
     Edge_Mode* getEdgeMode() { return edge_mode_; }
     
-    // Object selection management
-    void setMultipleSelectedObjects(const std::list<ThreeDObject*>& objects);
-    const std::list<ThreeDObject*>& getMultipleSelectedObjects() const { return multiple_selected_objects_; }
+    // ----------- HTML Texture Rendering -----------
+    HtmlTextureRenderer* getHtmlTextureRenderer() const { return html_texture_renderer_; }
     
-    // Selection lists for different modes
-    std::list<Vertice*>& getMultipleSelectedVertices() { return multiple_selected_vertices_; }
-    std::list<Face*>& getMultipleSelectedFaces() { return multiple_selected_faces_; }
-    std::list<Edge*>& getMultipleSelectedEdges() { return multiple_selected_edges_; }
-    
-    // Selector access
-    ThreeDObjectSelector* getSelector() { return selector_; }
+    // ----------- Edge Loop State -----------
+    bool isEdgeLoopActive = false;
 
 private:
+    // ----------- Windows Callback -----------
     static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
     
+    // ----------- Initialization & Cleanup -----------
     void initializeOpenGL();
     void initializeImGui();
     void shutdownImGui();
-    void renderScene();
-    void renderGuizmo();
     
+    // ----------- Rendering Internal -----------
+    void renderScene();
+    void ThreeDWorldInteractions();
+    
+    // ----------- Window & OpenGL Context -----------
     HWND hwnd_;
     HWND parent_;
     HDC hdc_;
@@ -110,48 +117,43 @@ private:
     int width_;
     int height_;
     
-    ThreeDScene* three_d_scene_;      
-    bool rendering_enabled_;    
-    
+    bool rendering_enabled_;
     bool imgui_initialized_;
     
-    // Raycast & Selection
-    ThreeDObjectSelector* selector_;
+    // ----------- 3D Scene -----------
+    ThreeDScene* three_d_scene_;
     
-    // Guizmo state
+    // ----------- Selection System -----------
+    ThreeDObjectSelector* selector_;
+    std::list<ThreeDObject*> multiple_selected_objects_;
+    std::list<Vertice*> multiple_selected_vertices_;
+    std::list<Face*> multiple_selected_faces_;
+    std::list<Edge*> multiple_selected_edges_;
+    
+    // ----------- Interaction Controllers -----------
+    CameraControl* camera_control_;
+    RaycastPerform* raycast_performer_;
+    OverlayClickHandler* click_handler_;
+    
+    // ----------- Gizmo State -----------
     ImGuizmo::OPERATION current_guizmo_operation_;
     ImGuizmo::MODE current_guizmo_mode_;
-    class CameraControl* camera_control_;
-    class RaycastPerform* raycast_performer_;
+    bool was_using_gizmo_last_frame_;
     
-    // Red texture overlay test
-    TextureRendererTest* texture_renderer_test_;
-    HtmlTextureRenderer* html_texture_renderer_;
-    
-    // HTML texture dimensions and position
-    int html_texture_x_ = 10;
-    int html_texture_y_ = 10;
-    int html_texture_width_ = 350;
-    int html_texture_height_ = 100;
-    
+    // ----------- 3D Modeling Modes -----------
     Normal_Mode* normal_mode_;
     Vertice_Mode* vertice_mode_;
     Face_Mode* face_mode_;
     Edge_Mode* edge_mode_;
     ThreeDMode* current_mode_;
     
-    std::list<ThreeDObject*> multiple_selected_objects_;
-    std::list<Vertice*> multiple_selected_vertices_;
-    std::list<Face*> multiple_selected_faces_;
-    std::list<Edge*> multiple_selected_edges_;
-    bool was_using_gizmo_last_frame_;
+    // ----------- HTML Texture Rendering -----------
+    TextureRendererTest* texture_renderer_test_;
+    HtmlTextureRenderer* html_texture_renderer_;
     
-    OverlayClickHandler* click_handler_;
-    
-public:
-    bool isEdgeLoopActive = false;
-    
-private:
-    void ThreeDWorldInteractions();
+    int html_texture_x_ = 10;
+    int html_texture_y_ = 10;
+    int html_texture_width_ = 350;
+    int html_texture_height_ = 100;
 };
 

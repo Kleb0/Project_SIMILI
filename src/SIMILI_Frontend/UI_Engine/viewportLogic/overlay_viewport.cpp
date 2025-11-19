@@ -41,6 +41,10 @@
 #include "../../Engine/ThreeDInteractions/EdgeTransform.hpp"
 #include "KeyManager.hpp"
 
+// ============================================================================
+// EXTERNAL & PLATFORM DEFINITIONS
+// ============================================================================
+
 // Forward declare message handler from imgui_impl_win32.cpp
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -58,8 +62,10 @@ namespace
 	const wchar_t* kOverlayClassName = L"SIMILI_OpenGL_Overlay";
 }
 
+// ============================================================================
+// LIFECYCLE MANAGEMENT
+// ============================================================================
 
-// --------- Window and scene rendering ------------- 
 
 OverlayViewport::OverlayViewport() : hwnd_(nullptr) 
 	, parent_(nullptr)
@@ -164,6 +170,10 @@ OverlayViewport::~OverlayViewport()
 	
 	destroy();
 }
+
+// ============================================================================
+// WINDOW CREATION & MANAGEMENT
+// ============================================================================
 
 bool OverlayViewport::create(HWND parent, int x, int y, int width, int height) 
 {
@@ -358,7 +368,7 @@ void OverlayViewport::initializeImGui()
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;// Enable Gamepad Controls
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
 	ImGui::StyleColorsDark();
 	ImGui_ImplWin32_Init(hwnd_);
@@ -383,6 +393,10 @@ void OverlayViewport::shutdownImGui()
 	imgui_initialized_ = false;
 }
 
+// ============================================================================
+// OPENGL CONTEXT MANAGEMENT
+// ============================================================================
+
 void OverlayViewport::makeContextCurrent() {
 	if (hdc_ && gl_context_) {
 		wglMakeCurrent(hdc_, gl_context_);
@@ -393,42 +407,9 @@ void OverlayViewport::releaseContext() {
 	wglMakeCurrent(nullptr, nullptr);
 }
 
-void OverlayViewport::setPosition(int x, int y, int width, int height) 
-{
-	if (hwnd_) 
-	{
-		SetWindowPos(hwnd_, HWND_TOP, x, y, width, height, 0);
-		width_ = width;
-		height_ = height;
-		
-		if (gl_context_ && hdc_) 
-		{
-			wglMakeCurrent(hdc_, gl_context_);
-			glViewport(0, 0, width, height);
-			wglMakeCurrent(nullptr, nullptr);
-		}
-		
-		if (texture_renderer_test_) 
-		{
-			texture_renderer_test_->resize(width, height);
-		}
-	}
-}
-
-void OverlayViewport::show(bool visible) 
-{
-	if (hwnd_) 
-	{
-		ShowWindow(hwnd_, visible ? SW_SHOW : SW_HIDE);
-	}
-}
-
-bool OverlayViewport::isVisible() const {
-	if (hwnd_) {
-		return IsWindowVisible(hwnd_) != 0;
-	}
-	return false;
-}
+// ============================================================================
+// RENDERING SYSTEM
+// ============================================================================
 
 void OverlayViewport::render() 
 {
@@ -485,8 +466,8 @@ void OverlayViewport::render()
 	
 }
 
-void OverlayViewport::renderScene() {
-
+void OverlayViewport::renderScene() 
+{
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glViewport(0, 0, width_, height_);
 	
@@ -499,17 +480,52 @@ void OverlayViewport::renderScene() {
 	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 	std::cout << "[OverlayViewport] WARNING: No 3D scene set" << std::endl;
 }
-// ----------- end of window and scene rendering ------------
 
-// ------------- Viewport mode management -------------
+// ============================================================================
+// WINDOWS MESSAGE HANDLING
+// ============================================================================
 
-void OverlayViewport::renderGuizmo() 
+void OverlayViewport::setPosition(int x, int y, int width, int height) 
 {
-	// This function is deprecated - Guizmo rendering is now handled in ThreeDWorldInteractions()
-	// Kept for backward compatibility
+	if (hwnd_) 
+	{
+		SetWindowPos(hwnd_, HWND_TOP, x, y, width, height, 0);
+		width_ = width;
+		height_ = height;
+		
+		if (gl_context_ && hdc_) 
+		{
+			wglMakeCurrent(hdc_, gl_context_);
+			glViewport(0, 0, width, height);
+			wglMakeCurrent(nullptr, nullptr);
+		}
+		
+		if (texture_renderer_test_) 
+		{
+			texture_renderer_test_->resize(width, height);
+		}
+	}
 }
 
-// -------------- Camera and overlay controls --------------
+void OverlayViewport::show(bool visible) 
+{
+	if (hwnd_) 
+	{
+		ShowWindow(hwnd_, visible ? SW_SHOW : SW_HIDE);
+	}
+}
+
+bool OverlayViewport::isVisible() const {
+	if (hwnd_) {
+		return IsWindowVisible(hwnd_) != 0;
+	}
+	return false;
+}
+
+// ============================================================================
+// WINDOWS MESSAGE HANDLING
+// ============================================================================
+
 LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 {
 	OverlayViewport* overlay = nullptr;
@@ -525,7 +541,6 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 		overlay = reinterpret_cast<OverlayViewport*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
 	}
 	
-
 	ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
 	
 	bool shouldProcessEvent = true;
@@ -654,16 +669,17 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				// Forward keyboard events to ImGui FIRST
 				ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
 				
-			// Process through KeyManager ECS
-			if (msg == WM_KEYDOWN)
-			{
-				SIMILI::Input::KeyManager::getInstance().handleKeyDown(static_cast<int>(wParam), lParam);
-			}
-			else if (msg == WM_KEYUP)
-			{
-				std::cout << "[OverlayViewport WndProc] WM_KEYUP received for key: " << (char)wParam << std::endl;
-				SIMILI::Input::KeyManager::getInstance().handleKeyUp(static_cast<int>(wParam));
-			}				return 0;
+				// Process through KeyManager ECS
+				if (msg == WM_KEYDOWN)
+				{
+					SIMILI::Input::KeyManager::getInstance().handleKeyDown(static_cast<int>(wParam), lParam);
+				}
+				else if (msg == WM_KEYUP)
+				{
+					std::cout << "[OverlayViewport WndProc] WM_KEYUP received for key: " << (char)wParam << std::endl;
+					SIMILI::Input::KeyManager::getInstance().handleKeyUp(static_cast<int>(wParam));
+				}
+				return 0;
 			}
 		}
 	}
@@ -671,7 +687,9 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 	return DefWindowProc(hwnd, msg, wParam, lParam);
 }
 
-// ------- Raycast & Selection Implementation -------
+// ============================================================================
+// RAYCAST & OBJECT SELECTION
+// ============================================================================
 
 void OverlayViewport::performRaycast(int mouseX, int mouseY) 
 {
@@ -680,7 +698,16 @@ void OverlayViewport::performRaycast(int mouseX, int mouseY)
 	}
 }
 
-// --------- 3D mode management ---------
+void OverlayViewport::setMultipleSelectedObjects(const std::list<ThreeDObject*>& objects) 
+{ 
+	multiple_selected_objects_ = objects; 
+	std::cout << "[OverlayViewport] setMultipleSelectedObjects called with " 
+	          << objects.size() << " objects" << std::endl;
+}
+
+// ============================================================================
+// 3D MODELING MODE MANAGEMENT
+// ============================================================================
 
 void OverlayViewport::setModelingMode(ThreeDMode* mode)
 {
@@ -689,13 +716,6 @@ void OverlayViewport::setModelingMode(ThreeDMode* mode)
 		current_mode_ = mode;
 		std::cout << "[OverlayViewport] Mode changed to: " << mode->getName() << std::endl;
 	}
-}
-
-void OverlayViewport::setMultipleSelectedObjects(const std::list<ThreeDObject*>& objects) 
-{ 
-	multiple_selected_objects_ = objects; 
-	std::cout << "[OverlayViewport] setMultipleSelectedObjects called with " 
-	          << objects.size() << " objects" << std::endl;
 }
 
 void OverlayViewport::switchModeByKey(int keyNumber)
@@ -719,7 +739,9 @@ void OverlayViewport::switchModeByKey(int keyNumber)
 	}
 }
 
-// --------- Object Manipulation ----------- //
+// ============================================================================
+// 3D OBJECT MANIPULATION & GIZMO
+// ============================================================================
 
 void OverlayViewport::ThreeDWorldInteractions()
 {
