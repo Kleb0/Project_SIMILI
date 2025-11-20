@@ -1,6 +1,6 @@
 #include "ui_handler.hpp"
-#include "viewportLogic/HtmlTextureRenderer.hpp"
-#include "viewportLogic/KeyManager.hpp"
+#include "viewportLogic/HTMLTextureRenderer/HtmlTextureRenderer.hpp"
+#include "viewportLogic/KeyManagement/KeyManager.hpp"
 #include "../../Engine/ThreeDScene.hpp"
 #include "../../Engine/OpenGLContext.hpp"
 #include "../../WorldObjects/Camera/Camera.hpp"

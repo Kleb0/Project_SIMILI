@@ -11,7 +11,7 @@
 #include "../../../UI/ThreeDModes/Vertice_Mode.hpp"
 #include "../../../UI/ThreeDModes/Face_Mode.hpp"
 #include "../../../UI/ThreeDModes/Edge_Mode.hpp"
-#include "KeyManager.hpp"
+#include "KeyManagement/KeyManager.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>

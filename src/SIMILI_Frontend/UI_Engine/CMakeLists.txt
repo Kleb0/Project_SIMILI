@@ -89,10 +89,21 @@ message(STATUS "OpenSSL libraries: ${OPENSSL_LIBRARIES}")
 file(GLOB SIMILI_UI_SOURCES 
 	"${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/*.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/CameraControl/*.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/HTMLTextureRenderer/*.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/Keymanagement/*.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/Raycasting/*.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/ClickHandling/*.cpp"
 )
 file(GLOB SIMILI_UI_HEADERS 
 	"${CMAKE_CURRENT_SOURCE_DIR}/*.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/*.hpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/CameraControl/*.hpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/HTMLTextureRenderer/*.hpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/Keymanagement/*.hpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/Raycasting/*.hpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/ClickHandling/*.hpp"
+
 )
 
 # Add SIMILI Services (Router) sources - specific files only, not examples
@@ -271,6 +282,10 @@ target_include_directories(SIMILI_UI PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}/../../Engine/MeshEdit
 	${CMAKE_CURRENT_SOURCE_DIR}/../../Engine/SaveLoadSystem
 	${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic
+	${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/HTMLTextureRenderer
+	${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/Keymanagement
+	${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/Raycasting
+	${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/ClickHandling
 	${Boost_INCLUDE_DIRS}
 	${OPENSSL_INCLUDE_DIR}
 )

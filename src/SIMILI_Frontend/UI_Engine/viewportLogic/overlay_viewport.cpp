@@ -1,5 +1,3 @@
-#define GLM_ENABLE_EXPERIMENTAL
-
 #include <iostream>
 #include <glad/glad.h>
 
@@ -16,11 +14,12 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include "overlay_viewport.hpp"
-#include "CameraControl.hpp"
-#include "RaycastPerform.hpp"
-#include "TextureRendererTest.hpp"
-#include "HtmlTextureRenderer.hpp"
-#include "OverlayClickHandler.hpp"
+#include "CameraControl/CameraControl.hpp"
+#include "Raycasting/RaycastPerform.hpp"
+#include "HTMLTextureRenderer/TextureRendererTest.hpp"
+#include "HTMLTextureRenderer/HtmlTextureRenderer.hpp"
+#include "ClickHandling/OverlayClickHandler.hpp"
+
 #include "../../Engine/ThreeDScene.hpp"
 #include "../../Engine/OpenGLContext.hpp"
 #include "../../Engine/ThreeDObjectSelector.hpp"
@@ -39,7 +38,7 @@
 #include "../../Engine/ThreeDInteractions/VerticeTransform.hpp"
 #include "../../Engine/ThreeDInteractions/FaceTransform.hpp"
 #include "../../Engine/ThreeDInteractions/EdgeTransform.hpp"
-#include "KeyManager.hpp"
+#include "Keymanagement/KeyManager.hpp"
 
 // ============================================================================
 // EXTERNAL & PLATFORM DEFINITIONS

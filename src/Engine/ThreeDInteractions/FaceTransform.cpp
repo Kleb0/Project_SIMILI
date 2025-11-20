@@ -6,7 +6,7 @@
 #include "Engine/OpenGLContext.hpp"
 #include "Engine/ThreeDScene.hpp"
 #include "Engine/Guizmo.hpp"
-#include "SIMILI_Frontend/UI_Engine/viewportLogic/KeyManager.hpp"
+#include "SIMILI_Frontend/UI_Engine/viewportLogic/Keymanagement/KeyManager.hpp"
 
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
