@@ -3,7 +3,6 @@
 #include "include/cef_sandbox_win.h"
 #include "include/views/cef_browser_view.h"
 #include "include/views/cef_window.h"
-#include "ui_app.hpp"
 #include "ui_handler.hpp"
 #include "simple_window_delegate.hpp"
 #include "simple_browser_view_delegate.hpp"
@@ -76,9 +75,9 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 
 	CefMainArgs main_args(hInstance);
 	
-	CefRefPtr<UIApp> app(new UIApp);
+	CefRefPtr<UIHandler> handler(new UIHandler);
 
-	int exit_code = CefExecuteProcess(main_args, app, nullptr);
+	int exit_code = CefExecuteProcess(main_args, handler, nullptr);
 	if (exit_code >= 0) 
 	{
 		return exit_code;
@@ -202,12 +201,10 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 	// Disable logging to avoid errors
 	settings.log_severity = LOGSEVERITY_DISABLE;
 
-	if (!CefInitialize(main_args, settings, app, nullptr)) {
+	if (!CefInitialize(main_args, settings, handler, nullptr)) {
 		std::cerr << "[Main] Failed to initialize CEF" << std::endl;
 		return -1;
 	}
-
-	CefRefPtr<UIHandler> handler(new UIHandler);
 
 	handler->setThreeDScene(myThreeDScene);
 	std::cout << "[Main_UI] 3D Scene linked to UIHandler" << std::endl;

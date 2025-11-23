@@ -114,7 +114,7 @@ list(APPEND SOURCES
 
 # Add KeyManager from SIMILI_Frontend (needed for ECS input system)
 list(APPEND SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/KeyManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/Keymanagement/KeyManager.cpp
 )
 
 

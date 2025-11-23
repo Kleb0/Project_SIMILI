@@ -3,6 +3,7 @@
 #include "include/cef_client.h"
 #include "include/cef_app.h"
 #include "include/wrapper/cef_helpers.h"
+#include "include/wrapper/cef_message_router.h"
 #include "include/views/cef_browser_view.h"
 #include "include/views/cef_window.h"
 #include "viewportLogic/overlay_viewport.hpp"
@@ -16,13 +17,31 @@ class OpenGLContext;
 class Camera;
 class Mesh;
 
-class UIHandler : public CefClient, public CefDisplayHandler,
-				  public CefLifeSpanHandler, public CefLoadHandler, 
+class UIHandler : public CefApp,
+				  public CefClient, 
+				  public CefBrowserProcessHandler,
+				  public CefRenderProcessHandler,
+				  public CefDisplayHandler,
+				  public CefLifeSpanHandler, 
+				  public CefLoadHandler, 
 				  public CefKeyboardHandler
 {
 public:
 	explicit UIHandler();
 	~UIHandler();
+
+	// CefApp methods
+	virtual CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler() override;
+	virtual CefRefPtr<CefRenderProcessHandler> GetRenderProcessHandler() override;
+	virtual void OnBeforeCommandLineProcessing(const CefString& process_type, CefRefPtr<CefCommandLine> command_line) override;
+
+	// CefBrowserProcessHandler methods
+	virtual void OnContextInitialized() override;
+
+	// CefRenderProcessHandler methods
+	virtual void OnContextCreated(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefV8Context> context) override;
+	virtual void OnContextReleased(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefV8Context> context) override;
+	virtual bool OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefProcessId source_process, CefRefPtr<CefProcessMessage> message) override;
 
 	// CefClient methods
 	virtual CefRefPtr<CefDisplayHandler> GetDisplayHandler() override;
@@ -89,6 +108,9 @@ private:
 	int last_viewport_y_;
 	int last_viewport_width_;
 	int last_viewport_height_;
+	
+	// Message router for render process
+	CefRefPtr<CefMessageRouterRendererSide> render_message_router_;
 
 	IMPLEMENT_REFCOUNTING(UIHandler);
 };

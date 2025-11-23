@@ -1,130 +1,172 @@
 {
-  "version": "2.0.0",
-  "tasks": 
-  [
-    {
-      "label": "Build SIMILI (UI + Main)",
-      "type": "shell",
-      "command": "${workspaceFolder}\\build_simili.bat",
-      "options": {
-        "cwd": "${workspaceFolder}",
-        "shell": {
-          "executable": "cmd.exe",
-          "args": ["/d", "/c"]
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build SIMILI (UI + Main)",
+            "type": "shell",
+            "command": "${workspaceFolder}\\build_simili.bat",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "shell": {
+                    "executable": "cmd.exe",
+                    "args": [
+                        "/d",
+                        "/c"
+                    ]
+                }
+            },
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Fast incremental build: UI + SIMILI with parallel compilation (10-20s)"
+        },
+        {
+            "label": "Build SIMILI_UI",
+            "type": "shell",
+            "command": "${workspaceFolder}\\build_ui.bat",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "shell": {
+                    "executable": "cmd.exe",
+                    "args": [
+                        "/d",
+                        "/c"
+                    ]
+                }
+            },
+            "problemMatcher": [],
+            "group": "build",
+            "detail": "Compile SIMILI_UI.exe only"
+        },
+        {
+            "label": "Deploy UI",
+            "type": "shell",
+            "command": "${workspaceFolder}\\deploy_ui.bat",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "shell": {
+                    "executable": "cmd.exe",
+                    "args": [
+                        "/d",
+                        "/c"
+                    ]
+                }
+            },
+            "problemMatcher": [],
+            "group": "build",
+            "detail": "Deploy SIMILI_UI.exe and CEF dependencies to build/Release"
+        },
+        {
+            "label": "Download CEF",
+            "type": "shell",
+            "command": "${workspaceFolder}\\download_cef.bat",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "shell": {
+                    "executable": "cmd.exe",
+                    "args": [
+                        "/d",
+                        "/c"
+                    ]
+                }
+            },
+            "problemMatcher": [],
+            "group": "none",
+            "detail": "Download and extract CEF binary distribution"
+        },
+        {
+            "label": "Generate SIMILI_UI CMake",
+            "type": "shell",
+            "command": "${workspaceFolder}\\generate_ui_cmake.bat",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "shell": {
+                    "executable": "cmd.exe",
+                    "args": [
+                        "/d",
+                        "/c"
+                    ]
+                }
+            },
+            "problemMatcher": [],
+            "group": "build",
+            "detail": "Generate CMake build files for SIMILI_UI with vcpkg toolchain"
+        },
+        {
+            "label": "Install Boost",
+            "type": "shell",
+            "command": "${workspaceFolder}\\install_boost.bat",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "shell": {
+                    "executable": "cmd.exe",
+                    "args": [
+                        "/d",
+                        "/c"
+                    ]
+                }
+            },
+            "problemMatcher": [],
+            "group": "none",
+            "detail": "Install Boost.Beast and Boost.Asio via vcpkg (static linking)"
+        },
+        {
+            "label": "Install vcpkg",
+            "type": "shell",
+            "command": "${workspaceFolder}\\install_vcpkg.bat",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "shell": {
+                    "executable": "cmd.exe",
+                    "args": [
+                        "/d",
+                        "/c"
+                    ]
+                }
+            },
+            "problemMatcher": [],
+            "group": "none",
+            "detail": "Install vcpkg package manager to C:\\vcpkg"
+        },
+        {
+            "label": "Install OpenSSL",
+            "type": "shell",
+            "command": "${workspaceFolder}\\install_openssl.bat",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "shell": {
+                    "executable": "cmd.exe",
+                    "args": [
+                        "/d",
+                        "/c"
+                    ]
+                }
+            },
+            "problemMatcher": [],
+            "group": "none",
+            "detail": "Install OpenSSL via vcpkg (required for HTTPS)"
+        },
+        {
+            "type": "cppbuild",
+            "label": "C/C++: g++.exe build active file",
+            "command": "C:\\msys64\\mingw64\\bin\\g++.exe",
+            "args": [
+                "-fdiagnostics-color=always",
+                "-g",
+                "${file}",
+                "-o",
+                "${fileDirname}\\${fileBasenameNoExtension}.exe"
+            ],
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": "build",
+            "detail": "Task generated by Debugger."
         }
-      },
-      "problemMatcher": [],
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
-      "detail": "Fast incremental build: UI + SIMILI with parallel compilation (10-20s)"
-    },
-    {
-      "label": "Build SIMILI_UI",
-      "type": "shell",
-      "command": "${workspaceFolder}\\build_ui.bat",
-      "options": {
-        "cwd": "${workspaceFolder}",
-        "shell": {
-          "executable": "cmd.exe",
-          "args": ["/d", "/c"]
-        }
-      },
-      "problemMatcher": [],
-      "group": "build",
-      "detail": "Compile SIMILI_UI.exe only"
-    },
-    {
-      "label": "Deploy UI",
-      "type": "shell",
-      "command": "${workspaceFolder}\\deploy_ui.bat",
-      "options": {
-        "cwd": "${workspaceFolder}",
-        "shell": {
-          "executable": "cmd.exe",
-          "args": ["/d", "/c"]
-        }
-      },
-      "problemMatcher": [],
-      "group": "build",
-      "detail": "Deploy SIMILI_UI.exe and CEF dependencies to build/Release"
-    },
-    {
-      "label": "Download CEF",
-      "type": "shell",
-      "command": "${workspaceFolder}\\download_cef.bat",
-      "options": {
-        "cwd": "${workspaceFolder}",
-        "shell": {
-          "executable": "cmd.exe",
-          "args": ["/d", "/c"]
-        }
-      },
-      "problemMatcher": [],
-      "group": "none",
-      "detail": "Download and extract CEF binary distribution"
-    },
-    {
-      "label": "Generate SIMILI_UI CMake",
-      "type": "shell",
-      "command": "${workspaceFolder}\\generate_ui_cmake.bat",
-      "options": {
-        "cwd": "${workspaceFolder}",
-        "shell": {
-          "executable": "cmd.exe",
-          "args": ["/d", "/c"]
-        }
-      },
-      "problemMatcher": [],
-      "group": "build",
-      "detail": "Generate CMake build files for SIMILI_UI with vcpkg toolchain"
-    },
-    {
-      "label": "Install Boost",
-      "type": "shell",
-      "command": "${workspaceFolder}\\install_boost.bat",
-      "options": {
-        "cwd": "${workspaceFolder}",
-        "shell": {
-          "executable": "cmd.exe",
-          "args": ["/d", "/c"]
-        }
-      },
-      "problemMatcher": [],
-      "group": "none",
-      "detail": "Install Boost.Beast and Boost.Asio via vcpkg (static linking)"
-    },
-    {
-      "label": "Install vcpkg",
-      "type": "shell",
-      "command": "${workspaceFolder}\\install_vcpkg.bat",
-      "options": {
-        "cwd": "${workspaceFolder}",
-        "shell": {
-          "executable": "cmd.exe",
-          "args": ["/d", "/c"]
-        }
-      },
-      "problemMatcher": [],
-      "group": "none",
-      "detail": "Install vcpkg package manager to C:\\vcpkg"
-    },
-    {
-      "label": "Install OpenSSL",
-      "type": "shell",
-      "command": "${workspaceFolder}\\install_openssl.bat",
-      "options": {
-        "cwd": "${workspaceFolder}",
-        "shell": {
-          "executable": "cmd.exe",
-          "args": ["/d", "/c"]
-        }
-      },
-      "problemMatcher": [],
-      "group": "none",
-      "detail": "Install OpenSSL via vcpkg (required for HTTPS)"
-    }
-  ]  
+    ]
 }
-
