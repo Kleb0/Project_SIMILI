@@ -719,21 +719,27 @@ void OverlayViewport::setModelingMode(ThreeDMode* mode)
 
 void OverlayViewport::switchModeByKey(int keyNumber)
 {
+	std::cout << "[OverlayViewport] switchModeByKey() called with keyNumber: " << keyNumber << std::endl;
 	switch (keyNumber)
 	{
 		case 1:
 			setModelingMode(normal_mode_);
+			std::cout << "[OverlayViewport] Switched to Normal Mode" << std::endl;
 			break;
 		case 2:
 			setModelingMode(edge_mode_);
+			std::cout << "[OverlayViewport] Switched to Edge Mode" << std::endl;
 			break;
 		case 3:
 			setModelingMode(vertice_mode_);
+			std::cout << "[OverlayViewport] Switched to Vertice Mode" << std::endl;
 			break;
 		case 4:
 			setModelingMode(face_mode_);
+			std::cout << "[OverlayViewport] Switched to Face Mode" << std::endl;
 			break;
 		default:
+			std::cout << "[OverlayViewport] Unknown key number: " << keyNumber << std::endl;
 			break;
 	}
 }
@@ -810,6 +816,5 @@ void OverlayViewport::ThreeDWorldInteractions()
 			view,
 			projection
 		);
-	}
-	
+	}	
 }

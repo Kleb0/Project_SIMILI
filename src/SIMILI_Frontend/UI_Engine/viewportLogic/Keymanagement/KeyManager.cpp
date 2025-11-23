@@ -24,13 +24,17 @@ namespace Input {
 	{
 		auto it = keyStates_.find(windowsKey);
 		if (it == keyStates_.end())
+		{
+			std::cout << "[KeyInputSystem] Key " << windowsKey << " (char: " << (char)windowsKey << ") not registered - ignoring" << std::endl;
 			return;
+		}
 		
 
 		bool isRepeat = (lParam & (1 << 30)) != 0;
 
 		if (!isRepeat && !it->second.isPressed)
 		{
+			std::cout << "[KeyInputSystem] Key " << windowsKey << " (char: " << (char)windowsKey << ") FIRST PRESS" << std::endl;
 			it->second.isPressed = true;
 			it->second.isFirstPress = true;
 		}
@@ -159,10 +163,12 @@ namespace Input {
 			
 			if (action.triggerOnPress && inputSystem_->wasKeyJustPressed(key))
 			{
+				std::cout << "[KeyActionSystem] Triggering action: " << action.actionName << " (key: " << (char)key << ")" << std::endl;
 				action.callback();
 			}
 			else if (!action.triggerOnPress && inputSystem_->wasKeyJustReleased(key))
 			{
+				std::cout << "[KeyActionSystem] Triggering action: " << action.actionName << " (key: " << (char)key << ") on release" << std::endl;
 				action.callback();
 			}
 		}
@@ -219,6 +225,8 @@ namespace Input {
 		if (!initialized_)
 			return;
 		
+		std::cout << "[KeyManager] handleKeyDown - key: " << windowsKey << " (char: " << (char)windowsKey << ")" << std::endl;
+		
 		inputSystem_->processKeyDown(windowsKey, lParam);
 		sendToImGui(windowsKey, true);
 	}
@@ -237,9 +245,10 @@ namespace Input {
 		if (!initialized_)
 			return;
 		
-		inputSystem_->update();
-		
+		// IMPORTANT: Process actions BEFORE clearing the "just pressed" flags
 		actionSystem_->processActions();
+		
+		inputSystem_->update();
 	}
 
 	void KeyManager::bindGizmoActions(std::function<void()> onTranslate, std::function<void()> onRotate, std::function<void()> onScale)
