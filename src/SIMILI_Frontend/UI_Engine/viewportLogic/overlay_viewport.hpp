@@ -95,10 +95,12 @@ public:
     
     // ----------- Contextual Menu Management -----------
     HtmlTextureRenderer* getContextualMenuRenderer() const { return contextual_menu_html_renderer_; }
-    void showContextualMenu(bool show);
+    void showContextualMenu(bool show) { contextual_menu_visible_ = show; }
+    void hideContextualMenu() { contextual_menu_visible_ = false; }
+    bool isContextualMenuVisible() const { return contextual_menu_visible_; }
     void setContextualMenuPosition(int x, int y);
     
-    // ----------- Edge Loop State 
+    // ----------- Edge Loop State -----------
     bool isEdgeLoopActive = false;
 
 private:
@@ -173,5 +175,6 @@ private:
     int contextual_menu_y_ = 100;
     int contextual_menu_width_ = 300;
     int contextual_menu_height_ = 200;
+    bool contextual_menu_visible_ = false;
 };
 

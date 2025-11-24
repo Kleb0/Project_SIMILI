@@ -499,14 +499,9 @@ void OverlayViewport::render()
 		texture_renderer_test_->render();
 	}
 	
-	// Render the contextual menu HTML texture
-	if (contextual_menu_texture_renderer_) {
+	// Render the contextual menu HTML texture only if visible
+	if (contextual_menu_visible_ && contextual_menu_texture_renderer_) {
 		contextual_menu_texture_renderer_->render();
-	}
-	
-	// Render the red contextual menu texture overlay (for testing)
-	if (contextual_menu_texture_test_) {
-		contextual_menu_texture_test_->render(width_, height_);
 	}
 	
 	if (imgui_initialized_) 
@@ -676,17 +671,26 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 			{
 				std::cout << "[OverlayViewport] WM_RBUTTONDOWN received - toggling contextual menu" << std::endl;
 				
-				// Toggle the contextual menu visibility
-				if (overlay->contextual_menu_texture_test_) 
+				// Get mouse position for menu placement
+				int mouseX = LOWORD(lParam);
+				int mouseY = HIWORD(lParam);
+				
+				// Toggle the contextual menu CEF visibility
+				overlay->contextual_menu_visible_ = !overlay->contextual_menu_visible_;
+				
+				if (overlay->contextual_menu_visible_)
 				{
-					overlay->contextual_menu_texture_test_->toggleVisibility();
-					std::cout << "[OverlayViewport] Contextual menu visibility: " 
-					          << (overlay->contextual_menu_texture_test_->isVisible() ? "VISIBLE" : "HIDDEN") 
-					          << std::endl;
-					
-					// Trigger a redraw
-					InvalidateRect(hwnd, nullptr, FALSE);
+					// Position menu at mouse cursor
+					overlay->setContextualMenuPosition(mouseX, mouseY);
+					std::cout << "[OverlayViewport] Contextual menu SHOWN at (" << mouseX << ", " << mouseY << ")" << std::endl;
 				}
+				else
+				{
+					std::cout << "[OverlayViewport] Contextual menu HIDDEN" << std::endl;
+				}
+				
+				// Trigger a redraw
+				InvalidateRect(hwnd, nullptr, FALSE);
 				return 0;
 			}
 					
@@ -895,4 +899,23 @@ void OverlayViewport::ThreeDWorldInteractions()
 			projection
 		);
 	}	
+}
+
+
+// ============================================================================
+// CONTEXTUAL MENU MANAGEMENT
+// ============================================================================
+
+void OverlayViewport::setContextualMenuPosition(int x, int y)
+{
+	contextual_menu_x_ = x;
+	contextual_menu_y_ = y;
+	
+	if (contextual_menu_texture_renderer_) 
+	{
+		contextual_menu_texture_renderer_->setRenderRect(x, y, 
+			contextual_menu_width_, contextual_menu_height_);
+	}
+	
+	std::cout << "[OverlayViewport] Contextual menu position set to (" << x << ", " << y << ")" << std::endl;
 }
