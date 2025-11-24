@@ -98,7 +98,7 @@ public:
     void showContextualMenu(bool show);
     void setContextualMenuPosition(int x, int y);
     
-    // ----------- Edge Loop State -----------
+    // ----------- Edge Loop State 
     bool isEdgeLoopActive = false;
 
 private:
