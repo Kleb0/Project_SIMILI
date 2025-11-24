@@ -19,6 +19,7 @@
 #include "HTMLTextureRenderer/TextureRendererTest.hpp"
 #include "HTMLTextureRenderer/HtmlTextureRenderer.hpp"
 #include "ClickHandling/OverlayClickHandler.hpp"
+#include "ContextualMenuLogic/ContextualMenuTextureTest.hpp"
 
 #include "../../Engine/ThreeDScene.hpp"
 #include "../../Engine/OpenGLContext.hpp"
@@ -86,6 +87,7 @@ OverlayViewport::OverlayViewport() : hwnd_(nullptr)
 	, edge_mode_(nullptr)
 	, current_mode_(nullptr)
 	, was_using_gizmo_last_frame_(false)
+	, contextual_menu_texture_test_(nullptr)
 {
 	selector_ = new ThreeDObjectSelector();
 	camera_control_ = new CameraControl(this);
@@ -165,6 +167,12 @@ OverlayViewport::~OverlayViewport()
 	{
 		delete edge_mode_;
 		edge_mode_ = nullptr;
+	}
+	
+	if (contextual_menu_texture_test_) 
+	{
+		delete contextual_menu_texture_test_;
+		contextual_menu_texture_test_ = nullptr;
 	}
 	
 	destroy();
@@ -353,6 +361,11 @@ void OverlayViewport::initializeOpenGL()
 		html_texture_renderer_->setViewportWindow(hwnd_);
 	
 	}
+	
+	// Initialize contextual menu texture test (red overlay)
+	contextual_menu_texture_test_ = new ContextualMenuTextureTest();
+	contextual_menu_texture_test_->initialize(width_, height_);
+	std::cout << "[OverlayViewport] Contextual menu red texture initialized" << std::endl;
 }
 
 void OverlayViewport::initializeImGui() 
@@ -452,6 +465,11 @@ void OverlayViewport::render()
 	
 	if (texture_renderer_test_) {
 		texture_renderer_test_->render();
+	}
+	
+	// Render the red contextual menu texture overlay
+	if (contextual_menu_texture_test_) {
+		contextual_menu_texture_test_->render(width_, height_);
 	}
 	
 	if (imgui_initialized_) 
@@ -609,6 +627,24 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 			{
 				// Release mouse capture
 				ReleaseCapture();
+				return 0;
+			}
+			
+			case WM_RBUTTONDOWN:
+			{
+				std::cout << "[OverlayViewport] WM_RBUTTONDOWN received - toggling contextual menu" << std::endl;
+				
+				// Toggle the contextual menu visibility
+				if (overlay->contextual_menu_texture_test_) 
+				{
+					overlay->contextual_menu_texture_test_->toggleVisibility();
+					std::cout << "[OverlayViewport] Contextual menu visibility: " 
+					          << (overlay->contextual_menu_texture_test_->isVisible() ? "VISIBLE" : "HIDDEN") 
+					          << std::endl;
+					
+					// Trigger a redraw
+					InvalidateRect(hwnd, nullptr, FALSE);
+				}
 				return 0;
 			}
 					

@@ -94,6 +94,7 @@ file(GLOB SIMILI_UI_SOURCES
 	"${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/Keymanagement/*.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/Raycasting/*.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/ClickHandling/*.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/ContextualMenuLogic/*.cpp"
 )
 file(GLOB SIMILI_UI_HEADERS 
 	"${CMAKE_CURRENT_SOURCE_DIR}/*.hpp"
@@ -103,6 +104,7 @@ file(GLOB SIMILI_UI_HEADERS
 	"${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/Keymanagement/*.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/Raycasting/*.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/ClickHandling/*.hpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/viewportLogic/ContextualMenuLogic/*.hpp"
 
 )
 

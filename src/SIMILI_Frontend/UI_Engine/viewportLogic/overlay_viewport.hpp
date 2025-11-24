@@ -30,6 +30,7 @@ class OverlayClickHandler;
 class Vertice;
 class Face;
 class Edge;
+class ContextualMenuTextureTest;
 
 class OverlayViewport {
 public:
@@ -155,5 +156,8 @@ private:
     int html_texture_y_ = 10;
     int html_texture_width_ = 350;
     int html_texture_height_ = 100;
+    
+    // ----------- Contextual Menu Texture -----------
+    ContextualMenuTextureTest* contextual_menu_texture_test_;
 };
 

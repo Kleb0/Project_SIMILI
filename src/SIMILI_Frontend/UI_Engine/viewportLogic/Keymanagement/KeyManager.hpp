@@ -79,7 +79,6 @@ public:
 	
 	void bindAction(int windowsKey, const std::string& actionName, std::function<void()> callback, bool triggerOnPress = true);
 	
-	// Unbind an action
 	void unbindAction(int windowsKey);
 	
 	void processActions();
