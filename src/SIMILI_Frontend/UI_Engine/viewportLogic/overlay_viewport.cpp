@@ -88,6 +88,8 @@ OverlayViewport::OverlayViewport() : hwnd_(nullptr)
 	, current_mode_(nullptr)
 	, was_using_gizmo_last_frame_(false)
 	, contextual_menu_texture_test_(nullptr)
+	, contextual_menu_texture_renderer_(nullptr)
+	, contextual_menu_html_renderer_(nullptr)
 {
 	selector_ = new ThreeDObjectSelector();
 	camera_control_ = new CameraControl(this);
@@ -173,6 +175,17 @@ OverlayViewport::~OverlayViewport()
 	{
 		delete contextual_menu_texture_test_;
 		contextual_menu_texture_test_ = nullptr;
+	}
+	
+	if (contextual_menu_texture_renderer_) 
+	{
+		delete contextual_menu_texture_renderer_;
+		contextual_menu_texture_renderer_ = nullptr;
+	}
+	
+	if (contextual_menu_html_renderer_) 
+	{
+		contextual_menu_html_renderer_ = nullptr;
 	}
 	
 	destroy();
@@ -366,6 +379,25 @@ void OverlayViewport::initializeOpenGL()
 	contextual_menu_texture_test_ = new ContextualMenuTextureTest();
 	contextual_menu_texture_test_->initialize(width_, height_);
 	std::cout << "[OverlayViewport] Contextual menu red texture initialized" << std::endl;
+	
+	// Initialize contextual menu HTML renderer
+	contextual_menu_texture_renderer_ = new TextureRendererTest();
+	contextual_menu_texture_renderer_->initialize(width_, height_);
+	
+	contextual_menu_width_ = 300;
+	contextual_menu_height_ = 200;
+	contextual_menu_x_ = 100;
+	contextual_menu_y_ = 100;
+	
+	contextual_menu_texture_renderer_->setRenderRect(contextual_menu_x_, contextual_menu_y_, 
+		contextual_menu_width_, contextual_menu_height_);
+	
+	contextual_menu_html_renderer_ = new HtmlTextureRenderer(contextual_menu_texture_renderer_);
+	contextual_menu_html_renderer_->createBrowser("file:///ui/Contextual_Menu.html", 
+		contextual_menu_width_, contextual_menu_height_);
+	contextual_menu_html_renderer_->setViewportWindow(hwnd_);
+	
+	std::cout << "[OverlayViewport] Contextual menu HTML renderer initialized" << std::endl;
 }
 
 void OverlayViewport::initializeImGui() 
@@ -467,7 +499,12 @@ void OverlayViewport::render()
 		texture_renderer_test_->render();
 	}
 	
-	// Render the red contextual menu texture overlay
+	// Render the contextual menu HTML texture
+	if (contextual_menu_texture_renderer_) {
+		contextual_menu_texture_renderer_->render();
+	}
+	
+	// Render the red contextual menu texture overlay (for testing)
 	if (contextual_menu_texture_test_) {
 		contextual_menu_texture_test_->render(width_, height_);
 	}
@@ -520,6 +557,11 @@ void OverlayViewport::setPosition(int x, int y, int width, int height)
 		if (texture_renderer_test_) 
 		{
 			texture_renderer_test_->resize(width, height);
+		}
+		
+		if (contextual_menu_texture_renderer_) 
+		{
+			contextual_menu_texture_renderer_->resize(width, height);
 		}
 	}
 }

@@ -93,6 +93,11 @@ public:
     // ----------- HTML Texture Rendering -----------
     HtmlTextureRenderer* getHtmlTextureRenderer() const { return html_texture_renderer_; }
     
+    // ----------- Contextual Menu Management -----------
+    HtmlTextureRenderer* getContextualMenuRenderer() const { return contextual_menu_html_renderer_; }
+    void showContextualMenu(bool show);
+    void setContextualMenuPosition(int x, int y);
+    
     // ----------- Edge Loop State -----------
     bool isEdgeLoopActive = false;
 
@@ -159,5 +164,14 @@ private:
     
     // ----------- Contextual Menu Texture -----------
     ContextualMenuTextureTest* contextual_menu_texture_test_;
+    
+    // ----------- Contextual Menu HTML Rendering -----------
+    TextureRendererTest* contextual_menu_texture_renderer_;
+    HtmlTextureRenderer* contextual_menu_html_renderer_;
+    
+    int contextual_menu_x_ = 100;
+    int contextual_menu_y_ = 100;
+    int contextual_menu_width_ = 300;
+    int contextual_menu_height_ = 200;
 };
 
