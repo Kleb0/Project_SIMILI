@@ -52,14 +52,18 @@ void HtmlTextureRenderer::OnAfterCreated(CefRefPtr<CefBrowser> browser)
 		browser_->GetHost()->SetFocus(true);
 		browser_->GetHost()->NotifyScreenInfoChanged();
 		browser_->GetHost()->WasResized();
-		
+		browser_->GetHost()->Invalidate(PET_VIEW);
+	}
+	
+	// Notify callback if set
+	if (on_browser_created_callback_) {
+		on_browser_created_callback_(browser_);
 	}
 }
 
 void HtmlTextureRenderer::OnBeforeClose(CefRefPtr<CefBrowser> browser)
 {
 	browser_ = nullptr;
-	std::cout << "[HtmlTextureRenderer] Browser closed" << std::endl;
 }
 
 bool HtmlTextureRenderer::OnConsoleMessage(CefRefPtr<CefBrowser> browser,
@@ -93,7 +97,6 @@ void HtmlTextureRenderer::OnTitleChange(CefRefPtr<CefBrowser> browser, const Cef
 	{		
 		if (browser_->GetHost()) {
 			browser_->GetHost()->Invalidate(PET_VIEW);
-			std::cout << "[HtmlTextureRenderer] Invalidate() called" << std::endl;
 		}
 		
 		if (viewport_hwnd_) 
@@ -140,8 +143,6 @@ void HtmlTextureRenderer::sendKeyEvent(const CefKeyEvent& event)
 				"})();";
 			
 			frame->ExecuteJavaScript(js_code, frame->GetURL(), 0);
-			
-			std::cout << "[HtmlTextureRenderer] Key '" << key_char << "' sent to browser" << std::endl;
 		}
 	}
 }

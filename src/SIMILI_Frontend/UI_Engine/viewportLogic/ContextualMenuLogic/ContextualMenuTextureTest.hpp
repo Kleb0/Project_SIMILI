@@ -2,6 +2,7 @@
 
 #include <glad/glad.h>
 #include <windows.h>
+#include "../../ThirdParty/CEF/cef_binary/include/cef_client.h"
 
 class ContextualMenuTextureTest 
 {
@@ -30,6 +31,13 @@ public:
 	void toggleVisibility() { visible_ = !visible_; }
 	bool isVisible() const { return visible_; }
 	
+	// CEF browser management
+	void setBrowser(CefRefPtr<CefBrowser> browser) { browser_ = browser; }
+	
+	// Mouse input forwarding to CEF
+	void sendMouseMove(int x, int y);
+	void sendMouseClick(int x, int y, bool is_left_button);
+	
 private:
 	void createTexture();
 	void createShaderProgram();
@@ -45,4 +53,6 @@ private:
 	
 	bool initialized_;
 	bool visible_;
+	
+	CefRefPtr<CefBrowser> browser_;
 };

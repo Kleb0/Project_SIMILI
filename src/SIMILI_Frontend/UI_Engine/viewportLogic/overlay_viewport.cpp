@@ -375,24 +375,37 @@ void OverlayViewport::initializeOpenGL()
 	
 	}
 	
-	// Initialize contextual menu texture test (red overlay)
-	contextual_menu_texture_test_ = new ContextualMenuTextureTest();
-	contextual_menu_texture_test_->initialize(width_, height_);
-	std::cout << "[OverlayViewport] Contextual menu red texture initialized" << std::endl;
-	
-	// Initialize contextual menu HTML renderer
-	contextual_menu_texture_renderer_ = new TextureRendererTest();
-	contextual_menu_texture_renderer_->initialize(width_, height_);
-	
+	// Initialize contextual menu dimensions first
 	contextual_menu_width_ = 300;
 	contextual_menu_height_ = 200;
 	contextual_menu_x_ = 100;
 	contextual_menu_y_ = 100;
 	
+	// Initialize contextual menu texture test (red overlay)
+	contextual_menu_texture_test_ = new ContextualMenuTextureTest();
+	contextual_menu_texture_test_->initialize(contextual_menu_width_, contextual_menu_height_);
+	std::cout << "[OverlayViewport] Contextual menu red texture initialized (" << contextual_menu_width_ << "x" << contextual_menu_height_ << ")" << std::endl;
+	
+	// Initialize contextual menu HTML renderer
+	contextual_menu_texture_renderer_ = new TextureRendererTest();
+	contextual_menu_texture_renderer_->initialize(width_, height_);
+	
 	contextual_menu_texture_renderer_->setRenderRect(contextual_menu_x_, contextual_menu_y_, 
 		contextual_menu_width_, contextual_menu_height_);
 	
 	contextual_menu_html_renderer_ = new HtmlTextureRenderer(contextual_menu_texture_renderer_);
+	
+	// Set callback to connect browser to ContextualMenuTextureTest when it's created
+	contextual_menu_html_renderer_->setOnBrowserCreatedCallback([this](CefRefPtr<CefBrowser> browser) {
+		if (contextual_menu_texture_test_) {
+			contextual_menu_texture_test_->setBrowser(browser);
+			std::cout << "[OverlayViewport] CEF browser connected to ContextualMenuTextureTest (browser valid: " 
+			          << (browser != nullptr) << ", host valid: " << (browser && browser->GetHost() != nullptr) << ")" << std::endl;
+		} else {
+			std::cout << "[OverlayViewport] ERROR: contextual_menu_texture_test_ is null in callback!" << std::endl;
+		}
+	});
+	
 	contextual_menu_html_renderer_->createBrowser("file:///ui/Contextual_Menu.html", 
 		contextual_menu_width_, contextual_menu_height_);
 	contextual_menu_html_renderer_->setViewportWindow(hwnd_);
@@ -630,7 +643,6 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				
 				SetCapture(hwnd);
 				
-				// Get mouse coordinates
 				int mouseX = LOWORD(lParam);
 				int mouseY = HIWORD(lParam);
 				
@@ -638,7 +650,20 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				std::cout << "[OverlayViewport] ImGuizmo state - IsOver: " << ImGuizmo::IsOver() 
 				          << " | IsUsing: " << ImGuizmo::IsUsing() << std::endl;
 				
-				// Check if we should process the click (only block when actively using gizmo)
+				if (overlay->contextual_menu_visible_ && overlay->contextual_menu_texture_test_)
+				{
+					int relX = mouseX - overlay->contextual_menu_x_;
+					int relY = mouseY - overlay->contextual_menu_y_;
+					
+					if (relX >= 0 && relX < overlay->contextual_menu_width_ && 
+						relY >= 0 && relY < overlay->contextual_menu_height_)
+					{
+						overlay->contextual_menu_texture_test_->sendMouseClick(relX, relY, true);
+						std::cout << "[OverlayViewport] Click forwarded to contextual menu at (" << relX << ", " << relY << ")" << std::endl;
+						return 0; // Consume the event
+					}
+				}
+				
 				if (shouldProcessEvent && !ImGuizmo::IsUsing())
 				{
 					std::cout << "[OverlayViewport] Processing click handler" << std::endl;
@@ -728,6 +753,26 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 			
 			case WM_MOUSEMOVE: 
 			{
+				// Get mouse coordinates
+				int mouseX = LOWORD(lParam);
+				int mouseY = HIWORD(lParam);
+				
+				// If contextual menu is visible, check if mouse is over it and forward events
+				if (overlay->contextual_menu_visible_ && overlay->contextual_menu_texture_test_)
+				{
+					// Calculate relative coordinates within the menu
+					int relX = mouseX - overlay->contextual_menu_x_;
+					int relY = mouseY - overlay->contextual_menu_y_;
+					
+					// Check if mouse is within menu bounds
+					if (relX >= 0 && relX < overlay->contextual_menu_width_ && 
+						relY >= 0 && relY < overlay->contextual_menu_height_)
+					{
+						std::cout << "[OverlayViewport] Mouse over contextual menu at relative pos (" << relX << ", " << relY << ")" << std::endl;
+						overlay->contextual_menu_texture_test_->sendMouseMove(relX, relY);
+					}
+				}
+				
 				// ImGui already processed this event at the top of WndProc
 				// Only handle camera movement if not over/using gizmo
 				if (!ImGuizmo::IsOver() && !ImGuizmo::IsUsing())

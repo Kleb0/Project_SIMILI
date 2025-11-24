@@ -1,6 +1,7 @@
 #include "ContextualMenuTextureTest.hpp"
 #include <iostream>
 #include <vector>
+#include "../../ThirdParty/CEF/cef_binary/include/cef_browser.h"
 
 // Vertex shader for rendering a textured quad
 const char* vertex_shader_source = R"(
@@ -41,6 +42,7 @@ ContextualMenuTextureTest::ContextualMenuTextureTest()
 	, height_(0)
 	, initialized_(false)
 	, visible_(false)
+	, browser_(nullptr)
 {
 }
 
@@ -220,7 +222,6 @@ void ContextualMenuTextureTest::resize(int width, int height)
 	width_ = width;
 	height_ = height;
 	
-	// Recreate texture with new size
 	if (texture_id_ != 0) {
 		glDeleteTextures(1, &texture_id_);
 		createTexture();
@@ -253,5 +254,39 @@ void ContextualMenuTextureTest::cleanup()
 	
 	initialized_ = false;
 	
-	std::cout << "[ContextualMenuTextureTest] Cleaned up" << std::endl;
+}
+
+void ContextualMenuTextureTest::sendMouseMove(int x, int y)
+{
+	if (!browser_ || !browser_->GetHost()) {
+		return;
+	}
+	
+	
+	CefMouseEvent mouse_event;
+	mouse_event.x = x;
+	mouse_event.y = y;
+	mouse_event.modifiers = 0;
+	
+	browser_->GetHost()->SendMouseMoveEvent(mouse_event, false);
+}
+
+void ContextualMenuTextureTest::sendMouseClick(int x, int y, bool is_left_button)
+{
+	if (!browser_ || !browser_->GetHost()) {
+		return;
+	}
+	
+	std::cout << "[ContextualMenuTextureTest] Sending mouse click to CEF at (" << x << ", " << y << ")" << std::endl;
+	
+	CefMouseEvent mouse_event;
+	mouse_event.x = x;
+	mouse_event.y = y;
+	mouse_event.modifiers = 0;
+	
+	CefBrowserHost::MouseButtonType button_type = is_left_button ? 
+		MBT_LEFT : MBT_RIGHT;
+	
+	browser_->GetHost()->SendMouseClickEvent(mouse_event, button_type, false, 1);
+	browser_->GetHost()->SendMouseClickEvent(mouse_event, button_type, true, 1);
 }

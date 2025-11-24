@@ -6,6 +6,7 @@
 #include "../../ThirdParty/CEF/cef_binary/include/cef_display_handler.h"
 #include "TextureRendererTest.hpp"
 #include <string>
+#include <functional>
 
 class HtmlTextureRenderer : public CefClient, public CefRenderHandler, public CefLifeSpanHandler, public CefDisplayHandler {
 public:
@@ -29,6 +30,11 @@ public:
     
     // Send keyboard event to the off-screen browser
     void sendKeyEvent(const CefKeyEvent& event);
+    
+    // Set callback to be called when browser is created
+    void setOnBrowserCreatedCallback(std::function<void(CefRefPtr<CefBrowser>)> callback) {
+        on_browser_created_callback_ = callback;
+    }
     
     // CefClient methods
     virtual CefRefPtr<CefRenderHandler> GetRenderHandler() override { return this; }
@@ -60,6 +66,7 @@ private:
     int width_;
     int height_;
     HWND viewport_hwnd_;
+    std::function<void(CefRefPtr<CefBrowser>)> on_browser_created_callback_;
     
     IMPLEMENT_REFCOUNTING(HtmlTextureRenderer);
 };
