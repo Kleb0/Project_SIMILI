@@ -306,25 +306,25 @@ void ThreeDWindow::onChangeMod()
     if (isPressed1  && !lastKeyState_1)
     {
         setModelingMode(&normalMode);
-        this->mainGUI->SetCurrentMode(currentMode);
+        // this->mainGUI->SetCurrentMode(currentMode); // MainSoftwareGUI excluded in CEF build
     }
 
     if (isPressed2 && !lastKeyState_2)
     {
         setModelingMode(&verticeMode);
-        this->mainGUI->SetCurrentMode(currentMode);
+        // this->mainGUI->SetCurrentMode(currentMode); // MainSoftwareGUI excluded in CEF build
     }
 
     if (isPressed3 && !lastKeyState_3)
     {
         setModelingMode(&faceMode);
-        this->mainGUI->SetCurrentMode(currentMode);
+        // this->mainGUI->SetCurrentMode(currentMode); // MainSoftwareGUI excluded in CEF build
     }
 
     if (isPressed4 && !lastKeyState_4)
     {
         setModelingMode(&edgeMode);
-        this->mainGUI->SetCurrentMode(currentMode);
+        // this->mainGUI->SetCurrentMode(currentMode); // MainSoftwareGUI excluded in CEF build
 
     }
 

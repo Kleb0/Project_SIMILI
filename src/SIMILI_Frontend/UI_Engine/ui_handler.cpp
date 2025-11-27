@@ -259,13 +259,16 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	int overlay_h = 100;
 	
 	overlay_viewport_->create(parent_hwnd, overlay_x, overlay_y, overlay_w, overlay_h);
-	// Hide overlay until JavaScript sends proper dimensions
-	overlay_viewport_->show(false);
 	
-	// Pass 3D scene to overlay
+	// Pass 3D scene to overlay IMMEDIATELY
 	if (three_d_scene_) 
 	{
 		overlay_viewport_->setThreeDScene(three_d_scene_);
+		std::cout << "[UIHandler] 3D Scene passed to overlay viewport" << std::endl;
+	}
+	else
+	{
+		std::cout << "[UIHandler] WARNING: No 3D scene available to pass to overlay!" << std::endl;
 	}
 	
 	overlay_viewport_->switchModeByKey(1);
@@ -273,6 +276,10 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	
 	// Initialize scene objects NOW that we have an OpenGL context
 	initializeSceneObjects();
+	
+	// Show overlay immediately with initial dimensions - JavaScript will update position later
+	overlay_viewport_->show(true);
+	std::cout << "[UIHandler] Overlay viewport shown (will be repositioned by JavaScript)" << std::endl;
 		
 	// Install window subclass to handle resize
 	SetWindowSubclass(parent_hwnd, ParentWindowProc, 0, reinterpret_cast<DWORD_PTR>(this));
@@ -421,23 +428,14 @@ void UIHandler::initializeSceneObjects()
 	{
 		overlay_viewport_->makeContextCurrent();
 		
-		// Initialize scene (will compile shaders, create grid VAO, etc.)
-		// NOTE: We DON'T initialize renderer_ because overlay renders directly, no FBO needed
-		three_d_scene_->initizalize();
-		
-		main_camera_->initialize();
-		
-		// Create cube mesh if pointer is provided
-		if (cube_mesh_ptr_) 
+		// Scene and camera are already initialized in main.cpp
+		// Just ensure they are passed to the overlay
+		if (three_d_scene_ && main_camera_) 
 		{
-			*cube_mesh_ptr_ = Primitives::CreateCubeMesh(1.0f, glm::vec3(0.0f, 0.0f, 0.0f), "Cube", true);
-			(*cube_mesh_ptr_)->initialize();
-			
-			three_d_scene_->addObject(*cube_mesh_ptr_);
+			overlay_viewport_->setThreeDScene(three_d_scene_);
+			std::cout << "[UIHandler] Scene with " << three_d_scene_->getObjectsRef().size() 
+			          << " objects passed to overlay" << std::endl;
 		}
-		
-		three_d_scene_->addObject(main_camera_);
-		three_d_scene_->setActiveCamera(main_camera_);
 		
 		scene_initialized_ = true;
 		

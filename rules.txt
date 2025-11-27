@@ -1,0 +1,3 @@
+- interdiction absolue de répondre avec des emoji dans le chat
+- interdiction absolue de dire " j'ai résolu le problème "
+- Regarde systématiquement fichiers que je te donne 

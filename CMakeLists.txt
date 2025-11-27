@@ -103,6 +103,25 @@ list(FILTER SOURCES EXCLUDE REGEX "/([Tt]ests?|[Uu]nit[Tt]ests?)/.*\\.cpp$")
 list(FILTER SOURCES EXCLUDE REGEX "src/SIMILI_Frontend/.*\\.cpp$")
 list(FILTER SOURCES EXCLUDE REGEX "src/SIMILI_Services/middleware/.*\\.cpp$")
 
+# Legacy UI code - most files still needed by CEF's OverlayViewport
+# Only exclude the old main GUI system (MainSoftwareGUI) and ui_process_manager
+list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/UI/MainSoftwareGUI.cpp")
+list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ui_process_manager.cpp")
+
+# Add CEF sources from SIMILI_Frontend (exclude main_ui.cpp - we use main.cpp now)
+file(GLOB CEF_UI_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/CameraControl/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/HTMLTextureRenderer/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/Keymanagement/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/Raycasting/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/ClickHandling/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/ContextualMenuLogic/*.cpp"
+)
+list(REMOVE_ITEM CEF_UI_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/main_ui.cpp")
+list(APPEND SOURCES ${CEF_UI_SOURCES})
+
 # Add SIMILI_Services/middleware sources explicitly
 list(APPEND SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware/SimpleHttpServer.cpp
@@ -110,6 +129,7 @@ list(APPEND SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware/HttpSession.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware/HttpListener.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware/ContextRegistry.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/router/RouterSim.cpp
 )
 
 # Add KeyManager from SIMILI_Frontend (needed for ECS input system)
@@ -121,7 +141,7 @@ list(APPEND SOURCES
 file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS src/*.hpp)
 file(GLOB_RECURSE UIS CONFIGURE_DEPENDS src/UI/*.ui)
 
-# ImGui sources
+# ImGui sources (including Win32 backend for OverlayViewport)
 file(GLOB IMGUI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/imgui.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/imgui_draw.cpp
@@ -129,6 +149,7 @@ file(GLOB IMGUI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/imgui_widgets.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/backends/imgui_impl_glfw.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/backends/imgui_impl_opengl3.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/backends/imgui_impl_win32.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/imgui_demo.cpp
 )
 
@@ -244,13 +265,22 @@ if(NOT D3D12_LIBRARY OR NOT DXGI_LIBRARY OR NOT D3DCOMPILER_LIBRARY)
 endif()
 
 
-# Executable
-add_executable(${PROJECT_NAME}
-    ${SOURCES}
-    ${HEADERS}
-    ${UIS}
-    ${GLAD_SOURCES}
-)
+# Executable (Windows subsystem for wWinMain)
+if(WIN32)
+    add_executable(${PROJECT_NAME} WIN32
+        ${SOURCES}
+        ${HEADERS}
+        ${UIS}
+        ${GLAD_SOURCES}
+    )
+else()
+    add_executable(${PROJECT_NAME}
+        ${SOURCES}
+        ${HEADERS}
+        ${UIS}
+        ${GLAD_SOURCES}
+    )
+endif()
 
 # Unity builds for faster compilation (optional - can be disabled if causing issues)
 set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -266,17 +296,6 @@ target_precompile_headers(${PROJECT_NAME} PRIVATE
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UnitTest
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ContextualMenu
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/EdgeLoopControl
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ThreeDModes
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/HierarchyInspectorLogic
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/HistoryLogic
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ObjectInspectorLogic
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/OptionMenu
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ThreeDWindow
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/UIDocking
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDInteractions
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDSceneDNA
@@ -300,11 +319,25 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/GLFW/include  
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/ImGuizmo
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glad/include
-    ${SDL3_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/tinyfiledialogs
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glm
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/nlohmann
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/router
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/types
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/CameraControl
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/HTMLTextureRenderer
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/Keymanagement
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/Raycasting
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/ClickHandling
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/ContextualMenuLogic
+    ${SDL3_INCLUDE_DIR}
     ${Boost_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/tinyfiledialogs
 )
 
 # Add CEF include directories if enabled

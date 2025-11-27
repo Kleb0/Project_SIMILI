@@ -208,7 +208,7 @@ bool OverlayViewport::create(HWND parent, int x, int y, int width, int height)
 	wc.lpfnWndProc = WndProc;
 	wc.hInstance = GetModuleHandle(nullptr);
 	wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-	wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
+	wc.hbrBackground = nullptr;
 	wc.lpszClassName = kOverlayClassName;
 	
 	static bool class_registered = false;
@@ -223,14 +223,14 @@ bool OverlayViewport::create(HWND parent, int x, int y, int width, int height)
 		class_registered = true;
 	}
 	
-	// Create the overlay window - ensure it receives mouse input
+	// Create child window OF the CEF window so it's always drawn over it
 	hwnd_ = CreateWindowExW(
-		WS_EX_NOPARENTNOTIFY,  // Don't notify parent, but DO receive input
+		0,  // No extended styles
 		kOverlayClassName,
 		L"OpenGL Overlay",
-		WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_TABSTOP,
+		WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
 		x, y, width, height,
-		parent,
+		parent,  // Parent is the CEF window
 		nullptr,
 		GetModuleHandle(nullptr),
 		this
@@ -239,13 +239,12 @@ bool OverlayViewport::create(HWND parent, int x, int y, int width, int height)
 	if (!hwnd_) 
 	{
 		DWORD error = GetLastError();
+		std::cerr << "[OverlayViewport] Failed to create window, error: " << error << std::endl;
 		return false;
 	}
 	
-	// Ensure window is top-level and receives input
-	SetWindowPos(hwnd_, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+	std::cout << "[OverlayViewport] Created as CHILD window of CEF (will always be on top)" << std::endl;
 	
-	// Verify click handler is initialized
 	if (!click_handler_) 
 	{
 		std::cerr << "[OverlayViewport] WARNING: Click handler not initialized!" << std::endl;
@@ -267,14 +266,8 @@ void OverlayViewport::destroy()
 {
 	shutdownImGui();
 	
-	if (gl_context_) {
-		wglMakeCurrent(hdc_, gl_context_);
-		wglMakeCurrent(nullptr, nullptr);
-		wglDeleteContext(gl_context_);
-		gl_context_ = nullptr;
-	}
-	
-	if (hdc_) {
+	if (hdc_) 
+	{
 		ReleaseDC(hwnd_, hdc_);
 		hdc_ = nullptr;
 	}
@@ -290,58 +283,38 @@ void OverlayViewport::initializeOpenGL()
 	hdc_ = GetDC(hwnd_);
 	
 	PIXELFORMATDESCRIPTOR pfd = {};
-	pfd.nSize = sizeof(pfd);
+	pfd.nSize = sizeof(PIXELFORMATDESCRIPTOR);
 	pfd.nVersion = 1;
 	pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
 	pfd.iPixelType = PFD_TYPE_RGBA;
 	pfd.cColorBits = 32;
 	pfd.cDepthBits = 24;
 	pfd.cStencilBits = 8;
-	pfd.cAlphaBits = 8;
+	pfd.iLayerType = PFD_MAIN_PLANE;
 	
-	int pixel_format = ChoosePixelFormat(hdc_, &pfd);
-	SetPixelFormat(hdc_, pixel_format, &pfd);
-	
-	HGLRC temp_context = wglCreateContext(hdc_);
-	wglMakeCurrent(hdc_, temp_context);
-	
-	if (!gladLoadGL()) 
-	{
-		std::cerr << "[OverlayViewport] Failed to load GLAD" << std::endl;
-		wglMakeCurrent(nullptr, nullptr);
-		wglDeleteContext(temp_context);
+	int pixelFormat = ChoosePixelFormat(hdc_, &pfd);
+	if (!pixelFormat) {
+		std::cerr << "[OverlayViewport] Failed to choose pixel format" << std::endl;
 		return;
 	}
 	
-	int attribs[] = 
-	{
-		WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
-		WGL_CONTEXT_MINOR_VERSION_ARB, 6,
-		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
-		0
-	};
-	
-	PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = 
-	(PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
-	
-	if (wglCreateContextAttribsARB) 
-	{
-		gl_context_ = wglCreateContextAttribsARB(hdc_, 0, attribs);
-		wglMakeCurrent(nullptr, nullptr);
-		wglDeleteContext(temp_context);
-		wglMakeCurrent(hdc_, gl_context_);
-		
-		std::cout << "[OverlayViewport] OpenGL " << glGetString(GL_VERSION) 
-				  << " - " << glGetString(GL_RENDERER)
-				  << " (Core Profile 4.6)" << std::endl;
+	if (!SetPixelFormat(hdc_, pixelFormat, &pfd)) {
+		std::cerr << "[OverlayViewport] Failed to set pixel format" << std::endl;
+		return;
 	}
-	else 
-	{
-		gl_context_ = temp_context;
-		std::cout << "[OverlayViewport] OpenGL " << glGetString(GL_VERSION) 
-				  << " - " << glGetString(GL_RENDERER)
-				  << " (Legacy - fallback)" << std::endl;
+	
+	static bool glad_loaded = false;
+	if (!glad_loaded) {
+		if (!gladLoadGL()) 
+		{
+			std::cerr << "[OverlayViewport] Failed to load GLAD extensions" << std::endl;
+			return;
+		}
+		glad_loaded = true;
 	}
+	
+	std::cout << "[OverlayViewport] Using shared OpenGL context - " 
+			  << glGetString(GL_VERSION) << " - " << glGetString(GL_RENDERER) << std::endl;
 	
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LESS);
@@ -349,7 +322,7 @@ void OverlayViewport::initializeOpenGL()
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	
-	std::cout << "[OverlayViewport] OpenGL initialized for 3D scene rendering" << std::endl;
+	std::cout << "[OverlayViewport] OpenGL state configured for 3D scene rendering" << std::endl;
 	
 	// Initialize ImGui after OpenGL context is ready
 	initializeImGui();
@@ -455,13 +428,15 @@ void OverlayViewport::shutdownImGui()
 // ============================================================================
 
 void OverlayViewport::makeContextCurrent() {
-	if (hdc_ && gl_context_) {
-		wglMakeCurrent(hdc_, gl_context_);
-	}
+	// Using shared GLFW context from main.cpp - no need to switch
+	// if (hdc_ && gl_context_) {
+	// 	wglMakeCurrent(hdc_, gl_context_);
+	// }
 }
 
 void OverlayViewport::releaseContext() {
-	wglMakeCurrent(nullptr, nullptr);
+	// No-op - using shared GLFW context
+	// wglMakeCurrent(nullptr, nullptr);
 }
 
 // ============================================================================
@@ -470,7 +445,7 @@ void OverlayViewport::releaseContext() {
 
 void OverlayViewport::render() 
 {
-	if (!hwnd_ || !gl_context_ || !rendering_enabled_) 
+	if (!hwnd_ || !rendering_enabled_) 
 	{
 		return;
 	}
@@ -478,7 +453,6 @@ void OverlayViewport::render()
 	// Process CEF message loop for off-screen rendering
 	CefDoMessageLoopWork();
 	
-	wglMakeCurrent(hdc_, gl_context_);
 	
 	if (imgui_initialized_) 
 	{
@@ -525,22 +499,28 @@ void OverlayViewport::render()
 	}
 	
 	SwapBuffers(hdc_);
-	
 }
 
 void OverlayViewport::renderScene() 
 {
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glViewport(0, 0, width_, height_);
-	
 	if (three_d_scene_) 
 	{
+		// Clear with scene background color before rendering
+		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glViewport(0, 0, width_, height_);
+		
+		// Render 3D scene (grid + objects)
 		three_d_scene_->renderDirect(width_, height_);
-		return;
 	}
-	
-	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-	std::cout << "[OverlayViewport] WARNING: No 3D scene set" << std::endl;
+	else 
+	{
+		// Fallback: clear to red if no scene
+		glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glViewport(0, 0, width_, height_);
+		std::cout << "[OverlayViewport] No 3D scene - showing RED fallback (" << width_ << "x" << height_ << ")" << std::endl;
+	}
 }
 
 // ============================================================================
@@ -549,18 +529,16 @@ void OverlayViewport::renderScene()
 
 void OverlayViewport::setPosition(int x, int y, int width, int height) 
 {
-	if (hwnd_) 
+	if (hwnd_ && parent_) 
 	{
-		SetWindowPos(hwnd_, HWND_TOP, x, y, width, height, 0);
+		// Since we're a CHILD window, coordinates are already relative to parent
+		// Just use them directly without ClientToScreen conversion
+		MoveWindow(hwnd_, x, y, width, height, TRUE);
+		
 		width_ = width;
 		height_ = height;
 		
-		if (gl_context_ && hdc_) 
-		{
-			wglMakeCurrent(hdc_, gl_context_);
-			glViewport(0, 0, width, height);
-			wglMakeCurrent(nullptr, nullptr);
-		}
+		glViewport(0, 0, width, height);
 		
 		if (texture_renderer_test_) 
 		{
@@ -571,6 +549,8 @@ void OverlayViewport::setPosition(int x, int y, int width, int height)
 		{
 			contextual_menu_texture_renderer_->resize(width, height);
 		}
+		
+		std::cout << "[OverlayViewport] Positioned at (" << x << ", " << y << ") size " << width << "x" << height << std::endl;
 	}
 }
 

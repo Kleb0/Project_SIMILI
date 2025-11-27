@@ -2,7 +2,7 @@
 setlocal EnableExtensions
 
 echo ========================================
-echo   FAST BUILD (UI + SIMILI)
+echo   BUILD SIMILI (Single Executable)
 echo ========================================
 echo.
 
@@ -12,75 +12,7 @@ echo === Visual Studio Environment initialized ===
 for /f %%A in ('powershell -NoProfile -Command "(Get-Date).ToString('o')"') do set "START_ISO=%%A"
 
 echo.
-echo [1/3] Building SIMILI_UI...
-cd /d "%~dp0src\SIMILI_Frontend\build"
-if %errorlevel% neq 0 (
-    echo ERROR: Folder src\SIMILI_Frontend\build not found
-    exit /b 1
-)
-
-cmake --build . --config Release --parallel %NUMBER_OF_PROCESSORS%
-if %errorlevel% neq 0 (
-    echo ERROR: SIMILI_UI compilation failed
-    exit /b 1
-)
-echo   + SIMILI_UI.exe compiled
-
-cd /d "%~dp0"
-
-echo.
-echo [2/3] Deploying SIMILI_UI...
-
-
-if not exist "build" mkdir "build"
-if not exist "build\Release" mkdir "build\Release"
-
-if not exist "src\ThirdParty\CEF\cef_binary\" (
-    echo ERROR: CEF binary directory not found: src\ThirdParty\CEF\cef_binary\
-    echo Please download CEF binaries first using download_cef.bat
-    exit /b 1
-)
-
-if not exist "src\ThirdParty\CEF\cef_binary\Release\libcef.dll" (
-    echo ERROR: CEF binaries not found in src\ThirdParty\CEF\cef_binary\Release\
-    echo Please download CEF binaries first using download_cef.bat
-    exit /b 1
-)
-
-copy /Y "src\SIMILI_Frontend\build\UI_Engine\Release\SIMILI_UI.exe" "build\Release\" >nul 2>nul
-if %errorlevel% neq 0 (
-    echo WARNING: Failed to copy SIMILI_UI.exe
-)
-
-echo Copying CEF DLLs...
-copy /Y "src\ThirdParty\CEF\cef_binary\Release\*.dll" "build\Release\" >nul
-if %errorlevel% neq 0 (
-    echo ERROR: Failed to copy CEF DLLs
-    exit /b 1
-)
-
-copy /Y "src\ThirdParty\CEF\cef_binary\Release\*.bin" "build\Release\" >nul 2>nul
-
-echo Copying CEF resources...
-copy /Y "src\ThirdParty\CEF\cef_binary\Resources\*.pak" "build\Release\" >nul 2>nul
-copy /Y "src\ThirdParty\CEF\cef_binary\Resources\*.dat" "build\Release\" >nul 2>nul
-
-if not exist "build\Release\locales" mkdir "build\Release\locales"
-xcopy /Y /Q "src\ThirdParty\CEF\cef_binary\Resources\locales\*" "build\Release\locales\" >nul 2>nul
-
-echo Copying UI HTML files...
-if not exist "build\Release\ui" mkdir "build\Release\ui"
-xcopy /Y /Q "ui\*.html" "build\Release\ui\" >nul 2>nul
-xcopy /Y /Q "ui\*.css" "build\Release\ui\" >nul 2>nul
-xcopy /Y /Q "ui\*.js" "build\Release\ui\" >nul 2>nul
-if %errorlevel% neq 0 (
-    echo WARNING: Failed to copy UI HTML files
-)
-
-echo   + SIMILI_UI deployed with CEF dependencies
-
-echo.
-echo [3/3] Building SIMILI...
+echo [1/3] Building SIMILI (with CEF integration)...
 
 if not exist build mkdir build
 cd build
@@ -114,6 +46,54 @@ echo   + SIMILI compiled
 
 cd ..
 
+echo.
+echo [2/3] Deploying CEF dependencies...
+
+if not exist "build\Release" mkdir "build\Release"
+
+if not exist "src\ThirdParty\CEF\cef_binary\" (
+    echo ERROR: CEF binary directory not found: src\ThirdParty\CEF\cef_binary\
+    echo Please download CEF binaries first using download_cef.bat
+    exit /b 1
+)
+
+if not exist "src\ThirdParty\CEF\cef_binary\Release\libcef.dll" (
+    echo ERROR: CEF binaries not found in src\ThirdParty\CEF\cef_binary\Release\
+    echo Please download CEF binaries first using download_cef.bat
+    exit /b 1
+)
+
+echo Copying CEF DLLs...
+copy /Y "src\ThirdParty\CEF\cef_binary\Release\*.dll" "build\Release\" >nul
+if %errorlevel% neq 0 (
+    echo ERROR: Failed to copy CEF DLLs
+    exit /b 1
+)
+
+copy /Y "src\ThirdParty\CEF\cef_binary\Release\*.bin" "build\Release\" >nul 2>nul
+
+echo Copying CEF resources...
+copy /Y "src\ThirdParty\CEF\cef_binary\Resources\*.pak" "build\Release\" >nul 2>nul
+copy /Y "src\ThirdParty\CEF\cef_binary\Resources\*.dat" "build\Release\" >nul 2>nul
+
+if not exist "build\Release\locales" mkdir "build\Release\locales"
+xcopy /Y /Q "src\ThirdParty\CEF\cef_binary\Resources\locales\*" "build\Release\locales\" >nul 2>nul
+
+echo   + CEF dependencies deployed
+
+echo.
+echo [3/3] Copying UI HTML files...
+
+if not exist "build\Release\ui" mkdir "build\Release\ui"
+xcopy /Y /Q "ui\*.html" "build\Release\ui\" >nul 2>nul
+xcopy /Y /Q "ui\*.css" "build\Release\ui\" >nul 2>nul
+xcopy /Y /Q "ui\*.js" "build\Release\ui\" >nul 2>nul
+if %errorlevel% neq 0 (
+    echo WARNING: Failed to copy UI HTML files
+)
+
+echo   + UI files deployed
+
 for /f %%A in ('powershell -NoProfile -Command "(Get-Date).ToString('o')"') do set "END_ISO=%%A"
 
 for /f "usebackq" %%A in (`powershell -NoProfile -Command ^
@@ -125,7 +105,6 @@ echo    BUILD COMPLETE!
 echo    Total time: %DURATION%s
 echo ========================================
 echo.
-echo Executables:
-echo   - build\Release\Project_SIMILI.exe
-echo   - build\Release\SIMILI_UI.exe
+echo Executable:
+echo   - build\Release\Project_SIMILI.exe (with CEF integrated)
 echo.

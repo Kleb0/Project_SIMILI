@@ -74,10 +74,10 @@
     </div>
     
     <script>
-        // Fetch scene info from the UI process router (port 8081)
+        // Fetch scene info from the main process router (port 8080)
         async function fetchSceneInfo() {
             try {
-                const response = await fetch('http://localhost:8081/api/scene-info');
+                const response = await fetch('http://localhost:8080/api/scene-info');
                 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);

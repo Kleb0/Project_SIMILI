@@ -1,292 +1,258 @@
-#define GLM_ENABLE_EXPERIMENTAL
-#define SDL_MAIN_HANDLED
-#define IMGUI_IMPL_OPENGL_LOADER_GLAD
+// CEF includes - MUST be first to avoid conflicts
+#include "include/cef_app.h"
+#include "include/cef_client.h"
+#include "include/cef_sandbox_win.h"
+#include "include/views/cef_browser_view.h"
+#include "include/views/cef_window.h"
+#include "SIMILI_Frontend/UI_Engine/ui_handler.hpp"
+#include "SIMILI_Frontend/UI_Engine/simple_window_delegate.hpp"
+#include "SIMILI_Frontend/UI_Engine/simple_browser_view_delegate.hpp"
 
-#define NOMINMAX
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#undef APIENTRY
+#include "SIMILI_Services/router/RouterSim.hpp"
+#include "SIMILI_Services/types/RouterTypes.hpp"
+#include "SIMILI_Services/middleware/SimpleHttpServer.hpp"
+#include "Engine/OpenGLContext.hpp"
+#include "Engine/ThreeDScene.hpp"
+#include "WorldObjects/Camera/Camera.hpp"
+#include "WorldObjects/Mesh/Mesh.hpp"
+#include "Engine/PrimitivesCreation/CreatePrimitive.hpp"
+
+#include <iostream>
+#include <sstream>
+#include <fstream>
+#include <thread>
+#include <chrono>
+#include <filesystem>
+
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-#include <filesystem>
 namespace fs = std::filesystem;
 fs::path gExecutableDir;
 
-#include <sstream>
-#include <fstream>
-#include <iostream>
-#include <thread>
-#include <chrono>
-
-#include "Engine/OpenGLContext.hpp"
-#include "Engine/ThreeDScene.hpp"
-#include "Engine/ThreeDObjectSelector.hpp"
-#include "SIMILI_Services/middleware/SimpleHttpServer.hpp"
-#include "SIMILI_Services/router/RouterSim.hpp"
-
-#include "WorldObjects/Entities/ThreedObject.hpp"
-#include "WorldObjects/Camera/Camera.hpp"
-
-#include "Engine/PrimitivesCreation/CreatePrimitive.hpp"
-#include "WorldObjects/Mesh/Mesh.hpp"
-
-#include <glm/gtc/matrix_transform.hpp>
-#include <SDL3/SDL.h>
-#include "UI/MainSoftwareGUI.hpp"
-#include "UI/HistoryLogic/HistoryLogic.hpp"
-#include "UI/InfoWindow.hpp"
-#include "UI/ThreeDWindow/ThreeDWindow.hpp"
-#include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
-#include "UI/UIdocking/UiCreator.hpp"
-#include "UI/ObjectInspectorLogic/ObjectInspector.hpp"
-#include "UI/ThreeDModes/ThreeDMode.hpp"
-#include "UI/ThreeDModes/Vertice_Mode.hpp"
-#include "UI/ThreeDModes/Normal_Mode.hpp"
-#include "UI/ContextualMenu/ContextualMenu.hpp"
-#include "UI/OptionMenu/OptionsMenu.hpp"
-#include "UI/EdgeLoopControl/EdgeLoopControl.hpp"
-#include "Engine/SimiliSelector.hpp"
-#include "Engine/ErrorBox.hpp"
-#include "Engine/ui_process_manager.hpp"
-
-// #include "UI/DirectX12TestWindow.hpp"
-
-UIProcessManager* g_uiManager = nullptr;
+#ifdef _WIN32
+#include <windows.h>
 
 BOOL WINAPI ConsoleCtrlHandler(DWORD dwCtrlType) {
     if (dwCtrlType == CTRL_CLOSE_EVENT || dwCtrlType == CTRL_C_EVENT || 
         dwCtrlType == CTRL_BREAK_EVENT || dwCtrlType == CTRL_LOGOFF_EVENT || 
         dwCtrlType == CTRL_SHUTDOWN_EVENT) {
         
-        std::cout << "[ConsoleCtrl] Cleanup signal received, stopping UI process..." << std::endl;
-        
-        if (g_uiManager) {
-            g_uiManager->stop();
-        }
-        
+        std::cout << "[ConsoleCtrl] Cleanup signal received..." << std::endl;
         return TRUE;
     }
     return FALSE;
 }
 
-int main(int argc, char **argv)
+int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine, int nCmdShow)
 {
-    gExecutableDir = fs::path(argv[0]).parent_path();
+    UNREFERENCED_PARAMETER(hPrevInstance);
+    UNREFERENCED_PARAMETER(lpCmdLine);
+
+    CefMainArgs main_args(hInstance);
+    CefRefPtr<UIHandler> handler(new UIHandler);
+
+    int exit_code = CefExecuteProcess(main_args, handler, nullptr);
+    if (exit_code >= 0) 
+    {
+        return exit_code;
+    }
+
+    // Console allocation
+    static bool console_allocated = false;
+    if (!console_allocated) 
+    {
+        AllocConsole();
+        FILE* fp;
+        freopen_s(&fp, "CONOUT$", "w", stdout);
+        freopen_s(&fp, "CONOUT$", "w", stderr);
+        console_allocated = true;
+    }
+
+    {
+        wchar_t exePath[MAX_PATH];
+        GetModuleFileNameW(NULL, exePath, MAX_PATH);
+        gExecutableDir = fs::path(exePath).parent_path();
+    }
 
     SetConsoleCtrlHandler(ConsoleCtrlHandler, TRUE);
-    
-    std::cout << "[Main] About to start HTTP Server..." << std::endl;
-    try {
-        SIMILI::Server::SimpleHttpServer::getInstance().start(8080);
-        std::cout << "[Main] HTTP Server started successfully" << std::endl;
+
+    std::cout << "[Main] Starting SIMILI with CEF..." << std::endl;
+
+    // Initialize GLFW (required for OpenGL context)
+    if (!glfwInit()) {
+        std::cerr << "[Main] Failed to initialize GLFW" << std::endl;
+        return -1;
     }
+    std::cout << "[Main] GLFW initialized" << std::endl;
+
+    // Create hidden GLFW window for OpenGL context
+    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    
+    GLFWwindow* hidden_window = glfwCreateWindow(800, 600, "SIMILI_Hidden_GL_Context", nullptr, nullptr);
+    if (!hidden_window) {
+        std::cerr << "[Main] Failed to create GLFW window for OpenGL context" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    
+    glfwMakeContextCurrent(hidden_window);
+    
+    // Initialize GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+        std::cerr << "[Main] Failed to initialize GLAD" << std::endl;
+        glfwDestroyWindow(hidden_window);
+        glfwTerminate();
+        return -1;
+    }
+    std::cout << "[Main] OpenGL " << glGetString(GL_VERSION) << " initialized" << std::endl;
+    
+    // IMPORTANT: Keep this GLFW context current throughout the application lifetime
+    // OverlayViewport will share this context instead of creating its own
+
+    // Start HTTP/HTTPS Server
+    std::cout << "[Main] Starting HTTP Server..." << std::endl;
+    try {
+        SIMILI::Server::SimpleHttpServer::getInstance().start(8080, 8443);
+        std::cout << "[Main] HTTP Server started on port 8080" << std::endl;
+    } 
     catch (const std::exception& e) {
         std::cerr << "[Main] ERROR starting HTTP Server: " << e.what() << std::endl;
+        glfwDestroyWindow(hidden_window);
+        glfwTerminate();
         return -1;
     }
 
-    UIProcessManager uiManager;
-    g_uiManager = &uiManager;
-    
-    if (!uiManager.start()) {
-        std::cerr << "Error: Failed to launch SIMILI_UI.exe" << std::endl;
-    } else {
-        std::cout << "SIMILI_UI.exe launched successfully!" << std::endl;
-    }
-
-    MainSoftwareGUI gui(1280, 720, "Main GUI");
-    SimiliSelector mySimiliSelector;
-    InfoWindow myInfoWindow;
-    ThreeDWindow myThreeDWindow;
+    // Initialize 3D Scene and Camera
     ThreeDScene myThreeDScene;
-    ThreeDObjectSelector selector;
     Camera mainCamera;
-    HierarchyInspector myHierarchy;
-    ObjectInspector objectInspector;
-    HistoryLogic historyLogic;
-    ContextualMenu contextualMenu;
-    OptionsMenuContent optionsMenu;
-    EdgeLoopControl edgeLoopControl;
-
-
-    Mesh* cubeMesh1 = Primitives::CreateCubeMesh(1.0f,glm::vec3(0.0f, 0.0f, 0.0f), "Cube", true);
-
-    // ------- DirectX 12 has been implemented, so comment it for now as i don't need it actually ------- //
-    // If you want to use DirectX 12, uncomment the following lines and make sure to include the necessary headers.
-
-    // DirectX12TestWindow dx12Window;
-    // dx12Window.getRenderer()->DetectGPU();
-
-    // dx12Window.title = "DirectX 12 Preview";
-    // dx12Window.text = "DirectX 12 is active !";
-
-    // ----------------------------------------- //
-
-    myThreeDWindow.glfwWindow = gui.getWindow();
-    myInfoWindow.title = "Project Viewer";
-    myThreeDWindow.title = "3D Viewport";
-
     mainCamera.setName("MainCamera");
+    mainCamera.initialize();
 
-    // Create OpenGL context AFTER GLFW is initialized
+    Mesh* cubeMesh1 = Primitives::CreateCubeMesh(1.0f, glm::vec3(0.0f, 0.0f, 0.0f), "Cube", true);
+    cubeMesh1->initialize();
+
     OpenGLContext renderer;
     std::cout << "[Main] OpenGL Context ID: " << renderer.getContextID() << std::endl;
-    
-    myThreeDWindow.setRenderer(renderer);
-    myThreeDWindow.setHierarchy(&myHierarchy);
-    myThreeDWindow.setObjectInspector(&objectInspector);
-    myThreeDWindow.setThreeDScene(&myThreeDScene);
-    
-    // Set OpenGL context BEFORE initializing the scene
+
     myThreeDScene.setOpenGLContext(&renderer);
     myThreeDScene.initizalize();
-    
-    // ===== Register context and scene in ECS for sharing with UI process =====
-    std::cout << "[Main] Registering OpenGL context and scene in ECS..." << std::endl;
-    auto& registry = SIMILI::Server::SimpleHttpServer::getInstance().getContextRegistry();
-    
-    // Create an entity for the main process context
-    auto mainEntity = registry.createEntity();
-    
-    // Add components to the entity
-    registry.addOpenGLContextComponent(mainEntity, &renderer, renderer.getContextID());
-    registry.addSceneComponent(mainEntity, &myThreeDScene, myThreeDScene.getSceneID());
-    registry.addMetadataComponent(mainEntity, "SIMILI_Main", "2025-11-06");
-    
-    std::cout << "[Main] Registered entity " << mainEntity << " with:" << std::endl;
-    std::cout << "  - OpenGL Context ID: " << renderer.getContextID() << std::endl;
-    std::cout << "  - Scene ID: " << myThreeDScene.getSceneID() << std::endl;
-    std::cout << "[Main] Context and scene are now shareable via HTTP server" << std::endl;
-    
-    auto& router = SIMILI::Server::SimpleHttpServer::getInstance().getRouter();
-
-    router.get("/api/context", [&registry](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response
-    {
-        SIMILI::Router::Response res;
-        res.statusCode = 200;
-        res.headers["Content-Type"] = "application/json";
-        
-        auto mainEntityOpt = registry.findEntityByProcessName("SIMILI_Main");
-        if (!mainEntityOpt.has_value()) 
-        {
-            res.statusCode = 404;
-            res.body = "{\"error\": \"Main process context not found\"}";
-            return res;
-        }
-        
-        auto entity = mainEntityOpt.value();
-        std::string contextID = "unknown";
-        std::string sceneID = "unknown";
-        
-        auto contextComp = registry.getOpenGLContextComponent(entity);
-        if (contextComp.has_value()) 
-        {
-            contextID = contextComp.value().contextID;
-        }
-        
-        auto sceneComp = registry.getSceneComponent(entity);
-        if (sceneComp.has_value()) 
-        {
-            sceneID = sceneComp.value().sceneID;
-        }
-        
-        res.body = "{\"contextID\": \"" + contextID + "\", \"sceneID\": \"" + sceneID + "\"}";
-        return res;
-    }, 
-    "Expose OpenGL context and scene info");
-    
-
-    std::cout << "[Main] Route /api/context registered in HTTP server" << std::endl;
-    
-    router.get("/api/scene/objects", [&myThreeDScene](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response 
-    {
-        SIMILI::Router::Response res;
-        res.statusCode = 200;
-        res.headers["Content-Type"] = "application/json";
-        
-        try {
-            nlohmann::json objectsJson = myThreeDScene.getObjectsListAsJson();
-            res.body = objectsJson.dump();
-        } catch (const std::exception& e) {
-            res.statusCode = 500;
-            res.body = "{\"error\": \"Failed to retrieve objects: " + std::string(e.what()) + "\"}";
-        }
-        
-        return res;
-    }, 
-    "Get list of all objects in the scene");
-    std::cout << "[Main] Route /api/scene/objects registered in HTTP server" << std::endl;
-
-
-    // -------- GUI SETUP -------- //
-    
-    mainCamera.initialize();
-    cubeMesh1->initialize();
-    
-    glfwPollEvents();
-    
-    myThreeDScene.addObject(cubeMesh1);
-    myThreeDScene.addObject(&mainCamera);
-    
-
     myThreeDScene.setActiveCamera(&mainCamera);
     
+    // Add objects to scene
+    myThreeDScene.addObject(cubeMesh1);
+    myThreeDScene.addObject(&mainCamera);
+
+    std::cout << "[Main] 3D Scene initialized with ID: " << myThreeDScene.getSceneID() << std::endl;
+
+    // Register API routes NOW that scene and renderer exist
+    auto& router = SIMILI::Server::SimpleHttpServer::getInstance().getRouter();
     
-    myThreeDScene.render();
-    myThreeDWindow.setModelingMode(&myThreeDWindow.normalMode);
-    myThreeDWindow.setSimiliSelector(&mySimiliSelector);
-
-    mySimiliSelector.setWindow(&myThreeDWindow);      
-
-    historyLogic.setTitle("SUPER HISTORY LOGGER");
-    historyLogic.setObjectInspector(&objectInspector);
-    historyLogic.setThreeDScene(&myThreeDScene);
-    historyLogic.setThreeDWindow(&myThreeDWindow);
-    historyLogic.setHierarchyInspector(&myHierarchy);
-
-    auto* sdna = myThreeDScene.getSceneDNA();
-    sdna->setSceneRef(&myThreeDScene);
-
-    myThreeDScene.setHierarchyInspector(&myHierarchy);
-    myThreeDScene.setThreeDWindow(&myThreeDWindow);
-    contextualMenu.setScene(&myThreeDScene);
-    contextualMenu.setHierarchyInspector(&myHierarchy);
-    contextualMenu.setObjectInspector(&objectInspector);
-    contextualMenu.setThreeDWindow(&myThreeDWindow);
-    mySimiliSelector.setScene(&myThreeDScene);      
-
-    myHierarchy.setThreeDScene(&myThreeDScene);
-    myHierarchy.setThreeDWindow(&myThreeDWindow);
-    myHierarchy.setObjectInspector(&objectInspector);
-
-    optionsMenu.setScene(&myThreeDScene);
-
-    gui.add(myInfoWindow);
-    gui.add(myThreeDWindow);
-    gui.add(objectInspector);
-    gui.add(myHierarchy);
-    gui.add(historyLogic);
-    gui.setContextualMenu(&contextualMenu);
-    gui.setOptionsMenu(&optionsMenu);
-    gui.setEdgeLoopControl(&edgeLoopControl);
-    gui.setThreeDWindow(&myThreeDWindow);
-    gui.setObjectInspector(&objectInspector);
-    myThreeDWindow.setMainGUI(&gui);
-    gui.SetCurrentMode(&myThreeDWindow.normalMode);
-
-    // add(gui, dx12Window);
-
-    gui.setScene(&myThreeDScene);
-
-    gui.run();
+    // Route: Get OpenGL Context ID
+    router.get("/api/context", [&renderer](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response {
+        SIMILI::Router::Response resp;
+        resp.statusCode = 200;
+        resp.statusMessage = "OK";
+        resp.body = "{\"contextId\": \"" + renderer.getContextID() + "\"}";
+        resp.headers["Content-Type"] = "application/json";
+        return resp;
+    }, "Get OpenGL context ID");
     
-    UiCreator::saveCurrentLayoutToDefault();
+    // Route: Get scene objects
+    router.get("/api/scene/objects", [&myThreeDScene](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response {
+        SIMILI::Router::Response resp;
+        resp.statusCode = 200;
+        resp.statusMessage = "OK";
+        
+        std::ostringstream json;
+        json << "[";
+        
+        auto& objects = myThreeDScene.getObjectsRef();
+        bool first = true;
+        for (auto* obj : objects) {
+            if (!first) json << ",";
+            json << "{"
+                 << "\"id\":" << obj->getID() << ","
+                 << "\"name\":\"" << obj->getName() << "\""
+                 << "}";
+            first = false;
+        }
+        
+        json << "]";
+        resp.body = json.str();
+        resp.headers["Content-Type"] = "application/json";
+        return resp;
+    }, "Get all scene objects");
     
-    std::cout << "Shutting down SIMILI_UI.exe..." << std::endl;
-    uiManager.stop();
+    // Route: Get scene info (Scene ID + Context ID)
+    router.get("/api/scene-info", [&myThreeDScene, &renderer](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response {
+        SIMILI::Router::Response resp;
+        resp.statusCode = 200;
+        resp.statusMessage = "OK";
+        
+        std::ostringstream json;
+        json << "{"
+             << "\"sceneID\":\"" << myThreeDScene.getSceneID() << "\","
+             << "\"contextID\":\"" << renderer.getContextID() << "\""
+             << "}";
+        
+        resp.body = json.str();
+        resp.headers["Content-Type"] = "application/json";
+        resp.headers["Access-Control-Allow-Origin"] = "*";
+        return resp;
+    }, "Get scene and context IDs");
     
+    std::cout << "[Main] API routes registered (/api/context, /api/scene/objects, /api/scene-info)" << std::endl;
+
+    // CEF initialization
+    CefSettings settings;
+    settings.no_sandbox = true;
+    settings.multi_threaded_message_loop = false;
+    settings.log_severity = LOGSEVERITY_DISABLE;
+
+    if (!CefInitialize(main_args, settings, handler, nullptr)) {
+        std::cerr << "[Main] Failed to initialize CEF" << std::endl;
+        return -1;
+    }
+
+    handler->setThreeDScene(&myThreeDScene);
+    std::cout << "[Main] 3D Scene linked to UIHandler" << std::endl;
+
+    handler->setSceneObjects(&renderer, &myThreeDScene, &mainCamera, &cubeMesh1);
+    std::cout << "[Main] Scene objects passed to UIHandler" << std::endl;
+
+    CefBrowserSettings browser_settings;
+    browser_settings.windowless_frame_rate = 60;
+
+    std::string url = "file:///ui/main_layout.html";
+
+    CefRefPtr<SimpleBrowserViewDelegate> browser_view_delegate(new SimpleBrowserViewDelegate());
+    CefRefPtr<CefBrowserView> browser_view = CefBrowserView::CreateBrowserView(
+        handler, url, browser_settings, nullptr, nullptr, browser_view_delegate);
+
+    CefRefPtr<SimpleWindowDelegate> window_delegate(new SimpleWindowDelegate(browser_view));
+    CefWindow::CreateTopLevelWindow(window_delegate);
+
+
+    std::cout << "[Main] CEF window created, entering message loop..." << std::endl;
+    CefRunMessageLoop();
+
+    std::cout << "[Main] Shutting down CEF..." << std::endl;
+    CefShutdown();
+
+    // Cleanup GLFW
+    glfwDestroyWindow(hidden_window);
+    glfwTerminate();
+    std::cout << "[Main] GLFW terminated" << std::endl;
+
     return 0;
 }
+#endif
     
