@@ -41,7 +41,9 @@ void main()
 )";
 
 // === CLASS ===
-ThreeDScene::ThreeDScene() {}
+ThreeDScene::ThreeDScene() 
+    : gridVAO(0), gridVBO(0), shaderProgram(0) 
+{}
 
 static inline void erasePtr(std::list<ThreeDObject*>& L, ThreeDObject* p) 
 {
@@ -192,6 +194,20 @@ void ThreeDScene::setSceneDNA(ThreeDScene_DNA* dna, bool takeOwnership)
 
 void ThreeDScene::initizalize()
 {
+    // Cleanup old OpenGL resources if they exist (for context switching)
+    if (gridVAO != 0) {
+        glDeleteVertexArrays(1, &gridVAO);
+        gridVAO = 0;
+    }
+    if (gridVBO != 0) {
+        glDeleteBuffers(1, &gridVBO);
+        gridVBO = 0;
+    }
+    if (shaderProgram != 0) {
+        glDeleteProgram(shaderProgram);
+        shaderProgram = 0;
+    }
+    
     compileShaders();
 
     if (!sceneDNA)
@@ -292,8 +308,16 @@ void ThreeDScene::render()
 
 void ThreeDScene::renderDirect(int width, int height)
 {
+	static int render_count = 0;
+	bool should_log = (render_count++ % 60 == 0);
+	
+	if (should_log) {
+		std::cout << "[ThreeDScene::renderDirect] Called with size " << width << "x" << height << std::endl;
+		std::cout << "[ThreeDScene::renderDirect] Active camera: " << (activeCamera ? activeCamera->getName() : "NULL") << std::endl;
+		std::cout << "[ThreeDScene::renderDirect] Objects count: " << objects.size() << std::endl;
+	}
     // Direct rendering without FBO - for overlay viewports
-    // Assumes OpenGL context is already current
+    // Assumes OpenGL context is already current AND buffer already cleared
     
     if (!activeCamera) 
     {
@@ -301,10 +325,11 @@ void ThreeDScene::renderDirect(int width, int height)
         return;
     }
 
-    // Already cleared by caller, but ensure depth test is on
+    // Enable depth testing for proper 3D rendering
     glEnable(GL_DEPTH_TEST);
-    glViewport(0, 0, width, height);
-
+    glDepthFunc(GL_LESS);
+    
+    // Viewport already set by caller
     const float aspect = (height > 0) ? float(width) / float(height) : 1.0f;
 
     glm::mat4 view = activeCamera->getViewMatrix();
@@ -317,23 +342,24 @@ void ThreeDScene::renderDirect(int width, int height)
         ownsViewproj = true;
     }
 
-    glDisable(GL_DEPTH_TEST);
-    drawBackgroundGradient();
-    glEnable(GL_DEPTH_TEST);
-
+    // Render grid (white lines)
     glUseProgram(shaderProgram);
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
 
-    // Render grid
+    glLineWidth(1.0f);
     glBindVertexArray(gridVAO);
     glm::mat4 model(1.0f);
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
     glDrawArrays(GL_LINES, 0, 44);
     glBindVertexArray(0);
 
-    // Render all objects
+    // Render all objects (cube)
     for (auto *obj : objects) {
         if (obj) obj->render(viewProj);
+    }
+    
+    if (should_log) {
+        std::cout << "[ThreeDScene::renderDirect] Rendering complete" << std::endl;
     }
 }
 

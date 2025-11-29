@@ -108,7 +108,7 @@ private:
     static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
     
     // ----------- Initialization & Cleanup -----------
-    void initializeOpenGL();
+    void initializeOpenGL(HGLRC shareContext = nullptr);
     void initializeImGui();
     void shutdownImGui();
     

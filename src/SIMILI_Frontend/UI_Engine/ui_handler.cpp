@@ -274,17 +274,13 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	overlay_viewport_->switchModeByKey(1);
 	std::cout << "[UIHandler] Overlay viewport initialized with Normal Mode (key 1)" << std::endl;
 	
-	// Initialize scene objects NOW that we have an OpenGL context
 	initializeSceneObjects();
 	
-	// Show overlay immediately with initial dimensions - JavaScript will update position later
 	overlay_viewport_->show(true);
 	std::cout << "[UIHandler] Overlay viewport shown (will be repositioned by JavaScript)" << std::endl;
 		
-	// Install window subclass to handle resize
 	SetWindowSubclass(parent_hwnd, ParentWindowProc, 0, reinterpret_cast<DWORD_PTR>(this));
 	
-	// Start render timer (60 FPS)
 	startRenderTimer();
 }
 
@@ -316,15 +312,12 @@ void UIHandler::updateOverlayPosition()
 
 static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime) 
 {
-	// Timer callback - trigger redraw
 	UIHandler* handler = reinterpret_cast<UIHandler*>(idEvent);
 
 	if (handler && handler->getOverlay()) 
 	{
-		// Process CEF message loop for off-screen browser
 		CefDoMessageLoopWork();
 		
-		// Trigger viewport redraw
 		InvalidateRect(handler->getOverlay()->getHandle(), nullptr, FALSE);
 	}
 }
@@ -333,7 +326,6 @@ void UIHandler::startRenderTimer()
 {
 	if (timer_id_ == 0 && overlay_viewport_) 
 	{
-		// 60 FPS = ~16ms
 		timer_id_ = SetTimer(nullptr, reinterpret_cast<UINT_PTR>(this), 16, RenderTimerProc);
 	}
 }
@@ -371,8 +363,7 @@ LRESULT CALLBACK UIHandler::ParentWindowProc(HWND hwnd, UINT msg, WPARAM wParam,
 	switch (msg) 
 	{
 		case WM_SIZE:
-			// Don't call updateOverlayPosition() here - JavaScript will send new dimensions
-			// via layout_resizer.js when window resizes
+
 			if (handler && handler->overlay_viewport_) 
 			{
 				SetWindowPos(handler->overlay_viewport_->getHandle(), HWND_TOP, 0, 0, 0, 0,
@@ -426,10 +417,26 @@ void UIHandler::initializeSceneObjects()
 	
 	try 
 	{
+		// CRITICAL: Make overlay context current BEFORE reinitializing scene
 		overlay_viewport_->makeContextCurrent();
 		
-		// Scene and camera are already initialized in main.cpp
-		// Just ensure they are passed to the overlay
+		// Reinitialize scene OpenGL objects (shaders, VAO, VBO) in overlay context
+		if (three_d_scene_) 
+		{
+			std::cout << "[UIHandler] Reinitializing 3D scene OpenGL resources in overlay context..." << std::endl;
+			three_d_scene_->initizalize();
+			std::cout << "[UIHandler] Scene reinitialized successfully" << std::endl;
+		}
+		
+		// CRITICAL: Reinitialize all mesh objects (faces, edges, vertices) in overlay context
+		if (three_d_scene_ && cube_mesh_ptr_ && *cube_mesh_ptr_) 
+		{
+			std::cout << "[UIHandler] Reinitializing cube mesh OpenGL resources..." << std::endl;
+			(*cube_mesh_ptr_)->finalize();
+			std::cout << "[UIHandler] Cube mesh reinitialized (faces, edges, vertices)" << std::endl;
+		}
+		
+		// Now pass the scene to the overlay
 		if (three_d_scene_ && main_camera_) 
 		{
 			overlay_viewport_->setThreeDScene(three_d_scene_);
