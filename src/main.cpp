@@ -38,221 +38,285 @@ fs::path gExecutableDir;
 #include <windows.h>
 
 BOOL WINAPI ConsoleCtrlHandler(DWORD dwCtrlType) {
-    if (dwCtrlType == CTRL_CLOSE_EVENT || dwCtrlType == CTRL_C_EVENT || 
-        dwCtrlType == CTRL_BREAK_EVENT || dwCtrlType == CTRL_LOGOFF_EVENT || 
-        dwCtrlType == CTRL_SHUTDOWN_EVENT) {
-        
-        std::cout << "[ConsoleCtrl] Cleanup signal received..." << std::endl;
-        return TRUE;
-    }
-    return FALSE;
+	if (dwCtrlType == CTRL_CLOSE_EVENT || dwCtrlType == CTRL_C_EVENT || 
+		dwCtrlType == CTRL_BREAK_EVENT || dwCtrlType == CTRL_LOGOFF_EVENT || 
+		dwCtrlType == CTRL_SHUTDOWN_EVENT) {
+		
+		std::cout << "[ConsoleCtrl] Cleanup signal received..." << std::endl;
+		return TRUE;
+	}
+	return FALSE;
 }
 
 int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine, int nCmdShow)
 {
-    UNREFERENCED_PARAMETER(hPrevInstance);
-    UNREFERENCED_PARAMETER(lpCmdLine);
+	UNREFERENCED_PARAMETER(hPrevInstance);
+	UNREFERENCED_PARAMETER(lpCmdLine);
 
-    CefMainArgs main_args(hInstance);
-    CefRefPtr<UIHandler> handler(new UIHandler);
+	CefMainArgs main_args(hInstance);
+	CefRefPtr<UIHandler> handler(new UIHandler);
 
-    int exit_code = CefExecuteProcess(main_args, handler, nullptr);
-    if (exit_code >= 0) 
-    {
-        return exit_code;
-    }
+	int exit_code = CefExecuteProcess(main_args, handler, nullptr);
+	if (exit_code >= 0) 
+	{
+		return exit_code;
+	}
 
-    // Console allocation
-    static bool console_allocated = false;
-    if (!console_allocated) 
-    {
-        AllocConsole();
-        FILE* fp;
-        freopen_s(&fp, "CONOUT$", "w", stdout);
-        freopen_s(&fp, "CONOUT$", "w", stderr);
-        console_allocated = true;
-    }
+	// Console allocation
+	static bool console_allocated = false;
+	if (!console_allocated) 
+	{
+		AllocConsole();
+		FILE* fp;
+		freopen_s(&fp, "CONOUT$", "w", stdout);
+		freopen_s(&fp, "CONOUT$", "w", stderr);
+		console_allocated = true;
+	}
 
-    {
-        wchar_t exePath[MAX_PATH];
-        GetModuleFileNameW(NULL, exePath, MAX_PATH);
-        gExecutableDir = fs::path(exePath).parent_path();
-    }
+	{
+		wchar_t exePath[MAX_PATH];
+		GetModuleFileNameW(NULL, exePath, MAX_PATH);
+		gExecutableDir = fs::path(exePath).parent_path();
+	}
 
-    SetConsoleCtrlHandler(ConsoleCtrlHandler, TRUE);
+	SetConsoleCtrlHandler(ConsoleCtrlHandler, TRUE);
 
-    std::cout << "[Main] Starting SIMILI with CEF..." << std::endl;
+	std::cout << "[Main] Starting SIMILI with CEF..." << std::endl;
 
-    // Initialize GLFW (required for OpenGL context)
-    if (!glfwInit()) {
-        std::cerr << "[Main] Failed to initialize GLFW" << std::endl;
-        return -1;
-    }
-    std::cout << "[Main] GLFW initialized" << std::endl;
+	// Initialize GLFW (required for OpenGL context)
+	if (!glfwInit()) {
+		std::cerr << "[Main] Failed to initialize GLFW" << std::endl;
+		return -1;
+	}
+	std::cout << "[Main] GLFW initialized" << std::endl;
 
-    // Create hidden GLFW window for OpenGL context
-    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    
-    GLFWwindow* hidden_window = glfwCreateWindow(800, 600, "SIMILI_Hidden_GL_Context", nullptr, nullptr);
-    if (!hidden_window) {
-        std::cerr << "[Main] Failed to create GLFW window for OpenGL context" << std::endl;
-        glfwTerminate();
-        return -1;
-    }
-    
-    glfwMakeContextCurrent(hidden_window);
-    
-    // Initialize GLAD
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-        std::cerr << "[Main] Failed to initialize GLAD" << std::endl;
-        glfwDestroyWindow(hidden_window);
-        glfwTerminate();
-        return -1;
-    }
-    std::cout << "[Main] OpenGL " << glGetString(GL_VERSION) << " initialized" << std::endl;
-    
-    // IMPORTANT: Keep this GLFW context current throughout the application lifetime
-    // OverlayViewport will share this context instead of creating its own
+	// Create hidden GLFW window for OpenGL context
+	glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	
+	GLFWwindow* hidden_window = glfwCreateWindow(800, 600, "SIMILI_Hidden_GL_Context", nullptr, nullptr);
+	if (!hidden_window) {
+		std::cerr << "[Main] Failed to create GLFW window for OpenGL context" << std::endl;
+		glfwTerminate();
+		return -1;
+	}
+	
+	glfwMakeContextCurrent(hidden_window);
+	
+	// Initialize GLAD
+	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+		std::cerr << "[Main] Failed to initialize GLAD" << std::endl;
+		glfwDestroyWindow(hidden_window);
+		glfwTerminate();
+		return -1;
+	}
+	std::cout << "[Main] OpenGL " << glGetString(GL_VERSION) << " initialized" << std::endl;
+	
 
-    // Start HTTP/HTTPS Server
-    std::cout << "[Main] Starting HTTP Server..." << std::endl;
-    try {
-        SIMILI::Server::SimpleHttpServer::getInstance().start(8080, 8443);
-        std::cout << "[Main] HTTP Server started on port 8080" << std::endl;
-    } 
-    catch (const std::exception& e) {
-        std::cerr << "[Main] ERROR starting HTTP Server: " << e.what() << std::endl;
-        glfwDestroyWindow(hidden_window);
-        glfwTerminate();
-        return -1;
-    }
+	std::cout << "[Main] Starting HTTP Server..." << std::endl;
+	try {
+		SIMILI::Server::SimpleHttpServer::getInstance().start(8080, 8443);
+		std::cout << "[Main] HTTP Server started on port 8080" << std::endl;
+	} 
+	catch (const std::exception& e) {
+		std::cerr << "[Main] ERROR starting HTTP Server: " << e.what() << std::endl;
+		glfwDestroyWindow(hidden_window);
+		glfwTerminate();
+		return -1;
+	}
 
-    // Initialize 3D Scene and Camera
-    ThreeDScene myThreeDScene;
-    Camera mainCamera;
-    mainCamera.setName("MainCamera");
-    mainCamera.initialize();
+	// Initialize 3D Scene and Camera
+	ThreeDScene myThreeDScene;
+	Camera mainCamera;
+	mainCamera.setName("MainCamera");
+	mainCamera.initialize();
 
-    Mesh* cubeMesh1 = Primitives::CreateCubeMesh(1.0f, glm::vec3(0.0f, 0.0f, 0.0f), "Cube", true);
-    cubeMesh1->initialize();
+	Mesh* cubeMesh1 = Primitives::CreateCubeMesh(1.0f, glm::vec3(0.0f, 0.0f, 0.0f), "Cube", true);
+	cubeMesh1->initialize();
 
-    OpenGLContext renderer;
-    std::cout << "[Main] OpenGL Context ID: " << renderer.getContextID() << std::endl;
+	OpenGLContext renderer;
+	std::cout << "[Main] OpenGL Context ID: " << renderer.getContextID() << std::endl;
 
-    myThreeDScene.setOpenGLContext(&renderer);
-    myThreeDScene.initizalize();
-    myThreeDScene.setActiveCamera(&mainCamera);
-    
-    // Add objects to scene
-    myThreeDScene.addObject(cubeMesh1);
-    myThreeDScene.addObject(&mainCamera);
+	myThreeDScene.setOpenGLContext(&renderer);
+	myThreeDScene.initizalize();
+	myThreeDScene.setActiveCamera(&mainCamera);
+	
+	// Add objects to scene
+	myThreeDScene.addObject(cubeMesh1);
+	myThreeDScene.addObject(&mainCamera);
 
-    std::cout << "[Main] 3D Scene initialized with ID: " << myThreeDScene.getSceneID() << std::endl;
+	std::cout << "[Main] 3D Scene initialized with ID: " << myThreeDScene.getSceneID() << std::endl;
 
-    // Register API routes NOW that scene and renderer exist
-    auto& router = SIMILI::Server::SimpleHttpServer::getInstance().getRouter();
-    
-    // Route: Get OpenGL Context ID
-    router.get("/api/context", [&renderer](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response {
-        SIMILI::Router::Response resp;
-        resp.statusCode = 200;
-        resp.statusMessage = "OK";
-        resp.body = "{\"contextId\": \"" + renderer.getContextID() + "\"}";
-        resp.headers["Content-Type"] = "application/json";
-        return resp;
-    }, "Get OpenGL context ID");
-    
-    // Route: Get scene objects
-    router.get("/api/scene/objects", [&myThreeDScene](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response {
-        SIMILI::Router::Response resp;
-        resp.statusCode = 200;
-        resp.statusMessage = "OK";
-        
-        std::ostringstream json;
-        json << "[";
-        
-        auto& objects = myThreeDScene.getObjectsRef();
-        bool first = true;
-        for (auto* obj : objects) {
-            if (!first) json << ",";
-            json << "{"
-                 << "\"id\":" << obj->getID() << ","
-                 << "\"name\":\"" << obj->getName() << "\""
-                 << "}";
-            first = false;
-        }
-        
-        json << "]";
-        resp.body = json.str();
-        resp.headers["Content-Type"] = "application/json";
-        return resp;
-    }, "Get all scene objects");
-    
-    // Route: Get scene info (Scene ID + Context ID)
-    router.get("/api/scene-info", [&myThreeDScene, &renderer](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response {
-        SIMILI::Router::Response resp;
-        resp.statusCode = 200;
-        resp.statusMessage = "OK";
-        
-        std::ostringstream json;
-        json << "{"
-             << "\"sceneID\":\"" << myThreeDScene.getSceneID() << "\","
-             << "\"contextID\":\"" << renderer.getContextID() << "\""
-             << "}";
-        
-        resp.body = json.str();
-        resp.headers["Content-Type"] = "application/json";
-        resp.headers["Access-Control-Allow-Origin"] = "*";
-        return resp;
-    }, "Get scene and context IDs");
-    
-    std::cout << "[Main] API routes registered (/api/context, /api/scene/objects, /api/scene-info)" << std::endl;
+	auto& router = SIMILI::Server::SimpleHttpServer::getInstance().getRouter();
+	
+	// Route: Get OpenGL Context ID
+	router.get("/api/context", [&renderer](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response {
+		SIMILI::Router::Response resp;
+		resp.statusCode = 200;
+		resp.statusMessage = "OK";
+		resp.body = "{\"contextId\": \"" + renderer.getContextID() + "\"}";
+		resp.headers["Content-Type"] = "application/json";
+		return resp;
+	}, "Get OpenGL context ID");
+	
+	// Route: Get scene objects
+	router.get("/api/scene/objects", [&myThreeDScene](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response {
+		SIMILI::Router::Response resp;
+		resp.statusCode = 200;
+		resp.statusMessage = "OK";
+		
+		std::ostringstream json;
+		json << "[";
+		
+		auto& objects = myThreeDScene.getObjectsRef();
+		bool first = true;
+		for (auto* obj : objects) {
+			if (!first) json << ",";
+			json << "{"
+				 << "\"id\":" << obj->getID() << ","
+				 << "\"name\":\"" << obj->getName() << "\""
+				 << "}";
+			first = false;
+		}
+		
+		json << "]";
+		resp.body = json.str();
+		resp.headers["Content-Type"] = "application/json";
+		return resp;
+	}, "Get all scene objects");
+	
+	// Route: Get scene info (Scene ID + Context ID)
+	router.get("/api/scene-info", [&myThreeDScene, &renderer](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response {
+		SIMILI::Router::Response resp;
+		resp.statusCode = 200;
+		resp.statusMessage = "OK";
+		
+		std::ostringstream json;
+		json << "{"
+			 << "\"sceneID\":\"" << myThreeDScene.getSceneID() << "\","
+			 << "\"contextID\":\"" << renderer.getContextID() << "\""
+			 << "}";
+		
+		resp.body = json.str();
+		resp.headers["Content-Type"] = "application/json";
+		resp.headers["Access-Control-Allow-Origin"] = "*";
+		return resp;
+	}, "Get scene and context IDs");
+	
+	router.post("/api/create-cube", [&myThreeDScene, &handler, hidden_window](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response {
+		
+		static int cubeCounter = 2; 
+		
+		std::string cubeName = "Cube" + std::to_string(cubeCounter);
 
-    // CEF initialization
-    CefSettings settings;
-    settings.no_sandbox = true;
-    settings.multi_threaded_message_loop = false;
-    settings.log_severity = LOGSEVERITY_DISABLE;
+		std::cout << "\n [Main] Creating new cube: " << cubeName << std::endl;
+		
+		float spacing = 2.0f;
+		glm::vec3 position((cubeCounter - 1) * spacing, 0.0f, 0.0f);
+		cubeCounter++;
+		
+		// Save current context and activate GLFW hidden window context
+		HGLRC previousContext = wglGetCurrentContext();
+		HDC previousDC = wglGetCurrentDC();
+		
+		glfwMakeContextCurrent(hidden_window);
+		std::cout << "[Main] GLFW context activated for cube creation" << std::endl;
+		
+		Mesh* newCube = Primitives::CreateCubeMesh(1.0f, position, cubeName, true);
+		
+		// Check for OpenGL errors immediately after cube creation
+		GLenum err = glGetError();
+		if (err != GL_NO_ERROR) {
+			std::cout << "[Main] OpenGL Error after CreateCubeMesh: " << err << std::endl;
+		}
+		
+		if (!newCube) 
+		{
+			SIMILI::Router::Response resp;
+			resp.statusCode = 500;
+			resp.statusMessage = "Internal Server Error";
+			resp.body = "{\"error\": \"Failed to create cube\"}";
+			resp.headers["Content-Type"] = "application/json";
+			resp.headers["Access-Control-Allow-Origin"] = "*";
+			return resp;
+		}
+		
+		myThreeDScene.addObject(newCube);
+		
+		err = glGetError();
+		if (err != GL_NO_ERROR) 
+		{
+			std::cout << "[Main] OpenGL Error after addObject: " << err << std::endl;
+		}
+		
+		if (previousContext && previousDC) 
+		{
+			wglMakeCurrent(previousDC, previousContext);
+			std::cout << "[Main] Restored previous GL context" << std::endl;
+		} 
+		else 
+		{
+			glfwMakeContextCurrent(nullptr);
+		}
+		
+		std::cout << "[Main] Cube " << cubeName << " created and added to scene at position (" 
+				  << position.x << ", " << position.y << ", " << position.z << ")" << std::endl;
+		
+		// Return success response with cube info
+		SIMILI::Router::Response resp;
+		resp.statusCode = 200;
+		resp.statusMessage = "OK";
+		resp.body = "{\"success\": true, \"cubeName\": \"" + cubeName + "\", \"id\": " + std::to_string(newCube->getID()) + "}";
+		resp.headers["Content-Type"] = "application/json";
+		resp.headers["Access-Control-Allow-Origin"] = "*";
+		return resp;
+	}, "Create a new cube and add it to the scene");
+	
+	std::cout << "[Main] API routes registered (/api/context, /api/scene/objects, /api/scene-info, /api/create-cube)" << std::endl;
 
-    if (!CefInitialize(main_args, settings, handler, nullptr)) {
-        std::cerr << "[Main] Failed to initialize CEF" << std::endl;
-        return -1;
-    }
+	CefSettings settings;
+	settings.no_sandbox = true;
+	settings.multi_threaded_message_loop = false;
+	settings.log_severity = LOGSEVERITY_DISABLE;
 
-    handler->setThreeDScene(&myThreeDScene);
-    std::cout << "[Main] 3D Scene linked to UIHandler" << std::endl;
+	if (!CefInitialize(main_args, settings, handler, nullptr)) {
+		std::cerr << "[Main] Failed to initialize CEF" << std::endl;
+		return -1;
+	}
 
-    handler->setSceneObjects(&renderer, &myThreeDScene, &mainCamera, &cubeMesh1);
-    std::cout << "[Main] Scene objects passed to UIHandler" << std::endl;
+	handler->setThreeDScene(&myThreeDScene);
+	std::cout << "[Main] 3D Scene linked to UIHandler" << std::endl;
 
-    CefBrowserSettings browser_settings;
-    browser_settings.windowless_frame_rate = 60;
+	handler->setSceneObjects(&renderer, &myThreeDScene, &mainCamera, &cubeMesh1);
+	std::cout << "[Main] Scene objects passed to UIHandler" << std::endl;
 
-    std::string url = "file:///ui/main_layout.html";
+	CefBrowserSettings browser_settings;
+	browser_settings.windowless_frame_rate = 60;
 
-    CefRefPtr<SimpleBrowserViewDelegate> browser_view_delegate(new SimpleBrowserViewDelegate());
-    CefRefPtr<CefBrowserView> browser_view = CefBrowserView::CreateBrowserView(
-        handler, url, browser_settings, nullptr, nullptr, browser_view_delegate);
+	std::string url = "file:///ui/main_layout.html";
 
-    CefRefPtr<SimpleWindowDelegate> window_delegate(new SimpleWindowDelegate(browser_view));
-    CefWindow::CreateTopLevelWindow(window_delegate);
+	CefRefPtr<SimpleBrowserViewDelegate> browser_view_delegate(new SimpleBrowserViewDelegate());
+	CefRefPtr<CefBrowserView> browser_view = CefBrowserView::CreateBrowserView(
+		handler, url, browser_settings, nullptr, nullptr, browser_view_delegate);
+
+	CefRefPtr<SimpleWindowDelegate> window_delegate(new SimpleWindowDelegate(browser_view));
+	CefWindow::CreateTopLevelWindow(window_delegate);
 
 
-    std::cout << "[Main] CEF window created, entering message loop..." << std::endl;
-    CefRunMessageLoop();
+	std::cout << "[Main] CEF window created, entering message loop..." << std::endl;
+	CefRunMessageLoop();
 
-    std::cout << "[Main] Shutting down CEF..." << std::endl;
-    CefShutdown();
+	std::cout << "[Main] Shutting down CEF..." << std::endl;
+	CefShutdown();
 
-    // Cleanup GLFW
-    glfwDestroyWindow(hidden_window);
-    glfwTerminate();
-    std::cout << "[Main] GLFW terminated" << std::endl;
+	// Cleanup GLFW
+	glfwDestroyWindow(hidden_window);
+	glfwTerminate();
+	std::cout << "[Main] GLFW terminated" << std::endl;
 
-    return 0;
+	return 0;
 }
 #endif
-    
+	

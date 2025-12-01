@@ -393,43 +393,37 @@ void OverlayViewport::initializeOpenGL(HGLRC shareContext)
 	
 	}
 	
-	// Initialize contextual menu dimensions first
 	contextual_menu_width_ = 300;
 	contextual_menu_height_ = 200;
 	contextual_menu_x_ = 100;
 	contextual_menu_y_ = 100;
 	
-	// Initialize contextual menu texture test (red overlay)
 	contextual_menu_texture_test_ = new ContextualMenuTextureTest();
 	contextual_menu_texture_test_->initialize(contextual_menu_width_, contextual_menu_height_);
-	std::cout << "[OverlayViewport] Contextual menu red texture initialized (" << contextual_menu_width_ << "x" << contextual_menu_height_ << ")" << std::endl;
 	
-	// Initialize contextual menu HTML renderer
 	contextual_menu_texture_renderer_ = new TextureRendererTest();
 	contextual_menu_texture_renderer_->initialize(width_, height_);
 	
 	contextual_menu_texture_renderer_->setRenderRect(contextual_menu_x_, contextual_menu_y_, 
-		contextual_menu_width_, contextual_menu_height_);
+	contextual_menu_width_, contextual_menu_height_);
 	
 	contextual_menu_html_renderer_ = new HtmlTextureRenderer(contextual_menu_texture_renderer_);
 	
-	// Set callback to connect browser to ContextualMenuTextureTest when it's created
-	contextual_menu_html_renderer_->setOnBrowserCreatedCallback([this](CefRefPtr<CefBrowser> browser) {
-		if (contextual_menu_texture_test_) {
+	contextual_menu_html_renderer_->setOnBrowserCreatedCallback([this](CefRefPtr<CefBrowser> browser) 
+	{
+		if (contextual_menu_texture_test_) 
+		{
 			contextual_menu_texture_test_->setBrowser(browser);
 			std::cout << "[OverlayViewport] CEF browser connected to ContextualMenuTextureTest (browser valid: " 
 			          << (browser != nullptr) << ", host valid: " << (browser && browser->GetHost() != nullptr) << ")" << std::endl;
-		} else {
-			std::cout << "[OverlayViewport] ERROR: contextual_menu_texture_test_ is null in callback!" << std::endl;
-		}
+		} 
 	});
 	
 	contextual_menu_html_renderer_->createBrowser("file:///ui/Contextual_Menu.html", 
-		contextual_menu_width_, contextual_menu_height_);
+	contextual_menu_width_, contextual_menu_height_);
+
 	contextual_menu_html_renderer_->setViewportWindow(hwnd_);
-	
-	std::cout << "[OverlayViewport] Contextual menu HTML renderer initialized" << std::endl;
-}
+	}
 
 void OverlayViewport::initializeImGui() 
 {
@@ -438,12 +432,11 @@ void OverlayViewport::initializeImGui()
 		return;
 	}
 	
-	// Setup Dear ImGui context
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad; 
 
 	ImGui::StyleColorsDark();
 	ImGui_ImplWin32_Init(hwnd_);
@@ -473,15 +466,13 @@ void OverlayViewport::shutdownImGui()
 // ============================================================================
 
 void OverlayViewport::makeContextCurrent() {
-	// Using shared GLFW context from main.cpp - no need to switch
-	// if (hdc_ && gl_context_) {
-	// 	wglMakeCurrent(hdc_, gl_context_);
-	// }
+	if (hdc_ && gl_context_) {
+		wglMakeCurrent(hdc_, gl_context_);
+	}
 }
 
 void OverlayViewport::releaseContext() {
-	// No-op - using shared GLFW context
-	// wglMakeCurrent(nullptr, nullptr);
+	wglMakeCurrent(nullptr, nullptr);
 }
 
 // ============================================================================
@@ -500,7 +491,9 @@ void OverlayViewport::render()
 		BOOL result = wglMakeCurrent(hdc_, gl_context_);
 		
 		static int debug_counter = 0;
-		if (debug_counter++ % 60 == 0) {
+		
+		if (debug_counter++ % 60 == 0) 
+		{
 			std::cout << "[OverlayViewport::render] wglMakeCurrent result: " << result << std::endl;
 			std::cout << "[OverlayViewport::render] HDC: " << hdc_ << ", Context: " << gl_context_ << std::endl;
 			std::cout << "[OverlayViewport::render] Current GL context: " << wglGetCurrentContext() << std::endl;
@@ -518,10 +511,8 @@ void OverlayViewport::render()
 		}
 	}
 	
-	// Process CEF message loop for off-screen rendering
 	CefDoMessageLoopWork();
-	
-	
+		
 	if (imgui_initialized_) 
 	{
 		ImGui_ImplOpenGL3_NewFrame();
@@ -554,8 +545,8 @@ void OverlayViewport::render()
 		texture_renderer_test_->render();
 	}
 	
-	// Render the contextual menu HTML texture only if visible
-	if (contextual_menu_visible_ && contextual_menu_texture_renderer_) {
+	if (contextual_menu_visible_ && contextual_menu_texture_renderer_) 
+	{
 		contextual_menu_texture_renderer_->render();
 	}
 	
@@ -576,39 +567,31 @@ void OverlayViewport::renderScene()
 	
 	if (three_d_scene_) 
 	{
-		// Clear with scene background color before rendering
 		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glViewport(0, 0, width_, height_);
 		
-		if (should_debug) {
-			std::cout << "[OverlayViewport::renderScene] Cleared buffer, viewport: " << width_ << "x" << height_ << std::endl;
-			
-			// Read a pixel from the center of the screen to see what color it is
+		if (should_debug) 
+		{
 			unsigned char pixel[4];
 			glReadPixels(width_/2, height_/2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
-			std::cout << "[OverlayViewport::renderScene] Center pixel BEFORE scene render: R=" 
-					  << (int)pixel[0] << " G=" << (int)pixel[1] << " B=" << (int)pixel[2] << " A=" << (int)pixel[3] << std::endl;
+
 		}
 		
-		// Render 3D scene (grid + objects)
 		three_d_scene_->renderDirect(width_, height_);
 		
-		if (should_debug) {
-			// Read the pixel again after rendering
+		if (should_debug) 
+		{
 			unsigned char pixel[4];
 			glReadPixels(width_/2, height_/2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
-			std::cout << "[OverlayViewport::renderScene] Center pixel AFTER scene render: R=" 
-					  << (int)pixel[0] << " G=" << (int)pixel[1] << " B=" << (int)pixel[2] << " A=" << (int)pixel[3] << std::endl;
+
 		}
 	}
 	else 
 	{
-		// Fallback: clear to red if no scene
 		glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glViewport(0, 0, width_, height_);
-		std::cout << "[OverlayViewport] No 3D scene - showing RED fallback (" << width_ << "x" << height_ << ")" << std::endl;
 	}
 }
 
@@ -639,7 +622,6 @@ void OverlayViewport::setPosition(int x, int y, int width, int height)
 			contextual_menu_texture_renderer_->resize(width, height);
 		}
 		
-		std::cout << "[OverlayViewport] Positioned at (" << x << ", " << y << ") size " << width << "x" << height << std::endl;
 	}
 }
 
@@ -763,27 +745,18 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 			
 			case WM_RBUTTONDOWN:
 			{
-				std::cout << "[OverlayViewport] WM_RBUTTONDOWN received - toggling contextual menu" << std::endl;
-				
-				// Get mouse position for menu placement
+			
 				int mouseX = LOWORD(lParam);
 				int mouseY = HIWORD(lParam);
 				
-				// Toggle the contextual menu CEF visibility
 				overlay->contextual_menu_visible_ = !overlay->contextual_menu_visible_;
 				
 				if (overlay->contextual_menu_visible_)
 				{
-					// Position menu at mouse cursor
 					overlay->setContextualMenuPosition(mouseX, mouseY);
-					std::cout << "[OverlayViewport] Contextual menu SHOWN at (" << mouseX << ", " << mouseY << ")" << std::endl;
 				}
-				else
-				{
-					std::cout << "[OverlayViewport] Contextual menu HIDDEN" << std::endl;
-				}
+
 				
-				// Trigger a redraw
 				InvalidateRect(hwnd, nullptr, FALSE);
 				return 0;
 			}
@@ -837,7 +810,6 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 					if (relX >= 0 && relX < overlay->contextual_menu_width_ && 
 						relY >= 0 && relY < overlay->contextual_menu_height_)
 					{
-						std::cout << "[OverlayViewport] Mouse over contextual menu at relative pos (" << relX << ", " << relY << ")" << std::endl;
 						overlay->contextual_menu_texture_test_->sendMouseMove(relX, relY);
 					}
 				}
@@ -871,7 +843,6 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				}
 				else if (msg == WM_KEYUP)
 				{
-					std::cout << "[OverlayViewport WndProc] WM_KEYUP received for key: " << (char)wParam << std::endl;
 					SIMILI::Input::KeyManager::getInstance().handleKeyUp(static_cast<int>(wParam));
 				}
 				return 0;
@@ -896,8 +867,7 @@ void OverlayViewport::performRaycast(int mouseX, int mouseY)
 void OverlayViewport::setMultipleSelectedObjects(const std::list<ThreeDObject*>& objects) 
 { 
 	multiple_selected_objects_ = objects; 
-	std::cout << "[OverlayViewport] setMultipleSelectedObjects called with " 
-	          << objects.size() << " objects" << std::endl;
+
 }
 
 // ============================================================================
@@ -909,33 +879,26 @@ void OverlayViewport::setModelingMode(ThreeDMode* mode)
 	if (mode)
 	{
 		current_mode_ = mode;
-		std::cout << "[OverlayViewport] Mode changed to: " << mode->getName() << std::endl;
 	}
 }
 
 void OverlayViewport::switchModeByKey(int keyNumber)
 {
-	std::cout << "[OverlayViewport] switchModeByKey() called with keyNumber: " << keyNumber << std::endl;
 	switch (keyNumber)
 	{
 		case 1:
 			setModelingMode(normal_mode_);
-			std::cout << "[OverlayViewport] Switched to Normal Mode" << std::endl;
 			break;
 		case 2:
 			setModelingMode(edge_mode_);
-			std::cout << "[OverlayViewport] Switched to Edge Mode" << std::endl;
 			break;
 		case 3:
 			setModelingMode(vertice_mode_);
-			std::cout << "[OverlayViewport] Switched to Vertice Mode" << std::endl;
 			break;
 		case 4:
 			setModelingMode(face_mode_);
-			std::cout << "[OverlayViewport] Switched to Face Mode" << std::endl;
 			break;
 		default:
-			std::cout << "[OverlayViewport] Unknown key number: " << keyNumber << std::endl;
 			break;
 	}
 }
@@ -1028,6 +991,4 @@ void OverlayViewport::setContextualMenuPosition(int x, int y)
 		contextual_menu_texture_renderer_->setRenderRect(x, y, 
 			contextual_menu_width_, contextual_menu_height_);
 	}
-	
-	std::cout << "[OverlayViewport] Contextual menu position set to (" << x << ", " << y << ")" << std::endl;
 }

@@ -58,6 +58,7 @@ public:
     // ----------- OpenGL Context Management -----------
     void makeContextCurrent();
     void releaseContext();
+    HGLRC getGLContext() const { return gl_context_; }
     
     // ----------- 3D Scene Management -----------
     void setThreeDScene(ThreeDScene* scene) { three_d_scene_ = scene; }

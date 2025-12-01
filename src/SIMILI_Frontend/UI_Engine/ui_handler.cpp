@@ -428,12 +428,20 @@ void UIHandler::initializeSceneObjects()
 			std::cout << "[UIHandler] Scene reinitialized successfully" << std::endl;
 		}
 		
-		// CRITICAL: Reinitialize all mesh objects (faces, edges, vertices) in overlay context
-		if (three_d_scene_ && cube_mesh_ptr_ && *cube_mesh_ptr_) 
+		// CRITICAL: Reinitialize ALL mesh objects (faces, edges, vertices) in overlay context
+		if (three_d_scene_) 
 		{
-			std::cout << "[UIHandler] Reinitializing cube mesh OpenGL resources..." << std::endl;
-			(*cube_mesh_ptr_)->finalize();
-			std::cout << "[UIHandler] Cube mesh reinitialized (faces, edges, vertices)" << std::endl;
+			std::cout << "[UIHandler] Reinitializing all meshes OpenGL resources..." << std::endl;
+			for (auto* obj : three_d_scene_->getObjectsRef()) 
+			{
+				if (obj && obj->getIsMesh()) 
+				{
+					Mesh* mesh = static_cast<Mesh*>(obj);
+					mesh->finalize();
+					std::cout << "[UIHandler] Mesh '" << mesh->getName() << "' reinitialized" << std::endl;
+				}
+			}
+			std::cout << "[UIHandler] All meshes reinitialized (faces, edges, vertices)" << std::endl;
 		}
 		
 		// Now pass the scene to the overlay
@@ -455,6 +463,7 @@ void UIHandler::initializeSceneObjects()
 	}
 }
 
+
 // ---------- Keyboard Handler Implementation ---------
 
 bool UIHandler::OnPreKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& event,
@@ -463,22 +472,12 @@ bool UIHandler::OnPreKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& 
 	if (!overlay_viewport_ || !overlay_viewport_->getHandle())
 		return false;
 	
-	// Get KeyManager instance to handle all keyboard input
 	auto& keyManager = SIMILI::Input::KeyManager::getInstance();
 	
 	if (event.type == KEYEVENT_KEYDOWN || event.type == KEYEVENT_RAWKEYDOWN)
 	{
 		LPARAM lParam = 1 | (event.native_key_code << 16);
-		
-		// Forward key DOWN event to KeyManager
-		// KeyManager will handle:
-		// - Gizmo operations (W=Translate, R=Rotate, S=Scale)
-		// - Mode switching (1-4)
-		// - Modifier keys (Shift for multi-selection, Ctrl, Alt)
-		// - All other viewport-related key bindings
-		std::cout << "[UIHandler] Forwarding key " << (char)event.windows_key_code 
-		<< " to KeyManager via handleKeyDown()" << std::endl;
-		
+				
 		keyManager.handleKeyDown(static_cast<int>(event.windows_key_code), lParam);
 		
 		// Additionally send mode keys (1-4) to HTML renderer for UI visual feedback
@@ -488,17 +487,14 @@ bool UIHandler::OnPreKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& 
 			if (html_renderer) 
 			{
 				html_renderer->sendKeyEvent(event);
-				std::cout << "[UIHandler] Mode key " << (char)event.windows_key_code 
-				          << " also sent to HTML for UI update" << std::endl;
+
 			}
 		}
 		
-		return true; // Consume all key events - KeyManager handles them
+		return true; 
 	}
 	else if (event.type == KEYEVENT_KEYUP)
 	{
-		std::cout << "[UIHandler] Forwarding key RELEASE " << (char)event.windows_key_code 
-		          << " to KeyManager via handleKeyUp()" << std::endl;
 		
 		keyManager.handleKeyUp(static_cast<int>(event.windows_key_code));
 		return true;
