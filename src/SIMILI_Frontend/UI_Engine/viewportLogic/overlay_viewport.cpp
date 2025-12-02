@@ -28,6 +28,10 @@
 #include "../../Engine/Guizmo.hpp"
 #include "../../WorldObjects/Camera/Camera.hpp"
 #include "../../WorldObjects/Entities/ThreeDObject.hpp"
+#include "../../WorldObjects/Mesh/Mesh.hpp"
+#include "../../WorldObjects/Basic/Vertice.hpp"
+#include "../../WorldObjects/Basic/Edge.hpp"
+#include "../../WorldObjects/Basic/Face.hpp"
 #include "../../ThirdParty/CEF/cef_binary/include/cef_app.h"
 #include "../../../UI/ThreeDModes/ThreeDMode.hpp"
 #include "../../../UI/ThreeDModes/Normal_Mode.hpp"
@@ -332,15 +336,23 @@ void OverlayViewport::initializeOpenGL(HGLRC shareContext)
 			0
 		};
 		
+		std::cout << "[OverlayViewport] Attempting to create shared context with GLFW context: " << shareContext << std::endl;
+		
 		// CRITICAL: Share with GLFW context to access VAO/VBO/Shaders!
 		gl_context_ = wglCreateContextAttribsARB(hdc_, shareContext, attribs);
 		if (gl_context_) {
 			wglMakeCurrent(nullptr, nullptr);
 			wglDeleteContext(tempContext);
 			wglMakeCurrent(hdc_, gl_context_);
-			std::cout << "[OverlayViewport] OpenGL 3.3 Core context created SHARED with GLFW" << std::endl;
+			
+			if (shareContext) {
+				std::cout << "[OverlayViewport] ✓ OpenGL 3.3 Core context created SHARED with GLFW context " << shareContext << std::endl;
+			} else {
+				std::cout << "[OverlayViewport] ✗ OpenGL 3.3 Core context created WITHOUT sharing (shareContext was NULL)" << std::endl;
+			}
 		} else {
-			std::cerr << "[OverlayViewport] Failed to create shared OpenGL 3.3 context, using compatibility context" << std::endl;
+			DWORD err = GetLastError();
+			std::cerr << "[OverlayViewport] Failed to create shared OpenGL 3.3 context (error: " << err << "), using compatibility context" << std::endl;
 			gl_context_ = tempContext;
 		}
 	} else {
@@ -467,12 +479,68 @@ void OverlayViewport::shutdownImGui()
 
 void OverlayViewport::makeContextCurrent() {
 	if (hdc_ && gl_context_) {
-		wglMakeCurrent(hdc_, gl_context_);
+		BOOL result = wglMakeCurrent(hdc_, gl_context_);
+		if (!result) {
+			DWORD error = GetLastError();
+			std::cerr << "[OverlayViewport::makeContextCurrent] FAILED! Error code: " << error << std::endl;
+			std::cerr << "[OverlayViewport::makeContextCurrent] HDC: " << hdc_ << ", Context: " << gl_context_ << std::endl;
+		} else {
+			std::cout << "[OverlayViewport::makeContextCurrent] SUCCESS - Context " << gl_context_ << " now active" << std::endl;
+		}
+	} else {
+		std::cerr << "[OverlayViewport::makeContextCurrent] ERROR: Invalid HDC or GL context!" << std::endl;
+		std::cerr << "[OverlayViewport::makeContextCurrent] HDC: " << hdc_ << ", Context: " << gl_context_ << std::endl;
 	}
 }
 
 void OverlayViewport::releaseContext() {
 	wglMakeCurrent(nullptr, nullptr);
+}
+
+// ============================================================================
+// MESH OPENGL RESOURCE MANAGEMENT
+// ============================================================================
+
+void OverlayViewport::reinitializeMeshComponents(Mesh* mesh)
+{
+	if (!mesh) 
+{
+		std::cerr << "[OverlayViewport] ERROR: Cannot reinitialize null mesh" << std::endl;
+		return;
+	}
+	
+	std::cout << "[OverlayViewport] Adding mesh '" << mesh->getName() << "' to pending finalization queue (will be finalized in render thread)..." << std::endl;
+	
+	std::lock_guard<std::mutex> lock(pending_meshes_mutex_);
+	pending_meshes_to_finalize_.push_back(mesh);
+	has_pending_meshes_.store(true, std::memory_order_release);
+
+	
+}
+
+void OverlayViewport::update_Scene_Rendering()
+{
+	if (has_pending_meshes_.load(std::memory_order_acquire))
+	{
+		std::lock_guard<std::mutex> lock(pending_meshes_mutex_);
+		if (!pending_meshes_to_finalize_.empty()) 		{
+			
+			for (Mesh* mesh : pending_meshes_to_finalize_) 
+			{
+				if (mesh) 
+				{
+					
+					for (int i = 0; i < 10 && glGetError() != GL_NO_ERROR; ++i);
+					
+					mesh->finalize();
+				
+				}
+			}
+			
+			pending_meshes_to_finalize_.clear();
+			has_pending_meshes_.store(false, std::memory_order_release);
+		}
+	}
 }
 
 // ============================================================================
@@ -486,30 +554,8 @@ void OverlayViewport::render()
 		return;
 	}
 	
-	// Make OpenGL context current for this window
-	if (hdc_ && gl_context_) {
-		BOOL result = wglMakeCurrent(hdc_, gl_context_);
-		
-		static int debug_counter = 0;
-		
-		if (debug_counter++ % 60 == 0) 
-		{
-			std::cout << "[OverlayViewport::render] wglMakeCurrent result: " << result << std::endl;
-			std::cout << "[OverlayViewport::render] HDC: " << hdc_ << ", Context: " << gl_context_ << std::endl;
-			std::cout << "[OverlayViewport::render] Current GL context: " << wglGetCurrentContext() << std::endl;
-			std::cout << "[OverlayViewport::render] Viewport size: " << width_ << "x" << height_ << std::endl;
-			
-			// Check if OpenGL is working
-			GLint viewport[4];
-			glGetIntegerv(GL_VIEWPORT, viewport);
-			std::cout << "[OverlayViewport::render] GL Viewport: " << viewport[0] << "," << viewport[1] << " " << viewport[2] << "x" << viewport[3] << std::endl;
-			
-			GLenum err = glGetError();
-			if (err != GL_NO_ERROR) {
-				std::cout << "[OverlayViewport::render] OpenGL Error: " << err << std::endl;
-			}
-		}
-	}
+	
+	update_Scene_Rendering();
 	
 	CefDoMessageLoopWork();
 		
@@ -520,7 +566,6 @@ void OverlayViewport::render()
 		ImGui::NewFrame();
 		ImGuizmo::BeginFrame();
 		
-		// Create an invisible fullscreen window for ImGuizmo
 		ImGui::SetNextWindowPos(ImVec2(0, 0));
 		ImGui::SetNextWindowSize(ImVec2(static_cast<float>(width_), static_cast<float>(height_)));
 		ImGui::Begin("ViewportOverlay", nullptr, 

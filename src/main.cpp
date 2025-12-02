@@ -211,26 +211,17 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 		
 		std::string cubeName = "Cube" + std::to_string(cubeCounter);
 
-		std::cout << "\n [Main] Creating new cube: " << cubeName << std::endl;
+		std::cout << "\n[Main] Creating new cube: " << cubeName << std::endl;
 		
 		float spacing = 2.0f;
 		glm::vec3 position((cubeCounter - 1) * spacing, 0.0f, 0.0f);
 		cubeCounter++;
-		
-		// Save current context and activate GLFW hidden window context
-		HGLRC previousContext = wglGetCurrentContext();
-		HDC previousDC = wglGetCurrentDC();
-		
-		glfwMakeContextCurrent(hidden_window);
-		std::cout << "[Main] GLFW context activated for cube creation" << std::endl;
+
+		// CRITICAL: Create cube WITHOUT any OpenGL context to avoid creating resources in wrong context
+		glfwMakeContextCurrent(nullptr);
+		std::cout << "[Main] No OpenGL context active - creating cube geometry only..." << std::endl;
 		
 		Mesh* newCube = Primitives::CreateCubeMesh(1.0f, position, cubeName, true);
-		
-		// Check for OpenGL errors immediately after cube creation
-		GLenum err = glGetError();
-		if (err != GL_NO_ERROR) {
-			std::cout << "[Main] OpenGL Error after CreateCubeMesh: " << err << std::endl;
-		}
 		
 		if (!newCube) 
 		{
@@ -243,25 +234,16 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 			return resp;
 		}
 		
+		std::cout << "[Main] Cube " << cubeName << " geometry created (8 vertices, 12 edges, 6 faces)" << std::endl;
+		
 		myThreeDScene.addObject(newCube);
 		
-		err = glGetError();
-		if (err != GL_NO_ERROR) 
-		{
-			std::cout << "[Main] OpenGL Error after addObject: " << err << std::endl;
+		if (handler) {
+			std::cout << "[Main] Calling UIHandler to reinitialize cube in overlay context..." << std::endl;
+			handler->reinitializeSingleObject(newCube);
 		}
 		
-		if (previousContext && previousDC) 
-		{
-			wglMakeCurrent(previousDC, previousContext);
-			std::cout << "[Main] Restored previous GL context" << std::endl;
-		} 
-		else 
-		{
-			glfwMakeContextCurrent(nullptr);
-		}
-		
-		std::cout << "[Main] Cube " << cubeName << " created and added to scene at position (" 
+		std::cout << "[Main] Cube " << cubeName << " added to scene at position (" 
 				  << position.x << ", " << position.y << ", " << position.z << ")" << std::endl;
 		
 		// Return success response with cube info
@@ -272,7 +254,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 		resp.headers["Content-Type"] = "application/json";
 		resp.headers["Access-Control-Allow-Origin"] = "*";
 		return resp;
-	}, "Create a new cube and add it to the scene");
+	}, " Create a new cube and add it to the scene \n ");
 	
 	std::cout << "[Main] API routes registered (/api/context, /api/scene/objects, /api/scene-info, /api/create-cube)" << std::endl;
 

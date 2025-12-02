@@ -14,6 +14,8 @@
 #include <iostream>
 #include <commctrl.h>  
 #include <glm/glm.hpp>
+#include <GLFW/glfw3.h>
+#include <windows.h>
 
 #pragma comment(lib, "comctl32.lib")
 
@@ -252,7 +254,6 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	int window_width = client_rect.right - client_rect.left;
 	int window_height = client_rect.bottom - client_rect.top;	
 
-	// Create overlay with placeholder dimensions (will be updated by JavaScript)
 	int overlay_x = 0;
 	int overlay_y = 0;
 	int overlay_w = 100;
@@ -260,7 +261,6 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	
 	overlay_viewport_->create(parent_hwnd, overlay_x, overlay_y, overlay_w, overlay_h);
 	
-	// Pass 3D scene to overlay IMMEDIATELY
 	if (three_d_scene_) 
 	{
 		overlay_viewport_->setThreeDScene(three_d_scene_);
@@ -299,7 +299,6 @@ void UIHandler::updateOverlayPosition()
 		int viewport_width = window_width - left_panel_width - right_panel_width;
 		int viewport_height = (int)(window_height * 0.60f);
 		
-		// Add 5px inset on all sides
 		const int inset = 5;
 		overlay_viewport_->setPosition(
 			left_panel_width + inset, 
@@ -415,51 +414,65 @@ void UIHandler::initializeSceneObjects()
 	
 	std::cout << "[UIHandler] Initializing scene objects with OpenGL context..." << std::endl;
 	
-	try 
+	GLFWwindow* glfwWindow = glfwGetCurrentContext();
+	HGLRC glfwContext = wglGetCurrentContext();
+	HDC glfwHDC = wglGetCurrentDC();
+
+	
+	overlay_viewport_->makeContextCurrent();
+	
+	HGLRC overlayContext = wglGetCurrentContext();
+	HDC overlayHDC = wglGetCurrentDC();
+
+	
+	if (three_d_scene_) 
 	{
-		// CRITICAL: Make overlay context current BEFORE reinitializing scene
-		overlay_viewport_->makeContextCurrent();
-		
-		// Reinitialize scene OpenGL objects (shaders, VAO, VBO) in overlay context
-		if (three_d_scene_) 
+		three_d_scene_->initizalize();
+	}
+	
+	if (three_d_scene_) 
+	{
+		for (auto* obj : three_d_scene_->getObjectsRef()) 
 		{
-			std::cout << "[UIHandler] Reinitializing 3D scene OpenGL resources in overlay context..." << std::endl;
-			three_d_scene_->initizalize();
-			std::cout << "[UIHandler] Scene reinitialized successfully" << std::endl;
-		}
-		
-		// CRITICAL: Reinitialize ALL mesh objects (faces, edges, vertices) in overlay context
-		if (three_d_scene_) 
-		{
-			std::cout << "[UIHandler] Reinitializing all meshes OpenGL resources..." << std::endl;
-			for (auto* obj : three_d_scene_->getObjectsRef()) 
+			if (obj && obj->getIsMesh()) 
 			{
-				if (obj && obj->getIsMesh()) 
-				{
-					Mesh* mesh = static_cast<Mesh*>(obj);
-					mesh->finalize();
-					std::cout << "[UIHandler] Mesh '" << mesh->getName() << "' reinitialized" << std::endl;
-				}
+				Mesh* mesh = static_cast<Mesh*>(obj);
+				mesh->finalize();
 			}
-			std::cout << "[UIHandler] All meshes reinitialized (faces, edges, vertices)" << std::endl;
 		}
-		
-		// Now pass the scene to the overlay
-		if (three_d_scene_ && main_camera_) 
-		{
-			overlay_viewport_->setThreeDScene(three_d_scene_);
-			std::cout << "[UIHandler] Scene with " << three_d_scene_->getObjectsRef().size() 
-			          << " objects passed to overlay" << std::endl;
-		}
-		
-		scene_initialized_ = true;
-		
-		// Context will remain current for rendering
-		
-	} catch (const std::exception& e) {
-		std::cerr << "[UIHandler] ERROR during scene initialization: " << e.what() << std::endl;
-	} catch (...) {
-		std::cerr << "[UIHandler] UNKNOWN ERROR during scene initialization" << std::endl;
+	}
+	
+	if (three_d_scene_ && main_camera_) 
+	{
+		overlay_viewport_->setThreeDScene(three_d_scene_);
+	}
+	
+	scene_initialized_ = true;
+}
+
+void UIHandler::reinitializeSingleObject(ThreeDObject* obj)
+{
+	if (!obj)
+	{
+		std::cerr << "[UIHandler] ERROR: Cannot reinitialize null object" << std::endl;
+		return;
+	}
+	
+	if (!overlay_viewport_)
+	{
+		std::cerr << "[UIHandler] ERROR: Overlay viewport not created yet!" << std::endl;
+		return;
+	}
+	
+	
+	if (obj->getIsMesh())
+	{
+		Mesh* mesh = static_cast<Mesh*>(obj);
+		overlay_viewport_->reinitializeMeshComponents(mesh);
+	}
+	else
+	{
+		std::cerr << "[UIHandler] WARNING: Object is not a mesh, cannot reinitialize components" << std::endl;
 	}
 }
 

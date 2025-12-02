@@ -308,16 +308,8 @@ void ThreeDScene::render()
 
 void ThreeDScene::renderDirect(int width, int height)
 {
-	static int render_count = 0;
-	bool should_log = (render_count++ % 60 == 0);
-	
-	if (should_log) {
-		std::cout << "[ThreeDScene::renderDirect] Called with size " << width << "x" << height << std::endl;
-		std::cout << "[ThreeDScene::renderDirect] Active camera: " << (activeCamera ? activeCamera->getName() : "NULL") << std::endl;
-		std::cout << "[ThreeDScene::renderDirect] Objects count: " << objects.size() << std::endl;
-	}
-    // Direct rendering without FBO - for overlay viewports
-    // Assumes OpenGL context is already current AND buffer already cleared
+
+
     
     if (!activeCamera) 
     {
@@ -353,14 +345,12 @@ void ThreeDScene::renderDirect(int width, int height)
     glDrawArrays(GL_LINES, 0, 44);
     glBindVertexArray(0);
 
-    // Render all objects (cube)
-    for (auto *obj : objects) {
+    // Render all objects (cube)&
+    for (auto *obj : objects) 
+    {
         if (obj) obj->render(viewProj);
-    }
-    
-    if (should_log) {
-        std::cout << "[ThreeDScene::renderDirect] Rendering complete" << std::endl;
-    }
+    }    
+
 }
 
 

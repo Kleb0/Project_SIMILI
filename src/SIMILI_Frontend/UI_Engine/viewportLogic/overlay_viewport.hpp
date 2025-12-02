@@ -3,6 +3,8 @@
 #include <windows.h>
 #include <vector>
 #include <list>
+#include <mutex>
+#include <atomic>
 
 // ============================================================================
 // FORWARD DECLARATIONS
@@ -60,6 +62,9 @@ public:
     void releaseContext();
     HGLRC getGLContext() const { return gl_context_; }
     
+    // ----------- Mesh OpenGL Resource Management -----------
+    void reinitializeMeshComponents(class Mesh* mesh);
+    
     // ----------- 3D Scene Management -----------
     void setThreeDScene(ThreeDScene* scene) { three_d_scene_ = scene; }
     ThreeDScene* getThreeDScene() const { return three_d_scene_; }
@@ -116,6 +121,7 @@ private:
     // ----------- Rendering Internal -----------
     void renderScene();
     void ThreeDWorldInteractions();
+    void update_Scene_Rendering();
     
     // ----------- Window & OpenGL Context -----------
     HWND hwnd_;
@@ -131,6 +137,11 @@ private:
     
     // ----------- 3D Scene -----------
     ThreeDScene* three_d_scene_;
+    
+    // ----------- Pending Meshes (Thread-Safe Queue) -----------
+    std::vector<class Mesh*> pending_meshes_to_finalize_;
+    std::mutex pending_meshes_mutex_;
+    std::atomic<bool> has_pending_meshes_{false};
     
     // ----------- Selection System -----------
     ThreeDObjectSelector* selector_;

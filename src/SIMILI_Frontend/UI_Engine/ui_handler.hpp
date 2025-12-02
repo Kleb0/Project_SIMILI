@@ -77,7 +77,8 @@ public:
 	ThreeDScene* getThreeDScene() const { return three_d_scene_; }
 	
 	void setSceneObjects(OpenGLContext* renderer, ThreeDScene* scene, Camera* camera, Mesh** cubeMesh);
-	void initializeSceneObjects(); 
+	void initializeSceneObjects();
+	void reinitializeSingleObject(ThreeDObject* obj); // Reinitialize a single object in overlay context
 	
 	static LRESULT CALLBACK ParentWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
 
