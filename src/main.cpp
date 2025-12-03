@@ -62,7 +62,6 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 		return exit_code;
 	}
 
-	// Console allocation
 	static bool console_allocated = false;
 	if (!console_allocated) 
 	{
@@ -73,18 +72,16 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 		console_allocated = true;
 	}
 
-	{
-		wchar_t exePath[MAX_PATH];
-		GetModuleFileNameW(NULL, exePath, MAX_PATH);
-		gExecutableDir = fs::path(exePath).parent_path();
-	}
+	wchar_t exePath[MAX_PATH];
+	GetModuleFileNameW(NULL, exePath, MAX_PATH);
+	gExecutableDir = fs::path(exePath).parent_path();
 
 	SetConsoleCtrlHandler(ConsoleCtrlHandler, TRUE);
 
 	std::cout << "[Main] Starting SIMILI with CEF..." << std::endl;
 
-	// Initialize GLFW (required for OpenGL context)
-	if (!glfwInit()) {
+	if (!glfwInit()) 
+	{
 		std::cerr << "[Main] Failed to initialize GLFW" << std::endl;
 		return -1;
 	}
@@ -106,7 +103,8 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 	glfwMakeContextCurrent(hidden_window);
 	
 	// Initialize GLAD
-	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) 
+{
 		std::cerr << "[Main] Failed to initialize GLAD" << std::endl;
 		glfwDestroyWindow(hidden_window);
 		glfwTerminate();
@@ -116,7 +114,8 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 	
 
 	std::cout << "[Main] Starting HTTP Server..." << std::endl;
-	try {
+	try 
+	{
 		SIMILI::Server::SimpleHttpServer::getInstance().start(8080, 8443);
 		std::cout << "[Main] HTTP Server started on port 8080" << std::endl;
 	} 
@@ -127,7 +126,6 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 		return -1;
 	}
 
-	// Initialize 3D Scene and Camera
 	ThreeDScene myThreeDScene;
 	Camera mainCamera;
 	mainCamera.setName("MainCamera");
@@ -217,9 +215,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 		glm::vec3 position((cubeCounter - 1) * spacing, 0.0f, 0.0f);
 		cubeCounter++;
 
-		// CRITICAL: Create cube WITHOUT any OpenGL context to avoid creating resources in wrong context
 		glfwMakeContextCurrent(nullptr);
-		std::cout << "[Main] No OpenGL context active - creating cube geometry only..." << std::endl;
 		
 		Mesh* newCube = Primitives::CreateCubeMesh(1.0f, position, cubeName, true);
 		
@@ -234,19 +230,16 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 			return resp;
 		}
 		
-		std::cout << "[Main] Cube " << cubeName << " geometry created (8 vertices, 12 edges, 6 faces)" << std::endl;
 		
 		myThreeDScene.addObject(newCube);
 		
-		if (handler) {
-			std::cout << "[Main] Calling UIHandler to reinitialize cube in overlay context..." << std::endl;
+		if (handler) 
+		{
 			handler->reinitializeSingleObject(newCube);
+			handler->notifySceneChanged();
 		}
+
 		
-		std::cout << "[Main] Cube " << cubeName << " added to scene at position (" 
-				  << position.x << ", " << position.y << ", " << position.z << ")" << std::endl;
-		
-		// Return success response with cube info
 		SIMILI::Router::Response resp;
 		resp.statusCode = 200;
 		resp.statusMessage = "OK";
@@ -293,7 +286,6 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 	std::cout << "[Main] Shutting down CEF..." << std::endl;
 	CefShutdown();
 
-	// Cleanup GLFW
 	glfwDestroyWindow(hidden_window);
 	glfwTerminate();
 	std::cout << "[Main] GLFW terminated" << std::endl;

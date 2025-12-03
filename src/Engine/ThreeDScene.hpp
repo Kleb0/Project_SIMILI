@@ -42,8 +42,7 @@ public:
 
     void initizalize();
     void resize(int w, int h);
-    void render();
-    void renderDirect(int width, int height);  // Direct rendering without FBO (for overlay)
+    void render(int width, int height);
     void drawBackgroundGradient();
 
     GLuint getTexture() const; 

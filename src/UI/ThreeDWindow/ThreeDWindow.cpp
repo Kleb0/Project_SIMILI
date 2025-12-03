@@ -114,7 +114,7 @@ void ThreeDWindow::threeDRendering()
     int newWidth = static_cast<int>(oglChildSize.x);
     int newHeight = static_cast<int>(oglChildSize.y);
 
-    scene->render();
+    // scene->render();
     ImTextureID textureID = (ImTextureID)(intptr_t)scene->getTexture();
 
     ImGui::Image(textureID, oglChildSize, ImVec2(0, 1), ImVec2(1, 0));

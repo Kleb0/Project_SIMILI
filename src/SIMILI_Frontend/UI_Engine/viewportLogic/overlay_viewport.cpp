@@ -623,7 +623,7 @@ void OverlayViewport::renderScene()
 
 		}
 		
-		three_d_scene_->renderDirect(width_, height_);
+		three_d_scene_->render(width_, height_);
 		
 		if (should_debug) 
 		{

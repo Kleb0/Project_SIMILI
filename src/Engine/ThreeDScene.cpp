@@ -254,7 +254,7 @@ void ThreeDScene::resize(int w, int h)
 }
 
 
-void ThreeDScene::render()
+void ThreeDScene::render(int width, int height)
 {
     if (!glctx) 
     {
@@ -271,57 +271,13 @@ void ThreeDScene::render()
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    const int w = glctx->getWidth();
-    const int h = glctx->getHeight();
-    const float aspect = (h > 0) ? float(w) / float(h) : 1.0f;
-
-    glm::mat4 view = activeCamera->getViewMatrix();
-    glm::mat4 proj = activeCamera->getProjectionMatrix(aspect);
-    glm::mat4 viewProj = proj * view;
-
-    if (!ownsViewproj) 
-    {
-        lastViewProj = viewProj;
-        std::cout << "[ThreeDScene] New view projection matrix set.\n";
-        ownsViewproj = true;
-    }
-
-    glDisable(GL_DEPTH_TEST);
-    drawBackgroundGradient();
-    glEnable(GL_DEPTH_TEST);
-
-    glUseProgram(shaderProgram);
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
-
-    glBindVertexArray(gridVAO);
-    glm::mat4 model(1.0f);
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
-    glDrawArrays(GL_LINES, 0, 44);
-    glBindVertexArray(0);
-
-    for (auto *obj : objects) {
-        if (obj) obj->render(viewProj);
-    }
-
-    glctx->unbind();
-}
-
-void ThreeDScene::renderDirect(int width, int height)
-{
-
-
-    
-    if (!activeCamera) 
-    {
-        std::cerr << "[ThreeDScene] ERROR: No active camera set.\n";
-        return;
-    }
-
     // Enable depth testing for proper 3D rendering
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
     
-    // Viewport already set by caller
+    // Set viewport with the provided dimensions (override OpenGLContext viewport)
+    glViewport(0, 0, width, height);
+    
     const float aspect = (height > 0) ? float(width) / float(height) : 1.0f;
 
     glm::mat4 view = activeCamera->getViewMatrix();
@@ -345,12 +301,13 @@ void ThreeDScene::renderDirect(int width, int height)
     glDrawArrays(GL_LINES, 0, 44);
     glBindVertexArray(0);
 
-    // Render all objects (cube)&
+    // Render all objects
     for (auto *obj : objects) 
     {
         if (obj) obj->render(viewProj);
-    }    
+    }
 
+    glctx->unbind();
 }
 
 

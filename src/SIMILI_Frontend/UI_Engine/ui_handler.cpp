@@ -11,6 +11,8 @@
 #include "../../UI/ThreeDModes/Vertice_Mode.hpp"
 #include "../../UI/ThreeDModes/Face_Mode.hpp"
 #include "../../UI/ThreeDModes/Edge_Mode.hpp"
+#include "include/base/cef_callback.h"
+#include "include/wrapper/cef_closure_task.h"
 #include <iostream>
 #include <commctrl.h>  
 #include <glm/glm.hpp>
@@ -454,13 +456,11 @@ void UIHandler::reinitializeSingleObject(ThreeDObject* obj)
 {
 	if (!obj)
 	{
-		std::cerr << "[UIHandler] ERROR: Cannot reinitialize null object" << std::endl;
 		return;
 	}
 	
 	if (!overlay_viewport_)
 	{
-		std::cerr << "[UIHandler] ERROR: Overlay viewport not created yet!" << std::endl;
 		return;
 	}
 	
@@ -470,9 +470,29 @@ void UIHandler::reinitializeSingleObject(ThreeDObject* obj)
 		Mesh* mesh = static_cast<Mesh*>(obj);
 		overlay_viewport_->reinitializeMeshComponents(mesh);
 	}
-	else
+
+}
+
+void UIHandler::notifySceneChanged()
+{
+	if (!CefCurrentlyOn(TID_UI))
 	{
-		std::cerr << "[UIHandler] WARNING: Object is not a mesh, cannot reinitialize components" << std::endl;
+		CefPostTask(TID_UI, base::BindOnce(&UIHandler::notifySceneChanged, base::Unretained(this)));
+		return;
+	}
+	
+	if (!browser_list_.empty())
+	{
+		CefRefPtr<CefBrowser> browser = browser_list_.front();
+		if (browser)
+		{
+			CefRefPtr<CefFrame> hierarchy_frame = browser->GetFrameByName("hierarchy_inspector");
+			if (hierarchy_frame && hierarchy_frame->IsValid())
+			{
+				CefString script = "if (typeof fetchSceneObjects === 'function') { fetchSceneObjects(); }";
+				hierarchy_frame->ExecuteJavaScript(script, hierarchy_frame->GetURL(), 0);
+			}
+		}
 	}
 }
 
