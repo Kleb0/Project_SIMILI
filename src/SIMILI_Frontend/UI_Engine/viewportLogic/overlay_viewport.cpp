@@ -970,7 +970,6 @@ void OverlayViewport::ThreeDWorldInteractions()
 	
 	if (current_mode_ == normal_mode_)
 	{
-		
 		MeshTransform::manipulateMesh(
 			three_d_scene_,
 			multiple_selected_objects_,

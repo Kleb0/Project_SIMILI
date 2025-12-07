@@ -215,11 +215,11 @@ namespace Input {
 		inputSystem_->registerKey('3', ImGuiKey_3);
 		inputSystem_->registerKey('4', ImGuiKey_4);
 		
+		inputSystem_->registerKey(VK_SHIFT, ImGuiKey_ModShift);
 		inputSystem_->registerKey(VK_LSHIFT, ImGuiKey_LeftShift);
 		inputSystem_->registerKey(VK_RSHIFT, ImGuiKey_RightShift);
-		
-	}
-
+	}	
+	
 	void KeyManager::handleKeyDown(int windowsKey, LPARAM lParam)
 	{
 		if (!initialized_)

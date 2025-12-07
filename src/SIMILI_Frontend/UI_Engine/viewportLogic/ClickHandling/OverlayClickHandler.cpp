@@ -31,15 +31,19 @@ static bool isShiftPressed()
 	
 	inputSystem->pollKeyStates();
 	
+	// Check generic Shift (16) OR specific left/right shifts
+	bool genericShift = inputSystem->isKeyPressed(VK_SHIFT);
 	bool leftShift = inputSystem->isKeyPressed(VK_LSHIFT);
 	bool rightShift = inputSystem->isKeyPressed(VK_RSHIFT);
 	
-	std::cout << "[isShiftPressed] LeftShift: " << leftShift 
-	          << " | RightShift: " << rightShift 
-	          << " | VK_LSHIFT=" << VK_LSHIFT 
-	          << " | VK_RSHIFT=" << VK_RSHIFT << std::endl;
+	std::cout << "[isShiftPressed] Generic: " << genericShift
+			  << " | LeftShift: " << leftShift 
+			  << " | RightShift: " << rightShift 
+			  << " | VK_SHIFT=" << VK_SHIFT
+			  << " | VK_LSHIFT=" << VK_LSHIFT 
+			  << " | VK_RSHIFT=" << VK_RSHIFT << std::endl;
 	
-	return leftShift || rightShift;
+	return genericShift || leftShift || rightShift;
 }
 
 void OverlayClickHandler::handle() 
@@ -74,14 +78,9 @@ void OverlayClickHandler::handle()
 	int mouseX = cursor_pos.x;
 	int mouseY = cursor_pos.y;
 
-	// std::cout << "[OVERLAY CLICK HANDLER] Mouse click at: (" << mouseX << ", " << mouseY 
-	//           << ") - Viewport size: " << viewport->getWidth() << "x" << viewport->getHeight() 
-	//           << " | ImGuizmo Over: " << ImGuizmo::IsOver() << std::endl;
-
 	if (mouseX < 0 || mouseX >= viewport->getWidth() ||
 		mouseY < 0 || mouseY >= viewport->getHeight())
 	{
-		// std::cout << "[OVERLAY CLICK HANDLER] Click outside viewport bounds - ignoring" << std::endl;
 		return;
 	}
 
@@ -96,7 +95,6 @@ void OverlayClickHandler::handle()
 		
 		if (listRef.empty()) 
 		{
-			// std::cout << "[OVERLAY CLICK HANDLER] No objects in scene or scene not ready" << std::endl;
 			return;
 		}
 		
@@ -111,18 +109,28 @@ void OverlayClickHandler::handle()
 		Vertice_Mode* verticeMode = viewport->getVerticeMode();
 		Face_Mode* faceMode = viewport->getFaceMode();
 		Edge_Mode* edgeMode = viewport->getEdgeMode();
-
-		// Get selector from viewport
 		ThreeDObjectSelector* selector = viewport->getSelector();
-		if (!selector) {
+
+		if (!selector) 
+		{
 			std::cerr << "[OVERLAY CLICK HANDLER] Error: No selector available" << std::endl;
 			return;
 		}
 
 		if (currentMode == normalMode)
 		{
+			bool shiftPressed = isShiftPressed();
+			
+			if (shiftPressed)
+			{
+				std::cout << "TEST TEST TEST TEST TEST !!!! Raycast called with left shift pressed !" << std::endl;
+			}
+			
 			// Don't perform raycast if hovering over gizmo (even if not actively using it)
 			bool preventSelection = ImGuizmo::IsOver();
+			
+			auto currentSelection = viewport->getMultipleSelectedObjects();
+			std::list<ThreeDObject*> multipleSelected(currentSelection.begin(), currentSelection.end());
 			
 			if (!preventSelection)
 			{
@@ -135,13 +143,9 @@ void OverlayClickHandler::handle()
 			}
 
 			ThreeDObject* selected = selector->getSelectedObject();
-			bool shiftPressed = isShiftPressed();
 
 			if (selected)
 			{
-				auto currentSelection = viewport->getMultipleSelectedObjects();
-				std::list<ThreeDObject*> multipleSelected(currentSelection.begin(), currentSelection.end());
-
 				if (!shiftPressed)
 				{
 					for (auto* obj : objects) obj->setSelected(false);
@@ -154,21 +158,6 @@ void OverlayClickHandler::handle()
 				{
 					multipleSelected.push_back(selected);
 					selected->setSelected(true);
-					
-					try 
-					{
-						glm::mat4 globalMatrix = selected->getGlobalModelMatrix();
-						glm::vec3 worldPos = glm::vec3(globalMatrix[3]);
-						// std::cout << "[OVERLAY CLICK HANDLER] : Selected object world position: ("
-						//         << worldPos.x << ", "
-						//         << worldPos.y << ", "
-						//         << worldPos.z << ")" 
-						// << " for object with name " << selected->getName() << std::endl;
-					} 
-					catch (const std::exception& e) 
-					{
-						std::cerr << "[OVERLAY CLICK HANDLER] Error getting object position: " << e.what() << std::endl;
-					}
 				}
 				else if (shiftPressed)
 				{
@@ -177,17 +166,15 @@ void OverlayClickHandler::handle()
 				}
 
 				viewport->setMultipleSelectedObjects(multipleSelected);
-				// std::cout << "[OVERLAY CLICK HANDLER] Multiple selected objects count: " 
-				//           << multipleSelected.size() << std::endl;
 				selector->clearTarget();
+
 			}
-			else if (!preventSelection)  // Only deselect if we weren't over gizmo
+			else if (!preventSelection)
 			{
 				for (auto* obj : objects) obj->setSelected(false);
 				std::list<ThreeDObject*> empty;
 				viewport->setMultipleSelectedObjects(empty);
 				selector->clearTarget();
-				// std::cout << "[OVERLAY CLICK HANDLER] Deselected all objects" << std::endl;
 			}
 		}
 
@@ -197,7 +184,7 @@ void OverlayClickHandler::handle()
 			bool shiftPressed = isShiftPressed();
 
 			std::cout << "[VerticeMode] Click - Shift: " << (shiftPressed ? "YES" : "NO") 
-			          << " | Gizmo prevent: " << (preventSelection ? "YES" : "NO") << std::endl;
+					  << " | Gizmo prevent: " << (preventSelection ? "YES" : "NO") << std::endl;
 
 			Vertice* selectedVertice = nullptr;
 			if (!preventSelection)
@@ -208,7 +195,7 @@ void OverlayClickHandler::handle()
 					objects, !shiftPressed
 				);
 				std::cout << "[VerticeMode] pickUpVertice returned: " 
-				          << (selectedVertice ? "VERTICE FOUND" : "nullptr") << std::endl;
+						  << (selectedVertice ? "VERTICE FOUND" : "nullptr") << std::endl;
 			}
 			else
 			{
@@ -270,7 +257,6 @@ void OverlayClickHandler::handle()
 
 		if (currentMode == faceMode)
 		{
-			// Don't perform raycast if hovering over gizmo (same logic as Normal mode)
 			bool preventSelection = ImGuizmo::IsOver() || ImGuizmo::IsUsing();
 			bool shiftPressed = isShiftPressed();
 
@@ -282,15 +268,10 @@ void OverlayClickHandler::handle()
 					windowWidth, windowHeight, view, proj, objects, shiftPressed
 				);
 			}
-			else
-			{
-				// std::cout << "[OVERLAY CLICK HANDLER] Face raycast skipped - mouse over or using ImGuizmo" << std::endl;
-			}
 
 			if (selectedFace)
 			{
-				// std::cout << "[OVERLAY CLICK HANDLER] Face selected in Face Mode" << std::endl;
-				
+			
 				auto& multipleFaces = viewport->getMultipleSelectedFaces();
 				
 				if (shiftPressed)
@@ -317,7 +298,7 @@ void OverlayClickHandler::handle()
 			}
 			else
 			{
-				if (!shiftPressed && !preventSelection)  // Only deselect if we weren't over gizmo
+				if (!shiftPressed && !preventSelection) 
 				{
 					for (ThreeDObject* obj : objects)
 					{
@@ -344,15 +325,10 @@ void OverlayClickHandler::handle()
 					windowWidth, windowHeight, view, proj, objects, shiftPressed
 				);
 			}
-			else
-			{
-				// std::cout << "[OVERLAY CLICK HANDLER] Edge raycast skipped - mouse over or using ImGuizmo" << std::endl;
-			}
 
 			if (selectedEdge)
 			{
-				// std::cout << "[OVERLAY CLICK HANDLER] Edge selected in Edge Mode" << std::endl;
-				
+			
 				auto& multipleEdges = viewport->getMultipleSelectedEdges();
 				
 				if (shiftPressed)

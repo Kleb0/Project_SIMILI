@@ -271,11 +271,9 @@ void ThreeDScene::render(int width, int height)
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Enable depth testing for proper 3D rendering
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
     
-    // Set viewport with the provided dimensions (override OpenGLContext viewport)
     glViewport(0, 0, width, height);
     
     const float aspect = (height > 0) ? float(width) / float(height) : 1.0f;
@@ -290,7 +288,6 @@ void ThreeDScene::render(int width, int height)
         ownsViewproj = true;
     }
 
-    // Render grid (white lines)
     glUseProgram(shaderProgram);
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
 
