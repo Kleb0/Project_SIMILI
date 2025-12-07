@@ -180,11 +180,19 @@ void OverlayClickHandler::handle()
 
 		if (currentMode == verticeMode)
 		{
-			bool preventSelection = ImGuizmo::IsOver() || ImGuizmo::IsUsing();		
 			bool shiftPressed = isShiftPressed();
+			
+			if (shiftPressed)
+			{
+				std::cout << "TEST TEST TEST TEST TEST !!!! Vertice raycast called with shift pressed !" << std::endl;
+			}
+			
+			bool preventSelection = ImGuizmo::IsOver() || ImGuizmo::IsUsing();
 
 			std::cout << "[VerticeMode] Click - Shift: " << (shiftPressed ? "YES" : "NO") 
-					  << " | Gizmo prevent: " << (preventSelection ? "YES" : "NO") << std::endl;
+					<< " | Gizmo prevent: " << (preventSelection ? "YES" : "NO") << std::endl;
+
+			auto& multipleVertices = viewport->getMultipleSelectedVertices();
 
 			Vertice* selectedVertice = nullptr;
 			if (!preventSelection)
@@ -192,10 +200,10 @@ void OverlayClickHandler::handle()
 				selectedVertice = selector->pickUpVertice(
 					mouseX, mouseY,
 					windowWidth, windowHeight, view, proj,
-					objects, !shiftPressed
+					objects, false  
 				);
 				std::cout << "[VerticeMode] pickUpVertice returned: " 
-						  << (selectedVertice ? "VERTICE FOUND" : "nullptr") << std::endl;
+						<< (selectedVertice ? "VERTICE FOUND" : "nullptr") << std::endl;
 			}
 			else
 			{
@@ -204,27 +212,8 @@ void OverlayClickHandler::handle()
 
 			if (selectedVertice)
 			{
-				auto& multipleVertices = viewport->getMultipleSelectedVertices();
-				
-				std::cout << "[VerticeMode] Before toggle - List size: " << multipleVertices.size() << std::endl;
-				
-				if (shiftPressed)
-				{
-					auto it = std::find(multipleVertices.begin(), multipleVertices.end(), selectedVertice);
-					if (it == multipleVertices.end())
-					{
-						multipleVertices.push_back(selectedVertice);
-						selectedVertice->setSelected(true);
-						std::cout << "[VerticeMode] SHIFT ADD - Vertice added to selection" << std::endl;
-					}
-					else
-					{
-						multipleVertices.erase(it);
-						selectedVertice->setSelected(false);
-						std::cout << "[VerticeMode] SHIFT REMOVE - Vertice removed from selection" << std::endl;
-					}
-				}
-				else
+
+				if (!shiftPressed)
 				{
 					for (ThreeDObject* obj : objects)
 					{
@@ -233,16 +222,28 @@ void OverlayClickHandler::handle()
 						for (Vertice* v : mesh->getVertices()) v->setSelected(false);
 					}
 					multipleVertices.clear();
-					selectedVertice->setSelected(true);
+				}
+
+				auto it = std::find(multipleVertices.begin(), multipleVertices.end(), selectedVertice);
+				
+				if (it == multipleVertices.end())
+				{
 					multipleVertices.push_back(selectedVertice);
-					std::cout << "[VerticeMode] NO SHIFT - Cleared all, selected new vertice" << std::endl;
+					selectedVertice->setSelected(true);
+					std::cout << "[VerticeMode] Vertice added to selection" << std::endl;
+				}
+				else if (shiftPressed)
+				{
+					multipleVertices.erase(it);
+					selectedVertice->setSelected(false);
+					std::cout << "[VerticeMode] SHIFT REMOVE - Vertice removed from selection" << std::endl;
 				}
 				
-				std::cout << "[VerticeMode] After toggle - List size: " << multipleVertices.size() << std::endl;
+				std::cout << "[VerticeMode] Total selected vertices: " << multipleVertices.size() << std::endl;
 			}
-			else
+			else if (!preventSelection)
 			{
-				if (!shiftPressed && !preventSelection)  // Only deselect if we weren't over gizmo
+				if (!shiftPressed)
 				{
 					for (ThreeDObject* obj : objects)
 					{
@@ -250,40 +251,37 @@ void OverlayClickHandler::handle()
 						if (!mesh) continue;    
 						for (Vertice* vert : mesh->getVertices()) vert->setSelected(false);
 					}
-					viewport->getMultipleSelectedVertices().clear();
+					multipleVertices.clear();
 				}
 			}
-		}
+		}		
 
 		if (currentMode == faceMode)
 		{
-			bool preventSelection = ImGuizmo::IsOver() || ImGuizmo::IsUsing();
 			bool shiftPressed = isShiftPressed();
+			
+			if (shiftPressed)
+			{
+				std::cout << "TEST TEST TEST TEST TEST !!!! Face raycast called with shift pressed !" << std::endl;
+			}
+			
+			bool preventSelection = ImGuizmo::IsOver() || ImGuizmo::IsUsing();
+
+			auto& multipleFaces = viewport->getMultipleSelectedFaces();
 
 			Face* selectedFace = nullptr;
 			if (!preventSelection)
 			{
 				selectedFace = selector->pickupFace(
 					mouseX, mouseY,
-					windowWidth, windowHeight, view, proj, objects, shiftPressed
+					windowWidth, windowHeight, view, proj, objects, false  // Always preserve selection for manual management
 				);
 			}
 
 			if (selectedFace)
 			{
-			
-				auto& multipleFaces = viewport->getMultipleSelectedFaces();
-				
-				if (shiftPressed)
-				{
-					auto it = std::find(multipleFaces.begin(), multipleFaces.end(), selectedFace);
-					if (it == multipleFaces.end())
-					{
-						multipleFaces.push_back(selectedFace);
-						for (Face* f : multipleFaces) if (f) f->setSelected(true);
-					}
-				}
-				else
+				// If Shift is NOT pressed, clear previous selection
+				if (!shiftPressed)
 				{
 					for (ThreeDObject* obj : objects)
 					{
@@ -292,13 +290,28 @@ void OverlayClickHandler::handle()
 						for (Face* f : mesh->getFaces()) if (f) f->setSelected(false);
 					}
 					multipleFaces.clear();
-					selectedFace->setSelected(true);
-					multipleFaces.push_back(selectedFace);
 				}
+
+				auto it = std::find(multipleFaces.begin(), multipleFaces.end(), selectedFace);
+				
+				if (it == multipleFaces.end())
+				{
+					multipleFaces.push_back(selectedFace);
+					selectedFace->setSelected(true);
+					std::cout << "[FaceMode] Face added to selection" << std::endl;
+				}
+				else if (shiftPressed)
+				{
+					multipleFaces.erase(it);
+					selectedFace->setSelected(false);
+					std::cout << "[FaceMode] SHIFT REMOVE - Face removed from selection" << std::endl;
+				}
+				
+				std::cout << "[FaceMode] Total selected faces: " << multipleFaces.size() << std::endl;
 			}
-			else
+			else if (!preventSelection)
 			{
-				if (!shiftPressed && !preventSelection) 
+				if (!shiftPressed)
 				{
 					for (ThreeDObject* obj : objects)
 					{
@@ -306,41 +319,37 @@ void OverlayClickHandler::handle()
 						if (!mesh) continue;
 						for (Face* f : mesh->getFaces()) if (f) f->setSelected(false);
 					}
-					viewport->getMultipleSelectedFaces().clear();
+					multipleFaces.clear();
 				}
 			}
-		}
-
+		}	
+		
 		if (currentMode == edgeMode)
 		{
-
-			bool preventSelection = ImGuizmo::IsOver() || ImGuizmo::IsUsing();
 			bool shiftPressed = isShiftPressed();
+			
+			if (shiftPressed)
+			{
+				std::cout << "TEST TEST TEST TEST TEST !!!! Edge raycast called with shift pressed !" << std::endl;
+			}
+			
+			bool preventSelection = ImGuizmo::IsOver() || ImGuizmo::IsUsing();
+
+			auto& multipleEdges = viewport->getMultipleSelectedEdges();
 
 			Edge* selectedEdge = nullptr;
 			if (!preventSelection)
 			{
 				selectedEdge = selector->pickupEdge(
 					mouseX, mouseY,
-					windowWidth, windowHeight, view, proj, objects, shiftPressed
+					windowWidth, windowHeight, view, proj, objects, false  // Always preserve selection for manual management
 				);
 			}
 
 			if (selectedEdge)
 			{
-			
-				auto& multipleEdges = viewport->getMultipleSelectedEdges();
-				
-				if (shiftPressed)
-				{
-					auto it = std::find(multipleEdges.begin(), multipleEdges.end(), selectedEdge);
-					if (it == multipleEdges.end())
-					{
-						multipleEdges.push_back(selectedEdge);
-						for (Edge* e : multipleEdges) if (e) e->setSelected(true);
-					}
-				}
-				else
+				// If Shift is NOT pressed, clear previous selection
+				if (!shiftPressed)
 				{
 					for (ThreeDObject* obj : objects)
 					{
@@ -349,13 +358,28 @@ void OverlayClickHandler::handle()
 						for (Edge* e : mesh->getEdges()) if (e) e->setSelected(false);
 					}
 					multipleEdges.clear();
-					selectedEdge->setSelected(true);
-					multipleEdges.push_back(selectedEdge);
 				}
+
+				auto it = std::find(multipleEdges.begin(), multipleEdges.end(), selectedEdge);
+				
+				if (it == multipleEdges.end())
+				{
+					multipleEdges.push_back(selectedEdge);
+					selectedEdge->setSelected(true);
+					std::cout << "[EdgeMode] Edge added to selection" << std::endl;
+				}
+				else if (shiftPressed)
+				{
+					multipleEdges.erase(it);
+					selectedEdge->setSelected(false);
+					std::cout << "[EdgeMode] SHIFT REMOVE - Edge removed from selection" << std::endl;
+				}
+				
+				std::cout << "[EdgeMode] Total selected edges: " << multipleEdges.size() << std::endl;
 			}
-			else
+			else if (!preventSelection)
 			{
-				if (!shiftPressed && !preventSelection) 
+				if (!shiftPressed)
 				{
 					for (ThreeDObject* obj : objects)
 					{
@@ -363,7 +387,7 @@ void OverlayClickHandler::handle()
 						if (!mesh) continue;    
 						for (Edge* e : mesh->getEdges()) if (e) e->setSelected(false);
 					}
-					viewport->getMultipleSelectedEdges().clear();
+					multipleEdges.clear();
 				}
 			}
 		}
