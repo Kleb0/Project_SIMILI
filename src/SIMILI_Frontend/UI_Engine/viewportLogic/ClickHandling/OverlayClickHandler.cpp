@@ -31,7 +31,6 @@ static bool isShiftPressed()
 	
 	inputSystem->pollKeyStates();
 	
-	// Check generic Shift (16) OR specific left/right shifts
 	bool genericShift = inputSystem->isKeyPressed(VK_SHIFT);
 	bool leftShift = inputSystem->isKeyPressed(VK_LSHIFT);
 	bool rightShift = inputSystem->isKeyPressed(VK_RSHIFT);

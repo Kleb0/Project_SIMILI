@@ -42,8 +42,6 @@ namespace VerticeTransform
     {
         static ImGuizmo::OPERATION currentGizmoOperation = ImGuizmo::TRANSLATE;
         
-        // CRITICAL: Check key presses BEFORE checking if vertices are selected
-        // This allows mode switching even when nothing is selected
         auto& keyManager = SIMILI::Input::KeyManager::getInstance();
         auto* inputSystem = keyManager.getInputSystem();
         
@@ -75,12 +73,15 @@ namespace VerticeTransform
         glm::mat4 proj = projectionMatrix;
 
         static glm::mat4 dummyMatrix = glm::mat4(1.0f);
-        static glm::mat4 prevDummyMatrix = glm::mat4(1.0f);
+        static glm::mat4 startMatrix = glm::mat4(1.0f);
+        static glm::mat4 prevMatrix = glm::mat4(1.0f);
         static size_t previousSetHash = 0;
+        static bool gizmoActive = false;
+        static glm::vec3 lockedCenter = glm::vec3(0.0f);
+        static ThreeDObject* lockedParent = nullptr;
 
-        static glm::mat4 accumDelta = glm::mat4(1.0f);
-        static std::vector<Vertice*> vertsSnapshot;
-        static bool dragActive = false;
+        static std::unordered_map<Vertice*, glm::vec3> initialLocalPositions;
+        static glm::mat4 totalAccumDelta = glm::mat4(1.0f);
 
         auto hashSet = [&]() -> size_t {
             size_t h = 1469598103934665603ull;
@@ -92,86 +93,133 @@ namespace VerticeTransform
             return h;
         };
 
-
-        glm::vec3 center(0.0f);
-        int count = 0;
-        for (auto* v : selectedVertices) 
-        {
-            if (!v) continue;
-            center += v->getPosition();
-            ++count;
-        }
-        if (count > 0) center /= static_cast<float>(count);
-
         size_t currentHash = hashSet();
         bool usingGizmo = ImGuizmo::IsUsing();
-        bool mouseDown = ImGui::IsMouseDown(ImGuiMouseButton_Left);
-        bool mouseReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left);
         bool selectionChanged = (currentHash != previousSetHash);
 
-        if (selectionChanged || !usingGizmo) 
+        glm::vec3 center = lockedCenter;
+        ThreeDObject* firstParent = lockedParent;
+        
+        if (!gizmoActive)
         {
-            dummyMatrix = glm::translate(glm::mat4(1.0f), center);
-            prevDummyMatrix = dummyMatrix;
-
-            if (selectionChanged) 
-            {
-                accumDelta = glm::mat4(1.0f);
-                vertsSnapshot.clear();
-                dragActive = false;
-            }
-            previousSetHash = currentHash;
-        }
-
-        if (!dragActive && usingGizmo && mouseDown) 
-        {
-            vertsSnapshot.clear();
-            std::unordered_set<Vertice*> uniq;
-            uniq.reserve(selectedVertices.size());
-            for (auto* v : selectedVertices) if (v) uniq.insert(v);
-            vertsSnapshot.reserve(uniq.size());
-            for (auto* v : uniq) vertsSnapshot.push_back(v);
-            accumDelta = glm::mat4(1.0f);
-            prevDummyMatrix = dummyMatrix;
-            dragActive = true;
-        }
-
-        // Prepare the gizmo (this sets up ImGuizmo state)
-        dummyMatrix = Guizmo::renderGizmoForVertices(selectedVertices, currentGizmoOperation, view, proj, oglChildPos, oglChildSize);
-
-        bool manipulated = ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(proj),
-        currentGizmoOperation, ImGuizmo::WORLD, glm::value_ptr(dummyMatrix));
-
-
-        if (usingGizmo && manipulated) 
-        {
-            glm::mat4 deltaWorld = dummyMatrix * glm::inverse(prevDummyMatrix);
-
+            center = glm::vec3(0.0f);
+            int count = 0;
+            firstParent = nullptr;
+            
             for (auto* v : selectedVertices) 
             {
                 if (!v) continue;
-                ThreeDObject* parent = v->getMeshParent();
-                if (!parent) continue;
-
-                const glm::mat4 P  = parent->getModelMatrix();
-                const glm::mat4 Pi = glm::inverse(P);
-
-                glm::vec4 L  = glm::vec4(v->getLocalPosition(), 1.0f);
-                glm::vec4 W  = P * L;
-                glm::vec4 W2 = deltaWorld * W;
-                glm::vec4 L2 = Pi * W2;
-
-                v->setLocalPosition(glm::vec3(L2));
-                v->setPosition(glm::vec3(W2));
+                
+                if (!firstParent) {
+                    firstParent = v->getMeshParent();
+                }
+                
+                center += v->getPosition();
+                ++count;
             }
-
-            accumDelta = deltaWorld * accumDelta;
-            prevDummyMatrix = dummyMatrix;
+            if (count > 0) center /= static_cast<float>(count);
         }
 
-        if (dragActive && mouseReleased) 
+        if (selectionChanged || (!usingGizmo && !gizmoActive)) 
+        {
+            dummyMatrix = glm::translate(glm::mat4(1.0f), center);
+            startMatrix = dummyMatrix;
+            prevMatrix = dummyMatrix;
+            gizmoActive = false;
+            lockedCenter = center;
+            lockedParent = firstParent;
+            initialLocalPositions.clear();
+            totalAccumDelta = glm::mat4(1.0f);
+            
+            if (selectionChanged) 
+            {
+                previousSetHash = currentHash;
+            }
+        }
+
+        glm::mat4 gizmoMatrix = Guizmo::renderGizmoForVertices(selectedVertices, currentGizmoOperation, view, proj, oglChildPos, oglChildSize);
+        
+        if (!gizmoActive)
+        {
+            dummyMatrix = gizmoMatrix;
+        }
+
+        if (usingGizmo && !gizmoActive)
+        {
+            gizmoActive = true;
+            lockedCenter = center;
+            lockedParent = firstParent;
+            startMatrix = dummyMatrix;
+            prevMatrix = dummyMatrix;
+            initialLocalPositions.clear();
+            totalAccumDelta = glm::mat4(1.0f);
+            
+            std::unordered_set<Vertice*> uniqueVerts;
+            for (auto* v : selectedVertices) if (v) uniqueVerts.insert(v);
+            
+            for (auto* v : uniqueVerts)
+            {
+                if (v) {
+                    initialLocalPositions[v] = v->getLocalPosition();
+                }
+            }
+        }
+
+        // Manipulate the gizmo
+        const bool Manipulated = ImGuizmo::Manipulate(
+            glm::value_ptr(view), 
+            glm::value_ptr(proj),
+            currentGizmoOperation, 
+            ImGuizmo::WORLD, 
+            glm::value_ptr(dummyMatrix)
+        );
+
+        // During drag: apply transformation from INITIAL positions
+        if (usingGizmo && Manipulated && lockedParent)
+        {
+            // Calculate TOTAL delta from start of drag
+            glm::mat4 totalDelta = dummyMatrix * glm::inverse(startMatrix);
+            
+            // Check if delta is not identity
+            if (!isIdentity(totalDelta))
+            {
+                glm::mat4 parentMat = lockedParent->getModelMatrix();
+                glm::mat4 parentInv = glm::inverse(parentMat);
+                
+                // Apply total transformation from initial positions
+                for (auto& pair : initialLocalPositions)
+                {
+                    Vertice* v = pair.first;
+                    glm::vec3 initialLocalPos = pair.second;
+                    
+                    if (!v) continue;
+                    
+                    // Transform initial local position to world space
+                    glm::vec3 initialWorldPos = glm::vec3(parentMat * glm::vec4(initialLocalPos, 1.0f));
+                    
+                    // Apply total transformation in world space
+                    glm::vec4 transformedWorld = totalDelta * glm::vec4(initialWorldPos, 1.0f);
+                    
+                    // Transform back to local space
+                    glm::vec3 newLocalPos = glm::vec3(parentInv * transformedWorld);
+                    
+                    v->setLocalPosition(newLocalPos);
+                    v->setPosition(glm::vec3(transformedWorld));
+                }
+                
+                // Store for DNA tracking
+                totalAccumDelta = totalDelta;
+            }
+            
+            prevMatrix = dummyMatrix;
+        }
+
+        // End of drag: track changes in DNA
+        if (!usingGizmo && gizmoActive)
         {
             Mesh* parentMesh = nullptr;
+            std::vector<Vertice*> vertsSnapshot;
+            
             if (!selectedVertices.empty()) 
             {
                 if (auto* any = selectedVertices.front()) 
@@ -182,19 +230,29 @@ namespace VerticeTransform
                     }
                 }
             }
-            if (parentMesh && !isIdentity(accumDelta)) 
+
+            // Collect vertices for DNA tracking
+            for (auto& pair : initialLocalPositions)
+            {
+                if (pair.first) {
+                    vertsSnapshot.push_back(pair.first);
+                }
+            }
+
+            if (parentMesh && !isIdentity(totalAccumDelta)) 
             {
                 if (auto* dna = parentMesh->getMeshDNA()) 
                 {
                     std::cout << "Tracking Vertice modification in Mesh DNA." << std::endl;
-                    dna->trackVerticeModify(accumDelta, vertsSnapshot);
+                    dna->trackVerticeModify(totalAccumDelta, vertsSnapshot);
                 }
             }
-            accumDelta = glm::mat4(1.0f);
-            vertsSnapshot.clear();
-            dragActive = false;
+
+            gizmoActive = false;
+            initialLocalPositions.clear();
+            totalAccumDelta = glm::mat4(1.0f);
         }
 
-        wasUsingGizmoLastFrame = usingGizmo || dragActive;
+        wasUsingGizmoLastFrame = usingGizmo;
     }
 }
