@@ -18,8 +18,10 @@
 #include <glm/glm.hpp>
 #include <GLFW/glfw3.h>
 #include <windows.h>
+#include <timeapi.h>
 
 #pragma comment(lib, "comctl32.lib")
+#pragma comment(lib, "winmm.lib")
 
 UIHandler::UIHandler() : parent_hwnd_(nullptr), timer_id_(0),
 	last_viewport_update_time_(0), last_viewport_x_(0), last_viewport_y_(0), 
@@ -263,6 +265,8 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	
 	overlay_viewport_->create(parent_hwnd, overlay_x, overlay_y, overlay_w, overlay_h);
 	
+	overlay_viewport_->setUIHandler(this);
+	
 	if (three_d_scene_) 
 	{
 		overlay_viewport_->setThreeDScene(three_d_scene_);
@@ -327,6 +331,8 @@ void UIHandler::startRenderTimer()
 {
 	if (timer_id_ == 0 && overlay_viewport_) 
 	{
+		// Set high resolution timer for consistent 60 FPS (16.67ms)
+		timeBeginPeriod(1);
 		timer_id_ = SetTimer(nullptr, reinterpret_cast<UINT_PTR>(this), 16, RenderTimerProc);
 	}
 }
@@ -336,6 +342,7 @@ void UIHandler::stopRenderTimer()
 	if (timer_id_ != 0) 
 	{
 		KillTimer(nullptr, timer_id_);
+		timeEndPeriod(1);
 		timer_id_ = 0;
 	}
 }

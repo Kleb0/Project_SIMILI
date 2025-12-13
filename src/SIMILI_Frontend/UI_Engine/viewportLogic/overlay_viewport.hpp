@@ -33,6 +33,7 @@ class Vertice;
 class Face;
 class Edge;
 class ContextualMenuTextureTest;
+class UIHandler;
 
 class OverlayViewport {
 public:
@@ -75,6 +76,8 @@ public:
     
     void setMultipleSelectedObjects(const std::list<ThreeDObject*>& objects);
     const std::list<ThreeDObject*>& getMultipleSelectedObjects() const { return multiple_selected_objects_; }
+    
+    void setUIHandler(UIHandler* handler) { ui_handler_ = handler; }
     
     std::list<Vertice*>& getMultipleSelectedVertices() { return multiple_selected_vertices_; }
     std::list<Face*>& getMultipleSelectedFaces() { return multiple_selected_faces_; }
@@ -137,6 +140,7 @@ private:
     
     // ----------- 3D Scene -----------
     ThreeDScene* three_d_scene_;
+    UIHandler* ui_handler_ = nullptr;
     
     // ----------- Pending Meshes (Thread-Safe Queue) -----------
     std::vector<class Mesh*> pending_meshes_to_finalize_;

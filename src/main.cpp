@@ -94,7 +94,8 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	
 	GLFWwindow* hidden_window = glfwCreateWindow(800, 600, "SIMILI_Hidden_GL_Context", nullptr, nullptr);
-	if (!hidden_window) {
+	if (!hidden_window) 
+	{
 		std::cerr << "[Main] Failed to create GLFW window for OpenGL context" << std::endl;
 		glfwTerminate();
 		return -1;
@@ -104,7 +105,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 	
 	// Initialize GLAD
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) 
-{
+	{
 		std::cerr << "[Main] Failed to initialize GLAD" << std::endl;
 		glfwDestroyWindow(hidden_window);
 		glfwTerminate();
@@ -112,7 +113,6 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 	}
 	std::cout << "[Main] OpenGL " << glGetString(GL_VERSION) << " initialized" << std::endl;
 	
-
 	std::cout << "[Main] Starting HTTP Server..." << std::endl;
 	try 
 	{
@@ -141,7 +141,6 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 	myThreeDScene.initizalize();
 	myThreeDScene.setActiveCamera(&mainCamera);
 	
-	// Add objects to scene
 	myThreeDScene.addObject(cubeMesh1);
 	myThreeDScene.addObject(&mainCamera);
 
@@ -149,8 +148,8 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 
 	auto& router = SIMILI::Server::SimpleHttpServer::getInstance().getRouter();
 	
-	// Route: Get OpenGL Context ID
-	router.get("/api/context", [&renderer](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response {
+	router.get("/api/context", [&renderer](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response 
+	{
 		SIMILI::Router::Response resp;
 		resp.statusCode = 200;
 		resp.statusMessage = "OK";
@@ -170,11 +169,26 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 		
 		auto& objects = myThreeDScene.getObjectsRef();
 		bool first = true;
-		for (auto* obj : objects) {
+
+		for (auto* obj : objects) 
+		{
 			if (!first) json << ",";
+			
+			std::string objType = "Unknown";
+			if (dynamic_cast<Camera*>(obj)) 
+			{
+				objType = "Camera";
+			} 
+			else if (obj->getIsMesh()) 
+			{
+				objType = "Mesh";
+			}
+			
 			json << "{"
 				 << "\"id\":" << obj->getID() << ","
-				 << "\"name\":\"" << obj->getName() << "\""
+				 << "\"name\":\"" << obj->getName() << "\","
+				 << "\"type\":\"" << objType << "\","
+				 << "\"selected\":" << (obj->getSelected() ? "true" : "false")
 				 << "}";
 			first = false;
 		}
@@ -249,14 +263,121 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 		return resp;
 	}, " Create a new cube and add it to the scene \n ");
 	
-	std::cout << "[Main] API routes registered (/api/context, /api/scene/objects, /api/scene-info, /api/create-cube)" << std::endl;
+	router.post("/api/select-object", [&myThreeDScene, &handler](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response {
+		SIMILI::Router::Response resp;
+		resp.headers["Content-Type"] = "application/json";
+		resp.headers["Access-Control-Allow-Origin"] = "*";
+		
+		// Parse JSON without exceptions
+		auto requestData = nlohmann::json::parse(msg.body, nullptr, false);
+		if (requestData.is_discarded()) 
+		{
+			std::cerr << "[Main] Error: Invalid JSON in request body" << std::endl;
+			resp.statusCode = 400;
+			resp.statusMessage = "Bad Request";
+			resp.body = "{\"error\": \"Invalid JSON\"}";
+			return resp;
+		}
+		
+		// Validate required fields
+		if (!requestData.contains("slotIndex") || !requestData.contains("objectName") || !requestData.contains("objectType")) {
+			std::cerr << "[Main] Error: Missing required fields" << std::endl;
+			resp.statusCode = 400;
+			resp.statusMessage = "Bad Request";
+			resp.body = "{\"error\": \"Missing required fields\"}";
+			return resp;
+		}
+		
+		int slotIndex = requestData["slotIndex"];
+		std::string objectName = requestData["objectName"];
+		std::string objectType = requestData["objectType"];
+		bool shiftKey = requestData.value("shiftKey", false);
+		
+		std::cout << "[Main] Selection request - Slot: " << slotIndex 
+				  << " | Object: " << objectName 
+				  << " | Type: " << objectType 
+				  << " | Shift: " << (shiftKey ? "YES" : "NO") << std::endl;
+		
+		auto& objects = myThreeDScene.getObjectsRef();
+		
+		if (slotIndex < 0 || slotIndex >= static_cast<int>(objects.size())) {
+			resp.statusCode = 400;
+			resp.statusMessage = "Bad Request";
+			resp.body = "{\"error\": \"Invalid slot index\"}";
+			return resp;
+		}
+		
+		auto it = objects.begin();
+		std::advance(it, slotIndex);
+		ThreeDObject* selectedObject = *it;
+		
+		if (!selectedObject) 
+		{
+			resp.statusCode = 404;
+			resp.statusMessage = "Not Found";
+			resp.body = "{\"error\": \"Object not found\"}";
+			return resp;
+		}
+		
+		// If Shift key is NOT pressed, deselect all objects
+		if (!shiftKey) 
+		{
+			for (auto* obj : objects) 
+			{
+				if (obj) obj->setSelected(false);
+			}
+		}
+		
+		bool isCamera = (objectType == "Camera");
+
+		if (!isCamera) 
+		{
+			selectedObject->setSelected(true);
+			
+			if (handler && handler->getOverlay()) 
+			{
+				// Build list of ALL currently selected objects
+				std::list<ThreeDObject*> selectedList;
+				for (auto* obj : objects) 
+				{
+					if (obj && obj->getSelected()) 
+					{
+						selectedList.push_back(obj);
+					}
+				}
+				
+				handler->getOverlay()->setMultipleSelectedObjects(selectedList);
+				
+				// Force immediate high-priority redraw
+				HWND overlayHwnd = handler->getOverlay()->getHandle();
+				if (overlayHwnd) 
+				{
+					RedrawWindow(overlayHwnd, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOCHILDREN);
+				}
+				
+				std::cout << "[Main] " << selectedList.size() << " object(s) selected, gizmo render forced" << std::endl;
+			}
+		} 
+		else 
+		{
+			std::cout << "[Main] Camera clicked - no gizmo displayed" << std::endl;
+		}
+		
+		resp.statusCode = 200;
+		resp.statusMessage = "OK";
+		resp.body = "{\"success\": true, \"selected\": \"" + selectedObject->getName() + "\", \"isCamera\": " + (isCamera ? "true" : "false") + "}";
+		return resp;
+	}, "Select object from hierarchy inspector");
+	
+	std::cout << "[Main] API routes registered (/api/context, /api/scene/objects, /api/scene-info, /api/create-cube, /api/select-object)" << std::endl;
 
 	CefSettings settings;
 	settings.no_sandbox = true;
 	settings.multi_threaded_message_loop = false;
 	settings.log_severity = LOGSEVERITY_DISABLE;
 
-	if (!CefInitialize(main_args, settings, handler, nullptr)) {
+	if (!CefInitialize(main_args, settings, handler, nullptr)) 
+	{
 		std::cerr << "[Main] Failed to initialize CEF" << std::endl;
 		return -1;
 	}

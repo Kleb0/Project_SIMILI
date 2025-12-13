@@ -44,6 +44,7 @@
 #include "../../Engine/ThreeDInteractions/FaceTransform.hpp"
 #include "../../Engine/ThreeDInteractions/EdgeTransform.hpp"
 #include "Keymanagement/KeyManager.hpp"
+#include "../ui_handler.hpp"
 
 // ============================================================================
 // EXTERNAL & PLATFORM DEFINITIONS
@@ -911,8 +912,11 @@ void OverlayViewport::performRaycast(int mouseX, int mouseY)
 
 void OverlayViewport::setMultipleSelectedObjects(const std::list<ThreeDObject*>& objects) 
 { 
-	multiple_selected_objects_ = objects; 
-
+	multiple_selected_objects_ = objects;
+	
+	if (ui_handler_) {
+		ui_handler_->notifySceneChanged();
+	}
 }
 
 // ============================================================================

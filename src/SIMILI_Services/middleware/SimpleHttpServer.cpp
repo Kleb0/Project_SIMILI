@@ -65,14 +65,19 @@ void SimpleHttpServer::start(unsigned short http_port, unsigned short https_port
     ssl_ctx_ = std::make_unique<ssl::context>(ssl::context::tlsv12_server);
     running_ = true;
 
-    // Run the I/O context in a separate thread
-    server_thread_ = std::thread([this]() {
-        std::cout << "[SimpleHttpServer] Server thread started" << std::endl;
-        ioc_.run();
-        std::cout << "[SimpleHttpServer] Server thread stopped" << std::endl;
-    });
+    // Run the I/O context in multiple high-priority threads for faster request processing
+    const int thread_count = 2;
+    for (int i = 0; i < thread_count; ++i) {
+        server_thread_ = std::thread([this, i]() {
+            SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+            std::cout << "[SimpleHttpServer] Worker thread " << i << " started with HIGHEST priority" << std::endl;
+            ioc_.run();
+            std::cout << "[SimpleHttpServer] Worker thread " << i << " stopped" << std::endl;
+        });
+        server_thread_.detach(); // Allow multiple threads to run concurrently
+    }
 
-    std::cout << "[SimpleHttpServer] HTTP server started on port " << http_port << std::endl;
+    std::cout << "[SimpleHttpServer] HTTP server started on port " << http_port << " with " << thread_count << " worker threads" << std::endl;
     std::cout << "[SimpleHttpServer] Test with: http://localhost:" << http_port << std::endl;
 }
 
