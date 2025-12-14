@@ -9,6 +9,7 @@
 #include "SIMILI_Frontend/UI_Engine/simple_browser_view_delegate.hpp"
 
 #include "SIMILI_Services/router/RouterSim.hpp"
+#include "SIMILI_Services/router/RoutesManager.hpp"
 #include "SIMILI_Services/types/RouterTypes.hpp"
 #include "SIMILI_Services/middleware/SimpleHttpServer.hpp"
 #include "Engine/OpenGLContext.hpp"
@@ -146,230 +147,11 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 
 	std::cout << "[Main] 3D Scene initialized with ID: " << myThreeDScene.getSceneID() << std::endl;
 
+	// Initialize all API routes via RoutesManager
 	auto& router = SIMILI::Server::SimpleHttpServer::getInstance().getRouter();
-	
-	router.get("/api/context", [&renderer](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response 
-	{
-		SIMILI::Router::Response resp;
-		resp.statusCode = 200;
-		resp.statusMessage = "OK";
-		resp.body = "{\"contextId\": \"" + renderer.getContextID() + "\"}";
-		resp.headers["Content-Type"] = "application/json";
-		return resp;
-	}, "Get OpenGL context ID");
-	
-	// Route: Get scene objects
-	router.get("/api/scene/objects", [&myThreeDScene](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response {
-		SIMILI::Router::Response resp;
-		resp.statusCode = 200;
-		resp.statusMessage = "OK";
-		
-		std::ostringstream json;
-		json << "[";
-		
-		auto& objects = myThreeDScene.getObjectsRef();
-		bool first = true;
-
-		for (auto* obj : objects) 
-		{
-			if (!first) json << ",";
-			
-			std::string objType = "Unknown";
-			if (dynamic_cast<Camera*>(obj)) 
-			{
-				objType = "Camera";
-			} 
-			else if (obj->getIsMesh()) 
-			{
-				objType = "Mesh";
-			}
-			
-			json << "{"
-				 << "\"id\":" << obj->getID() << ","
-				 << "\"name\":\"" << obj->getName() << "\","
-				 << "\"type\":\"" << objType << "\","
-				 << "\"selected\":" << (obj->getSelected() ? "true" : "false")
-				 << "}";
-			first = false;
-		}
-		
-		json << "]";
-		resp.body = json.str();
-		resp.headers["Content-Type"] = "application/json";
-		return resp;
-	}, "Get all scene objects");
-	
-	// Route: Get scene info (Scene ID + Context ID)
-	router.get("/api/scene-info", [&myThreeDScene, &renderer](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response {
-		SIMILI::Router::Response resp;
-		resp.statusCode = 200;
-		resp.statusMessage = "OK";
-		
-		std::ostringstream json;
-		json << "{"
-			 << "\"sceneID\":\"" << myThreeDScene.getSceneID() << "\","
-			 << "\"contextID\":\"" << renderer.getContextID() << "\""
-			 << "}";
-		
-		resp.body = json.str();
-		resp.headers["Content-Type"] = "application/json";
-		resp.headers["Access-Control-Allow-Origin"] = "*";
-		return resp;
-	}, "Get scene and context IDs");
-	
-	router.post("/api/create-cube", [&myThreeDScene, &handler, hidden_window](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response {
-		
-		static int cubeCounter = 2; 
-		
-		std::string cubeName = "Cube" + std::to_string(cubeCounter);
-
-		std::cout << "\n[Main] Creating new cube: " << cubeName << std::endl;
-		
-		float spacing = 2.0f;
-		glm::vec3 position((cubeCounter - 1) * spacing, 0.0f, 0.0f);
-		cubeCounter++;
-
-		glfwMakeContextCurrent(nullptr);
-		
-		Mesh* newCube = Primitives::CreateCubeMesh(1.0f, position, cubeName, true);
-		
-		if (!newCube) 
-		{
-			SIMILI::Router::Response resp;
-			resp.statusCode = 500;
-			resp.statusMessage = "Internal Server Error";
-			resp.body = "{\"error\": \"Failed to create cube\"}";
-			resp.headers["Content-Type"] = "application/json";
-			resp.headers["Access-Control-Allow-Origin"] = "*";
-			return resp;
-		}
-		
-		
-		myThreeDScene.addObject(newCube);
-		
-		if (handler) 
-		{
-			handler->reinitializeSingleObject(newCube);
-			handler->notifySceneChanged();
-		}
-
-		
-		SIMILI::Router::Response resp;
-		resp.statusCode = 200;
-		resp.statusMessage = "OK";
-		resp.body = "{\"success\": true, \"cubeName\": \"" + cubeName + "\", \"id\": " + std::to_string(newCube->getID()) + "}";
-		resp.headers["Content-Type"] = "application/json";
-		resp.headers["Access-Control-Allow-Origin"] = "*";
-		return resp;
-	}, " Create a new cube and add it to the scene \n ");
-	
-	router.post("/api/select-object", [&myThreeDScene, &handler](const SIMILI::Router::Message& msg) -> SIMILI::Router::Response {
-		SIMILI::Router::Response resp;
-		resp.headers["Content-Type"] = "application/json";
-		resp.headers["Access-Control-Allow-Origin"] = "*";
-		
-		// Parse JSON without exceptions
-		auto requestData = nlohmann::json::parse(msg.body, nullptr, false);
-		if (requestData.is_discarded()) 
-		{
-			std::cerr << "[Main] Error: Invalid JSON in request body" << std::endl;
-			resp.statusCode = 400;
-			resp.statusMessage = "Bad Request";
-			resp.body = "{\"error\": \"Invalid JSON\"}";
-			return resp;
-		}
-		
-		// Validate required fields
-		if (!requestData.contains("slotIndex") || !requestData.contains("objectName") || !requestData.contains("objectType")) {
-			std::cerr << "[Main] Error: Missing required fields" << std::endl;
-			resp.statusCode = 400;
-			resp.statusMessage = "Bad Request";
-			resp.body = "{\"error\": \"Missing required fields\"}";
-			return resp;
-		}
-		
-		int slotIndex = requestData["slotIndex"];
-		std::string objectName = requestData["objectName"];
-		std::string objectType = requestData["objectType"];
-		bool shiftKey = requestData.value("shiftKey", false);
-		
-		std::cout << "[Main] Selection request - Slot: " << slotIndex 
-				  << " | Object: " << objectName 
-				  << " | Type: " << objectType 
-				  << " | Shift: " << (shiftKey ? "YES" : "NO") << std::endl;
-		
-		auto& objects = myThreeDScene.getObjectsRef();
-		
-		if (slotIndex < 0 || slotIndex >= static_cast<int>(objects.size())) {
-			resp.statusCode = 400;
-			resp.statusMessage = "Bad Request";
-			resp.body = "{\"error\": \"Invalid slot index\"}";
-			return resp;
-		}
-		
-		auto it = objects.begin();
-		std::advance(it, slotIndex);
-		ThreeDObject* selectedObject = *it;
-		
-		if (!selectedObject) 
-		{
-			resp.statusCode = 404;
-			resp.statusMessage = "Not Found";
-			resp.body = "{\"error\": \"Object not found\"}";
-			return resp;
-		}
-		
-		// If Shift key is NOT pressed, deselect all objects
-		if (!shiftKey) 
-		{
-			for (auto* obj : objects) 
-			{
-				if (obj) obj->setSelected(false);
-			}
-		}
-		
-		bool isCamera = (objectType == "Camera");
-
-		if (!isCamera) 
-		{
-			selectedObject->setSelected(true);
-			
-			if (handler && handler->getOverlay()) 
-			{
-				// Build list of ALL currently selected objects
-				std::list<ThreeDObject*> selectedList;
-				for (auto* obj : objects) 
-				{
-					if (obj && obj->getSelected()) 
-					{
-						selectedList.push_back(obj);
-					}
-				}
-				
-				handler->getOverlay()->setMultipleSelectedObjects(selectedList);
-				
-				// Force immediate high-priority redraw
-				HWND overlayHwnd = handler->getOverlay()->getHandle();
-				if (overlayHwnd) 
-				{
-					RedrawWindow(overlayHwnd, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOCHILDREN);
-				}
-				
-				std::cout << "[Main] " << selectedList.size() << " object(s) selected, gizmo render forced" << std::endl;
-			}
-		} 
-		else 
-		{
-			std::cout << "[Main] Camera clicked - no gizmo displayed" << std::endl;
-		}
-		
-		resp.statusCode = 200;
-		resp.statusMessage = "OK";
-		resp.body = "{\"success\": true, \"selected\": \"" + selectedObject->getName() + "\", \"isCamera\": " + (isCamera ? "true" : "false") + "}";
-		return resp;
-	}, "Select object from hierarchy inspector");
-	
-	std::cout << "[Main] API routes registered (/api/context, /api/scene/objects, /api/scene-info, /api/create-cube, /api/select-object)" << std::endl;
+	SIMILI::Router::RoutesManager routesManager;
+	routesManager.initializeRoutes(router, renderer, myThreeDScene, handler, hidden_window);
+	std::cout << "[Main] All API routes initialized via RoutesManager" << std::endl;
 
 	CefSettings settings;
 	settings.no_sandbox = true;
@@ -394,6 +176,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 	std::string url = "file:///ui/main_layout.html";
 
 	CefRefPtr<SimpleBrowserViewDelegate> browser_view_delegate(new SimpleBrowserViewDelegate());
+
 	CefRefPtr<CefBrowserView> browser_view = CefBrowserView::CreateBrowserView(
 		handler, url, browser_settings, nullptr, nullptr, browser_view_delegate);
 
@@ -414,4 +197,3 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 	return 0;
 }
 #endif
-	
