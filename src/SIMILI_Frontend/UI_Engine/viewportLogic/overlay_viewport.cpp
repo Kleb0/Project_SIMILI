@@ -18,6 +18,7 @@
 #include "Raycasting/RaycastPerform.hpp"
 #include "HTMLTextureRenderer/TextureRendererTest.hpp"
 #include "HTMLTextureRenderer/HtmlTextureRenderer.hpp"
+#include "HTMLTextureRenderer/SlotTexture.hpp"
 #include "ClickHandling/OverlayClickHandler.hpp"
 #include "ContextualMenuLogic/ContextualMenuTextureTest.hpp"
 
@@ -46,12 +47,11 @@
 #include "Keymanagement/KeyManager.hpp"
 #include "../ui_handler.hpp"
 
-// ============================================================================
-// EXTERNAL & PLATFORM DEFINITIONS
-// ============================================================================
-
-// Forward declare message handler from imgui_impl_win32.cpp
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+#include <commctrl.h> 
+#include <windowsx.h> 
+#pragma comment(lib, "comctl32.lib")
 
 #ifndef WGL_CONTEXT_MAJOR_VERSION_ARB
 #define WGL_CONTEXT_MAJOR_VERSION_ARB 0x2091
@@ -65,6 +65,86 @@ typedef HGLRC (WINAPI * PFNWGLCREATECONTEXTATTRIBSARBPROC)(HDC hDC, HGLRC hShare
 namespace 
 {
 	const wchar_t* kOverlayClassName = L"SIMILI_OpenGL_Overlay";
+}
+
+// ============================================================================
+// PARENT WINDOW MESSAGE INTERCEPTION
+// ============================================================================
+
+LRESULT CALLBACK OverlayViewport::ParentSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, 
+UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
+{
+	OverlayViewport* overlay = reinterpret_cast<OverlayViewport*>(dwRefData);
+	
+	// Handle window resize events to ensure proper coordinate tracking
+	if (msg == WM_SIZE || msg == WM_WINDOWPOSCHANGED) {
+		if (overlay && overlay->hwnd_) {
+			// Force overlay position/size update
+			overlay->ensureProperZOrder();
+			
+			// Debug: Show parent window size changes
+			if (msg == WM_SIZE) {
+				int parentWidth = LOWORD(lParam);
+				int parentHeight = HIWORD(lParam);
+				std::cout << "[ParentSubclassProc] Parent window resized to: " << parentWidth << "x" << parentHeight << std::endl;
+				
+				// Force overlay to update its internal size tracking
+				RECT overlayRect;
+				GetWindowRect(overlay->hwnd_, &overlayRect);
+				int overlayWidth = overlayRect.right - overlayRect.left;
+				int overlayHeight = overlayRect.bottom - overlayRect.top;
+				std::cout << "[ParentSubclassProc] Overlay size: " << overlayWidth << "x" << overlayHeight << std::endl;
+			}
+		}
+	}
+	
+	// Forward mouse and keyboard messages to the OverlayViewport
+	if (overlay && overlay->hwnd_) {
+		switch (msg) {
+			case WM_MOUSEWHEEL:
+			case WM_MBUTTONDOWN:
+			case WM_MBUTTONUP:
+			case WM_MOUSEMOVE:
+			{
+				// Get the mouse position in parent window coordinates
+				POINT ptParent = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+				
+				// Get CURRENT window rectangles (critical after resize events)
+				RECT overlayRect, parentRect;
+				GetWindowRect(overlay->hwnd_, &overlayRect);
+				GetClientRect(hwnd, &parentRect);
+				
+				// Get CURRENT overlay dimensions (not cached values that may be stale after resize)
+				int currentOverlayWidth = overlayRect.right - overlayRect.left;
+				int currentOverlayHeight = overlayRect.bottom - overlayRect.top;
+				
+				// Convert overlay position to parent client coordinates
+				POINT overlayTopLeft = { overlayRect.left, overlayRect.top };
+				ScreenToClient(hwnd, &overlayTopLeft);
+				
+				// Calculate relative position within overlay
+				int relativeX = ptParent.x - overlayTopLeft.x;
+				int relativeY = ptParent.y - overlayTopLeft.y;
+				
+				// Debug for mouse wheel specifically - show CURRENT sizes
+				if (msg == WM_MOUSEWHEEL) {
+					std::cout << "[ParentSubclassProc] WHEEL - Parent: (" << ptParent.x << ", " << ptParent.y 
+					          << ") -> Overlay: (" << relativeX << ", " << relativeY 
+					          << ") | OverlayPos: (" << overlayTopLeft.x << ", " << overlayTopLeft.y << ")"
+					          << " | CurrentOverlaySize: " << currentOverlayWidth << "x" << currentOverlayHeight
+					          << " | CachedSize: " << overlay->width_ << "x" << overlay->height_ << std::endl;
+				}
+				
+				// Forward to overlay with adjusted coordinates
+				LPARAM newLParam = MAKELPARAM(relativeX, relativeY);
+				SendMessage(overlay->hwnd_, msg, wParam, newLParam);
+				break;
+			}
+		}
+	}
+	
+	// Call the original window procedure
+	return DefSubclassProc(hwnd, msg, wParam, lParam);
 }
 
 // ============================================================================
@@ -95,6 +175,7 @@ OverlayViewport::OverlayViewport() : hwnd_(nullptr)
 	, contextual_menu_texture_test_(nullptr)
 	, contextual_menu_texture_renderer_(nullptr)
 	, contextual_menu_html_renderer_(nullptr)
+	, slot_texture_(nullptr)
 {
 	selector_ = new ThreeDObjectSelector();
 	camera_control_ = new CameraControl(this);
@@ -193,6 +274,12 @@ OverlayViewport::~OverlayViewport()
 		contextual_menu_html_renderer_ = nullptr;
 	}
 	
+	if (slot_texture_) 
+	{
+		delete slot_texture_;
+		slot_texture_ = nullptr;
+	}
+	
 	destroy();
 }
 
@@ -247,10 +334,24 @@ bool OverlayViewport::create(HWND parent, int x, int y, int width, int height)
 		return false;
 	}
 	
-	// Set as topmost within parent's child windows
-	SetWindowPos(hwnd_, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+	// Set as top within parent's child windows (NOT TOPMOST to avoid always-on-top behavior)
+	// Using HWND_TOP keeps it above siblings without making it globally topmost
+	SetWindowPos(hwnd_, HWND_TOP, 0, 0, 0, 0, 
+				 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 	
-	std::cout << "[OverlayViewport] Created as CHILD window (attached to CEF)" << std::endl;
+	// Ensure we don't have TOPMOST extended style
+	DWORD exStyle = GetWindowLongW(hwnd_, GWL_EXSTYLE);
+	if (exStyle & WS_EX_TOPMOST) {
+		SetWindowLongW(hwnd_, GWL_EXSTYLE, exStyle & ~WS_EX_TOPMOST);
+		std::cout << "[OverlayViewport] Removed WS_EX_TOPMOST flag" << std::endl;
+	}
+	
+	std::cout << "[OverlayViewport] Created as CHILD window with Z-order control (NOT always-on-top)" << std::endl;
+	
+	// Install a message hook on the parent window to forward mouse messages to us
+	// This ensures we receive mouse messages even when SlotTexture is covering parts of the viewport
+	SetWindowSubclass(parent_, ParentSubclassProc, 1, reinterpret_cast<DWORD_PTR>(this));
+	std::cout << "[OverlayViewport] Installed message hook on parent window" << std::endl;
 	
 	if (!click_handler_) 
 	{
@@ -271,6 +372,14 @@ bool OverlayViewport::create(HWND parent, int x, int y, int width, int height)
 	return true;
 }void OverlayViewport::destroy() 
 {
+	std::cout << "[OverlayViewport] Destroying overlay viewport..." << std::endl;
+	
+	// Remove the subclass from parent window
+	if (parent_) {
+		RemoveWindowSubclass(parent_, ParentSubclassProc, 1);
+		std::cout << "[OverlayViewport] Removed message hook from parent window" << std::endl;
+	}
+	
 	shutdownImGui();
 	
 	if (gl_context_) {
@@ -428,7 +537,7 @@ void OverlayViewport::initializeOpenGL(HGLRC shareContext)
 		{
 			contextual_menu_texture_test_->setBrowser(browser);
 			std::cout << "[OverlayViewport] CEF browser connected to ContextualMenuTextureTest (browser valid: " 
-			          << (browser != nullptr) << ", host valid: " << (browser && browser->GetHost() != nullptr) << ")" << std::endl;
+					  << (browser != nullptr) << ", host valid: " << (browser && browser->GetHost() != nullptr) << ")" << std::endl;
 		} 
 	});
 	
@@ -485,9 +594,8 @@ void OverlayViewport::makeContextCurrent() {
 			DWORD error = GetLastError();
 			std::cerr << "[OverlayViewport::makeContextCurrent] FAILED! Error code: " << error << std::endl;
 			std::cerr << "[OverlayViewport::makeContextCurrent] HDC: " << hdc_ << ", Context: " << gl_context_ << std::endl;
-		} else {
-			std::cout << "[OverlayViewport::makeContextCurrent] SUCCESS - Context " << gl_context_ << " now active" << std::endl;
 		}
+		// Success log removed to reduce console spam
 	} else {
 		std::cerr << "[OverlayViewport::makeContextCurrent] ERROR: Invalid HDC or GL context!" << std::endl;
 		std::cerr << "[OverlayViewport::makeContextCurrent] HDC: " << hdc_ << ", Context: " << gl_context_ << std::endl;
@@ -591,9 +699,21 @@ void OverlayViewport::render()
 		texture_renderer_test_->render();
 	}
 	
+	// Ensure SlotTexture remains on top after 3D scene rendering (less frequent)
+	static int z_order_check_counter = 0;
+	if (slot_texture_ && (z_order_check_counter % 60 == 0)) { // Check every 60 frames
+		slot_texture_->ensureProperZOrder();
+	}
+	z_order_check_counter++;
+	
 	if (contextual_menu_visible_ && contextual_menu_texture_renderer_) 
 	{
 		contextual_menu_texture_renderer_->render();
+	}
+	
+	// Render SlotTexture (Layer 2 - Above everything else)
+	if (slot_texture_) {
+		slot_texture_->render();
 	}
 	
 	if (imgui_initialized_) 
@@ -609,7 +729,10 @@ void OverlayViewport::render()
 void OverlayViewport::renderScene() 
 {
 	static int render_debug_counter = 0;
-	bool should_debug = (render_debug_counter++ % 60 == 0);
+	bool should_debug = false; // Disabled to reduce console spam
+	
+	// CRITICAL: Ensure our OpenGL context is current before rendering
+	makeContextCurrent();
 	
 	if (three_d_scene_) 
 	{
@@ -619,25 +742,33 @@ void OverlayViewport::renderScene()
 		
 		if (should_debug) 
 		{
-			unsigned char pixel[4];
-			glReadPixels(width_/2, height_/2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
-
+			std::cout << "[OverlayViewport] Rendering 3D scene to " << width_ << "x" << height_ << " viewport" << std::endl;
 		}
+		
+		// Enable depth testing for 3D rendering
+		glEnable(GL_DEPTH_TEST);
+		glDepthFunc(GL_LESS);
 		
 		three_d_scene_->render(width_, height_);
 		
 		if (should_debug) 
 		{
+			// Check if anything was rendered
 			unsigned char pixel[4];
 			glReadPixels(width_/2, height_/2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
-
+			std::cout << "[OverlayViewport] Center pixel after render: R=" << (int)pixel[0] << " G=" << (int)pixel[1] << " B=" << (int)pixel[2] << std::endl;
 		}
 	}
 	else 
 	{
+		// Red background indicates missing 3D scene
 		glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glViewport(0, 0, width_, height_);
+		
+		if (should_debug) {
+			std::cout << "[OverlayViewport] WARNING: No 3D scene to render!" << std::endl;
+		}
 	}
 }
 
@@ -650,8 +781,9 @@ void OverlayViewport::setPosition(int x, int y, int width, int height)
 	if (hwnd_ && parent_) 
 	{
 		// Use client coordinates since we're a CHILD window
+		// HWND_TOP keeps it above siblings without global topmost
 		SetWindowPos(hwnd_, HWND_TOP, x, y, width, height, 
-		             SWP_NOACTIVATE | SWP_SHOWWINDOW);
+					 SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_NOZORDER);
 		
 		width_ = width;
 		height_ = height;
@@ -676,14 +808,60 @@ void OverlayViewport::show(bool visible)
 	if (hwnd_) 
 	{
 		ShowWindow(hwnd_, visible ? SW_SHOW : SW_HIDE);
+		
+		// Re-assert Z-order after show/hide to maintain proper layering
+		if (visible) 
+		{
+			ensureProperZOrder();
+		}
 	}
 }
 
-bool OverlayViewport::isVisible() const {
+bool OverlayViewport::isVisible() const
+{
 	if (hwnd_) {
 		return IsWindowVisible(hwnd_) != 0;
 	}
 	return false;
+}
+
+void OverlayViewport::ensureProperZOrder()
+{
+	if (!hwnd_ || !parent_) return;
+	
+	// Layer-based Z-order system:
+	// Layer 0: CEF browser (bottom)
+	// Layer 1: OpenGL overlay (on top of CEF)
+	// Higher layers = closer to user
+	
+	if (z_order_layer_ == 0) 
+	{
+		// Layer 0: Place at bottom of Z-order
+		SetWindowPos(hwnd_, HWND_BOTTOM, 0, 0, 0, 0, 
+					 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+	} 
+	else 
+	{
+		// Layer 1: Position after parent (CEF) but avoid constant repositioning
+		// Only reposition if we're not already in the right place
+		static bool positioned_once = false;
+		if (!positioned_once) {
+			SetWindowPos(hwnd_, parent_, 0, 0, 0, 0, 
+						 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+			positioned_once = true;
+			std::cout << "[OverlayViewport] Positioned after parent (Layer 1)" << std::endl;
+		}
+	}
+	
+	// Ensure TOPMOST flag is never set (prevents always-on-top behavior)
+	DWORD exStyle = GetWindowLongW(hwnd_, GWL_EXSTYLE);
+	if (exStyle & WS_EX_TOPMOST) 
+	{
+		SetWindowLongW(hwnd_, GWL_EXSTYLE, exStyle & ~WS_EX_TOPMOST);
+		SetWindowPos(hwnd_, HWND_NOTOPMOST, 0, 0, 0, 0, 
+					 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+		std::cout << "[OverlayViewport] Removed TOPMOST flag (layer=" << z_order_layer_ << ")" << std::endl;
+	}
 }
 
 // ============================================================================
@@ -729,8 +907,66 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				return 0;
 			}
 			
+			case WM_SIZE:
+			{
+				// Handle overlay viewport size changes
+				int newWidth = LOWORD(lParam);
+				int newHeight = HIWORD(lParam);
+				
+				if (newWidth > 0 && newHeight > 0) {
+					// Update internal dimensions IMMEDIATELY
+					overlay->width_ = newWidth;
+					overlay->height_ = newHeight;
+					
+					// Update OpenGL viewport
+					if (overlay->gl_context_) {
+						HGLRC prevContext = wglGetCurrentContext();
+						HDC prevDC = wglGetCurrentDC();
+						wglMakeCurrent(overlay->hdc_, overlay->gl_context_);
+						glViewport(0, 0, newWidth, newHeight);
+						if (prevContext && prevDC) {
+							wglMakeCurrent(prevDC, prevContext);
+						}
+					}
+					
+					std::cout << "[OverlayViewport] WM_SIZE - New size: " << newWidth << "x" << newHeight 
+					          << " (internal dimensions updated)" << std::endl;
+					
+					// Update texture renderers
+					if (overlay->texture_renderer_test_) {
+						overlay->texture_renderer_test_->resize(newWidth, newHeight);
+					}
+					if (overlay->contextual_menu_texture_renderer_) {
+						overlay->contextual_menu_texture_renderer_->resize(newWidth, newHeight);
+					}
+				}
+				return 0;
+			}
+			
 			case WM_ERASEBKGND:
 				return 1;
+			
+			case WM_WINDOWPOSCHANGING:
+			{
+				// Intercept window position changes to prevent unwanted Z-order modifications
+				WINDOWPOS* wp = reinterpret_cast<WINDOWPOS*>(lParam);
+				
+				// If someone tries to set us as TOPMOST, prevent it
+				if (wp->hwndInsertAfter == HWND_TOPMOST) {
+					wp->hwndInsertAfter = HWND_TOP;
+					std::cout << "[OverlayViewport] Prevented TOPMOST positioning" << std::endl;
+				}
+				break;
+			}
+			
+			case WM_ACTIVATE:
+			{
+				// Maintain Z-order after activation events
+				if (LOWORD(wParam) != WA_INACTIVE) {
+					overlay->ensureProperZOrder();
+				}
+				break;
+			}
 			
 			// ------ RAYCAST & SELECTION ------
 			
@@ -745,7 +981,7 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				
 				std::cout << "[OverlayViewport] Click at: (" << mouseX << ", " << mouseY << ")" << std::endl;
 				std::cout << "[OverlayViewport] ImGuizmo state - IsOver: " << ImGuizmo::IsOver() 
-				          << " | IsUsing: " << ImGuizmo::IsUsing() << std::endl;
+						  << " | IsUsing: " << ImGuizmo::IsUsing() << std::endl;
 				
 				if (overlay->contextual_menu_visible_ && overlay->contextual_menu_texture_test_)
 				{
@@ -811,24 +1047,35 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 			
 			case WM_MOUSEWHEEL: 
 			{
-				// Only handle camera zoom if NOT over ImGuizmo
+				// ALWAYS handle camera zoom - camera controls should work everywhere
+				// regardless of mouse position or overlay boundaries
 				if (!ImGuizmo::IsOver() && !ImGuizmo::IsUsing())
 				{
 					POINT cursor_pos;
 					GetCursorPos(&cursor_pos);
 					ScreenToClient(hwnd, &cursor_pos);
 					
+					std::cout << "[OverlayViewport] WHEEL - Processing camera zoom at cursor: (" 
+							  << cursor_pos.x << ", " << cursor_pos.y << ") | lParam: (" 
+							  << GET_X_LPARAM(lParam) << ", " << GET_Y_LPARAM(lParam) << ")" << std::endl;
+					
 					overlay->camera_control_->onMouseWheel(wParam);
+				} else {
+					std::cout << "[OverlayViewport] WHEEL blocked - ImGuizmo active" << std::endl;
 				}
 				return 0;
 			}
 			
 			case WM_MBUTTONDOWN: 
 			{
-				// Only handle camera pan if NOT over ImGuizmo
+				// ALWAYS handle camera pan - camera controls should work everywhere
+				// regardless of mouse position or overlay boundaries
 				if (!ImGuizmo::IsOver() && !ImGuizmo::IsUsing())
 				{
+					std::cout << "[OverlayViewport] MBTN_DOWN - Processing camera pan start" << std::endl;
 					overlay->camera_control_->onMiddleButtonDown();
+				} else {
+					std::cout << "[OverlayViewport] MBTN_DOWN blocked - ImGuizmo active" << std::endl;
 				}
 				return 0;
 			}
@@ -1038,5 +1285,63 @@ void OverlayViewport::setContextualMenuPosition(int x, int y)
 	{
 		contextual_menu_texture_renderer_->setRenderRect(x, y, 
 			contextual_menu_width_, contextual_menu_height_);
+	}
+}
+
+// ============================================================================
+// SLOT TEXTURE MANAGEMENT (Layer 2 - Above Everything)
+// ============================================================================
+
+void OverlayViewport::createSlotTexture(int x, int y, int width, int height)
+{
+	if (!parent_) {
+		std::cerr << "[OverlayViewport] Cannot create SlotTexture - no parent window" << std::endl;
+		return;
+	}
+	
+	if (slot_texture_) {
+		delete slot_texture_;
+		slot_texture_ = nullptr;
+	}
+	
+	slot_texture_ = new SlotTexture();
+	
+	// Create SlotTexture as child of parent (CEF window), NOT overlay viewport
+	// This allows it to extend beyond viewport boundaries
+	if (slot_texture_->create(parent_, x, y, width, height, 2)) {
+		// Load hello_cef.html instead of using red color
+		slot_texture_->loadHTML("file:///ui/hello_cef.html");
+		slot_texture_->setUseHTMLTexture(true);
+		
+		// Keep red color as fallback while HTML loads
+		slot_texture_->setColor(1.0f, 0.0f, 0.0f, 0.7f);
+		slot_texture_->ensureProperZOrder();
+		
+		// Force immediate render
+		slot_texture_->render();
+		InvalidateRect(slot_texture_->getHandle(), nullptr, TRUE);
+		UpdateWindow(slot_texture_->getHandle());
+		
+		std::cout << "[OverlayViewport] SlotTexture created with hello_cef.html (Layer 2) at (" << x << ", " << y 
+				  << ") size " << width << "x" << height << std::endl;
+	} 
+	else
+	 {
+		std::cerr << "[OverlayViewport] Failed to create SlotTexture" << std::endl;
+		delete slot_texture_;
+		slot_texture_ = nullptr;
+	}
+}
+
+void OverlayViewport::showSlotTexture(bool visible)
+{
+	if (slot_texture_) {
+		slot_texture_->show(visible);
+		
+		if (visible) 
+		{
+			// Force render update
+			InvalidateRect(slot_texture_->getHandle(), nullptr, FALSE);
+		}
 	}
 }

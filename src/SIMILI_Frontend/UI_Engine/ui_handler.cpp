@@ -1,5 +1,6 @@
 #include "ui_handler.hpp"
 #include "viewportLogic/HTMLTextureRenderer/HtmlTextureRenderer.hpp"
+#include "viewportLogic/HTMLTextureRenderer/SlotTexture.hpp"
 #include "viewportLogic/KeyManagement/KeyManager.hpp"
 #include "../../Engine/ThreeDScene.hpp"
 #include "../../Engine/OpenGLContext.hpp"
@@ -170,6 +171,9 @@ void UIHandler::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& ti
 					last_viewport_width_ = final_width;
 					last_viewport_height_ = final_height;
 					
+					// Ensure proper Z-order after resize
+					overlay_viewport_->ensureProperZOrder();
+					
 					if (!overlay_viewport_->isVisible()) 
 					{
 						overlay_viewport_->show(true);
@@ -284,6 +288,12 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	
 	overlay_viewport_->show(true);
 	std::cout << "[UIHandler] Overlay viewport shown (will be repositioned by JavaScript)" << std::endl;
+	
+	// Create SlotTexture (Layer 2) - Extended horizontally across full width
+	// Positioned to show it's not limited by viewport boundaries
+	overlay_viewport_->createSlotTexture(0, 50, 1920, 150);
+	overlay_viewport_->showSlotTexture(true);
+	std::cout << "[UIHandler] SlotTexture created and shown (Layer 2 - extends horizontally across screen)" << std::endl;
 		
 	SetWindowSubclass(parent_hwnd, ParentWindowProc, 0, reinterpret_cast<DWORD_PTR>(this));
 	
@@ -312,6 +322,9 @@ void UIHandler::updateOverlayPosition()
 			viewport_width - (2 * inset), 
 			viewport_height - (2 * inset)
 		);
+		
+		// Ensure Z-order is maintained after position update
+		overlay_viewport_->ensureProperZOrder();
 	}
 }
 
@@ -324,6 +337,11 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 		CefDoMessageLoopWork();
 		
 		InvalidateRect(handler->getOverlay()->getHandle(), nullptr, FALSE);
+		
+		// Also invalidate SlotTexture to ensure it renders
+		if (handler->getOverlay()->getSlotTexture()) {
+			InvalidateRect(handler->getOverlay()->getSlotTexture()->getHandle(), nullptr, FALSE);
+		}
 	}
 }
 
@@ -374,8 +392,8 @@ LRESULT CALLBACK UIHandler::ParentWindowProc(HWND hwnd, UINT msg, WPARAM wParam,
 
 			if (handler && handler->overlay_viewport_) 
 			{
-				SetWindowPos(handler->overlay_viewport_->getHandle(), HWND_TOP, 0, 0, 0, 0,
-				             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+				// Maintain layer-based Z-order after resize
+				handler->overlay_viewport_->ensureProperZOrder();
 			}
 			break;
 		
@@ -383,8 +401,8 @@ LRESULT CALLBACK UIHandler::ParentWindowProc(HWND hwnd, UINT msg, WPARAM wParam,
 		case WM_WINDOWPOSCHANGED:
 			if (handler && handler->overlay_viewport_) 
 			{
-				SetWindowPos(handler->overlay_viewport_->getHandle(), HWND_TOP, 0, 0, 0, 0,
-				SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+				// Maintain layer-based Z-order after window events
+				handler->overlay_viewport_->ensureProperZOrder();
 			}
 			break;
 			
@@ -454,6 +472,8 @@ void UIHandler::initializeSceneObjects()
 	if (three_d_scene_ && main_camera_) 
 	{
 		overlay_viewport_->setThreeDScene(three_d_scene_);
+		std::cout << "[UIHandler] 3D Scene set to overlay viewport - Objects count: " << three_d_scene_->getObjectsRef().size() << std::endl;
+		std::cout << "[UIHandler] 3D Scene camera: " << (three_d_scene_->getActiveCamera() ? three_d_scene_->getActiveCamera()->getName() : "NULL") << std::endl;
 	}
 	
 	scene_initialized_ = true;

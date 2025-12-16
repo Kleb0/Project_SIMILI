@@ -34,6 +34,7 @@ class Face;
 class Edge;
 class ContextualMenuTextureTest;
 class UIHandler;
+class SlotTexture;
 
 class OverlayViewport {
 public:
@@ -48,6 +49,9 @@ public:
     void setPosition(int x, int y, int width, int height);
     void show(bool visible);
     bool isVisible() const;
+    void ensureProperZOrder();
+    void setZOrderLayer(int layer) { z_order_layer_ = layer; ensureProperZOrder(); }
+    int getZOrderLayer() const { return z_order_layer_; }
     
     HWND getHandle() const { return hwnd_; }
     int getWidth() const { return width_; }
@@ -109,12 +113,19 @@ public:
     bool isContextualMenuVisible() const { return contextual_menu_visible_; }
     void setContextualMenuPosition(int x, int y);
     
+    // ----------- Slot Texture Management -----------
+    void createSlotTexture(int x, int y, int width, int height);
+    void showSlotTexture(bool visible);
+    SlotTexture* getSlotTexture() const { return slot_texture_; }
+    
     // ----------- Edge Loop State -----------
     bool isEdgeLoopActive = false;
 
 private:
     // ----------- Windows Callback -----------
     static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+    static LRESULT CALLBACK ParentSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, 
+                                               UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
     
     // ----------- Initialization & Cleanup -----------
     void initializeOpenGL(HGLRC shareContext = nullptr);
@@ -134,6 +145,7 @@ private:
     
     int width_;
     int height_;
+    int z_order_layer_ = 1;  // Layer position (higher = on top)
     
     bool rendering_enabled_;
     bool imgui_initialized_;
@@ -192,5 +204,8 @@ private:
     int contextual_menu_width_ = 300;
     int contextual_menu_height_ = 200;
     bool contextual_menu_visible_ = false;
+    
+    // ----------- Slot Texture (Layer 2) -----------
+    SlotTexture* slot_texture_;
 };
 
