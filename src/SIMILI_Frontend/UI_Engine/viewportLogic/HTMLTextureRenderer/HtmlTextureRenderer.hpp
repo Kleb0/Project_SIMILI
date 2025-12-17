@@ -28,6 +28,9 @@ public:
         }
     }
     
+    // Update browser dimensions and force resize
+    void updateSize(int width, int height);
+    
     // Send keyboard event to the off-screen browser
     void sendKeyEvent(const CefKeyEvent& event);
     
@@ -61,6 +64,8 @@ public:
     virtual void OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) override;
     
 private:
+    void injectScrollbarEliminationCSS();  // Helper method for CSS injection
+    
     TextureRendererTest* texture_renderer_;
     CefRefPtr<CefBrowser> browser_;
     int width_;

@@ -34,6 +34,7 @@ public:
     void loadHTML(const std::string& url);
     void setUseHTMLTexture(bool useTexture);
     bool isUsingHTMLTexture() const { return use_html_texture_; }
+    void updateHTMLTextureSize(int width, int height);  // Synchronize CEF browser size
     
 
     // ----------- Accessors -----------

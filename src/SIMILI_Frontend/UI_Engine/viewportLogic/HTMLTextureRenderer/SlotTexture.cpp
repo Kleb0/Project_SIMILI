@@ -477,12 +477,18 @@ void SlotTexture::setPosition(int x, int y, int width, int height)
     SetWindowPos(hwnd_, HWND_TOP, x, y, width, height, 
                  SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_NOZORDER);
     
-    width_ = width;
-    height_ = height;
-    
-    if (gl_context_) {
-        wglMakeCurrent(hdc_, gl_context_);
-        glViewport(0, 0, width, height);
+    // Only update if dimensions actually changed
+    if (width_ != width || height_ != height) {
+        width_ = width;
+        height_ = height;
+        
+        if (gl_context_) {
+            wglMakeCurrent(hdc_, gl_context_);
+            glViewport(0, 0, width, height);
+        }
+        
+        // Synchronize HTML texture size when SlotTexture is resized
+        updateHTMLTextureSize(width, height);
     }
     
     ensureProperZOrder();
@@ -767,6 +773,24 @@ void SlotTexture::setUseHTMLTexture(bool useTexture)
 {
     use_html_texture_ = useTexture;
     std::cout << "[SlotTexture] HTML texture usage: " << (useTexture ? "enabled" : "disabled") << std::endl;
+}
+
+void SlotTexture::updateHTMLTextureSize(int width, int height)
+{
+	width_ = width;
+	height_ = height;
+	
+	// Update texture renderer size
+	if (texture_renderer_) {
+		texture_renderer_->initialize(width, height);
+	}
+	
+	// Update HTML renderer size
+	if (html_renderer_) {
+		html_renderer_->updateSize(width, height);
+	}
+	
+	std::cout << "[SlotTexture] HTML texture size updated to: " << width << "x" << height << std::endl;
 }
 
 void SlotTexture::onBrowserCreated(CefBrowser* browser)

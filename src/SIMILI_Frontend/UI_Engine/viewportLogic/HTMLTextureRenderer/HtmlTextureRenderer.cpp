@@ -26,6 +26,17 @@ void HtmlTextureRenderer::createBrowser(const std::string& url, int width, int h
 	browser_settings.javascript_close_windows = STATE_DISABLED;
 	browser_settings.javascript_access_clipboard = STATE_DISABLED;
 	
+	// Disable scrollbars and optimize for texture rendering
+	browser_settings.image_loading = STATE_ENABLED;
+	browser_settings.text_area_resize = STATE_DISABLED;
+	browser_settings.tab_to_links = STATE_DISABLED;
+	
+	// Force exact dimensions without scrollbars
+	window_info.bounds.x = 0;
+	window_info.bounds.y = 0;
+	window_info.bounds.width = width;
+	window_info.bounds.height = height;
+	
 	CefBrowserHost::CreateBrowser(window_info, this, url, browser_settings, nullptr, nullptr);
 }
 
@@ -54,6 +65,10 @@ void HtmlTextureRenderer::OnAfterCreated(CefRefPtr<CefBrowser> browser)
 		browser_->GetHost()->WasResized();
 		browser_->GetHost()->Invalidate(PET_VIEW);
 	}
+	
+	// Inject CSS to eliminate scrollbars and ensure 100% fit
+	// Use direct execution without complex binding
+	injectScrollbarEliminationCSS();
 	
 	// Notify callback if set
 	if (on_browser_created_callback_) {
@@ -106,6 +121,26 @@ void HtmlTextureRenderer::OnTitleChange(CefRefPtr<CefBrowser> browser, const Cef
 	}
 }
 
+void HtmlTextureRenderer::updateSize(int width, int height)
+{
+	width_ = width;
+	height_ = height;
+	
+	if (browser_ && browser_->GetHost()) {
+		// Update texture renderer size
+		if (texture_renderer_) {
+			texture_renderer_->initialize(width, height);
+		}
+		
+		// Force CEF to resize and repaint
+		browser_->GetHost()->WasResized();
+		browser_->GetHost()->NotifyScreenInfoChanged();
+		browser_->GetHost()->Invalidate(PET_VIEW);
+		
+		std::cout << "[HtmlTextureRenderer] Size updated to: " << width << "x" << height << std::endl;
+	}
+}
+
 void HtmlTextureRenderer::sendKeyEvent(const CefKeyEvent& event)
 {
 	if (!browser_ || !browser_->GetHost()) 
@@ -144,5 +179,43 @@ void HtmlTextureRenderer::sendKeyEvent(const CefKeyEvent& event)
 			
 			frame->ExecuteJavaScript(js_code, frame->GetURL(), 0);
 		}
+	}
+}
+
+void HtmlTextureRenderer::injectScrollbarEliminationCSS()
+{
+	if (!browser_) return;
+	
+	CefRefPtr<CefFrame> frame = browser_->GetMainFrame();
+	if (frame) {
+		std::string css_injection = 
+			"(function() {"
+			"  if (document.readyState === 'loading') {"
+			"    document.addEventListener('DOMContentLoaded', function() {"
+			"      injectStyles();"
+			"    });"
+			"  } else {"
+			"    injectStyles();"
+			"  }"
+			"  function injectStyles() {"
+			"    var style = document.createElement('style');"
+			"    style.textContent = '"
+			"      html, body { margin: 0 !important; padding: 0 !important; overflow: hidden !important; width: 100% !important; height: 100% !important; box-sizing: border-box !important; }"
+			"      * { box-sizing: border-box !important; }"
+			"      ::-webkit-scrollbar { width: 0px !important; height: 0px !important; }"
+			"      body::-webkit-scrollbar { display: none !important; }"
+			"    ';"
+			"    if (document.head) {"
+			"      document.head.appendChild(style);"
+			"    } else if (document.documentElement) {"
+			"      document.documentElement.appendChild(style);"
+			"    }"
+			"    console.log('SIMILI: CSS scrollbar elimination injected');"
+			"  }"
+			"})();";
+		
+		// Execute CSS injection immediately
+		frame->ExecuteJavaScript(css_injection, frame->GetURL(), 0);
+		std::cout << "[HtmlTextureRenderer] CSS injection executed to eliminate scrollbars" << std::endl;
 	}
 }
