@@ -274,26 +274,15 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	if (three_d_scene_) 
 	{
 		overlay_viewport_->setThreeDScene(three_d_scene_);
-		std::cout << "[UIHandler] 3D Scene passed to overlay viewport" << std::endl;
 	}
-	else
-	{
-		std::cout << "[UIHandler] WARNING: No 3D scene available to pass to overlay!" << std::endl;
-	}
-	
+
 	overlay_viewport_->switchModeByKey(1);
-	std::cout << "[UIHandler] Overlay viewport initialized with Normal Mode (key 1)" << std::endl;
 	
 	initializeSceneObjects();
 	
 	overlay_viewport_->show(true);
-	std::cout << "[UIHandler] Overlay viewport shown (will be repositioned by JavaScript)" << std::endl;
 	
-	// Create SlotTexture (Layer 2) - Extended horizontally across full width
-	// Positioned to show it's not limited by viewport boundaries
-	overlay_viewport_->createSlotTexture(0, 50, 1920, 150);
-	overlay_viewport_->showSlotTexture(true);
-	std::cout << "[UIHandler] SlotTexture created and shown (Layer 2 - extends horizontally across screen)" << std::endl;
+	enableSlotTextureRendering(true);  
 		
 	SetWindowSubclass(parent_hwnd, ParentWindowProc, 0, reinterpret_cast<DWORD_PTR>(this));
 	
@@ -323,7 +312,6 @@ void UIHandler::updateOverlayPosition()
 			viewport_height - (2 * inset)
 		);
 		
-		// Ensure Z-order is maintained after position update
 		overlay_viewport_->ensureProperZOrder();
 	}
 }
@@ -338,7 +326,6 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 		
 		InvalidateRect(handler->getOverlay()->getHandle(), nullptr, FALSE);
 		
-		// Also invalidate SlotTexture to ensure it renders
 		if (handler->getOverlay()->getSlotTexture()) {
 			InvalidateRect(handler->getOverlay()->getSlotTexture()->getHandle(), nullptr, FALSE);
 		}
@@ -349,7 +336,6 @@ void UIHandler::startRenderTimer()
 {
 	if (timer_id_ == 0 && overlay_viewport_) 
 	{
-		// Set high resolution timer for consistent 60 FPS (16.67ms)
 		timeBeginPeriod(1);
 		timer_id_ = SetTimer(nullptr, reinterpret_cast<UINT_PTR>(this), 16, RenderTimerProc);
 	}
@@ -365,13 +351,6 @@ void UIHandler::stopRenderTimer()
 	}
 }
 
-void UIHandler::enableOverlayRendering(bool enable) 
-{
-	if (overlay_viewport_) 
-	{
-		overlay_viewport_->enableRendering(enable);
-	}
-}
 
 bool UIHandler::isOverlayRenderingEnabled() const 
 {
@@ -380,6 +359,32 @@ bool UIHandler::isOverlayRenderingEnabled() const
 		return overlay_viewport_->isRenderingEnabled();
 	}
 	return false;
+}
+
+void UIHandler::enableSlotTextureRendering(bool enable)
+{
+	if (!overlay_viewport_) return;
+	
+	if (enable) 
+	{
+		if (!overlay_viewport_->getSlotTexture()) 
+		{
+			overlay_viewport_->createSlotTexture(0, 50, 1920, 150);
+		} 
+		else 
+		{
+			overlay_viewport_->getSlotTexture()->enableRendering(true);
+			std::cout << "[UIHandler] SlotTexture rendering enabled" << std::endl;
+		}
+	} 
+	else 
+	{
+		if (overlay_viewport_->getSlotTexture()) 
+		{
+			overlay_viewport_->destroySlotTexture();
+			std::cout << "[UIHandler] SlotTexture DESTROYED" << std::endl;
+		}
+	}
 }
 
 LRESULT CALLBACK UIHandler::ParentWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData) 
@@ -392,7 +397,6 @@ LRESULT CALLBACK UIHandler::ParentWindowProc(HWND hwnd, UINT msg, WPARAM wParam,
 
 			if (handler && handler->overlay_viewport_) 
 			{
-				// Maintain layer-based Z-order after resize
 				handler->overlay_viewport_->ensureProperZOrder();
 			}
 			break;
@@ -401,7 +405,6 @@ LRESULT CALLBACK UIHandler::ParentWindowProc(HWND hwnd, UINT msg, WPARAM wParam,
 		case WM_WINDOWPOSCHANGED:
 			if (handler && handler->overlay_viewport_) 
 			{
-				// Maintain layer-based Z-order after window events
 				handler->overlay_viewport_->ensureProperZOrder();
 			}
 			break;

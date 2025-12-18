@@ -115,6 +115,7 @@ public:
     
     // ----------- Slot Texture Management -----------
     void createSlotTexture(int x, int y, int width, int height);
+    void destroySlotTexture();
     void showSlotTexture(bool visible);
     SlotTexture* getSlotTexture() const { return slot_texture_; }
     

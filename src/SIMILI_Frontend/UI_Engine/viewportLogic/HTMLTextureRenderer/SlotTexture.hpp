@@ -2,6 +2,7 @@
 
 #include <windows.h>
 #include <glad/glad.h>
+#include <string>
 
 // Forward declarations for CEF integration
 class HtmlTextureRenderer;
@@ -28,13 +29,14 @@ public:
     
     // ----------- Rendering -----------
     void render();
-    void setColor(float r, float g, float b, float a = 1.0f);
+    void enableRendering(bool enable);
+    bool isRenderingEnabled() const { return rendering_enabled_; }
     
     // ----------- CEF HTML Rendering -----------
     void loadHTML(const std::string& url);
     void setUseHTMLTexture(bool useTexture);
     bool isUsingHTMLTexture() const { return use_html_texture_; }
-    void updateHTMLTextureSize(int width, int height);  // Synchronize CEF browser size
+    void updateHTMLTextureSize(int width, int height);
     
 
     // ----------- Accessors -----------
@@ -76,4 +78,7 @@ private:
     TextureRendererTest* texture_renderer_;
     bool use_html_texture_;
     bool html_browser_ready_;
+    
+    // ----------- Rendering Control -----------
+    bool rendering_enabled_ = true;
 };

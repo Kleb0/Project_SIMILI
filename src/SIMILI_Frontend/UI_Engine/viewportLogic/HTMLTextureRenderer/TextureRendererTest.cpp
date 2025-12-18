@@ -68,9 +68,9 @@ void TextureRendererTest::createQuadMesh()
 		0.0f, 0.0f, 0.0f,   0.0f, 0.0f,  
 		1.0f, 0.0f, 0.0f,   1.0f, 0.0f,
 		 
-		0.0f, 1.0f, 0.0f,   0.0f, 1.0f,  // Top-left
-		1.0f, 0.0f, 0.0f,   1.0f, 0.0f,  // Bottom-right
-		1.0f, 1.0f, 0.0f,   1.0f, 1.0f   // Top-right
+		0.0f, 1.0f, 0.0f,   0.0f, 1.0f,
+		1.0f, 0.0f, 0.0f,   1.0f, 0.0f, 
+		1.0f, 1.0f, 0.0f,   1.0f, 1.0f  
 	};
 
 	glGenVertexArrays(1, &vao_);

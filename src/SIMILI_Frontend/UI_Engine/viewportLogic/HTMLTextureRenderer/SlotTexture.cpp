@@ -76,7 +76,9 @@ SlotTexture::SlotTexture()
     , color_a_(1.0f)    , html_renderer_(nullptr)
     , texture_renderer_(nullptr)
     , use_html_texture_(false)
-    , html_browser_ready_(false){
+    , html_browser_ready_(false)
+    , rendering_enabled_(false)  // Rendering DISABLED by default
+{
 }
 
 SlotTexture::~SlotTexture()
@@ -135,7 +137,7 @@ bool SlotTexture::create(HWND parent, int x, int y, int width, int height, int z
         0,  // No extended styles initially
         kSlotTextureClassName,
         L"SlotTexture Overlay",
-        WS_POPUP | WS_VISIBLE,  // Use POPUP instead of CHILD initially
+        WS_POPUP,  // HIDDEN by default - visibility controlled by show() method
         x, y, width, height,
         nullptr,  // No parent initially
         nullptr,
@@ -402,6 +404,7 @@ void SlotTexture::createQuad()
 void SlotTexture::render()
 {
     if (!gl_context_ || !hwnd_) return;
+    if (!rendering_enabled_) return;  
     if (!IsWindowVisible(hwnd_)) return;
     
     // Save current OpenGL context to restore later
@@ -410,7 +413,6 @@ void SlotTexture::render()
     
     wglMakeCurrent(hdc_, gl_context_);
     
-    // Clear with BLACK background (opaque) - Magenta (255,0,255) is transparent
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
     
@@ -450,20 +452,14 @@ void SlotTexture::renderQuad()
     glBindVertexArray(0);
 }
 
-void SlotTexture::setColor(float r, float g, float b, float a)
+void SlotTexture::enableRendering(bool enable)
 {
-    // CRITICAL: Avoid magenta (1,0,1) which is the transparency key!
-    if (r == 1.0f && g == 0.0f && b == 1.0f) {
-        std::cout << "[SlotTexture] WARNING: Magenta color detected! Using red instead." << std::endl;
-        r = 1.0f; g = 0.0f; b = 0.0f;  // Force to red
+    rendering_enabled_ = enable;
+    
+    // Hide/show the window to prevent black bar when rendering is disabled
+    if (hwnd_) {
+        ShowWindow(hwnd_, enable ? SW_SHOW : SW_HIDE);
     }
-    
-    color_r_ = r;
-    color_g_ = g;
-    color_b_ = b;
-    color_a_ = a;
-    
-    std::cout << "[SlotTexture] Color set to: " << r << "," << g << "," << b << "," << a << std::endl;
 }
 
 // ============================================================================
@@ -744,7 +740,8 @@ LRESULT CALLBACK SlotTexture::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
 
 void SlotTexture::loadHTML(const std::string& url)
 {
-    if (!texture_renderer_) {
+    if (!texture_renderer_) 
+    {
         texture_renderer_ = new TextureRendererTest();
         // Use actual SlotTexture dimensions for proper scaling
         texture_renderer_->initialize(width_, height_);

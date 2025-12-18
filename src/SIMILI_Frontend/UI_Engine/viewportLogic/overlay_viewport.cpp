@@ -1294,7 +1294,8 @@ void OverlayViewport::setContextualMenuPosition(int x, int y)
 
 void OverlayViewport::createSlotTexture(int x, int y, int width, int height)
 {
-	if (!parent_) {
+	if (!parent_) 
+	{
 		std::cerr << "[OverlayViewport] Cannot create SlotTexture - no parent window" << std::endl;
 		return;
 	}
@@ -1306,28 +1307,38 @@ void OverlayViewport::createSlotTexture(int x, int y, int width, int height)
 	
 	slot_texture_ = new SlotTexture();
 	
-	// Create SlotTexture as child of parent (CEF window), NOT overlay viewport
-	// This allows it to extend beyond viewport boundaries
-	if (slot_texture_->create(parent_, x, y, width, height, 2)) {
-		// Load hello_cef.html instead of using red color
+
+	if (slot_texture_->create(parent_, x, y, width, height, 2)) 
+	{
+		// Configure SlotTexture to display CEF HTML content
 		slot_texture_->loadHTML("file:///ui/hello_cef.html");
 		slot_texture_->setUseHTMLTexture(true);
 		
-		// Keep red color as fallback while HTML loads
-		slot_texture_->setColor(1.0f, 0.0f, 0.0f, 0.7f);
+		// Enable rendering
+		slot_texture_->enableRendering(true);
+				
+		// Show the window
+		slot_texture_->show(true);
+		
 		slot_texture_->ensureProperZOrder();
 		
-		// Force immediate render
+		// Force initial render
 		slot_texture_->render();
 		InvalidateRect(slot_texture_->getHandle(), nullptr, TRUE);
 		UpdateWindow(slot_texture_->getHandle());
 		
-		std::cout << "[OverlayViewport] SlotTexture created with hello_cef.html (Layer 2) at (" << x << ", " << y 
-				  << ") size " << width << "x" << height << std::endl;
 	} 
 	else
 	 {
 		std::cerr << "[OverlayViewport] Failed to create SlotTexture" << std::endl;
+		delete slot_texture_;
+		slot_texture_ = nullptr;
+	}
+}
+
+void OverlayViewport::destroySlotTexture()
+{
+	if (slot_texture_) {
 		delete slot_texture_;
 		slot_texture_ = nullptr;
 	}
@@ -1340,7 +1351,6 @@ void OverlayViewport::showSlotTexture(bool visible)
 		
 		if (visible) 
 		{
-			// Force render update
 			InvalidateRect(slot_texture_->getHandle(), nullptr, FALSE);
 		}
 	}
