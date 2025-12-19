@@ -620,6 +620,12 @@ LRESULT CALLBACK SlotTexture::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
                 break;
             }
             
+            case WM_NCHITTEST:
+            {
+
+                return HTTRANSPARENT;
+            }
+            
             case WM_SIZE:
             {
                 // Handle SlotTexture resize events - ensure we maintain proper message routing
@@ -653,77 +659,6 @@ LRESULT CALLBACK SlotTexture::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
                     std::cout << "[SlotTexture] Resize complete - forced window refresh and Z-order update" << std::endl;
                 }
                 break;
-            }
-            
-            // Pour tous les messages de souris et clavier, les rediriger vers l'OverlayViewport
-            // pour que les contrôles de caméra et raycast continuent de fonctionner
-            case WM_LBUTTONDOWN:
-            case WM_LBUTTONUP:
-            case WM_RBUTTONDOWN:
-            case WM_RBUTTONUP:
-            case WM_MBUTTONDOWN:
-            case WM_MBUTTONUP:
-
-            case WM_MOUSEMOVE:
-            case WM_MOUSEWHEEL:
-            case WM_KEYDOWN:
-            case WM_KEYUP:
-            case WM_CHAR:
-            {
-                // DEBUG: Log wheel messages specifically to track the issue
-                if (msg == WM_MOUSEWHEEL) {
-                    std::cout << "[SlotTexture] RECEIVED WHEEL - wParam: " << wParam 
-                              << " | lParam: (" << GET_X_LPARAM(lParam) << ", " << GET_Y_LPARAM(lParam) << ")" << std::endl;
-                }
-                
-                // CRITICAL: Always forward to parent first - let parent's subclass handle routing
-                // This ensures proper coordinate transformation and message routing
-                if (slot->parent_) {
-                    // Convert coordinates from SlotTexture to parent window
-                    POINT slotPoint = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
-                    ClientToScreen(hwnd, &slotPoint);
-                    ScreenToClient(slot->parent_, &slotPoint);
-                    LPARAM parentLParam = MAKELPARAM(slotPoint.x, slotPoint.y);
-                    
-                    // Debug critical camera control messages
-                    if (msg == WM_MOUSEWHEEL || msg == WM_MBUTTONDOWN || msg == WM_MBUTTONUP) {
-                        std::cout << "[SlotTexture] CRITICAL FORWARD " << 
-                                     (msg == WM_MOUSEWHEEL ? "WHEEL" : 
-                                      msg == WM_MBUTTONDOWN ? "MBTN_DOWN" : "MBTN_UP")
-                                  << " - SlotPos: (" << GET_X_LPARAM(lParam) << ", " << GET_Y_LPARAM(lParam) 
-                                  << ") -> ParentPos: (" << slotPoint.x << ", " << slotPoint.y << ")" << std::endl;
-                    }
-                    
-                    // Forward to parent - parent's subclass will route to overlay with proper transform
-                    PostMessage(slot->parent_, msg, wParam, parentLParam);
-                }
-                
-                // Also try direct overlay routing as fallback
-                HWND overlayWindow = FindWindowExW(slot->parent_, NULL, L"SIMILI_OpenGL_Overlay", NULL);
-                if (overlayWindow) {
-                    if (msg >= WM_MOUSEFIRST && msg <= WM_MOUSELAST && msg != WM_MOUSEWHEEL) {
-                        POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
-                        ClientToScreen(hwnd, &pt);
-                        ScreenToClient(overlayWindow, &pt);
-                        LPARAM newLParam = MAKELPARAM(pt.x, pt.y);
-                        
-                        if (msg == WM_MBUTTONDOWN || msg == WM_MBUTTONUP || msg == WM_MOUSEMOVE) {
-                            std::cout << "[SlotTexture] DIRECT OVERLAY " << 
-                                         (msg == WM_MBUTTONDOWN ? "MBTN_DOWN" : 
-                                          msg == WM_MBUTTONUP ? "MBTN_UP" : "MOUSEMOVE")
-                                      << " - OverlayPos: (" << GET_X_LPARAM(newLParam) << ", " << GET_Y_LPARAM(newLParam) << ")" << std::endl;
-                        }
-                        
-                        SendMessage(overlayWindow, msg, wParam, newLParam);
-                    } else {
-                        // Handle WHEEL and keyboard messages directly
-                        if (msg == WM_MOUSEWHEEL) {
-                            std::cout << "[SlotTexture] DIRECT OVERLAY WHEEL to overlay" << std::endl;
-                        }
-                        SendMessage(overlayWindow, msg, wParam, lParam);
-                    }
-                }
-                return 0; 
             }
             
             case WM_SETCURSOR:

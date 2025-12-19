@@ -81,6 +81,8 @@ public:
 	void reinitializeSingleObject(ThreeDObject* obj);
 	void notifySceneChanged();
 	
+	void logIFrameSizes();
+	
 	static LRESULT CALLBACK ParentWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
 
 private:

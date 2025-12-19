@@ -30,6 +30,7 @@ namespace SIMILI
 				void registerContextRoutes(RouterSim& router, OpenGLContext& renderer);
 				void registerSceneRoutes(RouterSim& router, ThreeDScene& scene, OpenGLContext& renderer);
 				void registerObjectRoutes(RouterSim& router, ThreeDScene& scene, CefRefPtr<UIHandler>& handler, GLFWwindow* glfwWindow);
+				void registerIFrameRoutes(RouterSim& router);
 		};
 
 	} 

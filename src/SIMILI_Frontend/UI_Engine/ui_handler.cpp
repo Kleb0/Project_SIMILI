@@ -2,6 +2,7 @@
 #include "viewportLogic/HTMLTextureRenderer/HtmlTextureRenderer.hpp"
 #include "viewportLogic/HTMLTextureRenderer/SlotTexture.hpp"
 #include "viewportLogic/KeyManagement/KeyManager.hpp"
+#include "viewportLogic/Keymanagement/IFrameSizeStocker.hpp"
 #include "../../Engine/ThreeDScene.hpp"
 #include "../../Engine/OpenGLContext.hpp"
 #include "../../WorldObjects/Camera/Camera.hpp"
@@ -255,6 +256,9 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	{
 		overlay_viewport_ = std::make_unique<OverlayViewport>();
 	}
+
+	auto& iframeStocker = IFrameSizeStocker::getInstance();
+	std::cout << "[UIHandler] IFrameSizeStocker ready for receiving iframe data" << std::endl;
 
 	RECT client_rect;
 	GetClientRect(parent_hwnd, &client_rect);
@@ -571,4 +575,20 @@ CefEventHandle os_event)
 {
 
 	return false;
+}
+
+void UIHandler::logIFrameSizes()
+{
+	auto& stocker = IFrameSizeStocker::getInstance();
+	auto allIFrames = stocker.getAllIFrames();
+	
+	std::cout << "[UIHandler] Current IFrame sizes (" << allIFrames.size() << " total):" << std::endl;
+	
+	for (const auto& pair : allIFrames)
+	{
+		const auto& data = pair.second;
+		std::cout << "  - " << data.name 
+				  << ": Position(" << data.x << "," << data.y << ")"
+				  << " Size(" << data.width << "x" << data.height << ")" << std::endl;
+	}
 }

@@ -8,7 +8,7 @@ SimpleWindowDelegate::SimpleWindowDelegate(CefRefPtr<CefBrowserView> browser_vie
 void SimpleWindowDelegate::OnWindowCreated(CefRefPtr<CefWindow> window) {
 	window->AddChildView(browser_view_);
 	
-	window->SetTitle("SIMILI - Object List");
+	window->SetTitle("SIMLI PROJECT");
 	
 	window->Show();
 	

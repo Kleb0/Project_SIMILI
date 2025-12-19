@@ -3,6 +3,7 @@
 #include "../../WorldObjects/Mesh/Mesh.hpp"
 #include "../../WorldObjects/Camera/Camera.hpp"
 #include "../../Engine/PrimitivesCreation/CreatePrimitive.hpp"
+#include "../../SIMILI_Frontend/UI_Engine/viewportLogic/Keymanagement/IFrameSizeStocker.hpp"
 #include <iostream>
 #include <sstream>
 #include <GLFW/glfw3.h>
@@ -28,6 +29,7 @@ void RoutesManager::initializeRoutes(
     registerContextRoutes(router, renderer);
     registerSceneRoutes(router, scene, renderer);
     registerObjectRoutes(router, scene, handler, glfwWindow);
+    registerIFrameRoutes(router);
     
     std::cout << "[RoutesManager] All routes registered successfully" << std::endl;
 }
@@ -271,6 +273,89 @@ void RoutesManager::registerObjectRoutes(RouterSim& router, ThreeDScene& scene, 
     }, "Select object from hierarchy inspector");
     
     std::cout << "[RoutesManager] Object routes registered" << std::endl;
+}
+
+void RoutesManager::registerIFrameRoutes(RouterSim& router)
+{
+    router.post("/api/iframes/update", [](const Message& msg) -> Response 
+    {
+        Response resp;
+        resp.headers["Access-Control-Allow-Origin"] = "*";
+        resp.headers["Content-Type"] = "application/json";
+        
+        try
+        {
+            json requestData = json::parse(msg.body);
+            
+            if (!requestData.contains("iframes") || !requestData["iframes"].is_array())
+            {
+                resp.statusCode = 400;
+                resp.statusMessage = "Bad Request";
+                resp.body = "{\"success\": false, \"error\": \"Missing or invalid 'iframes' array\"}";
+                return resp;
+            }
+            
+            auto& stocker = IFrameSizeStocker::getInstance();
+            
+            for (const auto& iframe : requestData["iframes"])
+            {
+                if (iframe.contains("name") && iframe.contains("x") && iframe.contains("y") && 
+                    iframe.contains("width") && iframe.contains("height"))
+                {
+                    std::string name = iframe["name"];
+                    int x = iframe["x"];
+                    int y = iframe["y"];
+                    int width = iframe["width"];
+                    int height = iframe["height"];
+                    
+                    stocker.updateIFrameData(name, x, y, width, height);
+                }
+            }
+            
+            resp.statusCode = 200;
+            resp.statusMessage = "OK";
+            resp.body = "{\"success\": true}";
+        }
+        catch (const json::exception& e)
+        {
+            std::cerr << "[RoutesManager] JSON parse error: " << e.what() << std::endl;
+            resp.statusCode = 400;
+            resp.statusMessage = "Bad Request";
+            resp.body = "{\"success\": false, \"error\": \"Invalid JSON\"}";
+        }
+        
+        return resp;
+    }, "Update iframe dimensions");
+    
+    router.get("/api/iframes/all", [](const Message& msg) -> Response 
+    {
+        Response resp;
+        resp.headers["Access-Control-Allow-Origin"] = "*";
+        resp.headers["Content-Type"] = "application/json";
+        
+        auto& stocker = IFrameSizeStocker::getInstance();
+        auto allIframes = stocker.getAllIFrames();
+        
+        json responseData = json::array();
+        
+        for (const auto& pair : allIframes)
+        {
+            json iframeJson;
+            iframeJson["name"] = pair.second.name;
+            iframeJson["x"] = pair.second.x;
+            iframeJson["y"] = pair.second.y;
+            iframeJson["width"] = pair.second.width;
+            iframeJson["height"] = pair.second.height;
+            responseData.push_back(iframeJson);
+        }
+        
+        resp.statusCode = 200;
+        resp.statusMessage = "OK";
+        resp.body = responseData.dump();
+        return resp;
+    }, "Get all iframe dimensions");
+    
+    std::cout << "[RoutesManager] IFrame routes registered" << std::endl;
 }
 
 } // namespace Router

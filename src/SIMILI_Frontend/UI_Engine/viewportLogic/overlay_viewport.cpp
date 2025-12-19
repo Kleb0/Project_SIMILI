@@ -952,7 +952,8 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				WINDOWPOS* wp = reinterpret_cast<WINDOWPOS*>(lParam);
 				
 				// If someone tries to set us as TOPMOST, prevent it
-				if (wp->hwndInsertAfter == HWND_TOPMOST) {
+				if (wp->hwndInsertAfter == HWND_TOPMOST) 
+				{
 					wp->hwndInsertAfter = HWND_TOP;
 					std::cout << "[OverlayViewport] Prevented TOPMOST positioning" << std::endl;
 				}
@@ -962,160 +963,16 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 			case WM_ACTIVATE:
 			{
 				// Maintain Z-order after activation events
-				if (LOWORD(wParam) != WA_INACTIVE) {
+				if (LOWORD(wParam) != WA_INACTIVE) 
+				{
 					overlay->ensureProperZOrder();
 				}
 				break;
 			}
 			
-			// ------ RAYCAST & SELECTION ------
-			
-			case WM_LBUTTONDOWN:
+			case WM_NCHITTEST:
 			{
-				std::cout << "[OverlayViewport] WM_LBUTTONDOWN received" << std::endl;
-				
-				SetCapture(hwnd);
-				
-				int mouseX = LOWORD(lParam);
-				int mouseY = HIWORD(lParam);
-				
-				std::cout << "[OverlayViewport] Click at: (" << mouseX << ", " << mouseY << ")" << std::endl;
-				std::cout << "[OverlayViewport] ImGuizmo state - IsOver: " << ImGuizmo::IsOver() 
-						  << " | IsUsing: " << ImGuizmo::IsUsing() << std::endl;
-				
-				if (overlay->contextual_menu_visible_ && overlay->contextual_menu_texture_test_)
-				{
-					int relX = mouseX - overlay->contextual_menu_x_;
-					int relY = mouseY - overlay->contextual_menu_y_;
-					
-					if (relX >= 0 && relX < overlay->contextual_menu_width_ && 
-						relY >= 0 && relY < overlay->contextual_menu_height_)
-					{
-						overlay->contextual_menu_texture_test_->sendMouseClick(relX, relY, true);
-						std::cout << "[OverlayViewport] Click forwarded to contextual menu at (" << relX << ", " << relY << ")" << std::endl;
-						return 0; // Consume the event
-					}
-				}
-				
-				if (shouldProcessEvent && !ImGuizmo::IsUsing())
-				{
-					std::cout << "[OverlayViewport] Processing click handler" << std::endl;
-					
-					if (overlay->click_handler_) 
-					{
-						overlay->click_handler_->handle();
-					}
-					else 
-					{
-						std::cerr << "[OverlayViewport] ERROR: No click handler available!" << std::endl;
-					}
-				}
-				else 
-				{
-					std::cout << "[OverlayViewport] Click blocked - ImGuizmo is being manipulated" << std::endl;
-				}
-				
-				return 0;
-			}
-			
-			case WM_LBUTTONUP:
-			{
-				// Release mouse capture
-				ReleaseCapture();
-				return 0;
-			}
-			
-			case WM_RBUTTONDOWN:
-			{
-			
-				int mouseX = LOWORD(lParam);
-				int mouseY = HIWORD(lParam);
-				
-				overlay->contextual_menu_visible_ = !overlay->contextual_menu_visible_;
-				
-				if (overlay->contextual_menu_visible_)
-				{
-					overlay->setContextualMenuPosition(mouseX, mouseY);
-				}
-
-				
-				InvalidateRect(hwnd, nullptr, FALSE);
-				return 0;
-			}
-					
-			// ------ CAMERA CONTROLS ------
-			
-			case WM_MOUSEWHEEL: 
-			{
-				// ALWAYS handle camera zoom - camera controls should work everywhere
-				// regardless of mouse position or overlay boundaries
-				if (!ImGuizmo::IsOver() && !ImGuizmo::IsUsing())
-				{
-					POINT cursor_pos;
-					GetCursorPos(&cursor_pos);
-					ScreenToClient(hwnd, &cursor_pos);
-					
-					std::cout << "[OverlayViewport] WHEEL - Processing camera zoom at cursor: (" 
-							  << cursor_pos.x << ", " << cursor_pos.y << ") | lParam: (" 
-							  << GET_X_LPARAM(lParam) << ", " << GET_Y_LPARAM(lParam) << ")" << std::endl;
-					
-					overlay->camera_control_->onMouseWheel(wParam);
-				} else {
-					std::cout << "[OverlayViewport] WHEEL blocked - ImGuizmo active" << std::endl;
-				}
-				return 0;
-			}
-			
-			case WM_MBUTTONDOWN: 
-			{
-				// ALWAYS handle camera pan - camera controls should work everywhere
-				// regardless of mouse position or overlay boundaries
-				if (!ImGuizmo::IsOver() && !ImGuizmo::IsUsing())
-				{
-					std::cout << "[OverlayViewport] MBTN_DOWN - Processing camera pan start" << std::endl;
-					overlay->camera_control_->onMiddleButtonDown();
-				} else {
-					std::cout << "[OverlayViewport] MBTN_DOWN blocked - ImGuizmo active" << std::endl;
-				}
-				return 0;
-			}
-			
-			case WM_MBUTTONUP: 
-			{
-				overlay->camera_control_->onMiddleButtonUp();
-				return 0;
-			}
-			
-			case WM_MOUSEMOVE: 
-			{
-				// Get mouse coordinates
-				int mouseX = LOWORD(lParam);
-				int mouseY = HIWORD(lParam);
-				
-				// If contextual menu is visible, check if mouse is over it and forward events
-				if (overlay->contextual_menu_visible_ && overlay->contextual_menu_texture_test_)
-				{
-					// Calculate relative coordinates within the menu
-					int relX = mouseX - overlay->contextual_menu_x_;
-					int relY = mouseY - overlay->contextual_menu_y_;
-					
-					// Check if mouse is within menu bounds
-					if (relX >= 0 && relX < overlay->contextual_menu_width_ && 
-						relY >= 0 && relY < overlay->contextual_menu_height_)
-					{
-						overlay->contextual_menu_texture_test_->sendMouseMove(relX, relY);
-					}
-				}
-				
-				// ImGui already processed this event at the top of WndProc
-				// Only handle camera movement if not over/using gizmo
-				if (!ImGuizmo::IsOver() && !ImGuizmo::IsUsing())
-				{
-					overlay->camera_control_->onMouseMove(wParam, lParam);
-				}
-				// Always trigger redraw for ImGuizmo hover state updates
-				InvalidateRect(hwnd, nullptr, FALSE);
-				return 0;
+				return HTTRANSPARENT;
 			}
 			
 			// ------ MODE SWITCHING -----
@@ -1129,7 +986,6 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 				// Forward keyboard events to ImGui FIRST
 				ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
 				
-				// Process through KeyManager ECS
 				if (msg == WM_KEYDOWN)
 				{
 					SIMILI::Input::KeyManager::getInstance().handleKeyDown(static_cast<int>(wParam), lParam);

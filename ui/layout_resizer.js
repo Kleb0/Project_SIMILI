@@ -8,6 +8,7 @@
     let startSizes = [];
     let resizeTimeout = null;
     let isWindowMaximized = false;
+    let hasDragged = false;
 
     function initSplitters() {
         const splitters = document.querySelectorAll('.splitter');
@@ -80,6 +81,7 @@
         e.preventDefault();
         
         isDragging = true;
+        hasDragged = true;
         currentSplitter = e.target;
         
         const direction = currentSplitter.getAttribute('data-direction');
@@ -268,26 +270,65 @@
         document.body.classList.remove('dragging');
         document.body.classList.remove('dragging-vertical');
         
-        // Re-enable pointer events on iframes
         document.querySelectorAll('iframe').forEach(iframe => {
             iframe.style.pointerEvents = 'auto';
         });
         
-        // Final repaint after drag ends
         forceBrowserRepaint();
+        
+        if (hasDragged) {
+            sendIFrameSizesToServer();
+            hasDragged = false;
+        }
+    }
+    
+    function sendIFrameSizesToServer()
+    {
+        const iframes = [
+            { selector: '.hierarchy-panel iframe', name: 'hierarchy_inspector' },
+            { selector: '.viewport-panel iframe', name: 'viewport_docking' },
+            { selector: '.object-inspector-panel iframe', name: 'object_inspector' },
+            { selector: '.history-panel iframe', name: 'history_logger' },
+            { selector: '.project-viewer-panel iframe', name: 'project_viewer' }
+        ];
+        
+        const iframeData = [];
+        
+        iframes.forEach(item => {
+            const element = document.querySelector(item.selector);
+            if (element) {
+                const rect = element.getBoundingClientRect();
+                iframeData.push({
+                    name: item.name,
+                    x: Math.round(rect.left),
+                    y: Math.round(rect.top),
+                    width: Math.round(rect.width),
+                    height: Math.round(rect.height)
+                });
+            }
+        });
+        
+        if (iframeData.length > 0) {
+            fetch('http://localhost:8080/api/iframes/update', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ iframes: iframeData })
+            }).catch(() => {});
+        }
     }
 
-    // Initialize when DOM is ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initSplitters);
     } else {
         initSplitters();
     }
     
-    // Send initial viewport dimensions after page loads
     window.addEventListener('load', function() {
         setTimeout(function() {
             notifyViewportResize();
+            sendIFrameSizesToServer();
         }, 200);
     });
 })();
