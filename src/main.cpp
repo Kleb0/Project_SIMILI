@@ -7,6 +7,7 @@
 #include "SIMILI_Frontend/UI_Engine/ui_handler.hpp"
 #include "SIMILI_Frontend/UI_Engine/simple_window_delegate.hpp"
 #include "SIMILI_Frontend/UI_Engine/simple_browser_view_delegate.hpp"
+#include "SIMILI_Frontend/UI_Engine/viewportLogic/Keymanagement/IFrameMouseDetector.hpp"
 
 #include "SIMILI_Services/router/RouterSim.hpp"
 #include "SIMILI_Services/router/RoutesManager.hpp"
@@ -169,6 +170,10 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 
 	handler->setSceneObjects(&renderer, &myThreeDScene, &mainCamera, &cubeMesh1);
 	std::cout << "[Main] Scene objects passed to UIHandler" << std::endl;
+
+	auto iframeMouseDetector = std::make_unique<SIMILI::Input::IFrameMouseDetector>();
+	handler->setIFrameMouseDetector(iframeMouseDetector.get());
+	std::cout << "[Main] IFrameMouseDetector created and linked to UIHandler" << std::endl;
 
 	CefBrowserSettings browser_settings;
 	browser_settings.windowless_frame_rate = 60;

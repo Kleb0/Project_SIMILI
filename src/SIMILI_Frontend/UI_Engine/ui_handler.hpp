@@ -7,6 +7,7 @@
 #include "include/views/cef_browser_view.h"
 #include "include/views/cef_window.h"
 #include "viewportLogic/overlay_viewport.hpp"
+#include "viewportLogic/Keymanagement/IFrameMouseDetector.hpp"
 #include <list>
 #include <sstream>
 #include <memory>
@@ -16,6 +17,7 @@ class ThreeDScene;
 class OpenGLContext;
 class Camera;
 class Mesh;
+class IFrameSizeStocker;
 
 class UIHandler : public CefApp,
 				  public CefClient, 
@@ -72,6 +74,7 @@ public:
 	void enableSlotTextureRendering(bool enable);
 	OverlayViewport* getOverlay() { return overlay_viewport_.get(); }
 	HWND getParentHWND() const { return parent_hwnd_; }
+	SIMILI::Input::IFrameMouseDetector* getIFrameMouseDetector() { return iframe_mouse_detector_; }
 	
 	void setThreeDScene(ThreeDScene* scene) { three_d_scene_ = scene; }
 	ThreeDScene* getThreeDScene() const { return three_d_scene_; }
@@ -80,10 +83,15 @@ public:
 	void initializeSceneObjects();
 	void reinitializeSingleObject(ThreeDObject* obj);
 	void notifySceneChanged();
+	void setIFrameMouseDetector(SIMILI::Input::IFrameMouseDetector* detector);
 	
 	void logIFrameSizes();
+	void updatePanelBoundsFromStocker();
 	
 	static LRESULT CALLBACK ParentWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
+	
+	// Friend function to allow RenderTimerProc access to private members
+	friend VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime);
 
 private:
 	typedef std::list<CefRefPtr<CefBrowser>> BrowserList;
@@ -106,6 +114,10 @@ private:
 	int last_viewport_height_;
 	
 	CefRefPtr<CefMessageRouterRendererSide> render_message_router_;
+	
+	// Mouse detection
+	SIMILI::Input::IFrameMouseDetector* iframe_mouse_detector_;
+	IFrameSizeStocker* iframe_size_stocker_;
 
 	IMPLEMENT_REFCOUNTING(UIHandler);
 };

@@ -928,9 +928,7 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 							wglMakeCurrent(prevDC, prevContext);
 						}
 					}
-					
-					std::cout << "[OverlayViewport] WM_SIZE - New size: " << newWidth << "x" << newHeight 
-					          << " (internal dimensions updated)" << std::endl;
+
 					
 					// Update texture renderers
 					if (overlay->texture_renderer_test_) {
