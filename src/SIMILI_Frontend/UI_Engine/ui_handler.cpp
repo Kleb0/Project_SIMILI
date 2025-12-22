@@ -38,16 +38,17 @@ UIHandler::UIHandler() : parent_hwnd_(nullptr), timer_id_(0),
 	iframe_size_stocker_(&IFrameSizeStocker::getInstance()),
 	current_mouse_state_(nullptr),
 	above_overlay_state_(nullptr),
-	outside_overlay_state_(nullptr)
+	outside_overlay_state_(nullptr),
+	last_detected_region_name_("")
 {
 	// Initialize mouse states
 	above_overlay_state_ = new SIMILI::Input::Mouse_Above_Overlay_State();
 	outside_overlay_state_ = new SIMILI::Input::Mouse_Outside_Overlay_State();
 	
-	// Start with outside state as default (don't call onEnter yet)
-	current_mouse_state_ = outside_overlay_state_;
+	// Start with null state (will be set on first mouse detection)
+	current_mouse_state_ = nullptr;
 	
-	std::cout << "[UIHandler] Mouse states created (not activated yet)" << std::endl;
+	std::cout << "[UIHandler] Mouse states created (will activate on first mouse detection)" << std::endl;
 }
 
 UIHandler::~UIHandler() 
@@ -278,6 +279,9 @@ void UIHandler::CloseAllBrowsers(bool force_close)
 	}
 }
 
+
+// -------- Rendering ------------
+
 void UIHandler::createOverlayViewport(HWND parent_hwnd) 
 {
 	parent_hwnd_ = parent_hwnd;
@@ -322,10 +326,8 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	if (iframe_mouse_detector_) {
 		iframe_mouse_detector_->setWindowHandle(parent_hwnd);
 		std::cout << "[UIHandler] IFrameMouseDetector initialized with window handle" << std::endl;
-	}
-		
-	SetWindowSubclass(parent_hwnd, ParentWindowProc, 0, reinterpret_cast<DWORD_PTR>(this));
-	
+	}		
+
 	startRenderTimer();
 	
 	// Initial bounds update (will be updated again when IFrames send their sizes)
@@ -382,17 +384,10 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 			InvalidateRect(handler->getOverlay()->getSlotTexture()->getHandle(), nullptr, FALSE);
 		}
 		
-		// Real-time mouse detection at 60 FPS
 		static int frameCounter = 0;
 		frameCounter++;
 		
-		auto mouseDetector = handler->getIFrameMouseDetector();
-		
-		if (frameCounter % 60 == 0) 
-		{
-			std::cout << "[RenderTimerProc] frameCounter=" << frameCounter 
-			          << " | mouseDetector=" << (mouseDetector ? "VALID" : "NULL") << std::endl;
-		}
+		auto mouseDetector = handler->getIFrameMouseDetector();	
 
 		if (mouseDetector && frameCounter % 30 == 0) 
 		{
@@ -433,7 +428,15 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 					break;
 			}
 			
-			std::cout << "[Mouse] Region: " << regionName << " | Position: (" << relativeX << ", " << relativeY << ")" << std::endl;
+			static std::string lastRegionName = "";
+			if (regionName != lastRegionName)
+			{
+				
+				std::cout << "\n [Mouse] Region: " << regionName << " | Position: (" << relativeX << ", " << relativeY << ")" << std::endl;
+				lastRegionName = regionName;
+				handler->transitionMouseState(regionName);
+			}
+			
 		}
 	}
 }
@@ -445,11 +448,13 @@ void UIHandler::startRenderTimer()
 		timeBeginPeriod(1);
 		timer_id_ = SetTimer(nullptr, 0, 16, RenderTimerProc);
 		
-		if (timer_id_ != 0) {
+		if (timer_id_ != 0) 
+		{
 			// Store handler in static map
 			g_timerHandlerMap[timer_id_] = this;
-			std::cout << "[UIHandler] Render timer started (ID=" << timer_id_ << "), panel bounds will be updated" << std::endl;
-		} else {
+		} 
+		else 
+		{
 			std::cerr << "[UIHandler] ERROR: Failed to create timer!" << std::endl;
 		}
 	}
@@ -463,9 +468,7 @@ void UIHandler::stopRenderTimer()
 		timeEndPeriod(1);
 		
 		// Remove from static map
-		g_timerHandlerMap.erase(timer_id_);
-		std::cout << "[UIHandler] Render timer stopped (ID=" << timer_id_ << ")" << std::endl;
-		
+		g_timerHandlerMap.erase(timer_id_);		
 		timer_id_ = 0;
 	}
 }
@@ -506,39 +509,10 @@ void UIHandler::enableSlotTextureRendering(bool enable)
 	}
 }
 
-LRESULT CALLBACK UIHandler::ParentWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData) 
-{
-	UIHandler* handler = reinterpret_cast<UIHandler*>(dwRefData);
-	
-	switch (msg) 
-	{
-		case WM_SIZE:
-			if (handler && handler->overlay_viewport_) 
-			{
-				handler->overlay_viewport_->ensureProperZOrder();
-				// Update panel bounds after window resize
-				handler->updatePanelBoundsFromStocker();
-			}
-			break;
-		
-		case WM_ACTIVATE:
-		case WM_WINDOWPOSCHANGED:
-			if (handler && handler->overlay_viewport_) 
-			{
-				handler->overlay_viewport_->ensureProperZOrder();
-			}
-			break;
-		
-		// WM_MOUSEMOVE removed - mouse detection now happens in RenderTimerProc at 60 FPS
-			
-		case WM_NCDESTROY:
-			// Remove subclass before window is destroyed
-			RemoveWindowSubclass(hwnd, ParentWindowProc, uIdSubclass);
-			break;
-	}
-	
-	return DefSubclassProc(hwnd, msg, wParam, lParam);
-}
+// ---------- End of Rendering ----------
+
+
+// ---------- Scene Update ------------ 
 
 void UIHandler::setSceneObjects(OpenGLContext* renderer, ThreeDScene* scene, Camera* camera, Mesh** cubeMesh) {
 	renderer_ = renderer;
@@ -648,6 +622,7 @@ void UIHandler::notifySceneChanged()
 	}
 }
 
+// ------------ End of Scene Update ------------- 
 
 // ---------- Keyboard Handler Implementation ---------
 
@@ -711,31 +686,36 @@ void UIHandler::updatePanelBoundsFromStocker()
 		const std::string& name = pair.first;
 		const IFrameData& data = pair.second;
 		
-		if (name == "hierarchy_inspector") {
+		if (name == "hierarchy_inspector") 
+		{
 			bounds.hierarchy.x = data.x;
 			bounds.hierarchy.y = data.y;
 			bounds.hierarchy.width = data.width;
 			bounds.hierarchy.height = data.height;
 		}
-		else if (name == "viewport_docking") {
+		else if (name == "viewport_docking") 
+		{
 			bounds.viewport.x = data.x;
 			bounds.viewport.y = data.y;
 			bounds.viewport.width = data.width;
 			bounds.viewport.height = data.height;
 		}
-		else if (name == "object_inspector") {
+		else if (name == "object_inspector") 
+		{
 			bounds.objectInspector.x = data.x;
 			bounds.objectInspector.y = data.y;
 			bounds.objectInspector.width = data.width;
 			bounds.objectInspector.height = data.height;
 		}
-		else if (name == "history_logger") {
+		else if (name == "history_logger") 
+		{
 			bounds.history.x = data.x;
 			bounds.history.y = data.y;
 			bounds.history.width = data.width;
 			bounds.history.height = data.height;
 		}
-		else if (name == "project_viewer") {
+		else if (name == "project_viewer") 
+		{
 			bounds.projectViewer.x = data.x;
 			bounds.projectViewer.y = data.y;
 			bounds.projectViewer.width = data.width;
@@ -774,4 +754,36 @@ void UIHandler::logIFrameSizes()
 	
 	// Update panel bounds after logging
 	updatePanelBoundsFromStocker();
+}
+
+void UIHandler::transitionMouseState(const std::string& regionName)
+{
+	
+	last_detected_region_name_ = regionName;
+	
+	SIMILI::Input::Mouse_State* newState = nullptr;
+	
+	if (regionName == "ViewportPanel")
+	{
+		newState = above_overlay_state_;
+	}
+	else
+	{
+		newState = outside_overlay_state_;
+	}
+	
+	if (newState != current_mouse_state_)
+	{
+		if (current_mouse_state_)
+		{
+			current_mouse_state_->onExit();
+		}
+		
+		current_mouse_state_ = newState;
+		
+		if (current_mouse_state_)
+		{
+			current_mouse_state_->onEnter();
+		}
+	}
 }

@@ -91,7 +91,11 @@ public:
 	void logIFrameSizes();
 	void updatePanelBoundsFromStocker();
 	
-	static LRESULT CALLBACK ParentWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
+	// Mouse state management
+	void transitionMouseState(const std::string& regionName);
+	SIMILI::Input::Mouse_State* getCurrentMouseState() const { return current_mouse_state_; }
+	
+	// static LRESULT CALLBACK ParentWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
 	
 	// Friend function to allow RenderTimerProc access to private members
 	friend VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime);
@@ -126,6 +130,7 @@ private:
 	SIMILI::Input::Mouse_State* current_mouse_state_;
 	SIMILI::Input::Mouse_Above_Overlay_State* above_overlay_state_;
 	SIMILI::Input::Mouse_Outside_Overlay_State* outside_overlay_state_;
+	std::string last_detected_region_name_;
 
 	IMPLEMENT_REFCOUNTING(UIHandler);
 };
