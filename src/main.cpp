@@ -55,23 +55,33 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
+	// Check if this is a CEF sub-process by checking command line
+	std::wstring cmdLine(GetCommandLineW());
+	bool isSubProcess = (cmdLine.find(L"--type=") != std::wstring::npos);
+
+	// Only allocate console in the main browser process
+	if (!isSubProcess)
+	{
+		static bool console_allocated = false;
+		if (!console_allocated) 
+		{
+			AllocConsole();
+			FILE* fp;
+			freopen_s(&fp, "CONOUT$", "w", stdout);
+			freopen_s(&fp, "CONOUT$", "w", stderr);
+			console_allocated = true;
+		}
+	}
+
 	CefMainArgs main_args(hInstance);
 	CefRefPtr<UIHandler> handler(new UIHandler);
 
+	// Check if this is a CEF sub-process (render, GPU, etc.)
 	int exit_code = CefExecuteProcess(main_args, handler, nullptr);
 	if (exit_code >= 0) 
 	{
+		// This is a sub-process, exit without further processing
 		return exit_code;
-	}
-
-	static bool console_allocated = false;
-	if (!console_allocated) 
-	{
-		AllocConsole();
-		FILE* fp;
-		freopen_s(&fp, "CONOUT$", "w", stdout);
-		freopen_s(&fp, "CONOUT$", "w", stderr);
-		console_allocated = true;
 	}
 
 	wchar_t exePath[MAX_PATH];

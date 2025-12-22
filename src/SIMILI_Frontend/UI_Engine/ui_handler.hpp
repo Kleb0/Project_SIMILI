@@ -8,6 +8,9 @@
 #include "include/views/cef_window.h"
 #include "viewportLogic/overlay_viewport.hpp"
 #include "viewportLogic/Keymanagement/IFrameMouseDetector.hpp"
+#include "viewportLogic/Keymanagement/MouseStates/Mouse_State.hpp"
+#include "viewportLogic/Keymanagement/MouseStates/Mouse_Above_Overlay_State.hpp"
+#include "viewportLogic/Keymanagement/MouseStates/Mouse_Outside_Overlay_State.hpp"
 #include <list>
 #include <sstream>
 #include <memory>
@@ -118,6 +121,11 @@ private:
 	// Mouse detection
 	SIMILI::Input::IFrameMouseDetector* iframe_mouse_detector_;
 	IFrameSizeStocker* iframe_size_stocker_;
+	
+	// Mouse states
+	SIMILI::Input::Mouse_State* current_mouse_state_;
+	SIMILI::Input::Mouse_Above_Overlay_State* above_overlay_state_;
+	SIMILI::Input::Mouse_Outside_Overlay_State* outside_overlay_state_;
 
 	IMPLEMENT_REFCOUNTING(UIHandler);
 };

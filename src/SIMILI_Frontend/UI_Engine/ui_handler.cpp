@@ -35,13 +35,37 @@ UIHandler::UIHandler() : parent_hwnd_(nullptr), timer_id_(0),
 	renderer_(nullptr), main_camera_(nullptr), cube_mesh_ptr_(nullptr), scene_initialized_(false),
 	render_message_router_(nullptr), 
 	iframe_mouse_detector_(nullptr),
-	iframe_size_stocker_(&IFrameSizeStocker::getInstance())
+	iframe_size_stocker_(&IFrameSizeStocker::getInstance()),
+	current_mouse_state_(nullptr),
+	above_overlay_state_(nullptr),
+	outside_overlay_state_(nullptr)
 {
+	// Initialize mouse states
+	above_overlay_state_ = new SIMILI::Input::Mouse_Above_Overlay_State();
+	outside_overlay_state_ = new SIMILI::Input::Mouse_Outside_Overlay_State();
+	
+	// Start with outside state as default (don't call onEnter yet)
+	current_mouse_state_ = outside_overlay_state_;
+	
+	std::cout << "[UIHandler] Mouse states created (not activated yet)" << std::endl;
 }
 
 UIHandler::~UIHandler() 
 {
 	stopRenderTimer();
+	
+	// Clean up mouse states
+	if (above_overlay_state_) 
+	{
+		delete above_overlay_state_;
+		above_overlay_state_ = nullptr;
+	}
+	if (outside_overlay_state_)
+	{
+		delete outside_overlay_state_;
+		outside_overlay_state_ = nullptr;
+	}
+	current_mouse_state_ = nullptr;
 }
 
 CefRefPtr<CefBrowserProcessHandler> UIHandler::GetBrowserProcessHandler() 
