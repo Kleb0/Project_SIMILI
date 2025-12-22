@@ -134,8 +134,9 @@ list(APPEND SOURCES
 
 # Add KeyManager from SIMILI_Frontend (needed for ECS input system)
 list(APPEND SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/Keymanagement/KeyManager.cpp
-)
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/Keymanagement/KeyManager.cpp    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/Keymanagement/MouseStates/Mouse_State.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/Keymanagement/MouseStates/Mouse_Above_Overlay_State.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/Keymanagement/MouseStates/Mouse_Outside_Overlay_State.cpp")
 
 
 file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS src/*.hpp)
