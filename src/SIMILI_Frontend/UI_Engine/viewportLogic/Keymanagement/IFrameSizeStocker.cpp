@@ -7,7 +7,7 @@ IFrameSizeStocker& IFrameSizeStocker::getInstance()
 	return instance;
 }
 
-void IFrameSizeStocker::updateIFrameData(const std::string& name, int x, int y, int width, int height)
+void IFrameSizeStocker::updateIFrameData(const std::string& name, int x, int y, int width, int height, int clientX, int clientY)
 {
 	std::lock_guard<std::mutex> lock(mutex_);
 	
@@ -17,11 +17,10 @@ void IFrameSizeStocker::updateIFrameData(const std::string& name, int x, int y, 
 	data.y = y;
 	data.width = width;
 	data.height = height;
+	data.clientX = clientX;
+	data.clientY = clientY;
 	
 	iframeDataMap_[name] = data;
-	
-	std::cout << "[IFrameSizeStocker] Updated: " << name 
-			  << " - Position(" << x << "," << y << ") Size(" << width << "x" << height << ")" << std::endl;
 }
 
 bool IFrameSizeStocker::getIFrameData(const std::string& name, IFrameData& outData) const
@@ -48,5 +47,4 @@ void IFrameSizeStocker::clearAll()
 {
 	std::lock_guard<std::mutex> lock(mutex_);
 	iframeDataMap_.clear();
-	std::cout << "[IFrameSizeStocker] Cleared all iframe data" << std::endl;
 }

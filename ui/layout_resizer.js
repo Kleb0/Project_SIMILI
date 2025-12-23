@@ -298,13 +298,22 @@
             const element = document.querySelector(item.selector);
             if (element) {
                 const rect = element.getBoundingClientRect();
+                
+                const logicalX = Math.round(rect.left);
+                const logicalY = Math.round(rect.top);
+                const logicalWidth = Math.round(rect.width);
+                const logicalHeight = Math.round(rect.height);
+                
                 iframeData.push({
                     name: item.name,
-                    x: Math.round(rect.left),
-                    y: Math.round(rect.top),
-                    width: Math.round(rect.width),
-                    height: Math.round(rect.height)
+                    x: logicalX,
+                    y: logicalY,
+                    width: logicalWidth,
+                    height: logicalHeight,
+                    clientX: logicalX,
+                    clientY: logicalY
                 });
+
             }
         });
         

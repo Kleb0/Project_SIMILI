@@ -11,6 +11,8 @@ struct IFrameData
 	int y;
 	int width;
 	int height;
+	int clientX;
+	int clientY;
 };
 
 class IFrameSizeStocker
@@ -18,7 +20,7 @@ class IFrameSizeStocker
 public:
 	static IFrameSizeStocker& getInstance();
 
-	void updateIFrameData(const std::string& name, int x, int y, int width, int height);
+	void updateIFrameData(const std::string& name, int x, int y, int width, int height, int clientX = 0, int clientY = 0);
 	
 	bool getIFrameData(const std::string& name, IFrameData& outData) const;
 	

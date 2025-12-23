@@ -307,11 +307,17 @@ namespace SIMILI {
 							int y = iframe["y"];
 							int width = iframe["width"];
 							int height = iframe["height"];
+							int clientX = iframe.contains("clientX") ? iframe["clientX"].get<int>() : x;
+							int clientY = iframe.contains("clientY") ? iframe["clientY"].get<int>() : y;
 							
-							stocker.updateIFrameData(name, x, y, width, height);
+							stocker.updateIFrameData(name, x, y, width, height, clientX, clientY);
+							
+							std::cout << "[RoutesManager] IFrame updated: " << name 
+									  << " at (" << x << "," << y << ") size " << width << "x" << height << std::endl;
 						}
 					}
 					
+					// Force immediate update of panel bounds in UIHandler
 					if (handler) 
 					{
 						handler->updatePanelBoundsFromStocker();
@@ -351,12 +357,16 @@ namespace SIMILI {
 					iframeJson["y"] = pair.second.y;
 					iframeJson["width"] = pair.second.width;
 					iframeJson["height"] = pair.second.height;
+					iframeJson["clientX"] = pair.second.clientX;
+					iframeJson["clientY"] = pair.second.clientY;
+					
 					responseData.push_back(iframeJson);
 				}
 				
 				resp.statusCode = 200;
 				resp.statusMessage = "OK";
 				resp.body = responseData.dump();
+				
 				return resp;
 			}, "Get all iframe dimensions");
 			

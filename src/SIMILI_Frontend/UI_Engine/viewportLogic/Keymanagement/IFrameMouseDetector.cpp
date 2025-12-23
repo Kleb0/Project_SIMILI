@@ -9,6 +9,9 @@ namespace SIMILI {
 			, window_rect_{}
 			, panel_bounds_{}
 			, dpi_scale_(1.0f)
+			, is_maximized_(false)
+			, maximized_offset_x_(0)
+			, maximized_offset_y_(0)
 		{
 		}
 
@@ -83,6 +86,20 @@ namespace SIMILI {
 			return panel_bounds_.viewport.contains(clientX, clientY);
 		}
 
+		void IFrameMouseDetector::setMaximizedState(bool isMaximized, int offsetX, int offsetY)
+		{
+			is_maximized_ = isMaximized;
+			maximized_offset_x_ = offsetX;
+			maximized_offset_y_ = offsetY;
+			
+			if (isMaximized) {
+				std::cout << "[IFrameMouseDetector] Window maximized - applying offsets: X=" 
+						  << offsetX << " Y=" << offsetY << std::endl;
+			} else {
+				std::cout << "[IFrameMouseDetector] Window not maximized - no offsets" << std::endl;
+			}
+		}
+
 		void IFrameMouseDetector::screenToClient(int screenX, int screenY, int& clientX, int& clientY) const
 		{
 			if (!window_handle_)
@@ -96,17 +113,15 @@ namespace SIMILI {
 			ScreenToClient(window_handle_, &pt);
 			clientX = pt.x;
 			clientY = pt.y;
+			
+			// Bounds are already adjusted with DPI and maximized offsets in updatePanelBoundsFromStocker()
+			// So we don't apply offsets here anymore
 		}
 
 		void IFrameMouseDetector::getRelativePosition(int screenX, int screenY, int& relativeX, int& relativeY) const
 		{
 			screenToClient(screenX, screenY, relativeX, relativeY);
-			
-			if (dpi_scale_ != 1.0f)
-			{
-				relativeX = static_cast<int>(relativeX / dpi_scale_);
-				relativeY = static_cast<int>(relativeY / dpi_scale_);
-			}
+			// Remove DPI scaling - not needed if JS sends correct client coordinates
 		}
 
 		void IFrameMouseDetector::getViewportRelativePosition(int screenX, int screenY, int& relativeX, int& relativeY) const
@@ -135,6 +150,25 @@ namespace SIMILI {
 			
 			int clientX, clientY;
 			screenToClient(screenX, screenY, clientX, clientY);
+			
+			// Work entirely in logical (CSS) pixels - no DPI scaling anywhere
+			
+			// DEBUG: Log mouse position and panel bounds
+			static int debugCounter = 0;
+			if (++debugCounter % 30 == 0)
+			{
+				std::cout << "[IFrameMouseDetector] Client position: (" << clientX << ", " << clientY << ")" << std::endl;
+				std::cout << "  Viewport bounds: x=" << panel_bounds_.viewport.x 
+						  << " y=" << panel_bounds_.viewport.y
+						  << " w=" << panel_bounds_.viewport.width
+						  << " h=" << panel_bounds_.viewport.height << std::endl;
+				
+				// Additional debug: show if mouse would be in viewport
+				bool inViewport = panel_bounds_.viewport.contains(clientX, clientY);
+				if (inViewport) {
+					std::cout << "  -> INSIDE viewport" << std::endl;
+				}
+			}
 			
 			if (panel_bounds_.hierarchy.contains(clientX, clientY))
 			{

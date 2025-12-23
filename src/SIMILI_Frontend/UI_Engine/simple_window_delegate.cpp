@@ -60,3 +60,58 @@ bool SimpleWindowDelegate::CanClose(CefRefPtr<CefWindow> window) {
 CefSize SimpleWindowDelegate::GetPreferredSize(CefRefPtr<CefView> view) {
 	return CefSize(800, 600);
 }
+
+bool SimpleWindowDelegate::isWindowMaximized() const
+{
+    if (!window_hwnd_) {
+        return false;
+    }
+    
+    WINDOWPLACEMENT placement;
+    placement.length = sizeof(WINDOWPLACEMENT);
+    
+    if (GetWindowPlacement(window_hwnd_, &placement)) {
+        return placement.showCmd == SW_SHOWMAXIMIZED;
+    }
+    
+    return false;
+}
+
+void SimpleWindowDelegate::getMaximizedBorderOffsets(int& offsetX, int& offsetY, int& offsetWidth, int& offsetHeight) const
+{
+    offsetX = 0;
+    offsetY = 0;
+    offsetWidth = 0;
+    offsetHeight = 0;
+    
+    if (!window_hwnd_ || !isWindowMaximized()) {
+        return;
+    }
+    
+    // When maximized, Windows adds invisible borders
+    // Get the window frame size
+    RECT windowRect, clientRect;
+    GetWindowRect(window_hwnd_, &windowRect);
+    GetClientRect(window_hwnd_, &clientRect);
+    
+    POINT clientOrigin = {0, 0};
+    ClientToScreen(window_hwnd_, &clientOrigin);
+    
+    // Calculate the offset (invisible border size)
+    offsetX = clientOrigin.x - windowRect.left;
+    offsetY = clientOrigin.y - windowRect.top;
+    
+    // Width and height offsets (borders on both sides)
+    int windowWidth = windowRect.right - windowRect.left;
+    int windowHeight = windowRect.bottom - windowRect.top;
+    int clientWidth = clientRect.right - clientRect.left;
+    int clientHeight = clientRect.bottom - clientRect.top;
+    
+    offsetWidth = windowWidth - clientWidth;
+    offsetHeight = windowHeight - clientHeight;
+    
+    std::cout << "[SimpleWindowDelegate] Maximized border offsets: X=" << offsetX 
+              << " Y=" << offsetY 
+              << " W=" << offsetWidth 
+              << " H=" << offsetHeight << std::endl;
+}

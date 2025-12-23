@@ -55,6 +55,9 @@ namespace SIMILI
 				void setWindowHandle(HWND hwnd);
 				void updatePanelBounds(const PanelBounds& bounds);
 				
+				// New: Set maximized state and border offsets
+				void setMaximizedState(bool isMaximized, int offsetX = 0, int offsetY = 0);
+				
 				MouseRegion detectMouseRegion(int screenX, int screenY);
 				bool isMouseInsideWindow(int screenX, int screenY) const;
 				bool isMouseOnViewport(int screenX, int screenY) const;
@@ -71,10 +74,15 @@ namespace SIMILI
 				PanelBounds panel_bounds_;
 				float dpi_scale_;
 				
+				// New: Maximized state tracking
+				bool is_maximized_;
+				int maximized_offset_x_;
+				int maximized_offset_y_;
+				
 				void updateWindowRect();
 				void updateDpiScale();
 				float getDpiScale() const;
 				void screenToClient(int screenX, int screenY, int& clientX, int& clientY) const;
 		};
 	} 
-} 
+}

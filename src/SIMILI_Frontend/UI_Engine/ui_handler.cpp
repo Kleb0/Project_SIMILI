@@ -164,7 +164,6 @@ void UIHandler::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& ti
 	
 	if (title_str.find("VIEWPORT_RESIZE:") == 0) 
 	{
-
 		std::string coords = title_str.substr(16); 
 		
 		int js_x, js_y, width, height;
@@ -203,7 +202,9 @@ void UIHandler::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& ti
 					last_viewport_width_ = final_width;
 					last_viewport_height_ = final_height;
 					
-					// Ensure proper Z-order after resize
+					// Force update of panel bounds after viewport resize
+					updatePanelBoundsFromStocker();
+					
 					overlay_viewport_->ensureProperZOrder();
 					
 					if (!overlay_viewport_->isVisible()) 
@@ -291,9 +292,6 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 		overlay_viewport_ = std::make_unique<OverlayViewport>();
 	}
 
-	auto& iframeStocker = IFrameSizeStocker::getInstance();
-	std::cout << "[UIHandler] IFrameSizeStocker ready for receiving iframe data" << std::endl;
-
 	RECT client_rect;
 	GetClientRect(parent_hwnd, &client_rect);
 	
@@ -322,15 +320,12 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	
 	enableSlotTextureRendering(false);  
 	
-	// Initialize mouse detector with window handle
 	if (iframe_mouse_detector_) {
 		iframe_mouse_detector_->setWindowHandle(parent_hwnd);
-		std::cout << "[UIHandler] IFrameMouseDetector initialized with window handle" << std::endl;
 	}		
 
 	startRenderTimer();
 	
-	// Initial bounds update (will be updated again when IFrames send their sizes)
 	updatePanelBoundsFromStocker();
 }
 
@@ -431,12 +426,10 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 			static std::string lastRegionName = "";
 			if (regionName != lastRegionName)
 			{
-				
 				std::cout << "\n [Mouse] Region: " << regionName << " | Position: (" << relativeX << ", " << relativeY << ")" << std::endl;
 				lastRegionName = regionName;
 				handler->transitionMouseState(regionName);
 			}
-			
 		}
 	}
 }
@@ -676,83 +669,108 @@ void UIHandler::updatePanelBoundsFromStocker()
 		return;
 	}
 	
+	// Check if window is maximized
+	bool isMaximized = false;
+	int offsetX = 0;
+	int offsetY = 0;
+	
+	if (parent_hwnd_) {
+		WINDOWPLACEMENT placement;
+		placement.length = sizeof(WINDOWPLACEMENT);
+		
+		if (GetWindowPlacement(parent_hwnd_, &placement)) {
+			isMaximized = (placement.showCmd == SW_SHOWMAXIMIZED);
+			
+			if (isMaximized) {
+				RECT windowRect, clientRect;
+				GetWindowRect(parent_hwnd_, &windowRect);
+				GetClientRect(parent_hwnd_, &clientRect);
+				
+				POINT clientOrigin = {0, 0};
+				ClientToScreen(parent_hwnd_, &clientOrigin);
+				
+				offsetX = clientOrigin.x - windowRect.left;
+				offsetY = clientOrigin.y - windowRect.top;
+			}
+		}
+	}
+	
 	SIMILI::Input::PanelBounds bounds;
 	
-	// Get all iframe data from stocker
 	auto allFrames = iframe_size_stocker_->getAllIFrames();
 	
-	// Map iframe names to panel bounds
+	// Use  oordinates from JavaScript 
+	// Only apply maximized offsets
 	for (const auto& pair : allFrames) {
 		const std::string& name = pair.first;
 		const IFrameData& data = pair.second;
 		
+		int adjustedX = data.x;
+		int adjustedY = data.y;
+		
+		// Only apply maximized offsets (no DPI scaling)at all)
+		if (isMaximized) {
+			adjustedX += offsetX;
+			adjustedY += offsetY;
+		}
+		
 		if (name == "hierarchy_inspector") 
 		{
-			bounds.hierarchy.x = data.x;
-			bounds.hierarchy.y = data.y;
+			bounds.hierarchy.x = adjustedX;
+			bounds.hierarchy.y = adjustedY;
 			bounds.hierarchy.width = data.width;
 			bounds.hierarchy.height = data.height;
 		}
 		else if (name == "viewport_docking") 
 		{
-			bounds.viewport.x = data.x;
-			bounds.viewport.y = data.y;
+			bounds.viewport.x = adjustedX;
+			bounds.viewport.y = adjustedY;
 			bounds.viewport.width = data.width;
 			bounds.viewport.height = data.height;
 		}
 		else if (name == "object_inspector") 
 		{
-			bounds.objectInspector.x = data.x;
-			bounds.objectInspector.y = data.y;
+			bounds.objectInspector.x = adjustedX;
+			bounds.objectInspector.y = adjustedY;
 			bounds.objectInspector.width = data.width;
 			bounds.objectInspector.height = data.height;
 		}
 		else if (name == "history_logger") 
 		{
-			bounds.history.x = data.x;
-			bounds.history.y = data.y;
+			bounds.history.x = adjustedX;
+			bounds.history.y = adjustedY;
 			bounds.history.width = data.width;
 			bounds.history.height = data.height;
 		}
 		else if (name == "project_viewer") 
 		{
-			bounds.projectViewer.x = data.x;
-			bounds.projectViewer.y = data.y;
+			bounds.projectViewer.x = adjustedX;
+			bounds.projectViewer.y = adjustedY;
 			bounds.projectViewer.width = data.width;
 			bounds.projectViewer.height = data.height;
 		}
 	}
 	
 	iframe_mouse_detector_->updatePanelBounds(bounds);
-	std::cout << "[UIHandler] Panel bounds updated from IFrameSizeStocker" << std::endl;
+	
+	std::cout << "[UIHandler] Panel bounds updated - Viewport at (" 
+			  << bounds.viewport.x << "," << bounds.viewport.y 
+			  << ") size " << bounds.viewport.width << "x" << bounds.viewport.height 
+			  << " (Maximized:" << (isMaximized ? "YES" : "NO") 
+			  << ", Offsets: X=" << offsetX << ", Y=" << offsetY << ")" << std::endl;
 }
 
 void UIHandler::setIFrameMouseDetector(SIMILI::Input::IFrameMouseDetector* detector)
 {
 	iframe_mouse_detector_ = detector;
-	std::cout << "[UIHandler] IFrameMouseDetector set from external source" << std::endl;
 }
 
 void UIHandler::logIFrameSizes()
 {
 	if (!iframe_size_stocker_) {
-		std::cout << "[UIHandler] IFrameSizeStocker not available" << std::endl;
 		return;
 	}
 	
-	std::cout << "[UIHandler] ===== IFrame Sizes =====" << std::endl;
-	
-	auto allFrames = iframe_size_stocker_->getAllIFrames();
-	for (const auto& pair : allFrames) {
-		const std::string& name = pair.first;
-		const IFrameData& data = pair.second;
-		std::cout << "  " << name << ": Position(" << data.x << ", " << data.y 
-				  << ") Size(" << data.width << " x " << data.height << ")" << std::endl;
-	}
-	
-	std::cout << "[UIHandler] ========================" << std::endl;
-	
-	// Update panel bounds after logging
 	updatePanelBoundsFromStocker();
 }
 
