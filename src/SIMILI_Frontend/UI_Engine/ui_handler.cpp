@@ -1,4 +1,5 @@
 #include "ui_handler.hpp"
+#include "simple_window_delegate.hpp"
 #include "viewportLogic/HTMLTextureRenderer/HtmlTextureRenderer.hpp"
 #include "viewportLogic/HTMLTextureRenderer/SlotTexture.hpp"
 #include "viewportLogic/KeyManagement/KeyManager.hpp"
@@ -36,6 +37,8 @@ UIHandler::UIHandler() : parent_hwnd_(nullptr), timer_id_(0),
 	render_message_router_(nullptr), 
 	iframe_mouse_detector_(nullptr),
 	iframe_size_stocker_(&IFrameSizeStocker::getInstance()),
+	iframe_catcher_(new SIMILI::Input::IFrameCatcher()),
+	window_delegate_(nullptr),
 	current_mouse_state_(nullptr),
 	above_overlay_state_(nullptr),
 	outside_overlay_state_(nullptr),
@@ -55,7 +58,6 @@ UIHandler::~UIHandler()
 {
 	stopRenderTimer();
 	
-	// Clean up mouse states
 	if (above_overlay_state_) 
 	{
 		delete above_overlay_state_;
@@ -65,6 +67,11 @@ UIHandler::~UIHandler()
 	{
 		delete outside_overlay_state_;
 		outside_overlay_state_ = nullptr;
+	}
+	if (iframe_catcher_)
+	{
+		delete iframe_catcher_;
+		iframe_catcher_ = nullptr;
 	}
 	current_mouse_state_ = nullptr;
 }
@@ -431,6 +438,17 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 				handler->transitionMouseState(regionName);
 			}
 		}
+		
+		static int maxCheckCounter = 0;
+		maxCheckCounter++;
+		if (maxCheckCounter >= 30)
+		{
+			maxCheckCounter = 0;
+			if (handler->window_delegate_)
+			{
+				handler->window_delegate_->checkAndCaptureIfMaximized();
+			}
+		}
 	}
 }
 
@@ -772,6 +790,17 @@ void UIHandler::logIFrameSizes()
 	}
 	
 	updatePanelBoundsFromStocker();
+}
+
+void UIHandler::captureIFramePositions()
+{
+	if (!iframe_catcher_ || !parent_hwnd_)
+	{
+		std::cout << "[UIHandler] Cannot capture iframe positions - invalid state" << std::endl;
+		return;
+	}
+	
+	iframe_catcher_->captureAllFrames(parent_hwnd_);
 }
 
 void UIHandler::transitionMouseState(const std::string& regionName)

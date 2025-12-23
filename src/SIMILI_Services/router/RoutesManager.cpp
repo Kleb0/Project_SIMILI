@@ -321,6 +321,7 @@ namespace SIMILI {
 					if (handler) 
 					{
 						handler->updatePanelBoundsFromStocker();
+						handler->captureIFramePositions();
 					}
 					
 					resp.statusCode = 200;

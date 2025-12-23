@@ -8,12 +8,15 @@
 #include "include/views/cef_window.h"
 #include "viewportLogic/overlay_viewport.hpp"
 #include "viewportLogic/Keymanagement/IFrameMouseDetector.hpp"
+#include "viewportLogic/Keymanagement/IFrameCatcher.hpp"
 #include "viewportLogic/Keymanagement/MouseStates/Mouse_State.hpp"
 #include "viewportLogic/Keymanagement/MouseStates/Mouse_Above_Overlay_State.hpp"
 #include "viewportLogic/Keymanagement/MouseStates/Mouse_Outside_Overlay_State.hpp"
 #include <list>
 #include <sstream>
 #include <memory>
+
+class SimpleWindowDelegate;
 
 // Forward declarations
 class ThreeDScene;
@@ -91,7 +94,11 @@ public:
 	void logIFrameSizes();
 	void updatePanelBoundsFromStocker();
 	
-	// Mouse state management
+	void captureIFramePositions();
+	SIMILI::Input::IFrameCatcher* getIFrameCatcher() { return iframe_catcher_; }
+	
+	void setWindowDelegate(SimpleWindowDelegate* delegate) { window_delegate_ = delegate; }
+	
 	void transitionMouseState(const std::string& regionName);
 	SIMILI::Input::Mouse_State* getCurrentMouseState() const { return current_mouse_state_; }
 	
@@ -125,6 +132,8 @@ private:
 	// Mouse detection
 	SIMILI::Input::IFrameMouseDetector* iframe_mouse_detector_;
 	IFrameSizeStocker* iframe_size_stocker_;
+	SIMILI::Input::IFrameCatcher* iframe_catcher_;
+	SimpleWindowDelegate* window_delegate_;
 	
 	// Mouse states
 	SIMILI::Input::Mouse_State* current_mouse_state_;

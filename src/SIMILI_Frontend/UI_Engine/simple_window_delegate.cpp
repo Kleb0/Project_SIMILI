@@ -2,7 +2,7 @@
 #include "ui_handler.hpp"
 
 SimpleWindowDelegate::SimpleWindowDelegate(CefRefPtr<CefBrowserView> browser_view)
-	: browser_view_(browser_view) {
+	: browser_view_(browser_view), window_hwnd_(nullptr), ui_handler_(nullptr), maximization_captured_(false) {
 }
 
 void SimpleWindowDelegate::OnWindowCreated(CefRefPtr<CefWindow> window) {
@@ -14,9 +14,9 @@ void SimpleWindowDelegate::OnWindowCreated(CefRefPtr<CefWindow> window) {
 	
 	browser_view_->RequestFocus();
 	
-	HWND window_hwnd = window->GetWindowHandle();
+	window_hwnd_ = window->GetWindowHandle();
 	
-	if (window_hwnd) 
+	if (window_hwnd_) 
 	{
 		CefRefPtr<CefBrowser> browser = browser_view_->GetBrowser();
 		if (browser) 
@@ -26,8 +26,7 @@ void SimpleWindowDelegate::OnWindowCreated(CefRefPtr<CefWindow> window) {
 			CefRefPtr<CefClient> client = browser->GetHost()->GetClient();
 			UIHandler* handler = static_cast<UIHandler*>(client.get());
 			if (handler) 
-			{
-				handler->createOverlayViewport(browser_hwnd);
+			{				ui_handler_ = handler;				handler->createOverlayViewport(browser_hwnd);
 			} 
 			else 
 			{
@@ -114,4 +113,19 @@ void SimpleWindowDelegate::getMaximizedBorderOffsets(int& offsetX, int& offsetY,
               << " Y=" << offsetY 
               << " W=" << offsetWidth 
               << " H=" << offsetHeight << std::endl;
+}
+
+void SimpleWindowDelegate::checkAndCaptureIfMaximized()
+{
+	if (maximization_captured_ || !window_hwnd_ || !ui_handler_)
+	{
+		return;
+	}
+	
+	if (isWindowMaximized())
+	{
+		std::cout << "\n[SimpleWindowDelegate] Window maximized detected - recapturing iframe positions..." << std::endl;
+		maximization_captured_ = true;
+		ui_handler_->captureIFramePositions();
+	}
 }
