@@ -1,8 +1,12 @@
 #include "simple_window_delegate.hpp"
 #include "ui_handler.hpp"
+#include <commctrl.h>
+
+#pragma comment(lib, "comctl32.lib")
 
 SimpleWindowDelegate::SimpleWindowDelegate(CefRefPtr<CefBrowserView> browser_view)
-	: browser_view_(browser_view), window_hwnd_(nullptr), ui_handler_(nullptr), maximization_captured_(false) {
+	: browser_view_(browser_view), window_hwnd_(nullptr), ui_handler_(nullptr), maximization_captured_(false),
+	  last_window_x_(0), last_window_y_(0) {
 }
 
 void SimpleWindowDelegate::OnWindowCreated(CefRefPtr<CefWindow> window) {
@@ -18,6 +22,17 @@ void SimpleWindowDelegate::OnWindowCreated(CefRefPtr<CefWindow> window) {
 	
 	if (window_hwnd_) 
 	{
+		// Initialize last window position
+		RECT windowRect;
+		if (GetWindowRect(window_hwnd_, &windowRect))
+		{
+			last_window_x_ = windowRect.left;
+			last_window_y_ = windowRect.top;
+		}
+		
+		// Install subclass to monitor window movement
+		SetWindowSubclass(window_hwnd_, WindowSubclassProc, 1, reinterpret_cast<DWORD_PTR>(this));
+		
 		CefRefPtr<CefBrowser> browser = browser_view_->GetBrowser();
 		if (browser) 
 		{
@@ -45,6 +60,12 @@ void SimpleWindowDelegate::OnWindowCreated(CefRefPtr<CefWindow> window) {
 }
 
 void SimpleWindowDelegate::OnWindowDestroyed(CefRefPtr<CefWindow> window) {
+	if (window_hwnd_)
+	{
+		// Remove subclass before window destruction
+		RemoveWindowSubclass(window_hwnd_, WindowSubclassProc, 1);
+		std::cout << "[SimpleWindowDelegate] Window subclass removed" << std::endl;
+	}
 	browser_view_ = nullptr;
 }
 
@@ -128,4 +149,57 @@ void SimpleWindowDelegate::checkAndCaptureIfMaximized()
 		maximization_captured_ = true;
 		ui_handler_->captureIFramePositions();
 	}
+}
+
+LRESULT CALLBACK SimpleWindowDelegate::WindowSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
+{
+	SimpleWindowDelegate* delegate = reinterpret_cast<SimpleWindowDelegate*>(dwRefData);
+	
+	switch (msg)
+	{
+		case WM_EXITSIZEMOVE:
+		{
+			// Called ONLY when user finishes moving or resizing the window
+			if (delegate && delegate->ui_handler_)
+			{
+				RECT windowRect;
+				if (GetWindowRect(hwnd, &windowRect))
+				{
+					int newX = windowRect.left;
+					int newY = windowRect.top;
+					
+					// Check if window actually moved (avoid redundant captures)
+					if (newX != delegate->last_window_x_ || newY != delegate->last_window_y_)
+					{
+						delegate->last_window_x_ = newX;
+						delegate->last_window_y_ = newY;
+						
+						std::cout << "[SimpleWindowDelegate] Window moved to (" << newX << ", " << newY 
+						          << ") - recapturing iframe positions..." << std::endl;
+						
+						delegate->ui_handler_->captureIFramePositions();
+					}
+				}
+			}
+			break;
+		}
+		
+		case WM_WINDOWPOSCHANGED:
+		{
+			// Handle window state changes (maximize/restore)
+			if (delegate && delegate->ui_handler_)
+			{
+				WINDOWPOS* pos = reinterpret_cast<WINDOWPOS*>(lParam);
+				
+				// Check if position changed (not just size)
+				if (pos && !(pos->flags & SWP_NOMOVE))
+				{
+					delegate->checkAndCaptureIfMaximized();
+				}
+			}
+			break;
+		}
+	}
+	
+	return DefSubclassProc(hwnd, msg, wParam, lParam);
 }

@@ -23,12 +23,17 @@ public:
     
     void checkAndCaptureIfMaximized();
     void setUIHandler(UIHandler* handler) { ui_handler_ = handler; }
+    
+    // Window movement detection
+    static LRESULT CALLBACK WindowSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
 
 private:
     CefRefPtr<CefBrowserView> browser_view_;
     HWND window_hwnd_;
     UIHandler* ui_handler_;
     bool maximization_captured_;
+    int last_window_x_;
+    int last_window_y_;
 
     IMPLEMENT_REFCOUNTING(SimpleWindowDelegate);
     DISALLOW_COPY_AND_ASSIGN(SimpleWindowDelegate);
