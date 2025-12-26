@@ -8,7 +8,7 @@
 #include "include/views/cef_window.h"
 #include "viewportLogic/overlay_viewport.hpp"
 #include "viewportLogic/Keymanagement/IFrameMouseDetector.hpp"
-#include "viewportLogic/Keymanagement/IFrameCatcher.hpp"
+#include "viewportLogic/FrameDatas/FrameDatas.hpp"
 #include "viewportLogic/Keymanagement/MouseStates/Mouse_State.hpp"
 #include "viewportLogic/Keymanagement/MouseStates/Mouse_Above_Overlay_State.hpp"
 #include "viewportLogic/Keymanagement/MouseStates/Mouse_Outside_Overlay_State.hpp"
@@ -95,7 +95,7 @@ public:
 	void updatePanelBoundsFromStocker();
 	
 	void captureIFramePositions();
-	SIMILI::Input::IFrameCatcher* getIFrameCatcher() { return iframe_catcher_; }
+	SIMILI::Frontend::FrameDatas* getFrameDatas() { return frame_datas_; }
 	
 	void setWindowDelegate(SimpleWindowDelegate* delegate) { window_delegate_ = delegate; }
 	
@@ -132,7 +132,7 @@ private:
 	// Mouse detection
 	SIMILI::Input::IFrameMouseDetector* iframe_mouse_detector_;
 	IFrameSizeStocker* iframe_size_stocker_;
-	SIMILI::Input::IFrameCatcher* iframe_catcher_;
+	SIMILI::Frontend::FrameDatas* frame_datas_;
 	SimpleWindowDelegate* window_delegate_;
 	
 	// Mouse states

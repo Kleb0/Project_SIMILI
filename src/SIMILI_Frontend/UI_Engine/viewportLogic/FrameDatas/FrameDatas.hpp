@@ -1,12 +1,12 @@
 #pragma once
 
-#include "IFrameSizeStocker.hpp"
+#include "../Keymanagement/IFrameSizeStocker.hpp"
 #include <windows.h>
 #include <string>
 #include <map>
 
 namespace SIMILI {
-namespace Input {
+namespace Frontend {
 
 struct IFrameScreenData
 {
@@ -32,11 +32,11 @@ struct IFrameScreenData
 	int screenHeight;
 };
 
-class IFrameCatcher
+class FrameDatas
 {
 public:
-	IFrameCatcher();
-	~IFrameCatcher() = default;
+	FrameDatas();
+	~FrameDatas() = default;
 
 	void captureAllFrames(HWND cefWindowHandle);
 	

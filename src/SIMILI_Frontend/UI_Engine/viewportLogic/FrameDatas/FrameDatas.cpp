@@ -1,20 +1,20 @@
-#include "IFrameCatcher.hpp"
+#include "FrameDatas.hpp"
 #include <iostream>
 #include <iomanip>
 
 namespace SIMILI {
-namespace Input {
+namespace Frontend {
 
-IFrameCatcher::IFrameCatcher()
+FrameDatas::FrameDatas()
 	: sizeStocker_(&IFrameSizeStocker::getInstance())
 {
 }
 
-void IFrameCatcher::captureAllFrames(HWND cefWindowHandle)
+void FrameDatas::captureAllFrames(HWND cefWindowHandle)
 {
 	if (!cefWindowHandle)
 	{
-		std::cout << "[IFrameCatcher] Invalid HWND provided" << std::endl;
+		std::cout << "[FrameDatas] Invalid HWND provided" << std::endl;
 		return;
 	}
 
@@ -22,7 +22,7 @@ void IFrameCatcher::captureAllFrames(HWND cefWindowHandle)
 	
 	if (allFrames.empty())
 	{
-		std::cout << "[IFrameCatcher] No frames available in IFrameSizeStocker" << std::endl;
+		std::cout << "[FrameDatas] No frames available in IFrameSizeStocker" << std::endl;
 		return;
 	}
 
@@ -55,7 +55,7 @@ void IFrameCatcher::captureAllFrames(HWND cefWindowHandle)
 	printAllFrameData();
 }
 
-bool IFrameCatcher::getFrameData(const std::string& name, IFrameScreenData& outData) const
+bool FrameDatas::getFrameData(const std::string& name, IFrameScreenData& outData) const
 {
 	auto it = frameDataMap_.find(name);
 	if (it != frameDataMap_.end())
@@ -66,9 +66,9 @@ bool IFrameCatcher::getFrameData(const std::string& name, IFrameScreenData& outD
 	return false;
 }
 
-void IFrameCatcher::printAllFrameData() const
+void FrameDatas::printAllFrameData() const
 {
-	std::cout << "\n========== IFrameCatcher - Captured Frame Data ==========" << std::endl;
+	std::cout << "\n========== FrameDatas - Captured Frame Data ==========" << std::endl;
 	std::cout << std::fixed << std::setprecision(2);
 	
 	for (const auto& pair : frameDataMap_)
@@ -89,7 +89,7 @@ void IFrameCatcher::printAllFrameData() const
 	std::cout << "\n========================================================\n" << std::endl;
 }
 
-float IFrameCatcher::getDPIScale(HWND hwnd) const
+float FrameDatas::getDPIScale(HWND hwnd) const
 {
 	HDC hdc = GetDC(hwnd);
 	if (!hdc)
@@ -103,7 +103,7 @@ float IFrameCatcher::getDPIScale(HWND hwnd) const
 	return static_cast<float>(dpiX) / 96.0f;
 }
 
-void IFrameCatcher::captureWindowData(HWND hwnd, IFrameScreenData& data)
+void FrameDatas::captureWindowData(HWND hwnd, IFrameScreenData& data)
 {
 	RECT windowRect;
 	GetWindowRect(hwnd, &windowRect);

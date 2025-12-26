@@ -37,7 +37,7 @@ UIHandler::UIHandler() : parent_hwnd_(nullptr), timer_id_(0),
 	render_message_router_(nullptr), 
 	iframe_mouse_detector_(nullptr),
 	iframe_size_stocker_(&IFrameSizeStocker::getInstance()),
-	iframe_catcher_(new SIMILI::Input::IFrameCatcher()),
+	frame_datas_(new SIMILI::Frontend::FrameDatas()),
 	window_delegate_(nullptr),
 	current_mouse_state_(nullptr),
 	above_overlay_state_(nullptr),
@@ -68,10 +68,10 @@ UIHandler::~UIHandler()
 		delete outside_overlay_state_;
 		outside_overlay_state_ = nullptr;
 	}
-	if (iframe_catcher_)
+	if (frame_datas_)
 	{
-		delete iframe_catcher_;
-		iframe_catcher_ = nullptr;
+		delete frame_datas_;
+		frame_datas_ = nullptr;
 	}
 	current_mouse_state_ = nullptr;
 }
@@ -794,13 +794,13 @@ void UIHandler::logIFrameSizes()
 
 void UIHandler::captureIFramePositions()
 {
-	if (!iframe_catcher_ || !parent_hwnd_)
+	if (!frame_datas_ || !parent_hwnd_)
 	{
 		std::cout << "[UIHandler] Cannot capture iframe positions - invalid state" << std::endl;
 		return;
 	}
 	
-	iframe_catcher_->captureAllFrames(parent_hwnd_);
+	frame_datas_->captureAllFrames(parent_hwnd_);
 }
 
 void UIHandler::transitionMouseState(const std::string& regionName)
