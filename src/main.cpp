@@ -197,6 +197,11 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 
 	CefRefPtr<SimpleWindowDelegate> window_delegate(new SimpleWindowDelegate(browser_view));
 	handler->setWindowDelegate(window_delegate.get());
+	window_delegate->setUIHandler(handler.get());
+	
+	// Initialize FrameDatas with window_delegate
+	handler->initializeFrameDatas(window_delegate.get());
+	
 	CefWindow::CreateTopLevelWindow(window_delegate);
 
 

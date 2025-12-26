@@ -203,3 +203,45 @@ LRESULT CALLBACK SimpleWindowDelegate::WindowSubclassProc(HWND hwnd, UINT msg, W
 	
 	return DefSubclassProc(hwnd, msg, wParam, lParam);
 }
+
+void SimpleWindowDelegate::updateIFrameData(const std::string& name, int x, int y, int width, int height, int clientX, int clientY)
+{
+	std::lock_guard<std::mutex> lock(iframe_mutex_);
+	
+	IFrameData data;
+	data.name = name;
+	data.x = x;
+	data.y = y;
+	data.width = width;
+	data.height = height;
+	data.clientX = clientX;
+	data.clientY = clientY;
+	
+	iframeDataMap_[name] = data;
+}
+
+bool SimpleWindowDelegate::getIFrameData(const std::string& name, IFrameData& outData) const
+{
+	std::lock_guard<std::mutex> lock(iframe_mutex_);
+	
+	auto it = iframeDataMap_.find(name);
+	if (it != iframeDataMap_.end())
+	{
+		outData = it->second;
+		return true;
+	}
+	
+	return false;
+}
+
+std::map<std::string, IFrameData> SimpleWindowDelegate::getAllIFrames() const
+{
+	std::lock_guard<std::mutex> lock(iframe_mutex_);
+	return iframeDataMap_;
+}
+
+void SimpleWindowDelegate::clearAllIFrames()
+{
+	std::lock_guard<std::mutex> lock(iframe_mutex_);
+	iframeDataMap_.clear();
+}

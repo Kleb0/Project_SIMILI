@@ -3,7 +3,7 @@
 #include "../../WorldObjects/Mesh/Mesh.hpp"
 #include "../../WorldObjects/Camera/Camera.hpp"
 #include "../../Engine/PrimitivesCreation/CreatePrimitive.hpp"
-#include "../../SIMILI_Frontend/UI_Engine/viewportLogic/Keymanagement/IFrameSizeStocker.hpp"
+#include "../../SIMILI_Frontend/UI_Engine/simple_window_delegate.hpp"
 #include <iostream>
 #include <sstream>
 #include <GLFW/glfw3.h>
@@ -277,6 +277,7 @@ namespace SIMILI {
 
 		void RoutesManager::registerIFrameRoutes(RouterSim& router, CefRefPtr<UIHandler>& handler)
 		{
+			// Update iframe dimensions route
 			router.post("/api/iframes/update", [&handler](const Message& msg) -> Response 
 			{
 				Response resp;
@@ -295,7 +296,15 @@ namespace SIMILI {
 						return resp;
 					}
 					
-					auto& stocker = IFrameSizeStocker::getInstance();
+					// Get window delegate from handler
+					SimpleWindowDelegate* windowDelegate = handler ? handler->getWindowDelegate() : nullptr;
+					if (!windowDelegate)
+					{
+						resp.statusCode = 500;
+						resp.statusMessage = "Internal Server Error";
+						resp.body = "{\"success\": false, \"error\": \"Window delegate not available\"}";
+						return resp;
+					}
 					
 					for (const auto& iframe : requestData["iframes"])
 					{
@@ -310,9 +319,12 @@ namespace SIMILI {
 							int clientX = iframe.contains("clientX") ? iframe["clientX"].get<int>() : x;
 							int clientY = iframe.contains("clientY") ? iframe["clientY"].get<int>() : y;
 							
-							stocker.updateIFrameData(name, x, y, width, height, clientX, clientY);
-							
-							std::cout << "[RoutesManager] IFrame updated: " << name 
+							windowDelegate->updateIFrameData(name, x, y, width, height, clientX, clientY);
+													if (handler && handler->getFrameDatas() && handler->getParentHWND())
+						{
+							handler->getFrameDatas()->updateFrameData(name, x, y, width, height, clientX, clientY, handler->getParentHWND());
+						}
+													std::cout << "[RoutesManager] IFrame updated: " << name 
 									  << " at (" << x << "," << y << ") size " << width << "x" << height << std::endl;
 						}
 					}
@@ -339,14 +351,22 @@ namespace SIMILI {
 				return resp;
 			}, "Update iframe dimensions");
 			
-			router.get("/api/iframes/all", [](const Message& msg) -> Response 
+			router.get("/api/iframes/all", [&handler](const Message& msg) -> Response 
 			{
 				Response resp;
 				resp.headers["Access-Control-Allow-Origin"] = "*";
 				resp.headers["Content-Type"] = "application/json";
 				
-				auto& stocker = IFrameSizeStocker::getInstance();
-				auto allIframes = stocker.getAllIFrames();
+				SimpleWindowDelegate* windowDelegate = handler ? handler->getWindowDelegate() : nullptr;
+				if (!windowDelegate)
+				{
+					resp.statusCode = 500;
+					resp.statusMessage = "Internal Server Error";
+					resp.body = "{\"success\": false, \"error\": \"Window delegate not available\"}";
+					return resp;
+				}
+				
+				auto allIframes = windowDelegate->getAllIFrames();
 				
 				json responseData = json::array();
 				

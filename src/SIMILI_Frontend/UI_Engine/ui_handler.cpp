@@ -3,7 +3,6 @@
 #include "viewportLogic/HTMLTextureRenderer/HtmlTextureRenderer.hpp"
 #include "viewportLogic/HTMLTextureRenderer/SlotTexture.hpp"
 #include "viewportLogic/KeyManagement/KeyManager.hpp"
-#include "viewportLogic/Keymanagement/IFrameSizeStocker.hpp"
 #include "../../Engine/ThreeDScene.hpp"
 #include "../../Engine/OpenGLContext.hpp"
 #include "../../WorldObjects/Camera/Camera.hpp"
@@ -36,8 +35,7 @@ UIHandler::UIHandler() : parent_hwnd_(nullptr), timer_id_(0),
 	renderer_(nullptr), main_camera_(nullptr), cube_mesh_ptr_(nullptr), scene_initialized_(false),
 	render_message_router_(nullptr), 
 	iframe_mouse_detector_(nullptr),
-	iframe_size_stocker_(&IFrameSizeStocker::getInstance()),
-	frame_datas_(new SIMILI::Frontend::FrameDatas()),
+	frame_datas_(nullptr),
 	window_delegate_(nullptr),
 	current_mouse_state_(nullptr),
 	above_overlay_state_(nullptr),
@@ -589,6 +587,18 @@ void UIHandler::initializeSceneObjects()
 	scene_initialized_ = true;
 }
 
+void UIHandler::initializeFrameDatas(SimpleWindowDelegate* windowDelegate)
+{
+	if (frame_datas_)
+	{
+		delete frame_datas_;
+		frame_datas_ = nullptr;
+	}
+	
+	frame_datas_ = new SIMILI::Frontend::FrameDatas(windowDelegate);
+	std::cout << "[UIHandler] FrameDatas initialized with SimpleWindowDelegate" << std::endl;
+}
+
 void UIHandler::reinitializeSingleObject(ThreeDObject* obj)
 {
 	if (!obj)
@@ -683,87 +693,50 @@ CefEventHandle os_event)
 
 void UIHandler::updatePanelBoundsFromStocker()
 {
-	if (!iframe_mouse_detector_ || !iframe_size_stocker_) {
+	if (!iframe_mouse_detector_ || !window_delegate_) {
 		return;
-	}
-	
-	// Check if window is maximized
-	bool isMaximized = false;
-	int offsetX = 0;
-	int offsetY = 0;
-	
-	if (parent_hwnd_) {
-		WINDOWPLACEMENT placement;
-		placement.length = sizeof(WINDOWPLACEMENT);
-		
-		if (GetWindowPlacement(parent_hwnd_, &placement)) {
-			isMaximized = (placement.showCmd == SW_SHOWMAXIMIZED);
-			
-			if (isMaximized) {
-				RECT windowRect, clientRect;
-				GetWindowRect(parent_hwnd_, &windowRect);
-				GetClientRect(parent_hwnd_, &clientRect);
-				
-				POINT clientOrigin = {0, 0};
-				ClientToScreen(parent_hwnd_, &clientOrigin);
-				
-				offsetX = clientOrigin.x - windowRect.left;
-				offsetY = clientOrigin.y - windowRect.top;
-			}
-		}
 	}
 	
 	SIMILI::Input::PanelBounds bounds;
 	
-	auto allFrames = iframe_size_stocker_->getAllIFrames();
+	auto allFrames = window_delegate_->getAllIFrames();
 	
-	// Use  oordinates from JavaScript 
-	// Only apply maximized offsets
 	for (const auto& pair : allFrames) {
 		const std::string& name = pair.first;
 		const IFrameData& data = pair.second;
 		
-		int adjustedX = data.x;
-		int adjustedY = data.y;
-		
-		// Only apply maximized offsets (no DPI scaling)at all)
-		if (isMaximized) {
-			adjustedX += offsetX;
-			adjustedY += offsetY;
-		}
-		
 		if (name == "hierarchy_inspector") 
 		{
-			bounds.hierarchy.x = adjustedX;
-			bounds.hierarchy.y = adjustedY;
+			bounds.hierarchy.x = data.x;
+			bounds.hierarchy.y = data.y;
 			bounds.hierarchy.width = data.width;
 			bounds.hierarchy.height = data.height;
 		}
 		else if (name == "viewport_docking") 
 		{
-			bounds.viewport.x = adjustedX;
-			bounds.viewport.y = adjustedY;
+			bounds.viewport.x = data.x;
+			bounds.viewport.y = data.y;
 			bounds.viewport.width = data.width;
 			bounds.viewport.height = data.height;
 		}
 		else if (name == "object_inspector") 
 		{
-			bounds.objectInspector.x = adjustedX;
-			bounds.objectInspector.y = adjustedY;
+			bounds.objectInspector.x = data.x;
+			bounds.objectInspector.y = data.y;
 			bounds.objectInspector.width = data.width;
 			bounds.objectInspector.height = data.height;
 		}
 		else if (name == "history_logger") 
 		{
-			bounds.history.x = adjustedX;
-			bounds.history.y = adjustedY;
+			bounds.history.x = data.x;
+			bounds.history.y = data.y;
 			bounds.history.width = data.width;
 			bounds.history.height = data.height;
 		}
 		else if (name == "project_viewer") 
 		{
-			bounds.projectViewer.x = adjustedX;
-			bounds.projectViewer.y = adjustedY;
+			bounds.projectViewer.x = data.x;
+			bounds.projectViewer.y = data.y;
 			bounds.projectViewer.width = data.width;
 			bounds.projectViewer.height = data.height;
 		}
@@ -773,9 +746,7 @@ void UIHandler::updatePanelBoundsFromStocker()
 	
 	std::cout << "[UIHandler] Panel bounds updated - Viewport at (" 
 			  << bounds.viewport.x << "," << bounds.viewport.y 
-			  << ") size " << bounds.viewport.width << "x" << bounds.viewport.height 
-			  << " (Maximized:" << (isMaximized ? "YES" : "NO") 
-			  << ", Offsets: X=" << offsetX << ", Y=" << offsetY << ")" << std::endl;
+			  << ") size " << bounds.viewport.width << "x" << bounds.viewport.height << std::endl;
 }
 
 void UIHandler::setIFrameMouseDetector(SIMILI::Input::IFrameMouseDetector* detector)
@@ -785,7 +756,7 @@ void UIHandler::setIFrameMouseDetector(SIMILI::Input::IFrameMouseDetector* detec
 
 void UIHandler::logIFrameSizes()
 {
-	if (!iframe_size_stocker_) {
+	if (!window_delegate_) {
 		return;
 	}
 	

@@ -23,6 +23,7 @@
         "${workspaceFolder}/src/Engine/ViewportLogic",
         "${workspaceFolder}/src/SIMILI_Frontend/UI_Engine/viewportLogic",
         "${workspaceFolder}/src/SIMILI_Frontend/UI_Engine/viewportLogic/viewportRendering",
+        "${workspaceFolder}/src/SIMILI_Frontend/UI_Engine/viewportLogic/FrameDatas",
         "${workspaceFolder}/src/Engine/PrimitivesCreation",
         "${workspaceFolder}/src/Layout_Theme",
         "${workspaceFolder}/src/WorldObjects",

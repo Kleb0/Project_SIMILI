@@ -4,8 +4,22 @@
 #include "include/views/cef_window.h"
 #include "include/base/cef_callback.h"
 #include <iostream>
+#include <string>
+#include <map>
+#include <mutex>
 
 class UIHandler;
+
+struct IFrameData
+{
+	std::string name;
+	int x;
+	int y;
+	int width;
+	int height;
+	int clientX;
+	int clientY;
+};
 
 class SimpleWindowDelegate : public CefWindowDelegate {
 public:
@@ -24,6 +38,12 @@ public:
     void checkAndCaptureIfMaximized();
     void setUIHandler(UIHandler* handler) { ui_handler_ = handler; }
     
+    // IFrame management methods
+    void updateIFrameData(const std::string& name, int x, int y, int width, int height, int clientX = 0, int clientY = 0);
+    bool getIFrameData(const std::string& name, IFrameData& outData) const;
+    std::map<std::string, IFrameData> getAllIFrames() const;
+    void clearAllIFrames();
+    
     // Window movement detection
     static LRESULT CALLBACK WindowSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
 
@@ -34,6 +54,10 @@ private:
     bool maximization_captured_;
     int last_window_x_;
     int last_window_y_;
+    
+    // IFrame data storage
+    mutable std::mutex iframe_mutex_;
+    std::map<std::string, IFrameData> iframeDataMap_;
 
     IMPLEMENT_REFCOUNTING(SimpleWindowDelegate);
     DISALLOW_COPY_AND_ASSIGN(SimpleWindowDelegate);

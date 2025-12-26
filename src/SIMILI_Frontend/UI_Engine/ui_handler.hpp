@@ -18,12 +18,10 @@
 
 class SimpleWindowDelegate;
 
-// Forward declarations
 class ThreeDScene;
 class OpenGLContext;
 class Camera;
 class Mesh;
-class IFrameSizeStocker;
 
 class UIHandler : public CefApp,
 				  public CefClient, 
@@ -87,17 +85,18 @@ public:
 	
 	void setSceneObjects(OpenGLContext* renderer, ThreeDScene* scene, Camera* camera, Mesh** cubeMesh);
 	void initializeSceneObjects();
+	void initializeFrameDatas(SimpleWindowDelegate* windowDelegate);
 	void reinitializeSingleObject(ThreeDObject* obj);
 	void notifySceneChanged();
 	void setIFrameMouseDetector(SIMILI::Input::IFrameMouseDetector* detector);
+	void setWindowDelegate(SimpleWindowDelegate* delegate) { window_delegate_ = delegate; }
+	SimpleWindowDelegate* getWindowDelegate() const { return window_delegate_; }
 	
 	void logIFrameSizes();
 	void updatePanelBoundsFromStocker();
 	
 	void captureIFramePositions();
 	SIMILI::Frontend::FrameDatas* getFrameDatas() { return frame_datas_; }
-	
-	void setWindowDelegate(SimpleWindowDelegate* delegate) { window_delegate_ = delegate; }
 	
 	void transitionMouseState(const std::string& regionName);
 	SIMILI::Input::Mouse_State* getCurrentMouseState() const { return current_mouse_state_; }
@@ -131,7 +130,6 @@ private:
 	
 	// Mouse detection
 	SIMILI::Input::IFrameMouseDetector* iframe_mouse_detector_;
-	IFrameSizeStocker* iframe_size_stocker_;
 	SIMILI::Frontend::FrameDatas* frame_datas_;
 	SimpleWindowDelegate* window_delegate_;
 	

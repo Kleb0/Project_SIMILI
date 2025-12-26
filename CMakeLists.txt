@@ -118,6 +118,7 @@ file(GLOB CEF_UI_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/Raycasting/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/ClickHandling/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/ContextualMenuLogic/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/FrameDatas/*.cpp"
 )
 list(REMOVE_ITEM CEF_UI_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/main_ui.cpp")
 list(APPEND SOURCES ${CEF_UI_SOURCES})
@@ -335,6 +336,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/Raycasting
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/ClickHandling
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/ContextualMenuLogic
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/FrameDatas
     ${SDL3_INCLUDE_DIR}
     ${Boost_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
