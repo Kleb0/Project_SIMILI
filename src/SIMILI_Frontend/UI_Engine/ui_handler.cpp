@@ -207,8 +207,8 @@ void UIHandler::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& ti
 					last_viewport_width_ = final_width;
 					last_viewport_height_ = final_height;
 					
-					// Force update of panel bounds after viewport resize
-					updatePanelBoundsFromStocker();
+					// Capture updated iframe positions after resize
+					captureIFramePositions();
 					
 					overlay_viewport_->ensureProperZOrder();
 					
@@ -365,7 +365,8 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 {
 	// Retrieve handler from static map using timer ID
 	auto it = g_timerHandlerMap.find(idEvent);
-	if (it == g_timerHandlerMap.end()) {
+	if (it == g_timerHandlerMap.end()) 
+	{
 		std::cout << "[RenderTimerProc] ERROR: Handler not found for timer ID " << idEvent << std::endl;
 		return;
 	}
@@ -374,81 +375,95 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 
 
 	if (handler && handler->getOverlay()) 
-	{
-		CefDoMessageLoopWork();
-		
-		InvalidateRect(handler->getOverlay()->getHandle(), nullptr, FALSE);
-		
-		if (handler->getOverlay()->getSlotTexture()) 
-		{
-			InvalidateRect(handler->getOverlay()->getSlotTexture()->getHandle(), nullptr, FALSE);
-		}
+	{		
 		
 		static int frameCounter = 0;
 		frameCounter++;
 		
 		auto mouseDetector = handler->getIFrameMouseDetector();	
 
-		if (mouseDetector && frameCounter % 30 == 0) 
+		if (mouseDetector) 
 		{
-			POINT screenPt;
-			GetCursorPos(&screenPt);
-			
-			SIMILI::Input::MouseRegion region = mouseDetector->detectMouseRegion(screenPt.x, screenPt.y);
-			
-			int relativeX, relativeY;
-			mouseDetector->getRelativePosition(screenPt.x, screenPt.y, relativeX, relativeY);
-			
-			std::string regionName = "Unknown";
-			switch (region) 
+			// Get current mouse position in screen coordinates
+			POINT cursorPos;
+			if (GetCursorPos(&cursorPos))
 			{
-				case SIMILI::Input::MouseRegion::Outside:
-					regionName = "Outside";
-					break;
-				case SIMILI::Input::MouseRegion::HierarchyPanel:
-					regionName = "HierarchyPanel";
-					break;
-				case SIMILI::Input::MouseRegion::ViewportPanel:
-					regionName = "ViewportPanel";
-					break;
-				case SIMILI::Input::MouseRegion::ObjectInspectorPanel:
-					regionName = "ObjectInspectorPanel";
-					break;
-				case SIMILI::Input::MouseRegion::HistoryPanel:
-					regionName = "HistoryPanel";
-					break;
-				case SIMILI::Input::MouseRegion::ProjectViewerPanel:
-					regionName = "ProjectViewerPanel";
-					break;
-				case SIMILI::Input::MouseRegion::Splitter:
-					regionName = "Splitter";
-					break;
-				case SIMILI::Input::MouseRegion::Unknown:
-					regionName = "Unknown";
-					break;
-			}
-			
-			static std::string lastRegionName = "";
-			if (regionName != lastRegionName)
-			{
-				std::cout << "\n [Mouse] Region: " << regionName << " | Position: (" << relativeX << ", " << relativeY << ")" << std::endl;
-				lastRegionName = regionName;
-				handler->transitionMouseState(regionName);
+				// Detect which panel the mouse is over (every 60 frames to avoid spam)
+				if (frameCounter % 60 == 0)
+				{
+					std::cout << "\n[RenderTimerProc] Screen cursor: (" << cursorPos.x << ", " << cursorPos.y << ")" << std::endl;
+					
+					// Convert to client coordinates and show the conversion
+					int clientX, clientY;
+					mouseDetector->getRelativePosition(cursorPos.x, cursorPos.y, clientX, clientY);
+					std::cout << "[RenderTimerProc] Client position: (" << clientX << ", " << clientY << ")" << std::endl;
+					
+					// Show all panel bounds
+					const auto& bounds = mouseDetector->getPanelBounds();
+					std::cout << "  Hierarchy [" << bounds.hierarchy.x << "," << bounds.hierarchy.y 
+							  << " -> " << (bounds.hierarchy.x + bounds.hierarchy.width) << "," 
+							  << (bounds.hierarchy.y + bounds.hierarchy.height) << "]: " 
+							  << (bounds.hierarchy.contains(clientX, clientY) ? "MATCH" : "no") << std::endl;
+					std::cout << "  Viewport [" << bounds.viewport.x << "," << bounds.viewport.y 
+							  << " -> " << (bounds.viewport.x + bounds.viewport.width) << "," 
+							  << (bounds.viewport.y + bounds.viewport.height) << "]: " 
+							  << (bounds.viewport.contains(clientX, clientY) ? "MATCH" : "no") << std::endl;
+					std::cout << "  ObjectInspector [" << bounds.objectInspector.x << "," << bounds.objectInspector.y 
+							  << " -> " << (bounds.objectInspector.x + bounds.objectInspector.width) << "," 
+							  << (bounds.objectInspector.y + bounds.objectInspector.height) << "]: " 
+							  << (bounds.objectInspector.contains(clientX, clientY) ? "MATCH" : "no") << std::endl;
+					std::cout << "  History [" << bounds.history.x << "," << bounds.history.y 
+							  << " -> " << (bounds.history.x + bounds.history.width) << "," 
+							  << (bounds.history.y + bounds.history.height) << "]: " 
+							  << (bounds.history.contains(clientX, clientY) ? "MATCH" : "no") << std::endl;
+					std::cout << "  ProjectViewer [" << bounds.projectViewer.x << "," << bounds.projectViewer.y 
+							  << " -> " << (bounds.projectViewer.x + bounds.projectViewer.width) << "," 
+							  << (bounds.projectViewer.y + bounds.projectViewer.height) << "]: " 
+							  << (bounds.projectViewer.contains(clientX, clientY) ? "MATCH" : "no") << std::endl;
+					
+					// Now detect the region
+					auto region = mouseDetector->detectMouseRegion(cursorPos.x, cursorPos.y);
+					
+					// Convert enum to readable string
+					std::string regionName;
+					switch (region)
+					{
+						case SIMILI::Input::MouseRegion::Outside:
+							regionName = "Outside Window";
+							break;
+						case SIMILI::Input::MouseRegion::HierarchyPanel:
+							regionName = "Hierarchy Panel";
+							break;
+						case SIMILI::Input::MouseRegion::ViewportPanel:
+							regionName = "Viewport Panel";
+							break;
+						case SIMILI::Input::MouseRegion::ObjectInspectorPanel:
+							regionName = "Object Inspector Panel";
+							break;
+						case SIMILI::Input::MouseRegion::HistoryPanel:
+							regionName = "History Panel";
+							break;
+						case SIMILI::Input::MouseRegion::ProjectViewerPanel:
+							regionName = "Project Viewer Panel";
+							break;
+						case SIMILI::Input::MouseRegion::Splitter:
+							regionName = "Splitter";
+							break;
+						case SIMILI::Input::MouseRegion::Unknown:
+						default:
+							regionName = "Unknown";
+							break;
+					}
+					
+					std::cout << ">>> Result: " << regionName << std::endl;
+				}
 			}
 		}
 		
-		static int maxCheckCounter = 0;
-		maxCheckCounter++;
-		if (maxCheckCounter >= 30)
-		{
-			maxCheckCounter = 0;
-			if (handler->window_delegate_)
-			{
-				handler->window_delegate_->checkAndCaptureIfMaximized();
-			}
-		}
 	}
 }
+
+ // --- test
 
 void UIHandler::startRenderTimer() 
 {
@@ -772,6 +787,40 @@ void UIHandler::captureIFramePositions()
 	}
 	
 	frame_datas_->captureAllFrames(parent_hwnd_);
+	
+	// Update IFrameMouseDetector with the new data
+	updateIFrameMouseDetectorFromFrameDatas();
+}
+
+void UIHandler::updateIFrameMouseDetectorFromFrameDatas()
+{
+	if (!frame_datas_ || !iframe_mouse_detector_)
+	{
+		return;
+	}
+	
+	// Convert FrameDatas to IFrameMouseDetector format
+	std::map<std::string, SIMILI::Input::IFrameScreenDataSimple> simpleFrameData;
+	
+	const auto& frameDataMap = frame_datas_->getFrameData();
+	for (const auto& pair : frameDataMap)
+	{
+		const SIMILI::Frontend::IFrameScreenData& data = pair.second;
+		SIMILI::Input::IFrameScreenDataSimple simple;
+		
+		simple.name = data.name;
+		simple.clientX = data.clientX;
+		simple.clientY = data.clientY;
+		simple.width = data.width;
+		simple.height = data.height;
+		
+		simpleFrameData[data.name] = simple;
+	}
+	
+	// Update IFrameMouseDetector with the converted data
+	iframe_mouse_detector_->updatePanelBoundsFromFrameData(simpleFrameData);
+	
+	std::cout << "[UIHandler] IFrameMouseDetector updated with " << simpleFrameData.size() << " frame(s)" << std::endl;
 }
 
 void UIHandler::transitionMouseState(const std::string& regionName)

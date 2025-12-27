@@ -2,11 +2,21 @@
 
 #include <windows.h>
 #include <string>
+#include <map>
 
 namespace SIMILI 
 {
 	namespace Input 
 	{
+		// Simple frame data structure for IFrameMouseDetector
+		struct IFrameScreenDataSimple
+		{
+			std::string name;
+			int clientX;
+			int clientY;
+			int width;
+			int height;
+		};
 
 		enum class MouseRegion
 		{
@@ -55,10 +65,10 @@ namespace SIMILI
 				void setWindowHandle(HWND hwnd);
 				void updatePanelBounds(const PanelBounds& bounds);
 				
-				// New: Set maximized state and border offsets
-				void setMaximizedState(bool isMaximized, int offsetX = 0, int offsetY = 0);
-				
-				MouseRegion detectMouseRegion(int screenX, int screenY);
+				// Update panel bounds from FrameDatas map
+				void updatePanelBoundsFromFrameData(const std::map<std::string, struct IFrameScreenDataSimple>& frameDataMap);
+						void setMaximizedState(bool isMaximized, int offsetX = 0, int offsetY = 0);
+							MouseRegion detectMouseRegion(int screenX, int screenY);
 				bool isMouseInsideWindow(int screenX, int screenY) const;
 				bool isMouseOnViewport(int screenX, int screenY) const;
 				

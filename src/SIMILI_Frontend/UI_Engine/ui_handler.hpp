@@ -96,6 +96,7 @@ public:
 	void updatePanelBoundsFromStocker();
 	
 	void captureIFramePositions();
+	void updateIFrameMouseDetectorFromFrameDatas();
 	SIMILI::Frontend::FrameDatas* getFrameDatas() { return frame_datas_; }
 	
 	void transitionMouseState(const std::string& regionName);

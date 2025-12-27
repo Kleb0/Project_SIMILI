@@ -74,6 +74,9 @@
             
             // Notify again after reset
             notifyViewportResize();
+            
+            // Send all iframe sizes to server after resize
+            sendIFrameSizesToServer();
         }, 150); // Wait 150ms after last resize event
     }
 

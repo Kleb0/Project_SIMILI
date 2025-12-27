@@ -27,6 +27,63 @@ namespace SIMILI {
 			panel_bounds_ = bounds;
 		}
 
+		void IFrameMouseDetector::updatePanelBoundsFromFrameData(const std::map<std::string, IFrameScreenDataSimple>& frameDataMap)
+		{
+			// Update panel bounds from frame data map
+			for (const auto& pair : frameDataMap)
+			{
+				const IFrameScreenDataSimple& data = pair.second;
+				
+				if (data.name == "hierarchy_inspector")
+				{
+					panel_bounds_.hierarchy.x = data.clientX;
+					panel_bounds_.hierarchy.y = data.clientY;
+					panel_bounds_.hierarchy.width = data.width;
+					panel_bounds_.hierarchy.height = data.height;
+				}
+				else if (data.name == "viewport_docking")
+				{
+					panel_bounds_.viewport.x = data.clientX;
+					panel_bounds_.viewport.y = data.clientY;
+					panel_bounds_.viewport.width = data.width;
+					panel_bounds_.viewport.height = data.height;
+				}
+				else if (data.name == "object_inspector")
+				{
+					panel_bounds_.objectInspector.x = data.clientX;
+					panel_bounds_.objectInspector.y = data.clientY;
+					panel_bounds_.objectInspector.width = data.width;
+					panel_bounds_.objectInspector.height = data.height;
+				}
+				else if (data.name == "history_logger")
+				{
+					panel_bounds_.history.x = data.clientX;
+					panel_bounds_.history.y = data.clientY;
+					panel_bounds_.history.width = data.width;
+					panel_bounds_.history.height = data.height;
+				}
+				else if (data.name == "project_viewer")
+				{
+					panel_bounds_.projectViewer.x = data.clientX;
+					panel_bounds_.projectViewer.y = data.clientY;
+					panel_bounds_.projectViewer.width = data.width;
+					panel_bounds_.projectViewer.height = data.height;
+				}
+			}
+			
+			std::cout << "[IFrameMouseDetector] Panel bounds updated from FrameDatas:" << std::endl;
+			std::cout << "  Hierarchy: (" << panel_bounds_.hierarchy.x << ", " << panel_bounds_.hierarchy.y 
+					<< ") Size: " << panel_bounds_.hierarchy.width << "x" << panel_bounds_.hierarchy.height << std::endl;
+			std::cout << "  Viewport: (" << panel_bounds_.viewport.x << ", " << panel_bounds_.viewport.y 
+					<< ") Size: " << panel_bounds_.viewport.width << "x" << panel_bounds_.viewport.height << std::endl;
+			std::cout << "  ObjectInspector: (" << panel_bounds_.objectInspector.x << ", " << panel_bounds_.objectInspector.y 
+					<< ") Size: " << panel_bounds_.objectInspector.width << "x" << panel_bounds_.objectInspector.height << std::endl;
+			std::cout << "  History: (" << panel_bounds_.history.x << ", " << panel_bounds_.history.y 
+					<< ") Size: " << panel_bounds_.history.width << "x" << panel_bounds_.history.height << std::endl;
+			std::cout << "  ProjectViewer: (" << panel_bounds_.projectViewer.x << ", " << panel_bounds_.projectViewer.y 
+					<< ") Size: " << panel_bounds_.projectViewer.width << "x" << panel_bounds_.projectViewer.height << std::endl;
+		}
+
 		void IFrameMouseDetector::updateWindowRect()
 		{
 			if (window_handle_)
@@ -111,29 +168,20 @@ namespace SIMILI {
 			
 			POINT pt = { screenX, screenY };
 			ScreenToClient(window_handle_, &pt);
-			clientX = pt.x;
-			clientY = pt.y;
-			
-			// Bounds are already adjusted with DPI and maximized offsets in updatePanelBoundsFromStocker()
-			// So we don't apply offsets here anymore
+				
+			clientX = static_cast<int>(pt.x / dpi_scale_);
+			clientY = static_cast<int>(pt.y / dpi_scale_);
 		}
 
 		void IFrameMouseDetector::getRelativePosition(int screenX, int screenY, int& relativeX, int& relativeY) const
 		{
 			screenToClient(screenX, screenY, relativeX, relativeY);
-			// Remove DPI scaling - not needed if JS sends correct client coordinates
 		}
 
 		void IFrameMouseDetector::getViewportRelativePosition(int screenX, int screenY, int& relativeX, int& relativeY) const
 		{
 			int clientX, clientY;
 			screenToClient(screenX, screenY, clientX, clientY);
-			
-			if (dpi_scale_ != 1.0f)
-			{
-				clientX = static_cast<int>(clientX / dpi_scale_);
-				clientY = static_cast<int>(clientY / dpi_scale_);
-			}
 			
 			relativeX = clientX - panel_bounds_.viewport.x;
 			relativeY = clientY - panel_bounds_.viewport.y;
@@ -149,35 +197,16 @@ namespace SIMILI {
 			}
 			
 			int clientX, clientY;
-			screenToClient(screenX, screenY, clientX, clientY);
-			
-			// Work entirely in logical (CSS) pixels - no DPI scaling anywhere
-			
-			// DEBUG: Log mouse position and panel bounds
-			static int debugCounter = 0;
-			if (++debugCounter % 30 == 0)
+			screenToClient(screenX, screenY, clientX, clientY);			
+
+			if (panel_bounds_.viewport.contains(clientX, clientY))
 			{
-				std::cout << "[IFrameMouseDetector] Client position: (" << clientX << ", " << clientY << ")" << std::endl;
-				std::cout << "  Viewport bounds: x=" << panel_bounds_.viewport.x 
-						  << " y=" << panel_bounds_.viewport.y
-						  << " w=" << panel_bounds_.viewport.width
-						  << " h=" << panel_bounds_.viewport.height << std::endl;
-				
-				// Additional debug: show if mouse would be in viewport
-				bool inViewport = panel_bounds_.viewport.contains(clientX, clientY);
-				if (inViewport) {
-					std::cout << "  -> INSIDE viewport" << std::endl;
-				}
+				return MouseRegion::ViewportPanel;
 			}
 			
 			if (panel_bounds_.hierarchy.contains(clientX, clientY))
 			{
 				return MouseRegion::HierarchyPanel;
-			}
-			
-			if (panel_bounds_.viewport.contains(clientX, clientY))
-			{
-				return MouseRegion::ViewportPanel;
 			}
 			
 			if (panel_bounds_.objectInspector.contains(clientX, clientY))
