@@ -320,12 +320,12 @@ namespace SIMILI {
 							int clientY = iframe.contains("clientY") ? iframe["clientY"].get<int>() : y;
 							
 							windowDelegate->updateIFrameData(name, x, y, width, height, clientX, clientY);
-													if (handler && handler->getFrameDatas() && handler->getParentHWND())
-						{
-							handler->getFrameDatas()->updateFrameData(name, x, y, width, height, clientX, clientY, handler->getParentHWND());
-						}
-													std::cout << "[RoutesManager] IFrame updated: " << name 
-									  << " at (" << x << "," << y << ") size " << width << "x" << height << std::endl;
+
+							if (handler && handler->getFrameDatas() && handler->getParentHWND())
+							{
+								handler->getFrameDatas()->updateFrameData(name, x, y, width, height, clientX, clientY, handler->getParentHWND());
+							}
+
 						}
 					}
 					

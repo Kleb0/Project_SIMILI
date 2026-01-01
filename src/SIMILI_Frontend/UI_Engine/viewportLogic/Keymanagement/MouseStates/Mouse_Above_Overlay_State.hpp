@@ -15,8 +15,7 @@ namespace SIMILI
 			// Override state behavior methods
 			virtual void onEnter() override;
 			virtual void onExit() override;
-			virtual void update() override;
-
+			virtual void update() override;		virtual const char* getStateName() const override;
 			// Specific getters
 			bool isOverViewport() const;
 			bool canInteract() const;

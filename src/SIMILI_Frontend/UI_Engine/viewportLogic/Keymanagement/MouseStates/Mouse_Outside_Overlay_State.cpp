@@ -33,6 +33,11 @@ namespace SIMILI
 			// State update logic if needed
 		}
 
+		const char* Mouse_Outside_Overlay_State::getStateName() const
+		{
+			return "Mouse_Outside_Overlay_State";
+		}
+
 		bool Mouse_Outside_Overlay_State::isOutsideWindow() const
 		{
 			return is_outside_window_;

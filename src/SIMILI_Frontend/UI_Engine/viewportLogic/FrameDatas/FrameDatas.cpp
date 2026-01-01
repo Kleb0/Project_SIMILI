@@ -11,55 +11,55 @@ namespace SIMILI {
 			{
 			}
 
-			void FrameDatas::captureAllFrames(HWND cefWindowHandle)
-			{
-				if (!cefWindowHandle)
+				void FrameDatas::captureAllFrames(HWND cefWindowHandle)
 				{
-					std::cout << "[FrameDatas] Invalid HWND provided" << std::endl;
+					if (!cefWindowHandle)
+					{
+						std::cout << "[FrameDatas] Invalid HWND provided" << std::endl;
+						return;
+					}
+				
+				if (!windowDelegate_)
+				{
+					std::cout << "[FrameDatas] No window delegate available" << std::endl;
 					return;
 				}
-			
-			if (!windowDelegate_)
-			{
-				std::cout << "[FrameDatas] No window delegate available" << std::endl;
-				return;
-			}
 
-			auto allFrames = windowDelegate_->getAllIFrames();
-			
-			if (allFrames.empty())
-			{
-				std::cout << "[FrameDatas] No frames available in SimpleWindowDelegate" << std::endl;
-				return;
-			}
+				auto allFrames = windowDelegate_->getAllIFrames();
+				
+				if (allFrames.empty())
+				{
+					std::cout << "[FrameDatas] No frames available in SimpleWindowDelegate" << std::endl;
+					return;
+				}
 
-			frameDataMap_.clear();
+				frameDataMap_.clear();
 
-			for (const auto& pair : allFrames)
-			{
-				const IFrameData& frameData = pair.second;
-				IFrameScreenData screenData;
+				for (const auto& pair : allFrames)
+				{
+					const IFrameData& frameData = pair.second;
+					IFrameScreenData screenData;
+					
+					screenData.name = frameData.name;
+					screenData.relativeX = frameData.x;
+					screenData.relativeY = frameData.y;
+					screenData.width = frameData.width;
+					screenData.height = frameData.height;
+					screenData.clientX = frameData.clientX;
+					screenData.clientY = frameData.clientY;
 				
-				screenData.name = frameData.name;
-				screenData.relativeX = frameData.x;
-				screenData.relativeY = frameData.y;
-				screenData.width = frameData.width;
-				screenData.height = frameData.height;
-				screenData.clientX = frameData.clientX;
-				screenData.clientY = frameData.clientY;
-			
-				captureWindowData(cefWindowHandle, screenData);
-				
-				RECT windowRect;
-				GetWindowRect(cefWindowHandle, &windowRect);
-				
-				screenData.screenX = windowRect.left + frameData.clientX;
-				screenData.screenY = windowRect.top + frameData.clientY;
-				
-				frameDataMap_[frameData.name] = screenData;
-			}
-				
-				printAllFrameData();
+					captureWindowData(cefWindowHandle, screenData);
+					
+					RECT windowRect;
+					GetWindowRect(cefWindowHandle, &windowRect);
+					
+					screenData.screenX = windowRect.left + frameData.clientX;
+					screenData.screenY = windowRect.top + frameData.clientY;
+					
+					frameDataMap_[frameData.name] = screenData;
+				}
+					
+				// printAllFrameData();
 			}
 
 			bool FrameDatas::getFrameData(const std::string& name, IFrameScreenData& outData) const

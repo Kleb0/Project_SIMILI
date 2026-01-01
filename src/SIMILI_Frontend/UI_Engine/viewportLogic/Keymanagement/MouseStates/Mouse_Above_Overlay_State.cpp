@@ -32,6 +32,11 @@ namespace SIMILI
 			// State update logic if needed
 		}
 
+		const char* Mouse_Above_Overlay_State::getStateName() const
+		{
+			return "Mouse_Above_Overlay_State";
+		}
+
 		bool Mouse_Above_Overlay_State::isOverViewport() const
 		{
 			return is_over_viewport_;

@@ -388,78 +388,77 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 			POINT cursorPos;
 			if (GetCursorPos(&cursorPos))
 			{
-				// Detect which panel the mouse is over (every 60 frames to avoid spam)
-				if (frameCounter % 60 == 0)
+				// Detect the region at every frame for state management
+				auto region = mouseDetector->detectMouseRegion(cursorPos.x, cursorPos.y);
+				
+				// Convert enum to readable string
+				std::string regionName;
+				switch (region)
 				{
-					std::cout << "\n[RenderTimerProc] Screen cursor: (" << cursorPos.x << ", " << cursorPos.y << ")" << std::endl;
-					
-					// Convert to client coordinates and show the conversion
-					int clientX, clientY;
-					mouseDetector->getRelativePosition(cursorPos.x, cursorPos.y, clientX, clientY);
-					std::cout << "[RenderTimerProc] Client position: (" << clientX << ", " << clientY << ")" << std::endl;
-					
-					// Show all panel bounds
-					const auto& bounds = mouseDetector->getPanelBounds();
-					std::cout << "  Hierarchy [" << bounds.hierarchy.x << "," << bounds.hierarchy.y 
-							  << " -> " << (bounds.hierarchy.x + bounds.hierarchy.width) << "," 
-							  << (bounds.hierarchy.y + bounds.hierarchy.height) << "]: " 
-							  << (bounds.hierarchy.contains(clientX, clientY) ? "MATCH" : "no") << std::endl;
-					std::cout << "  Viewport [" << bounds.viewport.x << "," << bounds.viewport.y 
-							  << " -> " << (bounds.viewport.x + bounds.viewport.width) << "," 
-							  << (bounds.viewport.y + bounds.viewport.height) << "]: " 
-							  << (bounds.viewport.contains(clientX, clientY) ? "MATCH" : "no") << std::endl;
-					std::cout << "  ObjectInspector [" << bounds.objectInspector.x << "," << bounds.objectInspector.y 
-							  << " -> " << (bounds.objectInspector.x + bounds.objectInspector.width) << "," 
-							  << (bounds.objectInspector.y + bounds.objectInspector.height) << "]: " 
-							  << (bounds.objectInspector.contains(clientX, clientY) ? "MATCH" : "no") << std::endl;
-					std::cout << "  History [" << bounds.history.x << "," << bounds.history.y 
-							  << " -> " << (bounds.history.x + bounds.history.width) << "," 
-							  << (bounds.history.y + bounds.history.height) << "]: " 
-							  << (bounds.history.contains(clientX, clientY) ? "MATCH" : "no") << std::endl;
-					std::cout << "  ProjectViewer [" << bounds.projectViewer.x << "," << bounds.projectViewer.y 
-							  << " -> " << (bounds.projectViewer.x + bounds.projectViewer.width) << "," 
-							  << (bounds.projectViewer.y + bounds.projectViewer.height) << "]: " 
-							  << (bounds.projectViewer.contains(clientX, clientY) ? "MATCH" : "no") << std::endl;
-					
-					// Now detect the region
-					auto region = mouseDetector->detectMouseRegion(cursorPos.x, cursorPos.y);
-					
-					// Convert enum to readable string
-					std::string regionName;
-					switch (region)
-					{
-						case SIMILI::Input::MouseRegion::Outside:
-							regionName = "Outside Window";
-							break;
-						case SIMILI::Input::MouseRegion::HierarchyPanel:
-							regionName = "Hierarchy Panel";
-							break;
-						case SIMILI::Input::MouseRegion::ViewportPanel:
-							regionName = "Viewport Panel";
-							break;
-						case SIMILI::Input::MouseRegion::ObjectInspectorPanel:
-							regionName = "Object Inspector Panel";
-							break;
-						case SIMILI::Input::MouseRegion::HistoryPanel:
-							regionName = "History Panel";
-							break;
-						case SIMILI::Input::MouseRegion::ProjectViewerPanel:
-							regionName = "Project Viewer Panel";
-							break;
-						case SIMILI::Input::MouseRegion::Splitter:
-							regionName = "Splitter";
-							break;
-						case SIMILI::Input::MouseRegion::Unknown:
-						default:
-							regionName = "Unknown";
-							break;
-					}
-					
-					std::cout << ">>> Result: " << regionName << std::endl;
+					case SIMILI::Input::MouseRegion::Outside:
+						regionName = "Outside Window";
+						break;
+					case SIMILI::Input::MouseRegion::HierarchyPanel:
+						regionName = "Hierarchy Panel";
+						break;
+					case SIMILI::Input::MouseRegion::ViewportPanel:
+						regionName = "Viewport Panel";
+						break;
+					case SIMILI::Input::MouseRegion::ObjectInspectorPanel:
+						regionName = "Object Inspector Panel";
+						break;
+					case SIMILI::Input::MouseRegion::HistoryPanel:
+						regionName = "History Panel";
+						break;
+					case SIMILI::Input::MouseRegion::ProjectViewerPanel:
+						regionName = "Project Viewer Panel";
+						break;
+					case SIMILI::Input::MouseRegion::Splitter:
+						regionName = "Splitter";
+						break;
+					case SIMILI::Input::MouseRegion::Unknown:
+					default:
+						regionName = "Unknown";
+						break;
 				}
+				
+				if (regionName != handler->getLastDetectedRegionName())
+				{					
+					handler->setLastDetectedRegionName(regionName);
+					
+					if (regionName == "Viewport Panel")
+					{
+						if (handler->getAboveOverlayState() && handler->getOutsideOverlayState())
+						{
+							if (handler->getOutsideOverlayState()->isActive())
+							{
+								handler->getOutsideOverlayState()->onExit();
+							}
+							
+							handler->getAboveOverlayState()->onEnter();
+							handler->getAboveOverlayState()->setOverViewport(true);
+							
+							std::cout << "[RenderTimerProc] Mouse State: " << handler->getAboveOverlayState()->getStateName() << std::endl;
+						}
+					}
+					else
+					{
+						if (handler->getAboveOverlayState() && handler->getOutsideOverlayState())
+						{
+							if (handler->getAboveOverlayState()->isActive())
+							{
+								handler->getAboveOverlayState()->onExit();
+							}
+							
+							handler->getOutsideOverlayState()->onEnter();
+							handler->getOutsideOverlayState()->setOutsideWindow(true);
+							
+							std::cout << "[RenderTimerProc] Mouse State: " << handler->getOutsideOverlayState()->getStateName() << std::endl;
+						}
+					}
+				}				
 			}
-		}
-		
+		}		
 	}
 }
 
@@ -474,7 +473,6 @@ void UIHandler::startRenderTimer()
 		
 		if (timer_id_ != 0) 
 		{
-			// Store handler in static map
 			g_timerHandlerMap[timer_id_] = this;
 		} 
 		else 
@@ -491,7 +489,6 @@ void UIHandler::stopRenderTimer()
 		KillTimer(nullptr, timer_id_);
 		timeEndPeriod(1);
 		
-		// Remove from static map
 		g_timerHandlerMap.erase(timer_id_);		
 		timer_id_ = 0;
 	}

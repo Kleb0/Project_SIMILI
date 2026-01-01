@@ -102,6 +102,14 @@ public:
 	void transitionMouseState(const std::string& regionName);
 	SIMILI::Input::Mouse_State* getCurrentMouseState() const { return current_mouse_state_; }
 	
+	// Mouse state getters
+	SIMILI::Input::Mouse_Above_Overlay_State* getAboveOverlayState() const { return above_overlay_state_; }
+	SIMILI::Input::Mouse_Outside_Overlay_State* getOutsideOverlayState() const { return outside_overlay_state_; }
+	
+	// Last detected region name accessors
+	std::string getLastDetectedRegionName() const { return last_detected_region_name_; }
+	void setLastDetectedRegionName(const std::string& regionName) { last_detected_region_name_ = regionName; }
+	
 	// static LRESULT CALLBACK ParentWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
 	
 	// Friend function to allow RenderTimerProc access to private members

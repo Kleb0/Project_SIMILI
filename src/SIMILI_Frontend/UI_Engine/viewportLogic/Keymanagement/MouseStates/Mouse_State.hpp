@@ -14,15 +14,14 @@ namespace SIMILI
 			virtual void onEnter() = 0;
 			virtual void onExit() = 0;
 			virtual void update() = 0;
+		virtual const char* getStateName() const = 0;
 
-			// Getters
-			virtual bool isActive() const;
+		// Getters
+		virtual bool isActive() const;
+		// Setters
+		virtual void setActive(bool active);
 
-			// Setters
-			virtual void setActive(bool active);
-
-		protected:
-			bool is_active_;
-		};
+	protected:
+		bool is_active_;		};
 	}
 }

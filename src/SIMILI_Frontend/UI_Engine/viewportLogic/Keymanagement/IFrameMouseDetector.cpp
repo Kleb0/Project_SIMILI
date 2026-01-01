@@ -69,19 +69,7 @@ namespace SIMILI {
 					panel_bounds_.projectViewer.width = data.width;
 					panel_bounds_.projectViewer.height = data.height;
 				}
-			}
-			
-			std::cout << "[IFrameMouseDetector] Panel bounds updated from FrameDatas:" << std::endl;
-			std::cout << "  Hierarchy: (" << panel_bounds_.hierarchy.x << ", " << panel_bounds_.hierarchy.y 
-					<< ") Size: " << panel_bounds_.hierarchy.width << "x" << panel_bounds_.hierarchy.height << std::endl;
-			std::cout << "  Viewport: (" << panel_bounds_.viewport.x << ", " << panel_bounds_.viewport.y 
-					<< ") Size: " << panel_bounds_.viewport.width << "x" << panel_bounds_.viewport.height << std::endl;
-			std::cout << "  ObjectInspector: (" << panel_bounds_.objectInspector.x << ", " << panel_bounds_.objectInspector.y 
-					<< ") Size: " << panel_bounds_.objectInspector.width << "x" << panel_bounds_.objectInspector.height << std::endl;
-			std::cout << "  History: (" << panel_bounds_.history.x << ", " << panel_bounds_.history.y 
-					<< ") Size: " << panel_bounds_.history.width << "x" << panel_bounds_.history.height << std::endl;
-			std::cout << "  ProjectViewer: (" << panel_bounds_.projectViewer.x << ", " << panel_bounds_.projectViewer.y 
-					<< ") Size: " << panel_bounds_.projectViewer.width << "x" << panel_bounds_.projectViewer.height << std::endl;
+			}			
 		}
 
 		void IFrameMouseDetector::updateWindowRect()
