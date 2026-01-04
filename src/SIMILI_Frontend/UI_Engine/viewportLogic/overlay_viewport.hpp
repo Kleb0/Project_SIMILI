@@ -119,7 +119,9 @@ public:
     void showSlotTexture(bool visible);
     SlotTexture* getSlotTexture() const { return slot_texture_; }
     
-    // ----------- Edge Loop State -----------
+    // ----- Manipulation in scene layer actions -----
+    void executeShiftLeftClickAction();
+    
     bool isEdgeLoopActive = false;
 
 private:

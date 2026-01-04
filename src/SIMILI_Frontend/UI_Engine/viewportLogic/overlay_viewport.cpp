@@ -45,6 +45,7 @@
 #include "../../Engine/ThreeDInteractions/FaceTransform.hpp"
 #include "../../Engine/ThreeDInteractions/EdgeTransform.hpp"
 #include "Keymanagement/KeyManager.hpp"
+#include "Keymanagement/MouseControlToOverlay.hpp"
 #include "../ui_handler.hpp"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -99,8 +100,18 @@ UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
 	}
 	
 	// Forward mouse and keyboard messages to the OverlayViewport
-	if (overlay && overlay->hwnd_) {
+	if (overlay && overlay->hwnd_) 
+	{
 		switch (msg) {
+			case WM_LBUTTONDOWN:
+			case WM_LBUTTONUP:
+			{
+				if (overlay->ui_handler_ && overlay->ui_handler_->getMouseControlToOverlay()) {
+					overlay->ui_handler_->getMouseControlToOverlay()->processMouseInput(msg, wParam);
+				}
+				break;
+			}
+			
 			case WM_MOUSEWHEEL:
 			case WM_MBUTTONDOWN:
 			case WM_MBUTTONUP:
@@ -114,20 +125,17 @@ UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
 				GetWindowRect(overlay->hwnd_, &overlayRect);
 				GetClientRect(hwnd, &parentRect);
 				
-				// Get CURRENT overlay dimensions (not cached values that may be stale after resize)
 				int currentOverlayWidth = overlayRect.right - overlayRect.left;
 				int currentOverlayHeight = overlayRect.bottom - overlayRect.top;
 				
-				// Convert overlay position to parent client coordinates
 				POINT overlayTopLeft = { overlayRect.left, overlayRect.top };
 				ScreenToClient(hwnd, &overlayTopLeft);
 				
-				// Calculate relative position within overlay
 				int relativeX = ptParent.x - overlayTopLeft.x;
 				int relativeY = ptParent.y - overlayTopLeft.y;
 				
-				// Debug for mouse wheel specifically - show CURRENT sizes
-				if (msg == WM_MOUSEWHEEL) {
+				if (msg == WM_MOUSEWHEEL) 
+				{
 					std::cout << "[ParentSubclassProc] WHEEL - Parent: (" << ptParent.x << ", " << ptParent.y 
 					          << ") -> Overlay: (" << relativeX << ", " << relativeY 
 					          << ") | OverlayPos: (" << overlayTopLeft.x << ", " << overlayTopLeft.y << ")"
@@ -981,7 +989,6 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 			case WM_SYSKEYUP:
 			case WM_CHAR:
 			{
-				// Forward keyboard events to ImGui FIRST
 				ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
 				
 				if (msg == WM_KEYDOWN)
@@ -993,6 +1000,16 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 					SIMILI::Input::KeyManager::getInstance().handleKeyUp(static_cast<int>(wParam));
 				}
 				return 0;
+			}
+			
+			case WM_LBUTTONDOWN:
+			case WM_LBUTTONUP:
+			{
+				if (overlay->ui_handler_ && overlay->ui_handler_->getMouseControlToOverlay())
+				{
+					overlay->ui_handler_->getMouseControlToOverlay()->processMouseInput(msg, wParam);
+				}
+				break;
 			}
 		}
 	}
@@ -1208,4 +1225,9 @@ void OverlayViewport::showSlotTexture(bool visible)
 			InvalidateRect(slot_texture_->getHandle(), nullptr, FALSE);
 		}
 	}
+}
+
+void OverlayViewport::executeShiftLeftClickAction()
+{
+	std::cout << "[OVERLAY_VIEWPORT] : TEST SUCCESSFULL ! INSTRUCTIONS RECEIVED FROM LEFT CLICK AND SHIFT WHEN MOUSE IS ABOVE VIEWPORT!" << std::endl;
 }

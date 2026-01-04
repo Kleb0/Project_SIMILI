@@ -18,6 +18,14 @@
 
 class SimpleWindowDelegate;
 
+namespace SIMILI 
+{
+	namespace Input 
+	{
+		class MouseControlToOverlay;
+	}
+}
+
 class ThreeDScene;
 class OpenGLContext;
 class Camera;
@@ -110,7 +118,7 @@ public:
 	std::string getLastDetectedRegionName() const { return last_detected_region_name_; }
 	void setLastDetectedRegionName(const std::string& regionName) { last_detected_region_name_ = regionName; }
 	
-	// static LRESULT CALLBACK ParentWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
+	SIMILI::Input::MouseControlToOverlay* getMouseControlToOverlay() const { return mouse_control_to_overlay_; }
 	
 	// Friend function to allow RenderTimerProc access to private members
 	friend VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime);
@@ -147,6 +155,8 @@ private:
 	SIMILI::Input::Mouse_Above_Overlay_State* above_overlay_state_;
 	SIMILI::Input::Mouse_Outside_Overlay_State* outside_overlay_state_;
 	std::string last_detected_region_name_;
+	
+	SIMILI::Input::MouseControlToOverlay* mouse_control_to_overlay_;
 
 	IMPLEMENT_REFCOUNTING(UIHandler);
 };

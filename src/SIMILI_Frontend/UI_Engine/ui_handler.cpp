@@ -3,6 +3,7 @@
 #include "viewportLogic/HTMLTextureRenderer/HtmlTextureRenderer.hpp"
 #include "viewportLogic/HTMLTextureRenderer/SlotTexture.hpp"
 #include "viewportLogic/KeyManagement/KeyManager.hpp"
+#include "viewportLogic/Keymanagement/MouseControlToOverlay.hpp"
 #include "../../Engine/ThreeDScene.hpp"
 #include "../../Engine/OpenGLContext.hpp"
 #include "../../WorldObjects/Camera/Camera.hpp"
@@ -40,16 +41,15 @@ UIHandler::UIHandler() : parent_hwnd_(nullptr), timer_id_(0),
 	current_mouse_state_(nullptr),
 	above_overlay_state_(nullptr),
 	outside_overlay_state_(nullptr),
-	last_detected_region_name_("")
+	last_detected_region_name_(""),
+	mouse_control_to_overlay_(nullptr)
 {
-	// Initialize mouse states
 	above_overlay_state_ = new SIMILI::Input::Mouse_Above_Overlay_State();
-	outside_overlay_state_ = new SIMILI::Input::Mouse_Outside_Overlay_State();
+	outside_overlay_state_ = new SIMILI::Input::Mouse_Outside_Overlay_State();	
+	mouse_control_to_overlay_ = new SIMILI::Input::MouseControlToOverlay();
 	
-	// Start with null state (will be set on first mouse detection)
 	current_mouse_state_ = nullptr;
 	
-	std::cout << "[UIHandler] Mouse states created (will activate on first mouse detection)" << std::endl;
 }
 
 UIHandler::~UIHandler() 
@@ -65,6 +65,11 @@ UIHandler::~UIHandler()
 	{
 		delete outside_overlay_state_;
 		outside_overlay_state_ = nullptr;
+	}
+	if (mouse_control_to_overlay_)
+	{
+		delete mouse_control_to_overlay_;
+		mouse_control_to_overlay_ = nullptr;
 	}
 	if (frame_datas_)
 	{
@@ -438,6 +443,11 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 							handler->getAboveOverlayState()->onEnter();
 							handler->getAboveOverlayState()->setOverViewport(true);
 							
+							if (handler->getMouseControlToOverlay())
+							{
+								handler->getMouseControlToOverlay()->setMouseState(handler->getAboveOverlayState());
+							}
+							
 							std::cout << "[RenderTimerProc] Mouse State: " << handler->getAboveOverlayState()->getStateName() << std::endl;
 						}
 					}
@@ -453,12 +463,25 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 							handler->getOutsideOverlayState()->onEnter();
 							handler->getOutsideOverlayState()->setOutsideWindow(true);
 							
+							if (handler->getMouseControlToOverlay())
+							{
+								handler->getMouseControlToOverlay()->setMouseState(handler->getOutsideOverlayState());
+							}
+							
 							std::cout << "[RenderTimerProc] Mouse State: " << handler->getOutsideOverlayState()->getStateName() << std::endl;
 						}
 					}
 				}				
 			}
-		}		
+		}
+		
+		if (handler->getMouseControlToOverlay() && handler->getMouseControlToOverlay()->isShiftLeftClickActive())
+		{
+			if (handler->getOverlay())
+			{
+				handler->getOverlay()->executeShiftLeftClickAction();
+			}
+		}
 	}
 }
 

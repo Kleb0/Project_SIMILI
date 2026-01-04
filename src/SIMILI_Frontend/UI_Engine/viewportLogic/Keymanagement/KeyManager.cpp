@@ -29,14 +29,17 @@ namespace Input {
 			return;
 		}
 		
-
 		bool isRepeat = (lParam & (1 << 30)) != 0;
 
-		if (!isRepeat && !it->second.isPressed)
+		if (!it->second.isPressed)
 		{
 			std::cout << "[KeyInputSystem] Key " << windowsKey << " (char: " << (char)windowsKey << ") FIRST PRESS" << std::endl;
 			it->second.isPressed = true;
 			it->second.isFirstPress = true;
+		}
+		else if (isRepeat)
+		{
+			it->second.isPressed = true;
 		}
 	}
 
