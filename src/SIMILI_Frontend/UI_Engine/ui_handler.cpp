@@ -429,53 +429,12 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 				
 				if (regionName != handler->getLastDetectedRegionName())
 				{					
-					handler->setLastDetectedRegionName(regionName);
-					
-					if (regionName == "Viewport Panel")
-					{
-						if (handler->getAboveOverlayState() && handler->getOutsideOverlayState())
-						{
-							if (handler->getOutsideOverlayState()->isActive())
-							{
-								handler->getOutsideOverlayState()->onExit();
-							}
-							
-							handler->getAboveOverlayState()->onEnter();
-							handler->getAboveOverlayState()->setOverViewport(true);
-							
-							if (handler->getMouseControlToOverlay())
-							{
-								handler->getMouseControlToOverlay()->setMouseState(handler->getAboveOverlayState());
-							}
-							
-							std::cout << "[RenderTimerProc] Mouse State: " << handler->getAboveOverlayState()->getStateName() << std::endl;
-						}
-					}
-					else
-					{
-						if (handler->getAboveOverlayState() && handler->getOutsideOverlayState())
-						{
-							if (handler->getAboveOverlayState()->isActive())
-							{
-								handler->getAboveOverlayState()->onExit();
-							}
-							
-							handler->getOutsideOverlayState()->onEnter();
-							handler->getOutsideOverlayState()->setOutsideWindow(true);
-							
-							if (handler->getMouseControlToOverlay())
-							{
-								handler->getMouseControlToOverlay()->setMouseState(handler->getOutsideOverlayState());
-							}
-							
-							std::cout << "[RenderTimerProc] Mouse State: " << handler->getOutsideOverlayState()->getStateName() << std::endl;
-						}
-					}
+					handler->transitionMouseState(regionName);
 				}				
 			}
 		}
 		
-		if (handler->getMouseControlToOverlay() && handler->getMouseControlToOverlay()->isShiftLeftClickActive())
+		if (handler->getMouseControlToOverlay()->isShiftLeftClickActive() && handler->getCurrentMouseState() == handler->getAboveOverlayState())
 		{
 			if (handler->getOverlay())
 			{
@@ -850,7 +809,7 @@ void UIHandler::transitionMouseState(const std::string& regionName)
 	
 	SIMILI::Input::Mouse_State* newState = nullptr;
 	
-	if (regionName == "ViewportPanel")
+	if (regionName == "Viewport Panel")
 	{
 		newState = above_overlay_state_;
 	}
@@ -871,6 +830,11 @@ void UIHandler::transitionMouseState(const std::string& regionName)
 		if (current_mouse_state_)
 		{
 			current_mouse_state_->onEnter();
+		}
+		
+		if (mouse_control_to_overlay_)
+		{
+			mouse_control_to_overlay_->setMouseState(current_mouse_state_);
 		}
 	}
 }

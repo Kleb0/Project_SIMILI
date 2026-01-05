@@ -35,6 +35,10 @@ namespace SIMILI
 			
 			bool left_button_down = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
 			
+			// std::cout << "[MouseControlToOverlay] CHECK: shift=" << shift_pressed 
+			//           << " left_mouse_pressed_=" << left_mouse_pressed_
+			//           << " GetAsyncKeyState(LBUTTON)=" << left_button_down << std::endl;
+			
 			return shift_pressed && (left_mouse_pressed_ || left_button_down);
 		}
 
