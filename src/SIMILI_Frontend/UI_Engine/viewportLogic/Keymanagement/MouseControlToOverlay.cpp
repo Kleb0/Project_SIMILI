@@ -10,6 +10,13 @@ namespace SIMILI
 			: current_mouse_state_(nullptr)
 			, left_mouse_pressed_(false)
 			, key_manager_(KeyManager::getInstance())
+			, current_mouse_x_(0)
+			, current_mouse_y_(0)
+			, previous_mouse_x_(0)
+			, previous_mouse_y_(0)
+			, mouse_delta_x_(0)
+			, mouse_delta_y_(0)
+			, mouse_position_initialized_(false)
 		{
 		}
 
@@ -52,6 +59,46 @@ namespace SIMILI
 			{
 				left_mouse_pressed_ = false;
 			}
+		}
+		
+		void MouseControlToOverlay::processMouseMove(int mouseX, int mouseY)
+		{
+			if (!mouse_position_initialized_)
+			{
+				current_mouse_x_ = mouseX;
+				current_mouse_y_ = mouseY;
+				previous_mouse_x_ = mouseX;
+				previous_mouse_y_ = mouseY;
+				mouse_delta_x_ = 0;
+				mouse_delta_y_ = 0;
+				mouse_position_initialized_ = true;
+				return;
+			}
+			
+			previous_mouse_x_ = current_mouse_x_;
+			previous_mouse_y_ = current_mouse_y_;
+			
+			current_mouse_x_ = mouseX;
+			current_mouse_y_ = mouseY;
+			
+			mouse_delta_x_ = current_mouse_x_ - previous_mouse_x_;
+			mouse_delta_y_ = current_mouse_y_ - previous_mouse_y_;
+		}
+		
+		void MouseControlToOverlay::updateMousePosition()
+		{
+			POINT cursorPos;
+			if (GetCursorPos(&cursorPos))
+			{
+				processMouseMove(cursorPos.x, cursorPos.y);
+			}
+		}
+		
+		void MouseControlToOverlay::resetMousePosition()
+		{
+			mouse_position_initialized_ = false;
+			mouse_delta_x_ = 0;
+			mouse_delta_y_ = 0;
 		}
 	}
 }

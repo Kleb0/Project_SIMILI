@@ -67,94 +67,6 @@ namespace
 {
 	const wchar_t* kOverlayClassName = L"SIMILI_OpenGL_Overlay";
 }
-
-// ============================================================================
-// PARENT WINDOW MESSAGE INTERCEPTION
-// ============================================================================
-
-LRESULT CALLBACK OverlayViewport::ParentSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, 
-UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
-{
-	OverlayViewport* overlay = reinterpret_cast<OverlayViewport*>(dwRefData);
-	
-	// Handle window resize events to ensure proper coordinate tracking
-	if (msg == WM_SIZE || msg == WM_WINDOWPOSCHANGED) {
-		if (overlay && overlay->hwnd_) {
-			// Force overlay position/size update
-			overlay->ensureProperZOrder();
-			
-			// Debug: Show parent window size changes
-			if (msg == WM_SIZE) {
-				int parentWidth = LOWORD(lParam);
-				int parentHeight = HIWORD(lParam);
-				std::cout << "[ParentSubclassProc] Parent window resized to: " << parentWidth << "x" << parentHeight << std::endl;
-				
-				// Force overlay to update its internal size tracking
-				RECT overlayRect;
-				GetWindowRect(overlay->hwnd_, &overlayRect);
-				int overlayWidth = overlayRect.right - overlayRect.left;
-				int overlayHeight = overlayRect.bottom - overlayRect.top;
-				std::cout << "[ParentSubclassProc] Overlay size: " << overlayWidth << "x" << overlayHeight << std::endl;
-			}
-		}
-	}
-	
-	// Forward mouse and keyboard messages to the OverlayViewport
-	if (overlay && overlay->hwnd_) 
-	{
-		switch (msg) {
-			case WM_LBUTTONDOWN:
-			case WM_LBUTTONUP:
-			{
-				if (overlay->ui_handler_ && overlay->ui_handler_->getMouseControlToOverlay()) {
-					overlay->ui_handler_->getMouseControlToOverlay()->processMouseInput(msg, wParam);
-				}
-				break;
-			}
-			
-			case WM_MOUSEWHEEL:
-			case WM_MBUTTONDOWN:
-			case WM_MBUTTONUP:
-			case WM_MOUSEMOVE:
-			{
-				// Get the mouse position in parent window coordinates
-				POINT ptParent = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
-				
-				// Get CURRENT window rectangles (critical after resize events)
-				RECT overlayRect, parentRect;
-				GetWindowRect(overlay->hwnd_, &overlayRect);
-				GetClientRect(hwnd, &parentRect);
-				
-				int currentOverlayWidth = overlayRect.right - overlayRect.left;
-				int currentOverlayHeight = overlayRect.bottom - overlayRect.top;
-				
-				POINT overlayTopLeft = { overlayRect.left, overlayRect.top };
-				ScreenToClient(hwnd, &overlayTopLeft);
-				
-				int relativeX = ptParent.x - overlayTopLeft.x;
-				int relativeY = ptParent.y - overlayTopLeft.y;
-				
-				if (msg == WM_MOUSEWHEEL) 
-				{
-					std::cout << "[ParentSubclassProc] WHEEL - Parent: (" << ptParent.x << ", " << ptParent.y 
-					          << ") -> Overlay: (" << relativeX << ", " << relativeY 
-					          << ") | OverlayPos: (" << overlayTopLeft.x << ", " << overlayTopLeft.y << ")"
-					          << " | CurrentOverlaySize: " << currentOverlayWidth << "x" << currentOverlayHeight
-					          << " | CachedSize: " << overlay->width_ << "x" << overlay->height_ << std::endl;
-				}
-				
-				// Forward to overlay with adjusted coordinates
-				LPARAM newLParam = MAKELPARAM(relativeX, relativeY);
-				SendMessage(overlay->hwnd_, msg, wParam, newLParam);
-				break;
-			}
-		}
-	}
-	
-	// Call the original window procedure
-	return DefSubclassProc(hwnd, msg, wParam, lParam);
-}
-
 // ============================================================================
 // LIFECYCLE MANAGEMENT
 // ============================================================================
@@ -355,12 +267,7 @@ bool OverlayViewport::create(HWND parent, int x, int y, int width, int height)
 	}
 	
 	std::cout << "[OverlayViewport] Created as CHILD window with Z-order control (NOT always-on-top)" << std::endl;
-	
-	// Install a message hook on the parent window to forward mouse messages to us
-	// This ensures we receive mouse messages even when SlotTexture is covering parts of the viewport
-	SetWindowSubclass(parent_, ParentSubclassProc, 1, reinterpret_cast<DWORD_PTR>(this));
-	std::cout << "[OverlayViewport] Installed message hook on parent window" << std::endl;
-	
+		
 	if (!click_handler_) 
 	{
 		std::cerr << "[OverlayViewport] WARNING: Click handler not initialized!" << std::endl;
@@ -372,21 +279,19 @@ bool OverlayViewport::create(HWND parent, int x, int y, int width, int height)
 	
 	// Get GLFW context from current thread to share resources
 	HGLRC glfwContext = wglGetCurrentContext();
-	if (glfwContext) {
+	if (glfwContext) 
+	{
 		std::cout << "[OverlayViewport] Sharing GLFW context: " << glfwContext << std::endl;
 	}
 	
 	initializeOpenGL(glfwContext);		
 	return true;
-}void OverlayViewport::destroy() 
+}
+
+void OverlayViewport::destroy() 
 {
 	std::cout << "[OverlayViewport] Destroying overlay viewport..." << std::endl;
 	
-	// Remove the subclass from parent window
-	if (parent_) {
-		RemoveWindowSubclass(parent_, ParentSubclassProc, 1);
-		std::cout << "[OverlayViewport] Removed message hook from parent window" << std::endl;
-	}
 	
 	shutdownImGui();
 	
@@ -926,8 +831,8 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 					overlay->width_ = newWidth;
 					overlay->height_ = newHeight;
 					
-					// Update OpenGL viewport
-					if (overlay->gl_context_) {
+					if (overlay->gl_context_) 
+					{
 						HGLRC prevContext = wglGetCurrentContext();
 						HDC prevDC = wglGetCurrentDC();
 						wglMakeCurrent(overlay->hdc_, overlay->gl_context_);
@@ -936,9 +841,7 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 							wglMakeCurrent(prevDC, prevContext);
 						}
 					}
-
-					
-					// Update texture renderers
+				
 					if (overlay->texture_renderer_test_) {
 						overlay->texture_renderer_test_->resize(newWidth, newHeight);
 					}
@@ -1217,7 +1120,8 @@ void OverlayViewport::destroySlotTexture()
 
 void OverlayViewport::showSlotTexture(bool visible)
 {
-	if (slot_texture_) {
+	if (slot_texture_) 
+	{
 		slot_texture_->show(visible);
 		
 		if (visible) 
@@ -1227,7 +1131,8 @@ void OverlayViewport::showSlotTexture(bool visible)
 	}
 }
 
-void OverlayViewport::executeShiftLeftClickAction()
+void OverlayViewport::executeShiftLeftClickAction(int deltaX, int deltaY)
 {
 	std::cout << "[OVERLAY_VIEWPORT] : TEST SUCCESSFULL ! INSTRUCTIONS RECEIVED FROM LEFT CLICK AND SHIFT WHEN MOUSE IS ABOVE VIEWPORT!" << std::endl;
+	std::cout << "[OVERLAY_VIEWPORT] Mouse Movement Vector -> DeltaX: " << deltaX << ", DeltaY: " << deltaY << std::endl;
 }

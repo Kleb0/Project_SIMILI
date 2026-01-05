@@ -120,15 +120,13 @@ public:
     SlotTexture* getSlotTexture() const { return slot_texture_; }
     
     // ----- Manipulation in scene layer actions -----
-    void executeShiftLeftClickAction();
+    void executeShiftLeftClickAction(int deltaX, int deltaY);
     
     bool isEdgeLoopActive = false;
 
 private:
     // ----------- Windows Callback -----------
     static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
-    static LRESULT CALLBACK ParentSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, 
-                                               UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
     
     // ----------- Initialization & Cleanup -----------
     void initializeOpenGL(HGLRC shareContext = nullptr);

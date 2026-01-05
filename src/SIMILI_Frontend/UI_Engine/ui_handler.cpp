@@ -328,7 +328,7 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	
 	overlay_viewport_->show(true);
 	
-	enableSlotTextureRendering(false);  
+	enableSlotTextureRendering(true);  
 	
 	if (iframe_mouse_detector_) {
 		iframe_mouse_detector_->setWindowHandle(parent_hwnd);
@@ -385,6 +385,12 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 		static int frameCounter = 0;
 		frameCounter++;
 		
+		// Update mouse position tracking in MouseControlToOverlay
+		if (handler->getMouseControlToOverlay())
+		{
+			handler->getMouseControlToOverlay()->updateMousePosition();
+		}
+		
 		auto mouseDetector = handler->getIFrameMouseDetector();	
 
 		if (mouseDetector) 
@@ -438,7 +444,9 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 		{
 			if (handler->getOverlay())
 			{
-				handler->getOverlay()->executeShiftLeftClickAction();
+				int deltaX = handler->getMouseControlToOverlay()->getMouseDeltaX();
+				int deltaY = handler->getMouseControlToOverlay()->getMouseDeltaY();
+				handler->getOverlay()->executeShiftLeftClickAction(deltaX, deltaY);
 			}
 		}
 	}
