@@ -328,7 +328,7 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	
 	overlay_viewport_->show(true);
 	
-	enableSlotTextureRendering(true);  
+	enableSlotTextureRendering(false);  
 	
 	if (iframe_mouse_detector_) {
 		iframe_mouse_detector_->setWindowHandle(parent_hwnd);
@@ -446,7 +446,7 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 			{
 				int deltaX = handler->getMouseControlToOverlay()->getMouseDeltaX();
 				int deltaY = handler->getMouseControlToOverlay()->getMouseDeltaY();
-				handler->getOverlay()->executeShiftLeftClickAction(deltaX, deltaY);
+				handler->getOverlay()->MoveCameraLaterally(deltaX, deltaY);
 			}
 		}
 	}

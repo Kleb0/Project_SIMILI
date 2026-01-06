@@ -91,7 +91,7 @@ void Camera::orbitAroundTarget(float deltaX, float deltaY)
 
 void Camera::lateralMovement(float deltaX, float deltaY)
 {
-    const float sensitivity = 0.005f;
+    const float sensitivity = 0.01f;
 
     glm::vec3 forward = glm::normalize(target - getPosition());
     glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0.0f, 1.0f, 0.0f)));

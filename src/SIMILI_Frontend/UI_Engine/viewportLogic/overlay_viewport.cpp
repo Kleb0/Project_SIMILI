@@ -1130,9 +1130,17 @@ void OverlayViewport::showSlotTexture(bool visible)
 		}
 	}
 }
-
-void OverlayViewport::executeShiftLeftClickAction(int deltaX, int deltaY)
+void OverlayViewport::MoveCameraLaterally(int deltaX, int deltaY)
 {
-	std::cout << "[OVERLAY_VIEWPORT] : TEST SUCCESSFULL ! INSTRUCTIONS RECEIVED FROM LEFT CLICK AND SHIFT WHEN MOUSE IS ABOVE VIEWPORT!" << std::endl;
-	std::cout << "[OVERLAY_VIEWPORT] Mouse Movement Vector -> DeltaX: " << deltaX << ", DeltaY: " << deltaY << std::endl;
+	if (!three_d_scene_) return;
+	Camera* cam = three_d_scene_->getActiveCamera();
+	if (!cam || !cam->isSoftwareCamera()) return;
+	
+	const float sensitivity = 1.0f;
+	
+	float dx = static_cast<float>(deltaX) * sensitivity;
+	float dy = static_cast<float>(deltaY) * sensitivity;
+	
+	cam->lateralMovement(dx, dy);
+	InvalidateRect(hwnd_, nullptr, FALSE);
 }

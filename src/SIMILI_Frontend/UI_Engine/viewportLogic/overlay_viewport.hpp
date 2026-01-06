@@ -119,8 +119,8 @@ public:
     void showSlotTexture(bool visible);
     SlotTexture* getSlotTexture() const { return slot_texture_; }
     
-    // ----- Manipulation in scene layer actions -----
-    void executeShiftLeftClickAction(int deltaX, int deltaY);
+    // ----- Manipulation in scene -----
+    void MoveCameraLaterally(int deltaX, int deltaY);
     
     bool isEdgeLoopActive = false;
 
@@ -209,4 +209,3 @@ private:
     // ----------- Slot Texture (Layer 2) -----------
     SlotTexture* slot_texture_;
 };
-
