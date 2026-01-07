@@ -903,17 +903,8 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 					SIMILI::Input::KeyManager::getInstance().handleKeyUp(static_cast<int>(wParam));
 				}
 				return 0;
-			}
-			
-			case WM_LBUTTONDOWN:
-			case WM_LBUTTONUP:
-			{
-				if (overlay->ui_handler_ && overlay->ui_handler_->getMouseControlToOverlay())
-				{
-					overlay->ui_handler_->getMouseControlToOverlay()->processMouseInput(msg, wParam);
-				}
-				break;
-			}
+			}		
+
 		}
 	}
 	
@@ -1143,4 +1134,9 @@ void OverlayViewport::MoveCameraLaterally(int deltaX, int deltaY)
 	
 	cam->lateralMovement(dx, dy);
 	InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
+void OverlayViewport::ProcessWheelInput(int wheelDirection)
+{
+	std::cout << "[OVERLAY_VIEWPORT] Wheel direction received: " << wheelDirection << std::endl;
 }

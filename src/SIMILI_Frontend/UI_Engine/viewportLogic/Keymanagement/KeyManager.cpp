@@ -228,7 +228,7 @@ namespace Input {
 		if (!initialized_)
 			return;
 		
-		std::cout << "[KeyManager] handleKeyDown - key: " << windowsKey << " (char: " << (char)windowsKey << ")" << std::endl;
+		// std::cout << "[KeyManager] handleKeyDown - key: " << windowsKey << " (char: " << (char)windowsKey << ")" << std::endl;
 		
 		inputSystem_->processKeyDown(windowsKey, lParam);
 		sendToImGui(windowsKey, true);

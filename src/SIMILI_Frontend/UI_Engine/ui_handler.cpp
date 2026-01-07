@@ -30,6 +30,28 @@
 // Static map to associate timer IDs with UIHandler instances
 static std::unordered_map<UINT_PTR, UIHandler*> g_timerHandlerMap;
 
+// Global mouse hook for capturing wheel events before CEF consumes them
+static HHOOK g_mouseHook = NULL;
+static UIHandler* g_activeHandler = nullptr;
+
+// Low-level mouse hook procedure
+LRESULT CALLBACK LowLevelMouseProc(int nCode, WPARAM wParam, LPARAM lParam)
+{
+	if (nCode == HC_ACTION && wParam == WM_MOUSEWHEEL)
+	{
+		if (g_activeHandler && g_activeHandler->getMouseControlToOverlay())
+		{
+			// Only process wheel input when mouse is above overlay
+			if (g_activeHandler->getCurrentMouseState() == g_activeHandler->getAboveOverlayState())
+			{
+				MSLLHOOKSTRUCT* pMouseStruct = (MSLLHOOKSTRUCT*)lParam;
+				g_activeHandler->getMouseControlToOverlay()->processMouseWheelInput(WM_MOUSEWHEEL, pMouseStruct->mouseData);
+			}
+		}
+	}
+	return CallNextHookEx(g_mouseHook, nCode, wParam, lParam);
+}
+
 UIHandler::UIHandler() : parent_hwnd_(nullptr), timer_id_(0),
 	last_viewport_update_time_(0), last_viewport_x_(0), last_viewport_y_(0), 
 	last_viewport_width_(0), last_viewport_height_(0), three_d_scene_(nullptr),
@@ -389,6 +411,9 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 		if (handler->getMouseControlToOverlay())
 		{
 			handler->getMouseControlToOverlay()->updateMousePosition();
+			
+			// Update wheel state to handle timeout
+			handler->getMouseControlToOverlay()->updateWheelState();
 		}
 		
 		auto mouseDetector = handler->getIFrameMouseDetector();	
@@ -449,6 +474,25 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 				handler->getOverlay()->MoveCameraLaterally(deltaX, deltaY);
 			}
 		}
+		
+		// Process mouse wheel input ONLY when mouse is above overlay
+		if (handler->getCurrentMouseState() == handler->getAboveOverlayState())
+		{
+			if (handler->getMouseControlToOverlay()->hasWheelInput())
+			{
+				int wheelDirection = handler->getMouseControlToOverlay()->getMouseWheelDirection();
+				std::cout << "[RenderTimerProc] Mouse ABOVE-OVERLAY: Processing wheel input: " << wheelDirection << std::endl;
+				handler->getOverlay()->ProcessWheelInput(wheelDirection);
+			}
+		}
+		else
+		{
+			// If mouse is not above overlay, clear any pending wheel input
+			if (handler->getMouseControlToOverlay()->hasWheelInput())
+			{
+				handler->getMouseControlToOverlay()->resetWheelDirection();
+			}
+		}
 	}
 }
 
@@ -464,6 +508,21 @@ void UIHandler::startRenderTimer()
 		if (timer_id_ != 0) 
 		{
 			g_timerHandlerMap[timer_id_] = this;
+			g_activeHandler = this;
+			
+			// Install low-level mouse hook to capture wheel events before CEF
+			if (!g_mouseHook)
+			{
+				g_mouseHook = SetWindowsHookEx(WH_MOUSE_LL, LowLevelMouseProc, GetModuleHandle(NULL), 0);
+				if (g_mouseHook)
+				{
+					std::cout << "[UIHandler] Mouse hook installed successfully" << std::endl;
+				}
+				else
+				{
+					std::cerr << "[UIHandler] ERROR: Failed to install mouse hook!" << std::endl;
+				}
+			}
 		} 
 		else 
 		{
@@ -479,7 +538,21 @@ void UIHandler::stopRenderTimer()
 		KillTimer(nullptr, timer_id_);
 		timeEndPeriod(1);
 		
-		g_timerHandlerMap.erase(timer_id_);		
+		g_timerHandlerMap.erase(timer_id_);
+		
+		// Uninstall mouse hook
+		if (g_mouseHook)
+		{
+			UnhookWindowsHookEx(g_mouseHook);
+			g_mouseHook = NULL;
+			std::cout << "[UIHandler] Mouse hook uninstalled" << std::endl;
+		}
+		
+		if (g_activeHandler == this)
+		{
+			g_activeHandler = nullptr;
+		}
+		
 		timer_id_ = 0;
 	}
 }
@@ -758,7 +831,8 @@ void UIHandler::setIFrameMouseDetector(SIMILI::Input::IFrameMouseDetector* detec
 
 void UIHandler::logIFrameSizes()
 {
-	if (!window_delegate_) {
+	if (!window_delegate_) 
+	{
 		return;
 	}
 	

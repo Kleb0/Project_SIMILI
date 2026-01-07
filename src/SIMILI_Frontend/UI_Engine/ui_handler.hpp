@@ -120,6 +120,7 @@ public:
 	
 	SIMILI::Input::MouseControlToOverlay* getMouseControlToOverlay() const { return mouse_control_to_overlay_; }
 	
+
 	// Friend function to allow RenderTimerProc access to private members
 	friend VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime);
 

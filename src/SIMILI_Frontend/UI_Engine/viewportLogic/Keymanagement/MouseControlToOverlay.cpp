@@ -17,6 +17,10 @@ namespace SIMILI
 			, mouse_delta_x_(0)
 			, mouse_delta_y_(0)
 			, mouse_position_initialized_(false)
+			, smoothed_delta_x_(0.0f)
+			, smoothed_delta_y_(0.0f)
+			, mouse_wheel_direction_(0)
+			, last_wheel_input_time_(0)
 		{
 		}
 
@@ -42,10 +46,6 @@ namespace SIMILI
 			
 			bool left_button_down = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
 			
-			// std::cout << "[MouseControlToOverlay] CHECK: shift=" << shift_pressed 
-			//           << " left_mouse_pressed_=" << left_mouse_pressed_
-			//           << " GetAsyncKeyState(LBUTTON)=" << left_button_down << std::endl;
-			
 			return shift_pressed && (left_mouse_pressed_ || left_button_down);
 		}
 
@@ -61,6 +61,45 @@ namespace SIMILI
 			}
 		}
 		
+		void MouseControlToOverlay::processMouseWheelInput(UINT msg, WPARAM wParam)
+		{
+			if (msg == WM_MOUSEWHEEL)
+			{
+				int delta = GET_WHEEL_DELTA_WPARAM(wParam);
+				last_wheel_input_time_ = GetTickCount();
+				
+				std::cout << "[MouseControlToOverlay] WM_MOUSEWHEEL detected! Delta: " << delta << std::endl;
+				
+				if (delta > 0)
+				{
+					mouse_wheel_direction_ = 1;
+					std::cout << "[MouseControlToOverlay] Scroll UP (1)" << std::endl;
+				}
+				else if (delta < 0)
+				{
+					mouse_wheel_direction_ = -1;
+					std::cout << "[MouseControlToOverlay] Scroll DOWN (-1)" << std::endl;
+				}
+				else
+				{
+					mouse_wheel_direction_ = 0;
+				}
+			}
+		}
+		
+		void MouseControlToOverlay::updateWheelState()
+		{
+			// Reset wheel direction if timeout has elapsed since last input
+			if (mouse_wheel_direction_ != 0)
+			{
+				DWORD current_time = GetTickCount();
+				if (current_time - last_wheel_input_time_ > wheel_timeout_ms_)
+				{
+					mouse_wheel_direction_ = 0;
+				}
+			}
+		}
+		
 		void MouseControlToOverlay::processMouseMove(int mouseX, int mouseY)
 		{
 			if (!mouse_position_initialized_)
@@ -71,6 +110,8 @@ namespace SIMILI
 				previous_mouse_y_ = mouseY;
 				mouse_delta_x_ = 0;
 				mouse_delta_y_ = 0;
+				smoothed_delta_x_ = 0.0f;
+				smoothed_delta_y_ = 0.0f;
 				mouse_position_initialized_ = true;
 				return;
 			}
@@ -81,8 +122,14 @@ namespace SIMILI
 			current_mouse_x_ = mouseX;
 			current_mouse_y_ = mouseY;
 			
-			mouse_delta_x_ = current_mouse_x_ - previous_mouse_x_;
-			mouse_delta_y_ = current_mouse_y_ - previous_mouse_y_;
+			int raw_delta_x = current_mouse_x_ - previous_mouse_x_;
+			int raw_delta_y = current_mouse_y_ - previous_mouse_y_;
+			
+			smoothed_delta_x_ = smoothed_delta_x_ * (1.0f - smoothing_factor_) + raw_delta_x * smoothing_factor_;
+			smoothed_delta_y_ = smoothed_delta_y_ * (1.0f - smoothing_factor_) + raw_delta_y * smoothing_factor_;
+			
+			mouse_delta_x_ = static_cast<int>(smoothed_delta_x_);
+			mouse_delta_y_ = static_cast<int>(smoothed_delta_y_);
 		}
 		
 		void MouseControlToOverlay::updateMousePosition()
@@ -99,6 +146,8 @@ namespace SIMILI
 			mouse_position_initialized_ = false;
 			mouse_delta_x_ = 0;
 			mouse_delta_y_ = 0;
+			smoothed_delta_x_ = 0.0f;
+			smoothed_delta_y_ = 0.0f;
 		}
 	}
 }
