@@ -1151,3 +1151,14 @@ void OverlayViewport::ProcessMouseMovementWhileLeftClicking(int deltaX, int delt
 {
 	std::cout << "[OVERLAY_VIEWPORT] Mouse movement while left clicking - DeltaX: " << deltaX << ", DeltaY: " << deltaY << std::endl;
 }
+
+void OverlayViewport::ProcessCameraOrbiting(int deltaX, int deltaY)
+{
+	if (!three_d_scene_) return;
+	Camera* cam = three_d_scene_->getActiveCamera();
+	if (!cam || !cam->isSoftwareCamera()) return;
+	
+	cam->prepareOrbit();
+	cam->orbitAroundTarget(static_cast<float>(deltaX), static_cast<float>(deltaY));
+	InvalidateRect(hwnd_, nullptr, FALSE);
+}

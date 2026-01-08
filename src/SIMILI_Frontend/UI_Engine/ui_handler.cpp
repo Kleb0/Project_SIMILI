@@ -227,6 +227,11 @@ void UIHandler::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& ti
 				{
 					overlay_viewport_->setPosition(final_x, final_y, final_width, final_height);
 					
+					if (mouse_control_to_overlay_)
+					{
+						mouse_control_to_overlay_->resetMousePosition();
+					}
+					
 					last_viewport_update_time_ = current_time;
 					last_viewport_x_ = final_x;
 					last_viewport_y_ = final_y;
@@ -474,14 +479,15 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 			}
 		}
 		
-		if (handler->getMouseControlToOverlay()->isLeftButtonClicking() && handler->getCurrentMouseState() == handler->getAboveOverlayState())
+		bool isShiftPressed = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+		if (handler->getMouseControlToOverlay()->isLeftButtonClicking() && !isShiftPressed && handler->getCurrentMouseState() == handler->getAboveOverlayState())
 		{
-			std::cout << "[RenderTimerProc] Mouse ABOVE-OVERLAY: Processing left-button dragging movement" << std::endl;
+			
 			if (handler->getOverlay())
 			{
 				int deltaX = handler->getMouseControlToOverlay()->getMouseDeltaX();
 				int deltaY = handler->getMouseControlToOverlay()->getMouseDeltaY();
-				handler->getOverlay()->ProcessMouseMovementWhileLeftClicking(deltaX, deltaY);
+				handler->getOverlay()->ProcessCameraOrbiting(deltaX, deltaY);
 			}
 		}
 		
