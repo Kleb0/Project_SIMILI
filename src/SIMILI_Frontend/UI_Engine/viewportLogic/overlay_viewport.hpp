@@ -123,6 +123,7 @@ public:
     void MoveCameraLaterally(int deltaX, int deltaY);
     void ProcessWheelInput(int wheelDirection);
     void ProcessZoom(int wheelDirection);
+    void ProcessMouseMovementWhileLeftClicking(int deltaX, int deltaY);
     
     bool isEdgeLoopActive = false;
 

@@ -28,6 +28,8 @@ namespace SIMILI
 				
 				void resetMousePosition();
 				
+				bool isLeftButtonClicking() const { return (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0; }
+				
 				// Mouse wheel scroll management
 				int getMouseWheelDirection() const { return mouse_wheel_direction_; }
 				void resetWheelDirection() { mouse_wheel_direction_ = 0; }

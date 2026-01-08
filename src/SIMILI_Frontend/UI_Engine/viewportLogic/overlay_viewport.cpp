@@ -1146,3 +1146,8 @@ void OverlayViewport::ProcessZoom(int wheelDirection)
 	if (!camera_control_) return;
 	camera_control_->onZoom(wheelDirection);
 }
+
+void OverlayViewport::ProcessMouseMovementWhileLeftClicking(int deltaX, int deltaY)
+{
+	std::cout << "[OVERLAY_VIEWPORT] Mouse movement while left clicking - DeltaX: " << deltaX << ", DeltaY: " << deltaY << std::endl;
+}

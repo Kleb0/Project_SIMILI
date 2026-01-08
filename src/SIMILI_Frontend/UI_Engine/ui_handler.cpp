@@ -474,6 +474,17 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 			}
 		}
 		
+		if (handler->getMouseControlToOverlay()->isLeftButtonClicking() && handler->getCurrentMouseState() == handler->getAboveOverlayState())
+		{
+			std::cout << "[RenderTimerProc] Mouse ABOVE-OVERLAY: Processing left-button dragging movement" << std::endl;
+			if (handler->getOverlay())
+			{
+				int deltaX = handler->getMouseControlToOverlay()->getMouseDeltaX();
+				int deltaY = handler->getMouseControlToOverlay()->getMouseDeltaY();
+				handler->getOverlay()->ProcessMouseMovementWhileLeftClicking(deltaX, deltaY);
+			}
+		}
+		
 		// Process mouse wheel input ONLY when mouse is above overlay
 		if (handler->getCurrentMouseState() == handler->getAboveOverlayState())
 		{
@@ -481,7 +492,7 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 			{
 				int wheelDirection = handler->getMouseControlToOverlay()->getMouseWheelDirection();
 				std::cout << "[RenderTimerProc] Mouse ABOVE-OVERLAY: Processing wheel input: " << wheelDirection << std::endl;
-				handler->getOverlay()->ProcessWheelInput(wheelDirection);
+				// handler->getOverlay()->ProcessWheelInput(wheelDirection);
 				handler->getOverlay()->ProcessZoom(wheelDirection);
 			}
 		}
