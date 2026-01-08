@@ -13,6 +13,7 @@ public:
     void onMiddleButtonDown();
     void onMiddleButtonUp();
     void onMouseMove(WPARAM wParam, LPARAM lParam);
+    void onZoom(int wheelDirection);
 
 private:
     OverlayViewport* overlay_;

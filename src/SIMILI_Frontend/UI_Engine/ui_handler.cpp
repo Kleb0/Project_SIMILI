@@ -205,7 +205,6 @@ void UIHandler::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& ti
 		
 		if (iss >> js_x >> comma >> js_y >> comma >> width >> comma >> height) 
 		{
-
 			if (iss >> comma >> dpiScale) 
 			{
 			}
@@ -350,7 +349,7 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	
 	overlay_viewport_->show(true);
 	
-	enableSlotTextureRendering(false);  
+	enableSlotTextureRendering(true);  
 	
 	if (iframe_mouse_detector_) {
 		iframe_mouse_detector_->setWindowHandle(parent_hwnd);
@@ -483,6 +482,7 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 				int wheelDirection = handler->getMouseControlToOverlay()->getMouseWheelDirection();
 				std::cout << "[RenderTimerProc] Mouse ABOVE-OVERLAY: Processing wheel input: " << wheelDirection << std::endl;
 				handler->getOverlay()->ProcessWheelInput(wheelDirection);
+				handler->getOverlay()->ProcessZoom(wheelDirection);
 			}
 		}
 		else

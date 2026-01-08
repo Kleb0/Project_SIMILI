@@ -1140,3 +1140,9 @@ void OverlayViewport::ProcessWheelInput(int wheelDirection)
 {
 	std::cout << "[OVERLAY_VIEWPORT] Wheel direction received: " << wheelDirection << std::endl;
 }
+
+void OverlayViewport::ProcessZoom(int wheelDirection)
+{
+	if (!camera_control_) return;
+	camera_control_->onZoom(wheelDirection);
+}

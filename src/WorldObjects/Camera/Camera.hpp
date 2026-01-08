@@ -39,7 +39,7 @@ public:
     float fov = 45.0f;
     float nearClip = 0.1f;
     float farClip = 100.0f;
-    float zoomSpeed = 0.1f;
+    float zoomSpeed = 2.5f;
     float zommFactor = 1.0f;
 
 private:

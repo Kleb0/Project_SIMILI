@@ -76,3 +76,15 @@ void CameraControl::onMouseMove(WPARAM /*wParam*/, LPARAM /*lParam*/)
 
     last_mouse_pos_ = current_pos;
 }
+
+void CameraControl::onZoom(int wheelDirection)
+{
+    if (!overlay_) return;
+    ThreeDScene* scene = overlay_->getThreeDScene();
+    if (!scene) return;
+    Camera* cam = scene->getActiveCamera();
+    if (!cam || !cam->isSoftwareCamera()) return;
+
+    cam->zoom(static_cast<float>(wheelDirection));
+    InvalidateRect(overlay_->getHandle(), nullptr, FALSE);
+}

@@ -122,6 +122,7 @@ public:
     // ----- Manipulation in scene -----
     void MoveCameraLaterally(int deltaX, int deltaY);
     void ProcessWheelInput(int wheelDirection);
+    void ProcessZoom(int wheelDirection);
     
     bool isEdgeLoopActive = false;
 
