@@ -354,7 +354,7 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	
 	overlay_viewport_->show(true);
 	
-	enableSlotTextureRendering(true);  
+	enableSlotTextureRendering(false);  
 	
 	if (iframe_mouse_detector_) {
 		iframe_mouse_detector_->setWindowHandle(parent_hwnd);
@@ -410,6 +410,7 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 		
 		static int frameCounter = 0;
 		frameCounter++;
+		
 		
 		// Update mouse position tracking in MouseControlToOverlay
 		if (handler->getMouseControlToOverlay())
@@ -479,15 +480,29 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 			}
 		}
 		
+		if (handler->getCurrentMouseState() == handler->getAboveOverlayState())
+		{
+			if (handler->getMouseControlToOverlay()->hasClickEvent())
+			{
+				if (handler->getOverlay())
+				{
+					handler->getOverlay()->shootRaycastFromUIHandler();
+				}
+			}
+		}
+		
 		bool isShiftPressed = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+
 		if (handler->getMouseControlToOverlay()->isLeftButtonClicking() && !isShiftPressed && handler->getCurrentMouseState() == handler->getAboveOverlayState())
 		{
-			
-			if (handler->getOverlay())
+			if (handler->getMouseControlToOverlay()->isClickHeldForDuration(200))
 			{
-				int deltaX = handler->getMouseControlToOverlay()->getMouseDeltaX();
-				int deltaY = handler->getMouseControlToOverlay()->getMouseDeltaY();
-				handler->getOverlay()->ProcessCameraOrbiting(deltaX, deltaY);
+				if (handler->getOverlay())
+				{
+					int deltaX = handler->getMouseControlToOverlay()->getMouseDeltaX();
+					int deltaY = handler->getMouseControlToOverlay()->getMouseDeltaY();
+					handler->getOverlay()->ProcessCameraOrbiting(deltaX, deltaY);
+				}
 			}
 		}
 		
@@ -497,8 +512,6 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 			if (handler->getMouseControlToOverlay()->hasWheelInput())
 			{
 				int wheelDirection = handler->getMouseControlToOverlay()->getMouseWheelDirection();
-				std::cout << "[RenderTimerProc] Mouse ABOVE-OVERLAY: Processing wheel input: " << wheelDirection << std::endl;
-				// handler->getOverlay()->ProcessWheelInput(wheelDirection);
 				handler->getOverlay()->ProcessZoom(wheelDirection);
 			}
 		}

@@ -29,6 +29,8 @@ namespace SIMILI
 				void resetMousePosition();
 				
 				bool isLeftButtonClicking() const { return (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0; }
+				bool hasClickEvent();
+				bool isClickHeldForDuration(DWORD durationMs = 1000);
 				
 				// Mouse wheel scroll management
 				int getMouseWheelDirection() const { return mouse_wheel_direction_; }
@@ -39,6 +41,7 @@ namespace SIMILI
 			private:
 				Mouse_State* current_mouse_state_;
 				bool left_mouse_pressed_;
+				bool was_left_button_down_;
 				
 				KeyManager& key_manager_;
 				
@@ -57,6 +60,13 @@ namespace SIMILI
 				int mouse_wheel_direction_;
 				DWORD last_wheel_input_time_;
 				const DWORD wheel_timeout_ms_ = 100;
+				
+				bool click_event_pending_;
+				int click_start_x_;
+				int click_start_y_;
+				const int click_movement_threshold_ = 5;
+				
+				DWORD click_start_time_;
 		};
 	}
 }

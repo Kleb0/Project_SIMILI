@@ -738,6 +738,12 @@ bool OverlayViewport::isVisible() const
 	return false;
 }
 
+void OverlayViewport::shootRaycastFromUIHandler()
+{
+	std::cout << "[Overlay_Viewport] Call from Ui_handler, click detected launch Raycast TEST" << std::endl;
+	performRaycast(0, 0);
+}
+
 void OverlayViewport::ensureProperZOrder()
 {
 	if (!hwnd_ || !parent_) return;
