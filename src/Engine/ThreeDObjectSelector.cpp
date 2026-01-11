@@ -36,103 +36,90 @@ void ThreeDObjectSelector::pickUpMesh(int mouseX, int mouseY, int screenWidth, i
 		return;
 	}
 	
-	try 
+	float mouseY_GL = screenHeight - mouseY;
+	
+	std::cout << " [pickUpMesh] Mouse input: (" << mouseX << ", " << mouseY << ")" << std::endl;
+	std::cout << " [pickUpMesh] Mouse GL (after Y-flip): (" << mouseX << ", " << mouseY_GL << ")" << std::endl;
+	std::cout << " [pickUpMesh] Screen: " << screenWidth << "x" << screenHeight << std::endl;
+	
+	glm::vec3 rayStart = glm::unProject(glm::vec3(mouseX, mouseY_GL, 0.0f), view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
+	glm::vec3 rayEnd = glm::unProject(glm::vec3(mouseX, mouseY_GL, 1.0f), view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
+
+	glm::vec3 rayDir = glm::normalize(rayEnd - rayStart);
+	glm::vec3 rayOrigin = rayStart;
+	
+	std::cout << " [pickUpMesh] Ray origin: (" << rayOrigin.x << ", " << rayOrigin.y << ", " << rayOrigin.z << ")" << std::endl;
+	std::cout << " [pickUpMesh] Ray dir: (" << rayDir.x << ", " << rayDir.y << ", " << rayDir.z << ")" << std::endl;
+
+	float bestScore = std::numeric_limits<float>::max();
+	ThreeDObject *closestObject = nullptr;
+	
+	const float MAX_SELECTION_DISTANCE = 100.0f;
+	const float MAX_PERPENDICULAR_DISTANCE = 2.5f; 
+
+	for (auto *obj : objects)
 	{
-		// Convert mouse coordinates to OpenGL convention (y=0 at bottom)
-		float mouseY_GL = screenHeight - mouseY;
+		if (!obj) continue;
+		if (!obj->isSelectable()) continue;
 		
-		std::cout << " [pickUpMesh] Mouse input: (" << mouseX << ", " << mouseY << ")" << std::endl;
-		std::cout << " [pickUpMesh] Mouse GL (after Y-flip): (" << mouseX << ", " << mouseY_GL << ")" << std::endl;
-		std::cout << " [pickUpMesh] Screen: " << screenWidth << "x" << screenHeight << std::endl;
-		
-		glm::vec3 rayStart = glm::unProject(glm::vec3(mouseX, mouseY_GL, 0.0f), view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
-		glm::vec3 rayEnd = glm::unProject(glm::vec3(mouseX, mouseY_GL, 1.0f), view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
+		Mesh* mesh = dynamic_cast<Mesh*>(obj);
 
-		glm::vec3 rayDir = glm::normalize(rayEnd - rayStart);
-		glm::vec3 rayOrigin = rayStart;
-		
-		std::cout << " [pickUpMesh] Ray origin: (" << rayOrigin.x << ", " << rayOrigin.y << ", " << rayOrigin.z << ")" << std::endl;
-		std::cout << " [pickUpMesh] Ray dir: (" << rayDir.x << ", " << rayDir.y << ", " << rayDir.z << ")" << std::endl;
-
-		// NEW APPROACH: Find closest object by proximity to ray direction
-		float bestScore = std::numeric_limits<float>::max();
-		ThreeDObject *closestObject = nullptr;
-		
-		const float MAX_SELECTION_DISTANCE = 100.0f;
-		const float MAX_PERPENDICULAR_DISTANCE = 1.5f; 
-
-		for (auto *obj : objects)
+		if (mesh) 
 		{
-			if (!obj) continue;
-			if (!obj->isSelectable()) continue;
-			
-			try {
-				Mesh* mesh = dynamic_cast<Mesh*>(obj);
-				if (mesh) {
-					const auto& verts = mesh->getVertices();
-					const auto& edges = mesh->getEdges();
-					const auto& faces = mesh->getFaces();
-					if (verts.empty() && edges.empty() && faces.empty()) continue;
-				}
-				
-				// Calculate distance from ray to object center
-				float distanceToRay = calculateDistanceToRay(rayOrigin, rayDir, *obj);
-				
-				// Get distance along ray (depth from camera)
-				glm::vec3 objectCenter = obj->getPosition();
-				glm::vec3 toObject = objectCenter - rayOrigin;
-				float depthAlongRay = glm::dot(toObject, rayDir);
-				
-				// Only consider objects in front of the camera
-				if (depthAlongRay <= 0.0f) {
-					std::cout << " [pickUpMesh] Object " << obj->getName() << " is behind camera, skipping" << std::endl;
-					continue;
-				}
-				
-				// Ignore objects too far away (along ray)
-				if (depthAlongRay > MAX_SELECTION_DISTANCE) {
-					std::cout << " [pickUpMesh] Object " << obj->getName() << " is too far (" << depthAlongRay << "), skipping" << std::endl;
-					continue;
-				}
-				
-				// NEW: Ignore objects too far from the ray (perpendicular distance)
-				if (distanceToRay > MAX_PERPENDICULAR_DISTANCE) {
-					std::cout << " [pickUpMesh] Object " << obj->getName() << " is too far from ray (" << distanceToRay << " > " << MAX_PERPENDICULAR_DISTANCE << "), skipping" << std::endl;
-					continue;
-				}
-				
-				// Combined score: distance to ray + depth (prioritize closer objects in ray direction)
-				// Weight the perpendicular distance more heavily than depth
-				float score = distanceToRay * 2.0f + depthAlongRay * 0.1f;
-				
-				std::cout << " [pickUpMesh] Object: " << obj->getName() 
-						  << " | Distance to ray: " << distanceToRay 
-						  << " | Depth: " << depthAlongRay 
-						  << " | Score: " << score << std::endl;
-				
-				if (score < bestScore)
-				{
-					bestScore = score;
-					closestObject = obj;
-				}
-			} 
-			catch (const std::exception& e) 
-			{
-				std::cerr << "[ThreeDObjectSelector] Error processing object: " << e.what() << std::endl;
-			}
+			const auto& verts = mesh->getVertices();
+			const auto& edges = mesh->getEdges();
+			const auto& faces = mesh->getFaces();
+			if (verts.empty() && edges.empty() && faces.empty()) continue;
 		}
-
-		selectedObject = closestObject;
 		
-		if (selectedObject) 
+		float distanceToRay = calculateDistanceToRay(rayOrigin, rayDir, *obj);
+		
+		glm::vec3 objectCenter = obj->getPosition();
+		glm::vec3 toObject = objectCenter - rayOrigin;
+		float depthAlongRay = glm::dot(toObject, rayDir);
+		
+		if (depthAlongRay <= 0.0f) 
 		{
-			std::cout << " [pickUpMesh] Selected: " << selectedObject->getName() 
-					  << " with best score: " << bestScore << std::endl;
-		} else {
-			std::cout << " [pickUpMesh] No object selected" << std::endl;
+			std::cout << " [pickUpMesh] Object " << obj->getName() << " is behind camera, skipping" << std::endl;
+			continue;
 		}
-	} catch (const std::exception& e) {
-		std::cerr << "[ThreeDObjectSelector] Error during pickUpMesh: " << e.what() << std::endl;
+		
+		if (depthAlongRay > MAX_SELECTION_DISTANCE) 
+		{
+			std::cout << " [pickUpMesh] Object " << obj->getName() << " is too far (" << depthAlongRay << "), skipping" << std::endl;
+			continue;
+		}
+		
+		if (distanceToRay > MAX_PERPENDICULAR_DISTANCE) 
+		{
+			std::cout << " [pickUpMesh] Object " << obj->getName() << " is too far from ray (" << distanceToRay << " > " << MAX_PERPENDICULAR_DISTANCE << "), skipping" << std::endl;
+			continue;
+		}
+		
+		float score = distanceToRay * 2.0f + depthAlongRay * 0.1f;
+		
+		std::cout << " [pickUpMesh] Object: " << obj->getName() 
+				  << " | Distance to ray: " << distanceToRay 
+				  << " | Depth: " << depthAlongRay 
+				  << " | Score: " << score << std::endl;
+		
+		if (score < bestScore)
+		{
+			bestScore = score;
+			closestObject = obj;
+		}
+	}
+
+	selectedObject = closestObject;
+	
+	if (selectedObject) 
+	{
+		std::cout << " [pickUpMesh] Selected: " << selectedObject->getName() 
+				  << " with best score: " << bestScore << std::endl;
+	} 
+	else 
+	{
+		std::cout << " [pickUpMesh] No object selected" << std::endl;
 	}
 }
 

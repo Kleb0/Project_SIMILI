@@ -46,6 +46,7 @@
 #include "../../Engine/ThreeDInteractions/EdgeTransform.hpp"
 #include "Keymanagement/KeyManager.hpp"
 #include "Keymanagement/MouseControlToOverlay.hpp"
+#include "FrameDatas/FrameDatas.hpp"
 #include "../ui_handler.hpp"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -738,10 +739,38 @@ bool OverlayViewport::isVisible() const
 	return false;
 }
 
-void OverlayViewport::shootRaycastFromUIHandler()
+void OverlayViewport::shootRaycastFromUIHandler(int mouseX, int mouseY)
 {
 	std::cout << "[Overlay_Viewport] Call from Ui_handler, click detected launch Raycast TEST" << std::endl;
-	performRaycast(0, 0);
+	
+	if (!ui_handler_ || !ui_handler_->getFrameDatas())
+	{
+		std::cout << "[Overlay_Viewport] ERROR: No FrameDatas available" << std::endl;
+		return;
+	}
+	
+	SIMILI::Frontend::IFrameScreenData viewportData;
+	if (!ui_handler_->getFrameDatas()->getFrameData("viewport_docking", viewportData))
+	{
+		std::cout << "[Overlay_Viewport] ERROR: viewport_docking data not found in FrameDatas" << std::endl;
+		return;
+	}
+	
+	int relativeX = mouseX - viewportData.screenX;
+	int relativeY = mouseY - viewportData.screenY;
+	
+	std::cout << "[Overlay_Viewport] Screen coords: (" << mouseX << ", " << mouseY << ")" << std::endl;
+	std::cout << "[Overlay_Viewport] Viewport screen pos: (" << viewportData.screenX << ", " << viewportData.screenY << ")" << std::endl;
+	std::cout << "[Overlay_Viewport] Relative coords: (" << relativeX << ", " << relativeY << ")" << std::endl;
+	
+	if (relativeX >= 0 && relativeX < viewportData.width && relativeY >= 0 && relativeY < viewportData.height)
+	{
+		performRaycast(relativeX, relativeY);
+	}
+	else
+	{
+		std::cout << "[Overlay_Viewport] Click outside viewport bounds" << std::endl;
+	}
 }
 
 void OverlayViewport::ensureProperZOrder()

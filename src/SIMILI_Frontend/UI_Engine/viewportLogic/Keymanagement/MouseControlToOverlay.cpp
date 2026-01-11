@@ -83,19 +83,15 @@ namespace SIMILI
 			if (msg == WM_MOUSEWHEEL)
 			{
 				int delta = GET_WHEEL_DELTA_WPARAM(wParam);
-				last_wheel_input_time_ = GetTickCount();
-				
-				std::cout << "[MouseControlToOverlay] WM_MOUSEWHEEL detected! Delta: " << delta << std::endl;
+				last_wheel_input_time_ = GetTickCount();				
 				
 				if (delta > 0)
 				{
 					mouse_wheel_direction_ = 1;
-					std::cout << "[MouseControlToOverlay] Scroll UP (1)" << std::endl;
 				}
 				else if (delta < 0)
 				{
 					mouse_wheel_direction_ = -1;
-					std::cout << "[MouseControlToOverlay] Scroll DOWN (-1)" << std::endl;
 				}
 				else
 				{

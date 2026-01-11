@@ -23,8 +23,11 @@ namespace SIMILI
 				void processMouseMove(int mouseX, int mouseY);
 				void updateMousePosition();
 
-				int getMouseDeltaX() const { return mouse_delta_x_; }
+					int getMouseDeltaX() const { return mouse_delta_x_; }
 				int getMouseDeltaY() const { return mouse_delta_y_; }
+				
+				int getCurrentMouseX() const { return current_mouse_x_; }
+				int getCurrentMouseY() const { return current_mouse_y_; }
 				
 				void resetMousePosition();
 				

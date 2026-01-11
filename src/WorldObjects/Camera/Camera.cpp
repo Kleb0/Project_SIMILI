@@ -27,7 +27,6 @@ glm::mat4 Camera::getProjectionMatrix(float aspectRatio) const
 
 void Camera::zoom(float offset)
 {
-    std::cout << "[DEBUG] Zooming camera: " << offset << std::endl;
     fov -= offset * zoomSpeed;
     if (fov < 20.0f)
         fov = 20.0f;

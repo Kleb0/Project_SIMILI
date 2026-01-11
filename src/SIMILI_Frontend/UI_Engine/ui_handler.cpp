@@ -409,8 +409,7 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 	{		
 		
 		static int frameCounter = 0;
-		frameCounter++;
-		
+		frameCounter++;		
 		
 		// Update mouse position tracking in MouseControlToOverlay
 		if (handler->getMouseControlToOverlay())
@@ -486,7 +485,9 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 			{
 				if (handler->getOverlay())
 				{
-					handler->getOverlay()->shootRaycastFromUIHandler();
+					int mouseX = handler->getMouseControlToOverlay()->getCurrentMouseX();
+					int mouseY = handler->getMouseControlToOverlay()->getCurrentMouseY();
+					handler->getOverlay()->shootRaycastFromUIHandler(mouseX, mouseY);
 				}
 			}
 		}

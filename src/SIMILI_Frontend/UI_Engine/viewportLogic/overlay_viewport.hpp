@@ -125,7 +125,7 @@ public:
     void ProcessZoom(int wheelDirection);
     void ProcessMouseMovementWhileLeftClicking(int deltaX, int deltaY);
     void ProcessCameraOrbiting(int deltaX, int deltaY);
-	void shootRaycastFromUIHandler();
+	void shootRaycastFromUIHandler(int mouseX, int mouseY);
     static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
     
     // ----------- Initialization & Cleanup -----------
