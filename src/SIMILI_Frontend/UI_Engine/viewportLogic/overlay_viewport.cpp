@@ -766,6 +766,40 @@ void OverlayViewport::shootRaycastFromUIHandler(int mouseX, int mouseY)
 	if (relativeX >= 0 && relativeX < viewportData.width && relativeY >= 0 && relativeY < viewportData.height)
 	{
 		performRaycast(relativeX, relativeY);
+		
+		if (three_d_scene_ && selector_)
+		{
+			auto& objects = three_d_scene_->getObjectsRef();
+			ThreeDObject* clickedObject = selector_->getSelectedObject();
+			
+			for (auto* obj : objects)
+			{
+				if (obj) obj->setSelected(false);
+			}
+			
+			if (clickedObject && clickedObject->isSelectable())
+			{
+				clickedObject->setSelected(true);
+			}
+			
+			std::list<ThreeDObject*> selectedList;
+			for (auto* obj : objects)
+			{
+				if (obj && obj->getSelected())
+				{
+					selectedList.push_back(obj);
+				}
+			}
+			
+			setMultipleSelectedObjects(selectedList);
+			
+			if (hwnd_)
+			{
+				RedrawWindow(hwnd_, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOCHILDREN);
+			}
+			
+			std::cout << "[Overlay_Viewport] " << selectedList.size() << " object(s) selected, gizmo render forced" << std::endl;
+		}
 	}
 	else
 	{

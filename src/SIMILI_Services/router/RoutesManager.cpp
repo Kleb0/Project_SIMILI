@@ -239,7 +239,6 @@ namespace SIMILI {
 					
 					if (handler && handler->getOverlay()) 
 					{
-						// Build list of ALL currently selected objects
 						std::list<ThreeDObject*> selectedList;
 						for (auto* obj : objects) 
 						{
@@ -251,7 +250,6 @@ namespace SIMILI {
 						
 						handler->getOverlay()->setMultipleSelectedObjects(selectedList);
 						
-						// Force immediate high-priority redraw
 						HWND overlayHwnd = handler->getOverlay()->getHandle();
 						if (overlayHwnd) 
 						{
