@@ -80,8 +80,6 @@ public:
 	void CloseAllBrowsers(bool force_close);
 	void createOverlayViewport(HWND parent_hwnd);
 	void updateOverlayPosition();
-	void startRenderTimer();
-	void stopRenderTimer();
 	bool isOverlayRenderingEnabled() const;
 	void enableSlotTextureRendering(bool enable);
 	OverlayViewport* getOverlay() { return overlay_viewport_.get(); }

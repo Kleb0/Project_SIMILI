@@ -76,7 +76,25 @@ UIHandler::UIHandler() : parent_hwnd_(nullptr), timer_id_(0),
 
 UIHandler::~UIHandler() 
 {
-	stopRenderTimer();
+	if (timer_id_ != 0) 
+	{
+		KillTimer(nullptr, timer_id_);
+		timeEndPeriod(1);
+		g_timerHandlerMap.erase(timer_id_);
+		
+		if (g_mouseHook)
+		{
+			UnhookWindowsHookEx(g_mouseHook);
+			g_mouseHook = NULL;
+		}
+		
+		if (g_activeHandler == this)
+		{
+			g_activeHandler = nullptr;
+		}
+		
+		timer_id_ = 0;
+	}
 	
 	if (above_overlay_state_) 
 	{
@@ -360,7 +378,19 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 		iframe_mouse_detector_->setWindowHandle(parent_hwnd);
 	}		
 
-	startRenderTimer();
+	if (timer_id_ == 0 && overlay_viewport_) 
+	{
+		timeBeginPeriod(1);
+		timer_id_ = SetTimer(nullptr, 0, 16, RenderTimerProc);
+		
+		if (timer_id_ != 0) 
+		{
+			g_timerHandlerMap[timer_id_] = this;
+			g_activeHandler = this;
+			g_mouseHook = SetWindowsHookEx(WH_MOUSE_LL, LowLevelMouseProc, GetModuleHandle(nullptr), 0);
+			std::cout << "[UIHandler] Render timer started with ID " << timer_id_ << std::endl;
+		}
+	}
 	
 	updatePanelBoundsFromStocker();
 }
@@ -394,11 +424,10 @@ void UIHandler::updateOverlayPosition()
 
 static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime) 
 {
-	// Retrieve handler from static map using timer ID
+	// The timer prevent the redraw of the overlay, as overlay is configured with HTTransparent
 	auto it = g_timerHandlerMap.find(idEvent);
 	if (it == g_timerHandlerMap.end()) 
 	{
-		std::cout << "[RenderTimerProc] ERROR: Handler not found for timer ID " << idEvent << std::endl;
 		return;
 	}
 	
@@ -558,67 +587,6 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 				}
 			}
 		}
-	}
-}
-
- // --- test
-
-void UIHandler::startRenderTimer() 
-{
-	if (timer_id_ == 0 && overlay_viewport_) 
-	{
-		timeBeginPeriod(1);
-		timer_id_ = SetTimer(nullptr, 0, 16, RenderTimerProc);
-		
-		if (timer_id_ != 0) 
-		{
-			g_timerHandlerMap[timer_id_] = this;
-			g_activeHandler = this;
-			
-			// Install low-level mouse hook to capture wheel events before CEF
-			if (!g_mouseHook)
-			{
-				g_mouseHook = SetWindowsHookEx(WH_MOUSE_LL, LowLevelMouseProc, GetModuleHandle(NULL), 0);
-				if (g_mouseHook)
-				{
-					std::cout << "[UIHandler] Mouse hook installed successfully" << std::endl;
-				}
-				else
-				{
-					std::cerr << "[UIHandler] ERROR: Failed to install mouse hook!" << std::endl;
-				}
-			}
-		} 
-		else 
-		{
-			std::cerr << "[UIHandler] ERROR: Failed to create timer!" << std::endl;
-		}
-	}
-}
-
-void UIHandler::stopRenderTimer() 
-{
-	if (timer_id_ != 0) 
-	{
-		KillTimer(nullptr, timer_id_);
-		timeEndPeriod(1);
-		
-		g_timerHandlerMap.erase(timer_id_);
-		
-		// Uninstall mouse hook
-		if (g_mouseHook)
-		{
-			UnhookWindowsHookEx(g_mouseHook);
-			g_mouseHook = NULL;
-			std::cout << "[UIHandler] Mouse hook uninstalled" << std::endl;
-		}
-		
-		if (g_activeHandler == this)
-		{
-			g_activeHandler = nullptr;
-		}
-		
-		timer_id_ = 0;
 	}
 }
 
