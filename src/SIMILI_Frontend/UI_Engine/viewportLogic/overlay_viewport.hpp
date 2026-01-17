@@ -126,6 +126,7 @@ public:
     void ProcessMouseMovementWhileLeftClicking(int deltaX, int deltaY);
     void ProcessCameraOrbiting(int deltaX, int deltaY);
 	void shootRaycastFromUIHandler(int mouseX, int mouseY);
+	void injectMouseInputs(int mouseX, int mouseY, bool leftDown, bool rightDown, bool middleDown, float wheelDelta);
     static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
     
     // ----------- Initialization & Cleanup -----------
@@ -208,4 +209,12 @@ public:
     
     // ----------- Slot Texture (Layer 2) -----------
     SlotTexture* slot_texture_;
+    
+    int injected_mouse_x_ = 0;
+    int injected_mouse_y_ = 0;
+    bool injected_left_down_ = false;
+    bool injected_right_down_ = false;
+    bool injected_middle_down_ = false;
+    float injected_wheel_delta_ = 0.0f;
+    bool has_injected_inputs_ = false;
 };

@@ -577,13 +577,24 @@ void OverlayViewport::render()
 		return;
 	}
 	
-	
 	update_Scene_Rendering();
 	
 	CefDoMessageLoopWork();
 		
 	if (imgui_initialized_) 
 	{
+		if (has_injected_inputs_)
+		{
+			ImGuiIO& io = ImGui::GetIO();
+			io.MousePos = ImVec2(static_cast<float>(injected_mouse_x_), static_cast<float>(injected_mouse_y_));
+			io.MouseDown[0] = injected_left_down_;
+			io.MouseDown[1] = injected_right_down_;
+			io.MouseDown[2] = injected_middle_down_;
+			io.MouseWheel = injected_wheel_delta_;
+			
+			injected_wheel_delta_ = 0.0f;
+		}
+		
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
@@ -609,7 +620,8 @@ void OverlayViewport::render()
 	
 	SIMILI::Input::KeyManager::getInstance().update();
 	
-	if (texture_renderer_test_) {
+	if (texture_renderer_test_) 
+	{
 		texture_renderer_test_->render();
 	}
 	
@@ -686,10 +698,6 @@ void OverlayViewport::renderScene()
 	}
 }
 
-// ============================================================================
-// WINDOWS MESSAGE HANDLING
-// ============================================================================
-
 void OverlayViewport::setPosition(int x, int y, int width, int height) 
 {
 	if (hwnd_ && parent_) 
@@ -739,74 +747,6 @@ bool OverlayViewport::isVisible() const
 	return false;
 }
 
-void OverlayViewport::shootRaycastFromUIHandler(int mouseX, int mouseY)
-{
-	std::cout << "[Overlay_Viewport] Call from Ui_handler, click detected launch Raycast TEST" << std::endl;
-	
-	if (!ui_handler_ || !ui_handler_->getFrameDatas())
-	{
-		std::cout << "[Overlay_Viewport] ERROR: No FrameDatas available" << std::endl;
-		return;
-	}
-	
-	SIMILI::Frontend::IFrameScreenData viewportData;
-	if (!ui_handler_->getFrameDatas()->getFrameData("viewport_docking", viewportData))
-	{
-		std::cout << "[Overlay_Viewport] ERROR: viewport_docking data not found in FrameDatas" << std::endl;
-		return;
-	}
-	
-	int relativeX = mouseX - viewportData.screenX;
-	int relativeY = mouseY - viewportData.screenY;
-	
-	std::cout << "[Overlay_Viewport] Screen coords: (" << mouseX << ", " << mouseY << ")" << std::endl;
-	std::cout << "[Overlay_Viewport] Viewport screen pos: (" << viewportData.screenX << ", " << viewportData.screenY << ")" << std::endl;
-	std::cout << "[Overlay_Viewport] Relative coords: (" << relativeX << ", " << relativeY << ")" << std::endl;
-	
-	if (relativeX >= 0 && relativeX < viewportData.width && relativeY >= 0 && relativeY < viewportData.height)
-	{
-		performRaycast(relativeX, relativeY);
-		
-		if (three_d_scene_ && selector_)
-		{
-			auto& objects = three_d_scene_->getObjectsRef();
-			ThreeDObject* clickedObject = selector_->getSelectedObject();
-			
-			for (auto* obj : objects)
-			{
-				if (obj) obj->setSelected(false);
-			}
-			
-			if (clickedObject && clickedObject->isSelectable())
-			{
-				clickedObject->setSelected(true);
-			}
-			
-			std::list<ThreeDObject*> selectedList;
-			for (auto* obj : objects)
-			{
-				if (obj && obj->getSelected())
-				{
-					selectedList.push_back(obj);
-				}
-			}
-			
-			setMultipleSelectedObjects(selectedList);
-			
-			if (hwnd_)
-			{
-				RedrawWindow(hwnd_, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOCHILDREN);
-			}
-			
-			std::cout << "[Overlay_Viewport] " << selectedList.size() << " object(s) selected, gizmo render forced" << std::endl;
-		}
-	}
-	else
-	{
-		std::cout << "[Overlay_Viewport] Click outside viewport bounds" << std::endl;
-	}
-}
-
 void OverlayViewport::ensureProperZOrder()
 {
 	if (!hwnd_ || !parent_) return;
@@ -846,9 +786,17 @@ void OverlayViewport::ensureProperZOrder()
 	}
 }
 
-// ============================================================================
-// WINDOWS MESSAGE HANDLING
-// ============================================================================
+void OverlayViewport::injectMouseInputs(int mouseX, int mouseY, bool leftDown, bool rightDown, bool middleDown, float wheelDelta)
+{
+	injected_mouse_x_ = mouseX;
+	injected_mouse_y_ = mouseY;
+	injected_left_down_ = leftDown;
+	injected_right_down_ = rightDown;
+	injected_middle_down_ = middleDown;
+	injected_wheel_delta_ = wheelDelta;
+	has_injected_inputs_ = true;
+}
+
 
 LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 {
@@ -884,7 +832,6 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 			{
 				PAINTSTRUCT ps;
 				BeginPaint(hwnd, &ps);
-				overlay->render();
 				EndPaint(hwnd, &ps);
 				return 0;
 			}
@@ -986,7 +933,8 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 
 void OverlayViewport::performRaycast(int mouseX, int mouseY) 
 {
-	if (raycast_performer_) {
+	if (raycast_performer_) 
+	{
 		raycast_performer_->performRaycast(mouseX, mouseY);
 	}
 }
@@ -995,7 +943,8 @@ void OverlayViewport::setMultipleSelectedObjects(const std::list<ThreeDObject*>&
 { 
 	multiple_selected_objects_ = objects;
 	
-	if (ui_handler_) {
+	if (ui_handler_) 
+	{
 		ui_handler_->notifySceneChanged();
 	}
 }
@@ -1190,6 +1139,9 @@ void OverlayViewport::showSlotTexture(bool visible)
 		}
 	}
 }
+
+// -------- Camera process 	------------ //
+
 void OverlayViewport::MoveCameraLaterally(int deltaX, int deltaY)
 {
 	if (!three_d_scene_) return;
@@ -1230,4 +1182,70 @@ void OverlayViewport::ProcessCameraOrbiting(int deltaX, int deltaY)
 	cam->prepareOrbit();
 	cam->orbitAroundTarget(static_cast<float>(deltaX), static_cast<float>(deltaY));
 	InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
+// ---------- Raycast process ------------- //
+
+void OverlayViewport::shootRaycastFromUIHandler(int mouseX, int mouseY)
+{
+	
+	if (!ui_handler_ || !ui_handler_->getFrameDatas())
+	{
+		return;
+	}
+	
+	SIMILI::Frontend::IFrameScreenData viewportData;
+	if (!ui_handler_->getFrameDatas()->getFrameData("viewport_docking", viewportData))
+	{
+		return;
+	}
+	
+	int relativeX = mouseX - viewportData.screenX;
+	int relativeY = mouseY - viewportData.screenY;
+	
+	std::cout << "[Overlay_Viewport] Screen coords: (" << mouseX << ", " << mouseY << ")" << std::endl;
+	std::cout << "[Overlay_Viewport] Viewport screen pos: (" << viewportData.screenX << ", " << viewportData.screenY << ")" << std::endl;
+	std::cout << "[Overlay_Viewport] Relative coords: (" << relativeX << ", " << relativeY << ")" << std::endl;
+	
+	if (relativeX >= 0 && relativeX < viewportData.width && relativeY >= 0 && relativeY < viewportData.height)
+	{
+		performRaycast(relativeX, relativeY);
+		
+		if (three_d_scene_ && selector_)
+		{
+			auto& objects = three_d_scene_->getObjectsRef();
+			ThreeDObject* clickedObject = selector_->getSelectedObject();
+			
+			for (auto* obj : objects)
+			{
+				if (obj) obj->setSelected(false);
+			}
+			
+			if (clickedObject && clickedObject->isSelectable())
+			{
+				clickedObject->setSelected(true);
+			}
+			
+			std::list<ThreeDObject*> selectedList;
+			for (auto* obj : objects)
+			{
+				if (obj && obj->getSelected())
+				{
+					selectedList.push_back(obj);
+				}
+			}
+			
+			setMultipleSelectedObjects(selectedList);
+			
+			if (hwnd_)
+			{
+				RedrawWindow(hwnd_, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOCHILDREN);
+			}
+			
+		}
+	}
+	else
+	{
+		return;
+	}
 }

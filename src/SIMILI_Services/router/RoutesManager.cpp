@@ -222,7 +222,6 @@ namespace SIMILI {
 					return resp;
 				}
 				
-				// If Shift key is NOT pressed, deselect all objects
 				if (!shiftKey) 
 				{
 					for (auto* obj : objects) 

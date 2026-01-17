@@ -117,8 +117,6 @@ namespace MeshTransform
 
 		static ImGuizmo::OPERATION currentGizmoOperation = ImGuizmo::TRANSLATE;
 		
-		// CRITICAL: Check key presses BEFORE checking if objects are selected
-		// This allows mode switching even when nothing is selected
 		auto& keyManager = SIMILI::Input::KeyManager::getInstance();
 		auto* inputSystem = keyManager.getInputSystem();
 		

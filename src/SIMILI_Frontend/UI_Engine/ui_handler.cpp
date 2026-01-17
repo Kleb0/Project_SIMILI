@@ -354,7 +354,7 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	
 	overlay_viewport_->show(true);
 	
-	enableSlotTextureRendering(false);  
+	enableSlotTextureRendering(true);  
 	
 	if (iframe_mouse_detector_) {
 		iframe_mouse_detector_->setWindowHandle(parent_hwnd);
@@ -522,6 +522,40 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 			if (handler->getMouseControlToOverlay()->hasWheelInput())
 			{
 				handler->getMouseControlToOverlay()->resetWheelDirection();
+			}
+		}
+		
+		if (handler->getOverlay() && handler->getMouseControlToOverlay())
+		{
+			POINT cursorPos;
+			if (GetCursorPos(&cursorPos))
+			{
+				HWND overlayHwnd = handler->getOverlay()->getHandle();
+				if (overlayHwnd)
+				{
+					ScreenToClient(overlayHwnd, &cursorPos);
+					
+					bool leftDown = handler->getMouseControlToOverlay()->isLeftButtonClicking();
+					bool rightDown = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+					bool middleDown = (GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0;
+					
+					float wheelDelta = 0.0f;
+					if (handler->getMouseControlToOverlay()->hasWheelInput())
+					{
+						wheelDelta = static_cast<float>(handler->getMouseControlToOverlay()->getMouseWheelDirection());
+					}
+					
+					handler->getOverlay()->injectMouseInputs(
+						cursorPos.x,
+						cursorPos.y,
+						leftDown,
+						rightDown,
+						middleDown,
+						wheelDelta
+					);
+					
+					handler->getOverlay()->render();
+				}
 			}
 		}
 	}
