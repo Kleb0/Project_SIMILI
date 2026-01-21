@@ -72,6 +72,7 @@ public:
 	virtual void OnLoadError(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, ErrorCode errorCode, 
 	const CefString& errorText, const CefString& failedUrl) override;
 
+	// keyboard events
 	virtual bool OnPreKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& event,
 		CefEventHandle os_event, bool* is_keyboard_shortcut) override;
 	virtual bool OnKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& event,
@@ -116,8 +117,7 @@ public:
 	std::string getLastDetectedRegionName() const { return last_detected_region_name_; }
 	void setLastDetectedRegionName(const std::string& regionName) { last_detected_region_name_ = regionName; }
 	
-	SIMILI::Input::MouseControlToOverlay* getMouseControlToOverlay() const { return mouse_control_to_overlay_; }
-	
+	SIMILI::Input::MouseControlToOverlay* getMouseControlToOverlay() const { return mouse_control_to_overlay_; }	
 
 	// Friend function to allow RenderTimerProc access to private members
 	friend VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime);

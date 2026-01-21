@@ -527,7 +527,7 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 		{
 			if (handler->getMouseControlToOverlay()->isClickHeldForDuration(200))
 			{
-				if (handler->getOverlay())
+				if (handler->getOverlay() && !handler->getOverlay()->isGizmoActive())
 				{
 					int deltaX = handler->getMouseControlToOverlay()->getMouseDeltaX();
 					int deltaY = handler->getMouseControlToOverlay()->getMouseDeltaY();
@@ -560,6 +560,7 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 			if (GetCursorPos(&cursorPos))
 			{
 				HWND overlayHwnd = handler->getOverlay()->getHandle();
+
 				if (overlayHwnd)
 				{
 					ScreenToClient(overlayHwnd, &cursorPos);
@@ -569,6 +570,7 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 					bool middleDown = (GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0;
 					
 					float wheelDelta = 0.0f;
+
 					if (handler->getMouseControlToOverlay()->hasWheelInput())
 					{
 						wheelDelta = static_cast<float>(handler->getMouseControlToOverlay()->getMouseWheelDirection());

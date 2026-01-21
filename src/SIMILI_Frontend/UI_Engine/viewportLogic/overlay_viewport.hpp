@@ -92,6 +92,7 @@ public:
     ImGuizmo::OPERATION getGuizmoOperation() const { return current_guizmo_operation_; }
     void setGuizmoMode(ImGuizmo::MODE mode) { current_guizmo_mode_ = mode; }
     ImGuizmo::MODE getGuizmoMode() const { return current_guizmo_mode_; }
+    bool isGizmoActive() const { return is_gizmo_active_; }
     
     // ----------- 3D Modeling Mode Management -----------
     void setModelingMode(ThreeDMode* mode);
@@ -177,6 +178,7 @@ public:
     ImGuizmo::OPERATION current_guizmo_operation_;
     ImGuizmo::MODE current_guizmo_mode_;
     bool was_using_gizmo_last_frame_;
+    bool is_gizmo_active_;
     
     // ----------- 3D Modeling Modes -----------
     Normal_Mode* normal_mode_;

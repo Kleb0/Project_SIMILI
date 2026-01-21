@@ -618,6 +618,15 @@ void OverlayViewport::render()
 	
 	ThreeDWorldInteractions();
 	
+	if (imgui_initialized_)
+	{
+		is_gizmo_active_ = ImGuizmo::IsUsing();
+	}
+	else
+	{
+		is_gizmo_active_ = false;
+	}
+	
 	SIMILI::Input::KeyManager::getInstance().update();
 	
 	if (texture_renderer_test_) 
