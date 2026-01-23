@@ -10,12 +10,12 @@ ThreeDObjectSelector::ThreeDObjectSelector()
 {
 }
 
-void ThreeDObjectSelector::printRaycastDebugHeader(int mouseX, int mouseY, int screenWidth, int screenHeight, 
+void ThreeDObjectSelector::printRaycastDebugHeader(int mouseX, int mouseY, int viewportSize, int viewportHeight, 
 const glm::vec3& cameraPos, const std::vector<ThreeDObject*>& objects)
 {
 	std::cout << "\n ========== RAYCAST DEBUG ==========" << std::endl;
 	std::cout << "[OverlayViewport] Mouse: (" << mouseX << ", " << mouseY << ")" << std::endl;
-	std::cout << "[OverlayViewport] Viewport: " << screenWidth << "x" << screenHeight << std::endl;
+	std::cout << "[OverlayViewport] Viewport: " << viewportSize << "x" << viewportHeight << std::endl;
 	std::cout << "[OverlayViewport] Camera position: (" << cameraPos.x << ", " << cameraPos.y << ", " << cameraPos.z << ")" << std::endl;
 	
 	for (const auto* obj : objects) {
@@ -28,22 +28,22 @@ const glm::vec3& cameraPos, const std::vector<ThreeDObject*>& objects)
 	std::cout << "[OverlayViewport] Starting raycast with " << objects.size() << " objects..." << std::endl;
 }
 
-void ThreeDObjectSelector::pickUpMesh(int mouseX, int mouseY, int screenWidth, int screenHeight, const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObject *> &objects)
+void ThreeDObjectSelector::pickUpMesh(int mouseX, int mouseY, int viewportSize, int viewportHeight, const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObject *> &objects)
 {
-	if (screenWidth <= 0 || screenHeight <= 0) 
+	if (viewportSize <= 0 || viewportHeight <= 0) 
 	{
 		std::cerr << "[ThreeDObjectSelector] Invalid screen dimensions" << std::endl;
 		return;
 	}
 	
-	float mouseY_GL = screenHeight - mouseY;
+	float mouseY_GL = viewportHeight - mouseY;
 	
 	std::cout << " [pickUpMesh] Mouse input: (" << mouseX << ", " << mouseY << ")" << std::endl;
 	std::cout << " [pickUpMesh] Mouse GL (after Y-flip): (" << mouseX << ", " << mouseY_GL << ")" << std::endl;
-	std::cout << " [pickUpMesh] Screen: " << screenWidth << "x" << screenHeight << std::endl;
+	std::cout << " [pickUpMesh] Viewport: " << viewportSize << "x" << viewportHeight << std::endl;
 	
-	glm::vec3 rayStart = glm::unProject(glm::vec3(mouseX, mouseY_GL, 0.0f), view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
-	glm::vec3 rayEnd = glm::unProject(glm::vec3(mouseX, mouseY_GL, 1.0f), view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
+	glm::vec3 rayStart = glm::unProject(glm::vec3(mouseX, mouseY_GL, 0.0f), view, projection, glm::vec4(0, 0, viewportSize, viewportHeight));
+	glm::vec3 rayEnd = glm::unProject(glm::vec3(mouseX, mouseY_GL, 1.0f), view, projection, glm::vec4(0, 0, viewportSize, viewportHeight));
 
 	glm::vec3 rayDir = glm::normalize(rayEnd - rayStart);
 	glm::vec3 rayOrigin = rayStart;
