@@ -8,8 +8,8 @@
 #include "WorldObjects/Mesh_DNA/Mesh_DNA.hpp"
 #include "WorldObjects/Entities/ThreeDObject.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
-#include "UI/ThreeDModes/ThreeDMode.hpp"
-#include "UI/ThreeDModes/Vertice_Mode.hpp"
+#include "Engine/ThreeDModes/ThreeDMode.hpp"
+#include "Engine/ThreeDModes/Vertice_Mode.hpp"
 #include "SIMILI_Frontend/UI_Engine/viewportLogic/Keymanagement/KeyManager.hpp"
 #include <glm/gtx/matrix_decompose.hpp>
 #include <glm/gtc/type_ptr.hpp>

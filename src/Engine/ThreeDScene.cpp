@@ -13,7 +13,7 @@
 #include "WorldObjects/Mesh/Mesh.hpp"
 #include "WorldObjects/Mesh_DNA/Mesh_DNA.hpp"
 #include "WorldObjects/Camera/Camera.hpp"
-#include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
+// #include "UI/HierarchyInspectorLogic/HierarchyInspector.hpp"
 #include "ErrorBox.hpp"
 #include "json.hpp"
 
@@ -370,7 +370,7 @@ bool ThreeDScene::removeObject(ThreeDObject* object)
         sdna->trackRemoveObject(object->getName(), object);
 
     pushInGraveyard(object);
-    hierarchyInspector->redrawSlotsList();
+    // hierarchyInspector->redrawSlotsList();
     return true;
 }
 

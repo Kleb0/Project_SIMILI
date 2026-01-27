@@ -7,10 +7,10 @@
 #include "../../../WorldObjects/Basic/Edge.hpp"
 #include "../../../WorldObjects/Camera/Camera.hpp"
 #include "../../../Engine/ThreeDObjectSelector.hpp"
-#include "../../../UI/ThreeDModes/Normal_Mode.hpp"
-#include "../../../UI/ThreeDModes/Vertice_Mode.hpp"
-#include "../../../UI/ThreeDModes/Face_Mode.hpp"
-#include "../../../UI/ThreeDModes/Edge_Mode.hpp"
+#include "../../../Engine/ThreeDModes/Normal_Mode.hpp"
+#include "../../../Engine/ThreeDModes/Vertice_Mode.hpp"
+#include "../../../Engine/ThreeDModes/Face_Mode.hpp"
+#include "../../../Engine/ThreeDModes/Edge_Mode.hpp"
 #include "KeyManagement/KeyManager.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
