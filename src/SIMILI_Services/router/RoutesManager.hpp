@@ -3,7 +3,7 @@
 #include "RouterSim.hpp"
 #include "../../Engine/OpenGLContext.hpp"
 #include "../../Engine/ThreeDScene.hpp"
-#include "../../SIMILI_Frontend/UI_Engine/ui_handler.hpp"
+#include "../../SIMILI_Frontend/ui_handler.hpp"
 
 struct GLFWwindow;
 

@@ -3,7 +3,7 @@
 #include "../../WorldObjects/Mesh/Mesh.hpp"
 #include "../../WorldObjects/Camera/Camera.hpp"
 #include "../../Engine/PrimitivesCreation/CreatePrimitive.hpp"
-#include "../../SIMILI_Frontend/UI_Engine/simple_window_delegate.hpp"
+#include "../../SIMILI_Frontend/simple_window_delegate.hpp"
 #include <iostream>
 #include <sstream>
 #include <GLFW/glfw3.h>

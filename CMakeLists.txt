@@ -54,18 +54,9 @@ endif()
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ContextualMenu
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/EdgeLoopControl
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ThreeDModes
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/HierarchyInspectorLogic
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/HistoryLogic
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ObjectInspectorLogic
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/OptionMenu
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/ThreeDWindow
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/UIDocking
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDInteractions
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDModes
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/MeshEdit
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/PrimitivesCreation
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ProjectBuilder
@@ -79,10 +70,11 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Camera
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Entities
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Mesh_DNA
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/DebugRay
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Resources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/example
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glad
@@ -93,34 +85,48 @@ include_directories(
 
 # Source files
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp)
-list(FILTER SOURCES EXCLUDE REGEX "${CMAKE_CURRENT_SOURCE_DIR}/src/unitTest/.*\\.cpp$")
+
+# Exclude LEGACY folders and _LEGACY files explicitly
+set(EXCLUDE_DIRS "LEGACY" "legacy" "UnitTest" "unitTest" "test" "tests" "Test")
+foreach(TMP_PATH ${SOURCES})
+    foreach(EXCLUDE_DIR ${EXCLUDE_DIRS})
+        string(FIND ${TMP_PATH} "/${EXCLUDE_DIR}/" EXCLUDE_DIR_FOUND)
+        if(NOT ${EXCLUDE_DIR_FOUND} EQUAL -1)
+            list(REMOVE_ITEM SOURCES ${TMP_PATH})
+            break()
+        endif()
+    endforeach()
+    # Also exclude _LEGACY suffix files
+    string(FIND ${TMP_PATH} "_LEGACY.cpp" LEGACY_SUFFIX_FOUND)
+    if(NOT ${LEGACY_SUFFIX_FOUND} EQUAL -1)
+        list(REMOVE_ITEM SOURCES ${TMP_PATH})
+    endif()
+endforeach()
+
 list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/ImGuizmo/vcpkg-example/main.cpp")
 list(FILTER SOURCES EXCLUDE REGEX "src/ThirdParty/imgui/backends/.*\\.cpp$")
 list(FILTER SOURCES EXCLUDE REGEX "src/ThirdParty/imgui/examples/.*\\.cpp$")
 list(FILTER SOURCES EXCLUDE REGEX "src/ThirdParty/imgui/misc/.*\\.cpp$")
 list(FILTER SOURCES EXCLUDE REGEX "src/ThirdParty/glm/.*\\.cpp$")
-list(FILTER SOURCES EXCLUDE REGEX "/([Tt]ests?|[Uu]nit[Tt]ests?)/.*\\.cpp$")
 list(FILTER SOURCES EXCLUDE REGEX "src/SIMILI_Frontend/.*\\.cpp$")
 list(FILTER SOURCES EXCLUDE REGEX "src/SIMILI_Services/middleware/.*\\.cpp$")
 
-# Legacy UI code - most files still needed by CEF's OverlayViewport
-# Only exclude the old main GUI system (MainSoftwareGUI) and ui_process_manager
-list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/UI/MainSoftwareGUI.cpp")
+# Legacy UI code excluded from compilation (see EXCLUDE REGEX above)
 list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ui_process_manager.cpp")
 
 # Add CEF sources from SIMILI_Frontend (exclude main_ui.cpp - we use main.cpp now)
 file(GLOB CEF_UI_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/CameraControl/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/HTMLTextureRenderer/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/Keymanagement/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/Raycasting/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/ClickHandling/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/ContextualMenuLogic/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/FrameDatas/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/CameraControl/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/HTMLTextureRenderer/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/Keymanagement/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/Raycasting/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/ClickHandling/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/ContextualMenuLogic/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/FrameDatas/*.cpp"
 )
-list(REMOVE_ITEM CEF_UI_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/main_ui.cpp")
+list(REMOVE_ITEM CEF_UI_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/main_ui.cpp")
 list(APPEND SOURCES ${CEF_UI_SOURCES})
 
 # Add SIMILI_Services/middleware sources explicitly
@@ -135,13 +141,12 @@ list(APPEND SOURCES
 
 # Add KeyManager from SIMILI_Frontend (needed for ECS input system)
 list(APPEND SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/Keymanagement/KeyManager.cpp    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/Keymanagement/MouseStates/Mouse_State.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/Keymanagement/MouseStates/Mouse_Above_Overlay_State.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/Keymanagement/MouseStates/Mouse_Outside_Overlay_State.cpp")
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/Keymanagement/KeyManager.cpp    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/Keymanagement/MouseStates/Mouse_State.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/Keymanagement/MouseStates/Mouse_Above_Overlay_State.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/Keymanagement/MouseStates/Mouse_Outside_Overlay_State.cpp")
 
 
 file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS src/*.hpp)
-file(GLOB_RECURSE UIS CONFIGURE_DEPENDS src/UI/*.ui)
 
 # ImGui sources (including Win32 backend for OverlayViewport)
 file(GLOB IMGUI_SOURCES
@@ -231,55 +236,17 @@ endif()
 message(STATUS "OpenSSL found: ${OPENSSL_INCLUDE_DIR}")
 message(STATUS "OpenSSL libraries: ${OPENSSL_LIBRARIES}")
 
-#find DirectX 12
-
-
-list(APPEND SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/DirectX12/DirectX12Renderer.cpp
-)
-list(APPEND HEADERS
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/DirectX12/DirectX12Renderer.hpp
-)
-
-list(APPEND SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/DirectX12TestWindow.cpp
-)
-list(APPEND HEADERS
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/UI/DirectX12TestWindow.hpp
-)
-
-set(WINDOWS_SDK_VERSION "10.0.22000.0")
-set(WINDOWS_SDK_INCLUDE_DIR "C:/Program Files (x86)/Windows Kits/10/Include/${WINDOWS_SDK_VERSION}")
-set(WINDOWS_SDK_LIB_DIR "C:/Program Files (x86)/Windows Kits/10/Lib/${WINDOWS_SDK_VERSION}/um/x64")
-
-include_directories(
-    ${WINDOWS_SDK_INCLUDE_DIR}/um
-    ${WINDOWS_SDK_INCLUDE_DIR}/shared
-    ${WINDOWS_SDK_INCLUDE_DIR}/winrt
-)
-
-find_library(D3D12_LIBRARY d3d12 PATHS "${WINDOWS_SDK_LIB_DIR}")
-find_library(DXGI_LIBRARY dxgi PATHS "${WINDOWS_SDK_LIB_DIR}")
-find_library(D3DCOMPILER_LIBRARY d3dcompiler PATHS "${WINDOWS_SDK_LIB_DIR}")
-
-if(NOT D3D12_LIBRARY OR NOT DXGI_LIBRARY OR NOT D3DCOMPILER_LIBRARY)
-    message(FATAL_ERROR "DirectX 12 libraries not found")
-endif()
-
-
 # Executable (Windows subsystem for wWinMain)
 if(WIN32)
     add_executable(${PROJECT_NAME} WIN32
         ${SOURCES}
         ${HEADERS}
-        ${UIS}
         ${GLAD_SOURCES}
     )
 else()
     add_executable(${PROJECT_NAME}
         ${SOURCES}
         ${HEADERS}
-        ${UIS}
         ${GLAD_SOURCES}
     )
 endif()
@@ -328,15 +295,14 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/types
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/CameraControl
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/HTMLTextureRenderer
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/Keymanagement
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/Raycasting
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/ClickHandling
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/ContextualMenuLogic
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/UI_Engine/viewportLogic/FrameDatas
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/CameraControl
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/HTMLTextureRenderer
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/Keymanagement
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/Raycasting
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/ClickHandling
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/ContextualMenuLogic
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/FrameDatas
     ${SDL3_INCLUDE_DIR}
     ${Boost_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
@@ -364,9 +330,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     glfw
     imgui
     tinyfiledialogs
-    ${D3D12_LIBRARY}
-    ${DXGI_LIBRARY}
-    ${D3DCOMPILER_LIBRARY}
     ${SDL3_LIBRARY}
     Boost::system
     OpenSSL::SSL

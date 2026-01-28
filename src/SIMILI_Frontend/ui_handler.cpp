@@ -899,6 +899,7 @@ void UIHandler::updateIFrameMouseDetectorFromFrameDatas()
 	std::map<std::string, SIMILI::Input::IFrameScreenDataSimple> simpleFrameData;
 	
 	const auto& frameDataMap = frame_datas_->getFrameData();
+
 	for (const auto& pair : frameDataMap)
 	{
 		const SIMILI::Frontend::IFrameScreenData& data = pair.second;
@@ -916,7 +917,6 @@ void UIHandler::updateIFrameMouseDetectorFromFrameDatas()
 	// Update IFrameMouseDetector with the converted data
 	iframe_mouse_detector_->updatePanelBoundsFromFrameData(simpleFrameData);
 	
-	std::cout << "[UIHandler] IFrameMouseDetector updated with " << simpleFrameData.size() << " frame(s)" << std::endl;
 }
 
 void UIHandler::transitionMouseState(const std::string& regionName)
