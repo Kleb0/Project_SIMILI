@@ -231,7 +231,7 @@ namespace SIMILI
 			if (!req_.body().empty()) 
 			{
 				std::ostringstream bodyMsg;
-				bodyMsg << "[HttpSession] Received from JavaScript: " << req_.body();
+				bodyMsg << "\n [HttpSession] Received from JavaScript: " << req_.body();
 				std::cout << bodyMsg.str() << std::endl;
 				ConsoleLogger::getInstance().addLog(bodyMsg.str(), "server");
 			}
