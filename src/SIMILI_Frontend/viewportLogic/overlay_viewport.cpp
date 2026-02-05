@@ -660,6 +660,20 @@ void OverlayViewport::render()
 	SwapBuffers(hdc_);
 }
 
+void OverlayViewport::updateViewportDimensions(int width, int height)
+{
+	if (width_ != width || height_ != height)
+	{
+		width_ = width;
+		height_ = height;
+		
+		if (three_d_scene_ && three_d_scene_->getOpenGLContext())
+		{
+			three_d_scene_->getOpenGLContext()->resize(width_, height_);
+		}
+	}
+}
+
 void OverlayViewport::renderScene() 
 {
 	static int render_debug_counter = 0;
@@ -719,6 +733,19 @@ void OverlayViewport::setPosition(int x, int y, int width, int height)
 		height_ = height;
 		
 		glViewport(0, 0, width, height);
+		
+		if (three_d_scene_ && three_d_scene_->getActiveCamera() && ui_handler_ && ui_handler_->getFrameDatas())
+		{
+			SIMILI::Frontend::IFrameScreenData viewportData;
+			if (ui_handler_->getFrameDatas()->getFrameData("viewport_docking", viewportData))
+			{
+				three_d_scene_->getActiveCamera()->setResolution(width, height, viewportData.dpiScale);
+			}
+			else
+			{
+				three_d_scene_->getActiveCamera()->setResolution(width, height);
+			}
+		}
 		
 		if (texture_renderer_test_) 
 		{
@@ -941,10 +968,25 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 
 void OverlayViewport::performRaycast(int mouseX, int mouseY) 
 {
-	if (raycast_performer_) 
+	if (!selector_ || !three_d_scene_)
 	{
-		raycast_performer_->performRaycast(mouseX, mouseY);
+		return;
 	}
+	
+	Camera* camera = three_d_scene_->getActiveCamera();
+	if (!camera)
+	{
+		return;
+	}
+	
+	float aspect = (height_ > 0) ? static_cast<float>(width_) / static_cast<float>(height_) : 1.0f;
+	glm::mat4 view = camera->getViewMatrix();
+	glm::mat4 projection = camera->getProjectionMatrix(aspect);
+	
+	auto& objects = three_d_scene_->getObjectsRef();
+	std::vector<ThreeDObject*> objectsVector(objects.begin(), objects.end());
+	
+	selector_->pickUpMesh(mouseX, mouseY, width_, height_, view, projection, objectsVector);
 }
 
 void OverlayViewport::setMultipleSelectedObjects(const std::list<ThreeDObject*>& objects) 
@@ -1196,64 +1238,7 @@ void OverlayViewport::ProcessCameraOrbiting(int deltaX, int deltaY)
 
 void OverlayViewport::shootRaycastFromUIHandler(int mouseX, int mouseY)
 {
-	
-	if (!ui_handler_ || !ui_handler_->getFrameDatas())
-	{
-		return;
-	}
-	
-	SIMILI::Frontend::IFrameScreenData viewportData;
-	if (!ui_handler_->getFrameDatas()->getFrameData("viewport_docking", viewportData))
-	{
-		return;
-	}
-	
-	int relativeX = mouseX - viewportData.screenX;
-	int relativeY = mouseY - viewportData.screenY;
-	
-	std::cout << "[Overlay_Viewport] Screen coords: (" << mouseX << ", " << mouseY << ")" << std::endl;
-	std::cout << "[Overlay_Viewport] Viewport screen pos: (" << viewportData.screenX << ", " << viewportData.screenY << ")" << std::endl;
-	std::cout << "[Overlay_Viewport] Relative coords: (" << relativeX << ", " << relativeY << ")" << std::endl;
-	
-	if (relativeX >= 0 && relativeX < viewportData.width && relativeY >= 0 && relativeY < viewportData.height)
-	{
-		performRaycast(relativeX, relativeY);
-		
-		if (three_d_scene_ && selector_)
-		{
-			auto& objects = three_d_scene_->getObjectsRef();
-			ThreeDObject* clickedObject = selector_->getSelectedObject();
-			
-			for (auto* obj : objects)
-			{
-				if (obj) obj->setSelected(false);
-			}
-			
-			if (clickedObject && clickedObject->isSelectable())
-			{
-				clickedObject->setSelected(true);
-			}
-			
-			std::list<ThreeDObject*> selectedList;
-			for (auto* obj : objects)
-			{
-				if (obj && obj->getSelected())
-				{
-					selectedList.push_back(obj);
-				}
-			}
-			
-			setMultipleSelectedObjects(selectedList);
-			
-			if (hwnd_)
-			{
-				RedrawWindow(hwnd_, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOCHILDREN);
-			}
-			
-		}
-	}
-	else
-	{
-		return;
-	}
+
+	std::cout << "\n [OVERLAY_VIEWPORT] shootRaycastFromUIHandler called with mouseX: " << mouseX << ", mouse Y: " << mouseY << std::endl;
+
 }

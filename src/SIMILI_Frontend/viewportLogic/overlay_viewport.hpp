@@ -57,6 +57,8 @@ public:
     int getWidth() const { return width_; }
     int getHeight() const { return height_; }
     
+    void updateViewportDimensions(int width, int height);
+    
     // ----------- Rendering Control -----------
     void render();
     void enableRendering(bool enable) { rendering_enabled_ = enable; }

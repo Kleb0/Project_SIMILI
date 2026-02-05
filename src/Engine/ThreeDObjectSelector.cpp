@@ -15,7 +15,7 @@ const glm::vec3& cameraPos, const std::vector<ThreeDObject*>& objects)
 {
 	std::cout << "\n ========== RAYCAST DEBUG ==========" << std::endl;
 	std::cout << "[OverlayViewport] Mouse: (" << mouseX << ", " << mouseY << ")" << std::endl;
-	std::cout << "[OverlayViewport] Viewport: " << viewportSize << "x" << viewportHeight << std::endl;
+	std::cout << "[OverlayViewport] Viewport Resolution: " << viewportSize << "x" << viewportHeight << std::endl;
 	std::cout << "[OverlayViewport] Camera position: (" << cameraPos.x << ", " << cameraPos.y << ", " << cameraPos.z << ")" << std::endl;
 	
 	for (const auto* obj : objects) {
@@ -35,6 +35,8 @@ void ThreeDObjectSelector::pickUpMesh(int mouseX, int mouseY, int viewportSize, 
 		std::cerr << "[ThreeDObjectSelector] Invalid screen dimensions" << std::endl;
 		return;
 	}
+	
+	std::cout << "[ThreeDObjectSelector] Camera/View dimensions - X: " << viewportSize << ", Y: " << viewportHeight << std::endl;
 	
 	float mouseY_GL = viewportHeight - mouseY;
 	

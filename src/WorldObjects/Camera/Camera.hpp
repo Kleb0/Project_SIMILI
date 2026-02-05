@@ -35,6 +35,11 @@ public:
     void resetOrbitPreparation();
     void orbitAroundTarget(float deltaX, float deltaY);
     void lateralMovement(float deltaX, float deltaY);
+    
+    void setResolution(int width, int height, float dpiScale = 1.0f);
+    int getResolutionWidth() const { return resolutionWidth_; }
+    int getResolutionHeight() const { return resolutionHeight_; }
+    float getDpiScale() const { return dpiScale_; }
 
     float fov = 45.0f;
     float nearClip = 0.1f;
@@ -46,4 +51,8 @@ private:
     float yaw = -90.0f;
     float pitch = 0.0f;
     float orbitRadius = 10.0f;
+    
+    int resolutionWidth_ = 800;
+    int resolutionHeight_ = 600;
+    float dpiScale_ = 1.0f;
 };

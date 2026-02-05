@@ -101,3 +101,11 @@ void Camera::lateralMovement(float deltaX, float deltaY)
     setPosition(getPosition() + translation);
     target += translation;
 }
+
+void Camera::setResolution(int width, int height, float dpiScale)
+{
+    resolutionWidth_ = width;
+    resolutionHeight_ = height;
+    dpiScale_ = dpiScale;
+    std::cout << "[Camera] Resolution updated: " << width << "x" << height << " (DPI Scale: " << dpiScale << ")" << std::endl;
+}

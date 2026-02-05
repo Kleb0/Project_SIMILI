@@ -250,6 +250,11 @@ void UIHandler::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& ti
 						mouse_control_to_overlay_->resetMousePosition();
 					}
 					
+					if (three_d_scene_ && three_d_scene_->getActiveCamera())
+					{
+						three_d_scene_->getActiveCamera()->setResolution(final_width, final_height, dpiScale);
+					}
+					
 					last_viewport_update_time_ = current_time;
 					last_viewport_x_ = final_x;
 					last_viewport_y_ = final_y;
@@ -372,7 +377,7 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	
 	overlay_viewport_->show(true);
 	
-	enableSlotTextureRendering(true);  
+	enableSlotTextureRendering(false);  
 	
 	if (iframe_mouse_detector_) {
 		iframe_mouse_detector_->setWindowHandle(parent_hwnd);
@@ -556,6 +561,19 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 		
 		if (handler->getOverlay() && handler->getMouseControlToOverlay())
 		{
+			if (handler->getThreeDScene() && handler->getThreeDScene()->getActiveCamera())
+			{
+				Camera* cam = handler->getThreeDScene()->getActiveCamera();
+				int camWidth = cam->getResolutionWidth();
+				int camHeight = cam->getResolutionHeight();
+				float camDpiScale = cam->getDpiScale();
+				
+				if (camWidth > 0 && camHeight > 0)
+				{
+					handler->getOverlay()->updateViewportDimensions(camWidth, camHeight);
+				}
+			}
+			
 			POINT cursorPos;
 			if (GetCursorPos(&cursorPos))
 			{
@@ -884,8 +902,16 @@ void UIHandler::captureIFramePositions()
 	
 	frame_datas_->captureAllFrames(parent_hwnd_);
 	
-	// Update IFrameMouseDetector with the new data
 	updateIFrameMouseDetectorFromFrameDatas();
+	
+	if (overlay_viewport_ && three_d_scene_ && three_d_scene_->getActiveCamera())
+	{
+		SIMILI::Frontend::IFrameScreenData viewportData;
+		if (frame_datas_->getFrameData("viewport_docking", viewportData))
+		{
+			overlay_viewport_->updateViewportDimensions(viewportData.width, viewportData.height);
+		}
+	}
 }
 
 void UIHandler::updateIFrameMouseDetectorFromFrameDatas()
