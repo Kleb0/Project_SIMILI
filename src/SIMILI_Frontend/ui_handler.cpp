@@ -561,19 +561,6 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 		
 		if (handler->getOverlay() && handler->getMouseControlToOverlay())
 		{
-			if (handler->getThreeDScene() && handler->getThreeDScene()->getActiveCamera())
-			{
-				Camera* cam = handler->getThreeDScene()->getActiveCamera();
-				int camWidth = cam->getResolutionWidth();
-				int camHeight = cam->getResolutionHeight();
-				float camDpiScale = cam->getDpiScale();
-				
-				if (camWidth > 0 && camHeight > 0)
-				{
-					handler->getOverlay()->updateViewportDimensions(camWidth, camHeight);
-				}
-			}
-			
 			POINT cursorPos;
 			if (GetCursorPos(&cursorPos))
 			{
@@ -906,10 +893,23 @@ void UIHandler::captureIFramePositions()
 	
 	if (overlay_viewport_ && three_d_scene_ && three_d_scene_->getActiveCamera())
 	{
-		SIMILI::Frontend::IFrameScreenData viewportData;
-		if (frame_datas_->getFrameData("viewport_docking", viewportData))
+		SIMILI::Frontend::IFrameScreenData ViewportPanelSize;
+
+		if (frame_datas_->getFrameData("viewport_docking", ViewportPanelSize))
 		{
-			overlay_viewport_->updateViewportDimensions(viewportData.width, viewportData.height);
+			float dpiScale = ViewportPanelSize.dpiScale;
+			int Width = static_cast<int>(ViewportPanelSize.width * dpiScale);
+			int Height = static_cast<int>(ViewportPanelSize.height * dpiScale);
+			
+			Camera* cam = three_d_scene_->getActiveCamera();
+			if (cam)
+			{
+				cam->setResolution(Width, Height, dpiScale);
+				std::cout << "[UIHandler] Camera resolution updated: " << "x : " << ViewportPanelSize.height << " y : " << ViewportPanelSize.width
+						  << " DPI scale: " << dpiScale  << std::endl;
+			}
+			
+			overlay_viewport_->updateViewportDimensions(Width, Height);
 		}
 	}
 }
