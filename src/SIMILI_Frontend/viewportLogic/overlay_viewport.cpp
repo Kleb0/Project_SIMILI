@@ -1238,7 +1238,68 @@ void OverlayViewport::ProcessCameraOrbiting(int deltaX, int deltaY)
 
 void OverlayViewport::shootRaycastFromUIHandler(int mouseX, int mouseY)
 {
-
-	std::cout << "\n [OVERLAY_VIEWPORT] shootRaycastFromUIHandler called with mouseX: " << mouseX << ", mouse Y: " << mouseY << std::endl;
-
+	if (!three_d_scene_ || !selector_ || !hwnd_)
+	{
+		return;
+	}
+	
+	Camera* cam = three_d_scene_->getActiveCamera();
+	if (!cam)
+	{
+		return;
+	}
+	
+	POINT screenPos = {mouseX, mouseY};
+	POINT clientPos = screenPos;
+	
+	if (ScreenToClient(hwnd_, &clientPos))
+	{
+		int localMouseX = clientPos.x;
+		int localMouseY = clientPos.y;
+		
+		float dpiScale = cam->getDpiScale();
+		int resolutionWidth = cam->getResolutionWidth();
+		int resolutionHeight = cam->getResolutionHeight();
+		
+		glm::mat4 view = cam->getViewMatrix();
+		float aspectRatio = static_cast<float>(resolutionWidth) / static_cast<float>(resolutionHeight);
+		glm::mat4 projection = cam->getProjectionMatrix(aspectRatio);
+		
+		auto& objects = three_d_scene_->getObjectsRef();
+		std::vector<ThreeDObject*> objectsVector(objects.begin(), objects.end());
+		
+		selector_->pickUpMesh(localMouseX, localMouseY, resolutionWidth, resolutionHeight, view, projection, objectsVector);
+		
+		if (three_d_scene_ && selector_)
+		{
+			auto& objects = three_d_scene_->getObjectsRef();
+			ThreeDObject* clickedObject = selector_->getSelectedObject();
+			
+			for (auto* obj : objects)
+			{
+				if (obj) obj->setSelected(false);
+			}
+			
+			if (clickedObject && clickedObject->isSelectable())
+			{
+				clickedObject->setSelected(true);
+			}
+			
+			std::list<ThreeDObject*> selectedList;
+			for (auto* obj : objects)
+			{
+				if (obj && obj->getSelected())
+				{
+					selectedList.push_back(obj);
+				}
+			}
+			
+			setMultipleSelectedObjects(selectedList);
+			
+			if (hwnd_)
+			{
+				RedrawWindow(hwnd_, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOCHILDREN);
+			}
+		}
+	}
 }

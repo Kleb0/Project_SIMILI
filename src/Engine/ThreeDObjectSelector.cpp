@@ -53,11 +53,8 @@ void ThreeDObjectSelector::pickUpMesh(int mouseX, int mouseY, int viewportSize, 
 	std::cout << " [pickUpMesh] Ray origin: (" << rayOrigin.x << ", " << rayOrigin.y << ", " << rayOrigin.z << ")" << std::endl;
 	std::cout << " [pickUpMesh] Ray dir: (" << rayDir.x << ", " << rayDir.y << ", " << rayDir.z << ")" << std::endl;
 
-	float bestScore = std::numeric_limits<float>::max();
+	float closestDistance = std::numeric_limits<float>::max();
 	ThreeDObject *closestObject = nullptr;
-	
-	const float MAX_SELECTION_DISTANCE = 100.0f;
-	const float MAX_PERPENDICULAR_DISTANCE = 2.5f; 
 
 	for (auto *obj : objects)
 	{
@@ -74,8 +71,6 @@ void ThreeDObjectSelector::pickUpMesh(int mouseX, int mouseY, int viewportSize, 
 			if (verts.empty() && edges.empty() && faces.empty()) continue;
 		}
 		
-		float distanceToRay = calculateDistanceToRay(rayOrigin, rayDir, *obj);
-		
 		glm::vec3 objectCenter = obj->getPosition();
 		glm::vec3 toObject = objectCenter - rayOrigin;
 		float depthAlongRay = glm::dot(toObject, rayDir);
@@ -86,29 +81,25 @@ void ThreeDObjectSelector::pickUpMesh(int mouseX, int mouseY, int viewportSize, 
 			continue;
 		}
 		
-		if (depthAlongRay > MAX_SELECTION_DISTANCE) 
+		float intersectionDistance = -1.0f;
+		bool intersects = rayIntersectsMesh(rayOrigin, rayDir, *obj, &intersectionDistance);
+		
+		if (intersects && intersectionDistance >= 0.0f)
 		{
-			std::cout << " [pickUpMesh] Object " << obj->getName() << " is too far (" << depthAlongRay << "), skipping" << std::endl;
-			continue;
+			std::cout << " [pickUpMesh] Object: " << obj->getName() 
+					  << " | Intersection distance: " << intersectionDistance 
+					  << " | RAY INTERSECTS MESH" << std::endl;
+			
+			if (intersectionDistance < closestDistance)
+			{
+				closestDistance = intersectionDistance;
+				closestObject = obj;
+			}
 		}
-		
-		if (distanceToRay > MAX_PERPENDICULAR_DISTANCE) 
+		else
 		{
-			std::cout << " [pickUpMesh] Object " << obj->getName() << " is too far from ray (" << distanceToRay << " > " << MAX_PERPENDICULAR_DISTANCE << "), skipping" << std::endl;
-			continue;
-		}
-		
-		float score = distanceToRay * 2.0f + depthAlongRay * 0.1f;
-		
-		std::cout << " [pickUpMesh] Object: " << obj->getName() 
-				  << " | Distance to ray: " << distanceToRay 
-				  << " | Depth: " << depthAlongRay 
-				  << " | Score: " << score << std::endl;
-		
-		if (score < bestScore)
-		{
-			bestScore = score;
-			closestObject = obj;
+			std::cout << " [pickUpMesh] Object: " << obj->getName() 
+					  << " | NO INTERSECTION with mesh" << std::endl;
 		}
 	}
 
@@ -117,11 +108,11 @@ void ThreeDObjectSelector::pickUpMesh(int mouseX, int mouseY, int viewportSize, 
 	if (selectedObject) 
 	{
 		std::cout << " [pickUpMesh] Selected: " << selectedObject->getName() 
-				  << " with best score: " << bestScore << std::endl;
+				  << " at distance: " << closestDistance << std::endl;
 	} 
 	else 
 	{
-		std::cout << " [pickUpMesh] No object selected" << std::endl;
+		std::cout << " [pickUpMesh] No object selected (no mesh intersections found)" << std::endl;
 	}
 }
 
