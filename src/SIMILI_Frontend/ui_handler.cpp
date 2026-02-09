@@ -377,7 +377,7 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	
 	overlay_viewport_->show(true);
 	
-	enableSlotTextureRendering(false);  
+	enableSlotTextureRendering(true);  
 	
 	if (iframe_mouse_detector_) {
 		iframe_mouse_detector_->setWindowHandle(parent_hwnd);

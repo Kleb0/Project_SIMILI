@@ -1268,33 +1268,93 @@ void OverlayViewport::shootRaycastFromUIHandler(int mouseX, int mouseY)
 		auto& objects = three_d_scene_->getObjectsRef();
 		std::vector<ThreeDObject*> objectsVector(objects.begin(), objects.end());
 		
-		selector_->pickUpMesh(localMouseX, localMouseY, resolutionWidth, resolutionHeight, view, projection, objectsVector);
-		
-		if (three_d_scene_ && selector_)
+		if (current_mode_ == normal_mode_)
 		{
-			auto& objects = three_d_scene_->getObjectsRef();
-			ThreeDObject* clickedObject = selector_->getSelectedObject();
+			selector_->pickUpMesh(localMouseX, localMouseY, resolutionWidth, resolutionHeight, view, projection, objectsVector);
 			
-			for (auto* obj : objects)
+			if (three_d_scene_ && selector_)
 			{
-				if (obj) obj->setSelected(false);
-			}
-			
-			if (clickedObject && clickedObject->isSelectable())
-			{
-				clickedObject->setSelected(true);
-			}
-			
-			std::list<ThreeDObject*> selectedList;
-			for (auto* obj : objects)
-			{
-				if (obj && obj->getSelected())
+				auto& objects = three_d_scene_->getObjectsRef();
+				ThreeDObject* clickedObject = selector_->getSelectedObject();
+				
+				for (auto* obj : objects)
 				{
-					selectedList.push_back(obj);
+					if (obj) obj->setSelected(false);
+				}
+				
+				if (clickedObject && clickedObject->isSelectable())
+				{
+					clickedObject->setSelected(true);
+				}
+				
+				std::list<ThreeDObject*> selectedList;
+				for (auto* obj : objects)
+				{
+					if (obj && obj->getSelected())
+					{
+						selectedList.push_back(obj);
+					}
+				}
+				
+				setMultipleSelectedObjects(selectedList);
+				
+				if (hwnd_)
+				{
+					RedrawWindow(hwnd_, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOCHILDREN);
 				}
 			}
+		}
+		else if (current_mode_ == face_mode_)
+		{
+			Face* clickedFace = selector_->pickupFace(localMouseX, localMouseY, resolutionWidth, resolutionHeight, view, projection, objectsVector, true);
 			
-			setMultipleSelectedObjects(selectedList);
+			if (clickedFace)
+			{
+				multiple_selected_faces_.clear();
+				multiple_selected_faces_.push_back(clickedFace);
+			}
+			else
+			{
+				multiple_selected_faces_.clear();
+			}
+			
+			if (hwnd_)
+			{
+				RedrawWindow(hwnd_, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOCHILDREN);
+			}
+		}
+		else if (current_mode_ == vertice_mode_)
+		{
+			Vertice* clickedVertice = selector_->pickUpVertice(localMouseX, localMouseY, resolutionWidth, resolutionHeight, view, projection, objectsVector, true);
+			
+			if (clickedVertice)
+			{
+				multiple_selected_vertices_.clear();
+				multiple_selected_vertices_.push_back(clickedVertice);
+			}
+			else
+			{
+				multiple_selected_vertices_.clear();
+			}
+			
+			if (hwnd_)
+			{
+				RedrawWindow(hwnd_, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOCHILDREN);
+			}
+		}
+		else if (current_mode_ == edge_mode_)
+		{
+			Edge* clickedEdge = selector_->pickupEdge(localMouseX, localMouseY, resolutionWidth, resolutionHeight, view, projection, objectsVector, true);
+			
+			if (clickedEdge)
+			{
+				multiple_selected_edges_.clear();
+				multiple_selected_edges_.push_back(clickedEdge);
+			}
+			else
+			{
+				multiple_selected_edges_.clear();
+			}
 			
 			if (hwnd_)
 			{
