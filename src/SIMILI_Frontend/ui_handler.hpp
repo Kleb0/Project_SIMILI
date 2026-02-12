@@ -44,6 +44,9 @@ public:
 	explicit UIHandler();
 	~UIHandler();
 
+	static UIHandler* getInstance();
+	static void setInstance(UIHandler* handler);
+
 	// CefApp methods
 	virtual CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler() override;
 	virtual CefRefPtr<CefRenderProcessHandler> GetRenderProcessHandler() override;
@@ -122,7 +125,11 @@ public:
 	// Friend function to allow RenderTimerProc access to private members
 	friend VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime);
 
+	void CallTestFromServer();
+
 private:
+	static UIHandler* s_instance_;
+
 	typedef std::list<CefRefPtr<CefBrowser>> BrowserList;
 	BrowserList browser_list_;
 	std::unique_ptr<OverlayViewport> overlay_viewport_;

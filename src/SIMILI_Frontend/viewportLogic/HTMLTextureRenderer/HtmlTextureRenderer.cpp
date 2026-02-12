@@ -48,7 +48,7 @@ void HtmlTextureRenderer::GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& re
 void HtmlTextureRenderer::OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type,
 const RectList& dirtyRects, const void* buffer, int width, int height)
 {
-	if (type == PET_VIEW && texture_renderer_) {
+	if (type == PET_VIEW && texture_renderer_ && !being_destroyed_) {
 		texture_renderer_->updateTexture(buffer, width, height);
 	}
 }
@@ -78,7 +78,11 @@ void HtmlTextureRenderer::OnAfterCreated(CefRefPtr<CefBrowser> browser)
 
 void HtmlTextureRenderer::OnBeforeClose(CefRefPtr<CefBrowser> browser)
 {
+	std::cout << "[HtmlTextureRenderer] OnBeforeClose called - browser is fully closed" << std::endl;
+	being_destroyed_ = true;
+	texture_renderer_ = nullptr;
 	browser_ = nullptr;
+	browser_closed_ = true;
 }
 
 bool HtmlTextureRenderer::OnConsoleMessage(CefRefPtr<CefBrowser> browser,

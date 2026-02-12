@@ -7,6 +7,7 @@
 #include "TextureRendererTest.hpp"
 #include <string>
 #include <functional>
+#include <atomic>
 
 class HtmlTextureRenderer : public CefClient, public CefRenderHandler, public CefLifeSpanHandler, public CefDisplayHandler {
 public:
@@ -63,6 +64,14 @@ public:
     
     virtual void OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) override;
     
+    void detachTextureRenderer() { 
+        being_destroyed_ = true;
+        texture_renderer_ = nullptr; 
+    }
+    
+    // Check if browser has been completely closed (OnBeforeClose called)
+    bool isBrowserClosed() const { return browser_closed_; }
+    
 private:
     void injectScrollbarEliminationCSS();  // Helper method for CSS injection
     
@@ -72,6 +81,8 @@ private:
     int height_;
     HWND viewport_hwnd_;
     std::function<void(CefRefPtr<CefBrowser>)> on_browser_created_callback_;
+    std::atomic<bool> being_destroyed_{false};
+    std::atomic<bool> browser_closed_{false};
     
     IMPLEMENT_REFCOUNTING(HtmlTextureRenderer);
 };

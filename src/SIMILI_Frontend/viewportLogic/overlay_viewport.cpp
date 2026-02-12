@@ -194,10 +194,13 @@ OverlayViewport::~OverlayViewport()
 		contextual_menu_html_renderer_ = nullptr;
 	}
 	
-	if (slot_texture_) 
 	{
-		delete slot_texture_;
-		slot_texture_ = nullptr;
+		std::lock_guard<std::mutex> lock(slot_texture_mutex_);
+		if (slot_texture_) 
+		{
+			delete slot_texture_;
+			slot_texture_ = nullptr;
+		}
 	}
 	
 	destroy();
@@ -635,8 +638,12 @@ void OverlayViewport::render()
 	
 	// Ensure SlotTexture remains on top after 3D scene rendering (less frequent)
 	static int z_order_check_counter = 0;
-	if (slot_texture_ && (z_order_check_counter % 60 == 0)) { // Check every 60 frames
-		slot_texture_->ensureProperZOrder();
+	if (!is_destroying_slot_texture_)
+	{
+		std::lock_guard<std::mutex> lock(slot_texture_mutex_);
+		if (slot_texture_ && (z_order_check_counter % 60 == 0)) {
+			slot_texture_->ensureProperZOrder();
+		}
 	}
 	z_order_check_counter++;
 	
@@ -646,8 +653,12 @@ void OverlayViewport::render()
 	}
 	
 	// Render SlotTexture (Layer 2 - Above everything else)
-	if (slot_texture_) {
-		slot_texture_->render();
+	if (!is_destroying_slot_texture_)
+	{
+		std::lock_guard<std::mutex> lock(slot_texture_mutex_);
+		if (slot_texture_) {
+			slot_texture_->render();
+		}
 	}
 	
 	if (imgui_initialized_) 
@@ -1133,57 +1144,122 @@ void OverlayViewport::createSlotTexture(int x, int y, int width, int height)
 		return;
 	}
 	
-	if (slot_texture_) {
-		delete slot_texture_;
-		slot_texture_ = nullptr;
+	// First destroy existing SlotTexture with mutex protection
+	{
+		std::lock_guard<std::mutex> lock(slot_texture_mutex_);
+		if (slot_texture_) {
+			delete slot_texture_;
+			slot_texture_ = nullptr;
+		}
 	}
 	
-	slot_texture_ = new SlotTexture();
+	// Create new SlotTexture without holding mutex (long operation)
+	SlotTexture* new_texture = new SlotTexture();
 	
-
-	if (slot_texture_->create(parent_, x, y, width, height, 2)) 
+	if (new_texture->create(parent_, x, y, width, height, 2)) 
 	{
 		// Configure SlotTexture to display CEF HTML content
-		slot_texture_->loadHTML("file:///ui/hello_cef.html");
-		slot_texture_->setUseHTMLTexture(true);
+		new_texture->loadHTML("file:///ui/hello_cef.html");
+		new_texture->setUseHTMLTexture(true);
 		
 		// Enable rendering
-		slot_texture_->enableRendering(true);
+		new_texture->enableRendering(true);
 				
 		// Show the window
-		slot_texture_->show(true);
+		new_texture->show(true);
 		
-		slot_texture_->ensureProperZOrder();
+		new_texture->ensureProperZOrder();
 		
 		// Force initial render
-		slot_texture_->render();
-		InvalidateRect(slot_texture_->getHandle(), nullptr, TRUE);
-		UpdateWindow(slot_texture_->getHandle());
+		new_texture->render();
+		InvalidateRect(new_texture->getHandle(), nullptr, TRUE);
+		UpdateWindow(new_texture->getHandle());
+		
+		// Now atomically assign to slot_texture_ with mutex protection
+		{
+			std::lock_guard<std::mutex> lock(slot_texture_mutex_);
+			slot_texture_ = new_texture;
+		}
 		
 	} 
 	else
 	 {
 		std::cerr << "[OverlayViewport] Failed to create SlotTexture" << std::endl;
-		delete slot_texture_;
-		slot_texture_ = nullptr;
+		delete new_texture;
 	}
 }
 
 void OverlayViewport::destroySlotTexture()
 {
-	if (slot_texture_) {
-		delete slot_texture_;
-		slot_texture_ = nullptr;
+	is_destroying_slot_texture_ = true;
+	
+	SlotTexture* texture_to_delete = nullptr;
+	
+	{
+		std::lock_guard<std::mutex> lock(slot_texture_mutex_);
+		if (slot_texture_)
+		{
+			texture_to_delete = slot_texture_;
+			slot_texture_ = nullptr;
+			texture_to_delete->enableRendering(false);
+		}
 	}
+	
+	if (texture_to_delete)
+	{
+		HGLRC prevContext = wglGetCurrentContext();
+		HDC prevDC = wglGetCurrentDC();
+		
+		delete texture_to_delete;
+		
+		if (prevContext && prevDC)
+		{
+			wglMakeCurrent(prevDC, prevContext);
+		}
+		
+		std::cout << "[OverlayViewport] SlotTexture deleted successfully" << std::endl;
+	}
+	
+	is_destroying_slot_texture_ = false;
+	std::cout << "[OverlayViewport] destroySlotTexture() completed" << std::endl;
 }
 
 void OverlayViewport::showSlotTexture(bool visible)
 {
+	std::lock_guard<std::mutex> lock(slot_texture_mutex_);
 	if (slot_texture_) 
 	{
 		slot_texture_->show(visible);
 		
 		if (visible) 
+		{
+			InvalidateRect(slot_texture_->getHandle(), nullptr, FALSE);
+		}
+	}
+}
+
+bool OverlayViewport::hasSlotTexture() const
+{
+	std::lock_guard<std::mutex> lock(slot_texture_mutex_);
+	return slot_texture_ != nullptr;
+}
+
+void OverlayViewport::enableSlotTextureRenderingInternal(bool enable)
+{
+	std::lock_guard<std::mutex> lock(slot_texture_mutex_);
+	if (slot_texture_)
+	{
+		slot_texture_->enableRendering(enable);
+	}
+}
+
+void OverlayViewport::showSlotTextureInternal(bool visible)
+{
+	std::lock_guard<std::mutex> lock(slot_texture_mutex_);
+	if (slot_texture_)
+	{
+		slot_texture_->show(visible);
+		if (visible)
 		{
 			InvalidateRect(slot_texture_->getHandle(), nullptr, FALSE);
 		}

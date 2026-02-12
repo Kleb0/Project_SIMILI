@@ -121,6 +121,10 @@ public:
     void destroySlotTexture();
     void showSlotTexture(bool visible);
     SlotTexture* getSlotTexture() const { return slot_texture_; }
+    bool hasSlotTexture() const;
+    void enableSlotTextureRenderingInternal(bool enable);
+    void showSlotTextureInternal(bool visible);
+    bool isDestroyingSlotTexture() const { return is_destroying_slot_texture_; }
     
     // ----- Manipulation in scene -----
     void MoveCameraLaterally(int deltaX, int deltaY);
@@ -213,6 +217,8 @@ public:
     
     // ----------- Slot Texture (Layer 2) -----------
     SlotTexture* slot_texture_;
+    mutable std::mutex slot_texture_mutex_;
+    std::atomic<bool> is_destroying_slot_texture_{false};  // Protect access to slot_texture_
     
     int injected_mouse_x_ = 0;
     int injected_mouse_y_ = 0;

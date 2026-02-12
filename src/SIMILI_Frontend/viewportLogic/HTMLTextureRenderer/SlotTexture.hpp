@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <glad/glad.h>
 #include <string>
+#include <atomic>
 
 // Forward declarations for CEF integration
 class HtmlTextureRenderer;
@@ -81,4 +82,5 @@ private:
     
     // ----------- Rendering Control -----------
     bool rendering_enabled_ = true;
+    std::atomic<bool> being_destroyed_{false};
 };

@@ -83,6 +83,7 @@ SlotTexture::SlotTexture()
 
 SlotTexture::~SlotTexture()
 {
+    being_destroyed_ = true;
     destroy();
 }
 
@@ -212,37 +213,105 @@ bool SlotTexture::create(HWND parent, int x, int y, int width, int height, int z
 
 void SlotTexture::destroy()
 {
-    if (html_renderer_) {
-        delete html_renderer_;
-        html_renderer_ = nullptr;
-    }
-    
-    if (texture_renderer_) {
-        delete texture_renderer_;
-        texture_renderer_ = nullptr;
-    }
-    
-    if (gl_context_) {
-        wglMakeCurrent(hdc_, gl_context_);
-        
-        if (vao_) glDeleteVertexArrays(1, &vao_);
-        if (vbo_) glDeleteBuffers(1, &vbo_);
-        if (shader_program_) glDeleteProgram(shader_program_);
-        
-        wglMakeCurrent(nullptr, nullptr);
-        wglDeleteContext(gl_context_);
-        gl_context_ = nullptr;
-    }
-    
-    if (hdc_) {
-        ReleaseDC(hwnd_, hdc_);
-        hdc_ = nullptr;
-    }
-    
-    if (hwnd_) {
-        DestroyWindow(hwnd_);
-        hwnd_ = nullptr;
-    }
+	if (!hwnd_) return;
+	
+	std::cout << "\n[SlotTexture] Destroying SlotTexture..." << std::endl;
+	
+	// CRITICAL: Set being_destroyed_ FIRST to prevent any new render calls
+	being_destroyed_ = true;
+	rendering_enabled_ = false;
+	
+	if (html_renderer_)
+	{
+		html_renderer_->detachTextureRenderer();
+		
+		if (html_renderer_->getBrowser())
+		{
+			html_renderer_->getBrowser()->GetHost()->CloseBrowser(true);					
+
+		}
+		
+		html_renderer_ = nullptr;
+	}
+	
+	HGLRC prevContext = wglGetCurrentContext();
+	HDC prevDC = wglGetCurrentDC();
+	
+	if (gl_context_ && hdc_ && IsWindow(hwnd_))
+	{
+		BOOL makeCurrentResult = wglMakeCurrent(hdc_, gl_context_);
+		if (makeCurrentResult)
+		{
+			if (texture_renderer_)
+			{
+				texture_renderer_->cleanup();
+				delete texture_renderer_;
+				texture_renderer_ = nullptr;
+			}
+			
+			if (vao_) 
+			{
+				glDeleteVertexArrays(1, &vao_);
+				vao_ = 0;
+			}
+			if (vbo_) 
+			{
+				glDeleteBuffers(1, &vbo_);
+				vbo_ = 0;
+			}
+			if (shader_program_) 
+			{
+				glDeleteProgram(shader_program_);
+				shader_program_ = 0;
+			}
+			
+			wglMakeCurrent(nullptr, nullptr);
+		}
+		else
+		{
+			if (texture_renderer_)
+			{
+				delete texture_renderer_;
+				texture_renderer_ = nullptr;
+			}
+		}
+		
+		wglDeleteContext(gl_context_);
+		gl_context_ = nullptr;
+	}
+	else
+	{
+		if (texture_renderer_)
+		{
+			delete texture_renderer_;
+			texture_renderer_ = nullptr;
+		}
+		
+		if (gl_context_)
+		{
+			wglDeleteContext(gl_context_);
+			gl_context_ = nullptr;
+		}
+	}
+	
+	if (prevContext && prevDC)
+	{
+		wglMakeCurrent(prevDC, prevContext);
+	}
+	
+	if (hdc_ && hwnd_)
+	{
+		ReleaseDC(hwnd_, hdc_);
+		hdc_ = nullptr;
+	}
+	
+	if (hwnd_ && IsWindow(hwnd_))
+	{
+		DestroyWindow(hwnd_);
+		hwnd_ = nullptr;
+	}
+	
+	std::cout << "[SlotTexture] SlotTexture destroyed successfully" << std::endl;
 }
 
 // ============================================================================
@@ -403,13 +472,22 @@ void SlotTexture::createQuad()
 
 void SlotTexture::render()
 {
+    if (being_destroyed_) return;
     if (!gl_context_ || !hwnd_) return;
     if (!rendering_enabled_) return;  
     if (!IsWindowVisible(hwnd_)) return;
     
-    // Save current OpenGL context to restore later
+    // Save current OpenGL context and state to restore later
     HGLRC prevContext = wglGetCurrentContext();
     HDC prevDC = wglGetCurrentDC();
+    GLint prevFBO = 0;
+    GLint prevViewport[4] = {0, 0, 0, 0};
+    
+    if (prevContext) 
+	{
+        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFBO);
+        glGetIntegerv(GL_VIEWPORT, prevViewport);
+    }
     
     wglMakeCurrent(hdc_, gl_context_);
     
@@ -420,9 +498,11 @@ void SlotTexture::render()
     
     SwapBuffers(hdc_);
     
-    // Restore the previous OpenGL context to avoid conflicts with overlay
+    // Restore the previous OpenGL context and state to avoid conflicts with overlay
     if (prevContext && prevDC) {
         wglMakeCurrent(prevDC, prevContext);
+        glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
+        glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
     }
 }
 
@@ -454,6 +534,7 @@ void SlotTexture::renderQuad()
 
 void SlotTexture::enableRendering(bool enable)
 {
+    if (being_destroyed_) return;
     rendering_enabled_ = enable;
     
     // Hide/show the window to prevent black bar when rendering is disabled
@@ -468,6 +549,7 @@ void SlotTexture::enableRendering(bool enable)
 
 void SlotTexture::setPosition(int x, int y, int width, int height)
 {
+    if (being_destroyed_) return;
     if (!hwnd_) return;
     
     SetWindowPos(hwnd_, HWND_TOP, x, y, width, height, 
@@ -492,17 +574,42 @@ void SlotTexture::setPosition(int x, int y, int width, int height)
 
 void SlotTexture::show(bool visible)
 {
+    if (being_destroyed_) return;
     if (!hwnd_) return;
     
-    ShowWindow(hwnd_, visible ? SW_SHOW : SW_HIDE);
-    
-    if (visible) {
+    if (!visible)
+    {
+        // Clear OpenGL content before hiding to prevent artifacts
+        if (gl_context_ && hdc_)
+        {
+            HGLRC prevContext = wglGetCurrentContext();
+            HDC prevDC = wglGetCurrentDC();
+            
+            wglMakeCurrent(hdc_, gl_context_);
+            glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            SwapBuffers(hdc_);
+            
+            if (prevContext && prevDC)
+            {
+                wglMakeCurrent(prevDC, prevContext);
+            }
+        }
+        
+        // Hide window properly
+        SetWindowPos(hwnd_, NULL, 0, 0, 0, 0,
+                     SWP_HIDEWINDOW | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    else
+    {
+        ShowWindow(hwnd_, SW_SHOW);
         ensureProperZOrder();
     }
 }
 
 bool SlotTexture::isVisible() const
 {
+    if (being_destroyed_) return false;
     return hwnd_ && IsWindowVisible(hwnd_);
 }
 
@@ -518,6 +625,7 @@ void SlotTexture::setZOrderLayer(int layer)
 
 void SlotTexture::ensureProperZOrder()
 {
+    if (being_destroyed_) return;
     if (!hwnd_ || !parent_) return;
     
     // Layer-based Z-order:
@@ -571,6 +679,10 @@ LRESULT CALLBACK SlotTexture::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
         SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(slot));
     } else {
         slot = reinterpret_cast<SlotTexture*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    }
+    
+    if (slot && slot->being_destroyed_) {
+        return DefWindowProc(hwnd, msg, wParam, lParam);
     }
     
     if (slot) {

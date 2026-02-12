@@ -2,6 +2,7 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <windows.h>
 
 TextureRendererTest::TextureRendererTest()
 	: texture_id_(0)
@@ -267,6 +268,13 @@ void TextureRendererTest::setRenderRect(int x, int y, int w, int h)
 void TextureRendererTest::cleanup()
 {
 	if (!initialized_) {
+		return;
+	}
+	
+	HGLRC currentContext = wglGetCurrentContext();
+	if (!currentContext) {
+		std::cerr << "[TextureRendererTest] Warning: cleanup() called without active OpenGL context" << std::endl;
+		initialized_ = false;
 		return;
 	}
 

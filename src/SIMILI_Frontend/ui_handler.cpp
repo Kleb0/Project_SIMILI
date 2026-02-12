@@ -34,6 +34,8 @@ static std::unordered_map<UINT_PTR, UIHandler*> g_timerHandlerMap;
 static HHOOK g_mouseHook = NULL;
 static UIHandler* g_activeHandler = nullptr;
 
+UIHandler* UIHandler::s_instance_ = nullptr;
+
 // Low-level mouse hook procedure
 LRESULT CALLBACK LowLevelMouseProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
@@ -72,6 +74,7 @@ UIHandler::UIHandler() : parent_hwnd_(nullptr), timer_id_(0),
 	
 	current_mouse_state_ = nullptr;
 	
+	s_instance_ = this;
 }
 
 UIHandler::~UIHandler() 
@@ -117,6 +120,11 @@ UIHandler::~UIHandler()
 		frame_datas_ = nullptr;
 	}
 	current_mouse_state_ = nullptr;
+	
+	if (s_instance_ == this)
+	{
+		s_instance_ = nullptr;
+	}
 }
 
 CefRefPtr<CefBrowserProcessHandler> UIHandler::GetBrowserProcessHandler() 
@@ -127,6 +135,16 @@ CefRefPtr<CefBrowserProcessHandler> UIHandler::GetBrowserProcessHandler()
 CefRefPtr<CefRenderProcessHandler> UIHandler::GetRenderProcessHandler() 
 {
 	return this;
+}
+
+UIHandler* UIHandler::getInstance()
+{
+	return s_instance_;
+}
+
+void UIHandler::setInstance(UIHandler* handler)
+{
+	s_instance_ = handler;
 }
 
 void UIHandler::OnBeforeCommandLineProcessing(const CefString& process_type, CefRefPtr<CefCommandLine> command_line) 
@@ -236,9 +254,9 @@ void UIHandler::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& ti
 				
 				DWORD current_time = GetTickCount();
 				bool position_changed = (abs(final_x - last_viewport_x_) > 2 || 
-				                        abs(final_y - last_viewport_y_) > 2 ||
-				                        abs(final_width - last_viewport_width_) > 2 ||
-				                        abs(final_height - last_viewport_height_) > 2);
+										abs(final_y - last_viewport_y_) > 2 ||
+										abs(final_width - last_viewport_width_) > 2 ||
+										abs(final_height - last_viewport_height_) > 2);
 				bool time_elapsed = (current_time - last_viewport_update_time_) > 16;
 				
 				if (position_changed || time_elapsed || !overlay_viewport_->isVisible()) 
@@ -377,7 +395,7 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	
 	overlay_viewport_->show(true);
 	
-	enableSlotTextureRendering(true);  
+	enableSlotTextureRendering(false);  
 	
 	if (iframe_mouse_detector_) {
 		iframe_mouse_detector_->setWindowHandle(parent_hwnd);
@@ -613,19 +631,32 @@ void UIHandler::enableSlotTextureRendering(bool enable)
 	
 	if (enable) 
 	{
-		if (!overlay_viewport_->getSlotTexture()) 
+		if (overlay_viewport_->isDestroyingSlotTexture())
+		{
+			std::cout << "[UIHandler] Cannot enable SlotTexture - destruction in progress" << std::endl;
+			return;
+		}
+		
+		if (!overlay_viewport_->hasSlotTexture()) 
 		{
 			overlay_viewport_->createSlotTexture(0, 50, 1920, 150);
 		} 
 		else 
 		{
-			overlay_viewport_->getSlotTexture()->enableRendering(true);
+			overlay_viewport_->enableSlotTextureRenderingInternal(true);
+			overlay_viewport_->showSlotTextureInternal(true);
 			std::cout << "[UIHandler] SlotTexture rendering enabled" << std::endl;
 		}
 	} 
 	else 
 	{
-		if (overlay_viewport_->getSlotTexture()) 
+		if (overlay_viewport_->isDestroyingSlotTexture())
+		{
+			std::cout << "[UIHandler] SlotTexture destruction already in progress" << std::endl;
+			return;
+		}
+		
+		if (overlay_viewport_->hasSlotTexture()) 
 		{
 			overlay_viewport_->destroySlotTexture();
 			std::cout << "[UIHandler] SlotTexture DESTROYED" << std::endl;
@@ -980,4 +1011,19 @@ void UIHandler::transitionMouseState(const std::string& regionName)
 			mouse_control_to_overlay_->setMouseState(current_mouse_state_);
 		}
 	}
+}
+
+void UIHandler::CallTestFromServer()
+{
+	std::cout << "[UIHandler] CallTestFromServer invoked - this is a test function callable from CEF" << std::endl;
+	
+	if (!CefCurrentlyOn(TID_UI))
+	{
+		// the texture need to be rendered on the UI thread, so we post a task to enable it there
+		CefPostTask(TID_UI, base::BindOnce(&UIHandler::enableSlotTextureRendering, base::Unretained(this), true));
+		std::cout << "[UIHandler] Posted enableSlotTextureRendering to UI thread" << std::endl;
+		return;
+	}
+	
+	enableSlotTextureRendering(true);
 }

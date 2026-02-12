@@ -4,6 +4,7 @@
 #include "../../WorldObjects/Camera/Camera.hpp"
 #include "../../Engine/PrimitivesCreation/CreatePrimitive.hpp"
 #include "../../SIMILI_Frontend/simple_window_delegate.hpp"
+#include "../../SIMILI_Frontend/viewportLogic/HTMLTextureRenderer/TextureEnabler.hpp"
 #include <iostream>
 #include <sstream>
 #include <GLFW/glfw3.h>
@@ -165,6 +166,19 @@ namespace SIMILI {
 			// Route: Select object from hierarchy
 			router.post("/api/select-object", [&scene, &handler](const Message& msg) -> Response 
 			{
+				std::cout << "\n [RoutesManager] /api/select-object called - handler is " << (handler ? "VALID" : "NULL") << std::endl;
+				
+				// if (handler)
+				// {
+				// 	std::cout << "[RoutesManager] Calling CallTestFromServer()..." << std::endl;
+				// 	// handler->CallTestFromServer();
+				// 	std::cout << "[RoutesManager] CallTestFromServer() returned" << std::endl;
+				// }
+				// else
+				// {
+				// 	std::cout << "[RoutesManager] ERROR: handler is NULL, cannot call CallTestFromServer()" << std::endl;
+				// }
+				
 				Response resp;
 				resp.headers["Content-Type"] = "application/json";
 				resp.headers["Access-Control-Allow-Origin"] = "*";
@@ -268,6 +282,41 @@ namespace SIMILI {
 				resp.body = "{\"success\": true, \"selected\": \"" + selectedObject->getName() + "\", \"isCamera\": " + (isCamera ? "true" : "false") + "}";
 				return resp;
 			}, "Select object from hierarchy inspector");
+			
+			router.post("/api/slot-texture/toggle", [&handler](const Message& msg) -> Response 
+			{
+				Response resp;
+				resp.headers["Content-Type"] = "application/json";
+				resp.headers["Access-Control-Allow-Origin"] = "*";
+				
+				auto requestData = nlohmann::json::parse(msg.body, nullptr, false);
+				if (requestData.is_discarded() || !requestData.contains("visible")) 
+				{
+					resp.statusCode = 400;
+					resp.statusMessage = "Bad Request";
+					resp.body = "{\"error\": \"Invalid JSON\"}";
+					return resp;
+				}
+				
+				bool visible = requestData["visible"];
+				
+				if (handler)
+				{
+					if (!CefCurrentlyOn(TID_UI))
+					{
+						CefPostTask(TID_UI, new TextureEnablerTask(handler, visible));
+					}
+					else
+					{
+						handler->enableSlotTextureRendering(visible);
+					}
+				}
+				
+				resp.statusCode = 200;
+				resp.statusMessage = "OK";
+				resp.body = "{\"success\": true, \"visible\": " + std::string(visible ? "true" : "false") + "}";
+				return resp;
+			}, "Toggle SlotTexture visibility");
 			
 			std::cout << "[RoutesManager] Object routes registered" << std::endl;
 		}

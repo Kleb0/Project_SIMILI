@@ -6,7 +6,7 @@ namespace SIMILI {
 namespace Server {
 
 namespace beast = boost::beast;
-namespace net = boost::asio;
+namespace net = boost::asio;                                                                                                                                    
 using tcp = boost::asio::ip::tcp;
 
 HttpListener::HttpListener(net::io_context& ioc, tcp::endpoint endpoint)
