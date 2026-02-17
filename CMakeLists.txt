@@ -189,6 +189,20 @@ set_source_files_properties(${GLAD_SOURCES} PROPERTIES
     SKIP_UNITY_BUILD_INCLUSION ON
 )
 
+# Exclude TextureEnabler from Unity builds (GLM experimental headers conflict)
+set_source_files_properties(
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/HTMLTextureRenderer/TextureEnabler.cpp"
+    PROPERTIES
+    SKIP_UNITY_BUILD_INCLUSION ON
+)
+
+# Exclude Overlay_HTML_Texture_Renderer from Unity builds (GLM experimental headers conflict)
+set_source_files_properties(
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/HTMLTextureRenderer/Overlay_HTML_Texture_Renderer.cpp"
+    PROPERTIES
+    SKIP_UNITY_BUILD_INCLUSION ON
+)
+
 # GLFW
 set(GLFW_BUILD_EXAMPLES OFF CACHE INTERNAL "GLFW: Build the examples" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE INTERNAL "GLFW: Build the tests" FORCE)

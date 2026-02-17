@@ -1373,11 +1373,7 @@ void OverlayViewport::shootRaycastFromUIHandler(int mouseX, int mouseY)
 				}
 				
 				setMultipleSelectedObjects(selectedList);
-				
-				if (hwnd_)
-				{
-					RedrawWindow(hwnd_, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOCHILDREN);
-				}
+
 			}
 		}
 		else if (current_mode_ == face_mode_)
@@ -1394,10 +1390,7 @@ void OverlayViewport::shootRaycastFromUIHandler(int mouseX, int mouseY)
 				multiple_selected_faces_.clear();
 			}
 			
-			if (hwnd_)
-			{
-				RedrawWindow(hwnd_, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOCHILDREN);
-			}
+
 		}
 		else if (current_mode_ == vertice_mode_)
 		{
@@ -1413,10 +1406,6 @@ void OverlayViewport::shootRaycastFromUIHandler(int mouseX, int mouseY)
 				multiple_selected_vertices_.clear();
 			}
 			
-			if (hwnd_)
-			{
-				RedrawWindow(hwnd_, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOCHILDREN);
-			}
 		}
 		else if (current_mode_ == edge_mode_)
 		{
@@ -1431,11 +1420,7 @@ void OverlayViewport::shootRaycastFromUIHandler(int mouseX, int mouseY)
 			{
 				multiple_selected_edges_.clear();
 			}
-			
-			if (hwnd_)
-			{
-				RedrawWindow(hwnd_, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOCHILDREN);
-			}
+		
 		}
 	}
 }

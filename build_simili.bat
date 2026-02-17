@@ -1,9 +1,9 @@
 @echo off
 setlocal EnableExtensions
 
-echo ========================================
-echo   BUILD SIMILI (Single Executable)
-echo ========================================
+echo ================================
+echo   BUILD SIMILI - CEF INTEGRATION
+echo ================================
 echo.
 
 call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
@@ -84,15 +84,18 @@ echo   + CEF dependencies deployed
 echo.
 echo [3/3] Copying UI HTML files...
 
-if not exist "build\Release\ui" mkdir "build\Release\ui"
-xcopy /Y /Q "ui\*.html" "build\Release\ui\" >nul 2>nul
-xcopy /Y /Q "ui\*.css" "build\Release\ui\" >nul 2>nul
-xcopy /Y /Q "ui\*.js" "build\Release\ui\" >nul 2>nul
-if %errorlevel% neq 0 (
-    echo WARNING: Failed to copy UI HTML files
+if exist "build\Release\ui" (
+    echo Removing old UI folder...
+    rmdir /S /Q "build\Release\ui"
 )
 
-echo   + UI files deployed
+echo Copying fresh UI files from project root...
+xcopy /E /I /Y /Q "ui" "build\Release\ui" >nul 2>nul
+if %errorlevel% neq 0 (
+    echo WARNING: Failed to copy UI files
+) else (
+    echo   + UI files deployed
+)
 
 for /f %%A in ('powershell -NoProfile -Command "(Get-Date).ToString('o')"') do set "END_ISO=%%A"
 
