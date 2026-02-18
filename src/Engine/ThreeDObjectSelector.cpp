@@ -36,6 +36,8 @@ void ThreeDObjectSelector::pickUpMesh(int mouseX, int mouseY, int viewportSize, 
 		return;
 	}
 	
+	std::cout << "\n ---------------------- [pickUpMesh] picking process ------------------- \n" << std::endl;
+
 	std::cout << "[ThreeDObjectSelector] Camera/View dimensions - X: " << viewportSize << ", Y: " << viewportHeight << std::endl;
 	
 	float mouseY_GL = viewportHeight - mouseY;
@@ -98,8 +100,7 @@ void ThreeDObjectSelector::pickUpMesh(int mouseX, int mouseY, int viewportSize, 
 		}
 		else
 		{
-			std::cout << " [pickUpMesh] Object: " << obj->getName() 
-					  << " | NO INTERSECTION with mesh" << std::endl;
+			std::cout << " [pickUpMesh] Object: " << obj->getName() << " | NO INTERSECTION with mesh" << std::endl;
 		}
 	}
 
@@ -107,12 +108,13 @@ void ThreeDObjectSelector::pickUpMesh(int mouseX, int mouseY, int viewportSize, 
 	
 	if (selectedObject) 
 	{
-		std::cout << " [pickUpMesh] Selected: " << selectedObject->getName() 
-				  << " at distance: " << closestDistance << std::endl;
+		std::cout << " [pickUpMesh] Selected: " << selectedObject->getName() << " at distance: " << closestDistance << std::endl;
+		std::cout << " -------------------- End of Raycast Debug ----------- \n " << std::endl;
 	} 
 	else 
 	{
 		std::cout << " [pickUpMesh] No object selected (no mesh intersections found)" << std::endl;
+		std::cout << " -------------------- End of Raycast Debug ----------- \n " << std::endl;
 	}
 }
 
@@ -171,6 +173,7 @@ bool ThreeDObjectSelector::rayIntersectsMesh(const glm::vec3 &rayOrigin, const g
 			}
 			
 			std::cout << " MISS: No face intersection" << std::endl;
+			std::cout << " -------------------- End of Raycast Debug ----------- \n " << std::endl;
 			return false;
 		}
 		else 

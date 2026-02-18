@@ -98,16 +98,64 @@ namespace SIMILI {
 
 			float FrameDatas::getDPIScale(HWND hwnd) const
 			{
+				if (!hwnd)
+				{
+					return 1.0f;
+				}
+				
+				HMONITOR hMonitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+				if (!hMonitor)
+				{
+					return 1.0f;
+				}
+				
+				typedef HRESULT(WINAPI* GetDpiForMonitorFunc)(HMONITOR, int, UINT*, UINT*);
+				HMODULE shcore = LoadLibraryA("Shcore.dll");
+				if (!shcore)
+				{
+					HDC hdc = GetDC(hwnd);
+					if (!hdc)
+					{
+						return 1.0f;
+					}
+					int dpiX = GetDeviceCaps(hdc, LOGPIXELSX);
+					ReleaseDC(hwnd, hdc);
+					return static_cast<float>(dpiX) / 96.0f;
+				}
+				
+				GetDpiForMonitorFunc getDpiForMonitor = (GetDpiForMonitorFunc)GetProcAddress(shcore, "GetDpiForMonitor");
+				if (!getDpiForMonitor)
+				{
+					FreeLibrary(shcore);
+					HDC hdc = GetDC(hwnd);
+					if (!hdc)
+					{
+						return 1.0f;
+					}
+					int dpiX = GetDeviceCaps(hdc, LOGPIXELSX);
+					ReleaseDC(hwnd, hdc);
+					return static_cast<float>(dpiX) / 96.0f;
+				}
+				
+				UINT dpiX = 96;
+				UINT dpiY = 96;
+				HRESULT hr = getDpiForMonitor(hMonitor, 0, &dpiX, &dpiY);
+				
+				FreeLibrary(shcore);
+				
+				if (SUCCEEDED(hr))
+				{
+					return static_cast<float>(dpiX) / 96.0f;
+				}
+				
 				HDC hdc = GetDC(hwnd);
 				if (!hdc)
 				{
 					return 1.0f;
 				}
-				
-				int dpiX = GetDeviceCaps(hdc, LOGPIXELSX);
+				int dpi = GetDeviceCaps(hdc, LOGPIXELSX);
 				ReleaseDC(hwnd, hdc);
-				
-				return static_cast<float>(dpiX) / 96.0f;
+				return static_cast<float>(dpi) / 96.0f;
 			}
 
 			void FrameDatas::captureWindowData(HWND hwnd, IFrameScreenData& data)
