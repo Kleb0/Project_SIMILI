@@ -288,11 +288,11 @@
     function sendIFrameSizesToServer()
     {
         const iframes = [
-            { selector: '.hierarchy-panel iframe', name: 'hierarchy_inspector' },
-            { selector: '.viewport-panel iframe', name: 'viewport_docking' },
-            { selector: '.object-inspector-panel iframe', name: 'object_inspector' },
-            { selector: '.history-panel iframe', name: 'history_logger' },
-            { selector: '.project-viewer-panel iframe', name: 'project_viewer' }
+            { selector: '.hierarchy-panel iframe', name: 'hierarchy_panel' },
+            { selector: '.viewport-panel iframe', name: 'viewport_panel' },
+            { selector: '.object-inspector-panel iframe', name: 'object_inspector_panel' },
+            { selector: '.history-panel iframe', name: 'history_panel' },
+            { selector: '.project-viewer-panel iframe', name: 'project_viewer_panel' }
         ];
         
         const iframeData = [];

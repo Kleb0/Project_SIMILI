@@ -67,7 +67,8 @@ UIHandler::UIHandler() : parent_hwnd_(nullptr), timer_id_(0),
 	outside_overlay_state_(nullptr),
 	last_detected_region_name_(""),
 	mouse_control_to_overlay_(nullptr),
-	slot_texture_renderer_(nullptr)
+	slot_texture_renderer_(nullptr),
+	composite_test_renderer_(nullptr)
 {
 	above_overlay_state_ = new SIMILI::Input::Mouse_Above_Overlay_State();
 	outside_overlay_state_ = new SIMILI::Input::Mouse_Outside_Overlay_State();	
@@ -124,6 +125,11 @@ UIHandler::~UIHandler()
 	{
 		delete slot_texture_renderer_;
 		slot_texture_renderer_ = nullptr;
+	}
+	if (composite_test_renderer_)
+	{
+		delete composite_test_renderer_;
+		composite_test_renderer_ = nullptr;
 	}
 	current_mouse_state_ = nullptr;
 	
@@ -398,7 +404,8 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 	
 	overlay_viewport_->show(true);
 	
-	enableSlotTextureRendering(false);  
+	enableSlotTextureRendering(false);
+	enableCompositeTestRenderer(true);
 	
 	if (iframe_mouse_detector_) {
 		iframe_mouse_detector_->setWindowHandle(parent_hwnd);
@@ -618,6 +625,33 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 		{
 			handler->slot_texture_renderer_->render();
 		}
+		
+		if (handler->composite_test_renderer_ && handler->composite_test_renderer_->isRenderingEnabled())
+		{
+			if (handler->composite_test_renderer_->hasParent() && handler->getFrameDatas())
+			{
+				SIMILI::Frontend::IFrameScreenData parentData;
+				if (handler->getFrameDatas()->getFrameData("viewport_panel", parentData))
+				{
+					// std::cout <<"\n ---------------------------------- " << std::endl;
+					// std::cout << "[UIHandler] Updating Composite_Test renderer with parent frame data: " 
+					// 	<< "X: " << parentData.screenX << ", Y: " << parentData.screenY 
+					// 	<< ", Width: " << parentData.width << ", Height: " << parentData.height 
+					// 	<< ", DPI Scale: " << parentData.dpiScale << std::endl;
+					// std::cout <<"---------------------------------- " << std::endl;
+
+					handler->composite_test_renderer_->UpdateParentData(
+						parentData.screenX,
+						parentData.screenY,
+						parentData.width,
+						parentData.height,
+						parentData.dpiScale
+					);
+					handler->composite_test_renderer_->setCenterize();
+				}
+			}
+			handler->composite_test_renderer_->render();
+		}
 	}
 }
 
@@ -687,6 +721,62 @@ void UIHandler::enableSlotTextureRendering(bool enable)
 			temp->destroy();
 			
 			std::cout << "[UIHandler] Overlay_HTML_Texture_Renderer DESTROYED" << std::endl;
+		}
+	}
+}
+
+void UIHandler::enableCompositeTestRenderer(bool enable)
+{
+	if (!parent_hwnd_) return;
+	
+	if (enable)
+	{
+		if (!composite_test_renderer_)
+		{
+			HGLRC shareContext = nullptr;
+			if (overlay_viewport_)
+			{
+				overlay_viewport_->makeContextCurrent();
+				shareContext = overlay_viewport_->getGLContext();
+			}
+			
+			composite_test_renderer_ = new Overlay_HTML_Texture_Renderer("file:///ui/Composite_Test.html");
+			
+			if (composite_test_renderer_->create(parent_hwnd_, 0, 0, 500, 500, shareContext))
+			{
+				composite_test_renderer_->SetParentByName("viewport_panel");
+				composite_test_renderer_->setCenterize();
+				composite_test_renderer_->enableRendering(true);
+				composite_test_renderer_->show(true);
+			}
+			else
+			{
+				delete composite_test_renderer_;
+				composite_test_renderer_ = nullptr;
+			}
+		}
+		else
+		{
+			composite_test_renderer_->enableRendering(true);
+			composite_test_renderer_->show(true);
+			
+			if (composite_test_renderer_->getHandle())
+			{
+				InvalidateRect(composite_test_renderer_->getHandle(), nullptr, TRUE);
+			}
+		}
+	}
+	else
+	{
+		if (composite_test_renderer_)
+		{
+			composite_test_renderer_->enableRendering(false);
+			composite_test_renderer_->show(false);
+			
+			auto* temp = composite_test_renderer_;
+			composite_test_renderer_ = nullptr;
+			
+			temp->destroy();
 		}
 	}
 }
@@ -878,35 +968,35 @@ void UIHandler::updatePanelBoundsFromStocker()
 		const std::string& name = pair.first;
 		const IFrameData& data = pair.second;
 		
-		if (name == "hierarchy_inspector") 
+		if (name == "hierarchy_panel") 
 		{
 			bounds.hierarchy.x = data.x;
 			bounds.hierarchy.y = data.y;
 			bounds.hierarchy.width = data.width;
 			bounds.hierarchy.height = data.height;
 		}
-		else if (name == "viewport_docking") 
+		else if (name == "viewport_panel") 
 		{
 			bounds.viewport.x = data.x;
 			bounds.viewport.y = data.y;
 			bounds.viewport.width = data.width;
 			bounds.viewport.height = data.height;
 		}
-		else if (name == "object_inspector") 
+		else if (name == "object_inspector_panel") 
 		{
 			bounds.objectInspector.x = data.x;
 			bounds.objectInspector.y = data.y;
 			bounds.objectInspector.width = data.width;
 			bounds.objectInspector.height = data.height;
 		}
-		else if (name == "history_logger") 
+		else if (name == "history_panel") 
 		{
 			bounds.history.x = data.x;
 			bounds.history.y = data.y;
 			bounds.history.width = data.width;
 			bounds.history.height = data.height;
 		}
-		else if (name == "project_viewer") 
+		else if (name == "project_viewer_panel") 
 		{
 			bounds.projectViewer.x = data.x;
 			bounds.projectViewer.y = data.y;
@@ -953,7 +1043,7 @@ void UIHandler::captureIFramePositions()
 	{
 		SIMILI::Frontend::IFrameScreenData ViewportPanelSize;
 
-		if (frame_datas_->getFrameData("viewport_docking", ViewportPanelSize))
+		if (frame_datas_->getFrameData("viewport_panel", ViewportPanelSize))
 		{
 			float dpiScale = ViewportPanelSize.dpiScale;
 			int Width = static_cast<int>(ViewportPanelSize.width * dpiScale);

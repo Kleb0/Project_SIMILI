@@ -87,6 +87,7 @@ public:
 	void updateOverlayPosition();
 	bool isOverlayRenderingEnabled() const;
 	void enableSlotTextureRendering(bool enable);
+	void enableCompositeTestRenderer(bool enable);
 	OverlayViewport* getOverlay() { return overlay_viewport_.get(); }
 	HWND getParentHWND() const { return parent_hwnd_; }
 	SIMILI::Input::IFrameMouseDetector* getIFrameMouseDetector() { return iframe_mouse_detector_; }
@@ -165,8 +166,8 @@ private:
 	
 	SIMILI::Input::MouseControlToOverlay* mouse_control_to_overlay_;
 	
-	// Slot texture renderer
 	Overlay_HTML_Texture_Renderer* slot_texture_renderer_;
+	Overlay_HTML_Texture_Renderer* composite_test_renderer_;
 
 	IMPLEMENT_REFCOUNTING(UIHandler);
 };
