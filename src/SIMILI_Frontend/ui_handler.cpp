@@ -1,7 +1,7 @@
 #include "ui_handler.hpp"
 #include "simple_window_delegate.hpp"
 #include "viewportLogic/HTMLTextureRenderer/HtmlTextureRenderer.hpp"
-#include "viewportLogic/HTMLTextureRenderer/SlotTexture.hpp"
+#include "viewportLogic/HTMLTextureRenderer/Overlay_HTML_Texture_Renderer.hpp"
 #include "viewportLogic/KeyManagement/KeyManager.hpp"
 #include "viewportLogic/Keymanagement/MouseControlToOverlay.hpp"
 #include "../../Engine/ThreeDScene.hpp"
@@ -66,7 +66,8 @@ UIHandler::UIHandler() : parent_hwnd_(nullptr), timer_id_(0),
 	above_overlay_state_(nullptr),
 	outside_overlay_state_(nullptr),
 	last_detected_region_name_(""),
-	mouse_control_to_overlay_(nullptr)
+	mouse_control_to_overlay_(nullptr),
+	slot_texture_renderer_(nullptr)
 {
 	above_overlay_state_ = new SIMILI::Input::Mouse_Above_Overlay_State();
 	outside_overlay_state_ = new SIMILI::Input::Mouse_Outside_Overlay_State();	
@@ -118,6 +119,11 @@ UIHandler::~UIHandler()
 	{
 		delete frame_datas_;
 		frame_datas_ = nullptr;
+	}
+	if (slot_texture_renderer_)
+	{
+		delete slot_texture_renderer_;
+		slot_texture_renderer_ = nullptr;
 	}
 	current_mouse_state_ = nullptr;
 	
@@ -279,10 +285,7 @@ void UIHandler::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& ti
 					last_viewport_width_ = final_width;
 					last_viewport_height_ = final_height;
 					
-					// Capture updated iframe positions after resize
 					captureIFramePositions();
-					
-					overlay_viewport_->ensureProperZOrder();
 					
 					if (!overlay_viewport_->isVisible()) 
 					{
@@ -440,8 +443,6 @@ void UIHandler::updateOverlayPosition()
 			viewport_width - (2 * inset), 
 			viewport_height - (2 * inset)
 		);
-		
-		overlay_viewport_->ensureProperZOrder();
 	}
 }
 
@@ -612,6 +613,11 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 				}
 			}
 		}
+		
+		if (handler->slot_texture_renderer_ && handler->slot_texture_renderer_->isRenderingEnabled())
+		{
+			handler->slot_texture_renderer_->render();
+		}
 	}
 }
 
@@ -627,39 +633,60 @@ bool UIHandler::isOverlayRenderingEnabled() const
 
 void UIHandler::enableSlotTextureRendering(bool enable)
 {
-	if (!overlay_viewport_) return;
+	if (!parent_hwnd_) return;
 	
 	if (enable) 
 	{
-		if (overlay_viewport_->isDestroyingSlotTexture())
+		if (!slot_texture_renderer_) 
 		{
-			std::cout << "[UIHandler] Cannot enable SlotTexture - destruction in progress" << std::endl;
-			return;
-		}
-		
-		if (!overlay_viewport_->hasSlotTexture()) 
-		{
-			overlay_viewport_->createSlotTexture(0, 50, 1920, 150);
+			HGLRC shareContext = nullptr;
+			if (overlay_viewport_)
+			{
+				overlay_viewport_->makeContextCurrent();
+				shareContext = overlay_viewport_->getGLContext();
+			}
+			
+			slot_texture_renderer_ = new Overlay_HTML_Texture_Renderer("file:///ui/hello_cef.html");
+			
+			if (slot_texture_renderer_->create(parent_hwnd_, 0, 50, 1920, 150, shareContext))
+			{
+				slot_texture_renderer_->enableRendering(true);
+				slot_texture_renderer_->show(true);
+				std::cout << "[UIHandler] Overlay_HTML_Texture_Renderer created and shown" << std::endl;
+			}
+			else
+			{
+				std::cerr << "[UIHandler] Failed to create Overlay_HTML_Texture_Renderer" << std::endl;
+				delete slot_texture_renderer_;
+				slot_texture_renderer_ = nullptr;
+			}
 		} 
 		else 
 		{
-			overlay_viewport_->enableSlotTextureRenderingInternal(true);
-			overlay_viewport_->showSlotTextureInternal(true);
-			std::cout << "[UIHandler] SlotTexture rendering enabled" << std::endl;
+			slot_texture_renderer_->enableRendering(true);
+			slot_texture_renderer_->show(true);
+
+			if (slot_texture_renderer_->getHandle())
+			{
+				InvalidateRect(slot_texture_renderer_->getHandle(), nullptr, TRUE);
+			}
+
+			std::cout << "[UIHandler] Overlay_HTML_Texture_Renderer rendering enabled" << std::endl;
 		}
 	} 
 	else 
 	{
-		if (overlay_viewport_->isDestroyingSlotTexture())
+		if (slot_texture_renderer_) 
 		{
-			std::cout << "[UIHandler] SlotTexture destruction already in progress" << std::endl;
-			return;
-		}
-		
-		if (overlay_viewport_->hasSlotTexture()) 
-		{
-			overlay_viewport_->destroySlotTexture();
-			std::cout << "[UIHandler] SlotTexture DESTROYED" << std::endl;
+			slot_texture_renderer_->enableRendering(false);
+			slot_texture_renderer_->show(false);
+			
+			auto* temp = slot_texture_renderer_;
+			slot_texture_renderer_ = nullptr;
+			
+			temp->destroy();
+			
+			std::cout << "[UIHandler] Overlay_HTML_Texture_Renderer DESTROYED" << std::endl;
 		}
 	}
 }
@@ -1015,7 +1042,9 @@ void UIHandler::transitionMouseState(const std::string& regionName)
 
 void UIHandler::CallTestFromServer()
 {
-	std::cout << "[UIHandler] CallTestFromServer invoked - this is a test function callable from CEF" << std::endl;
+	std::cout <<" \n ----------------------------------------------------------------------------------------- " << std::endl;
+	std::cout << "[UIHandler] \n CallTestFromServer invoked - this is a test function callable from CEF" << std::endl;
+
 	
 	if (!CefCurrentlyOn(TID_UI))
 	{
@@ -1026,4 +1055,5 @@ void UIHandler::CallTestFromServer()
 	}
 	
 	enableSlotTextureRendering(true);
+
 }

@@ -110,7 +110,7 @@ Overlay_HTML_Texture_Renderer::~Overlay_HTML_Texture_Renderer()
 	destroy();
 }
 
-bool Overlay_HTML_Texture_Renderer::create(HWND parent, int x, int y, int width, int height)
+bool Overlay_HTML_Texture_Renderer::create(HWND parent, int x, int y, int width, int height, HGLRC shareContext)
 {
 	parent_ = parent;
 	width_ = width;
@@ -192,7 +192,22 @@ bool Overlay_HTML_Texture_Renderer::create(HWND parent, int x, int y, int width,
 		return false;
 	}
 
-	initializeOpenGL(nullptr);
+	HGLRC previousContext = wglGetCurrentContext();
+	HDC previousDC = wglGetCurrentDC();
+
+	initializeOpenGL(shareContext);
+
+	if (!gl_context_)
+	{
+		std::cerr << "[Overlay_HTML_Texture_Renderer] Failed to initialize OpenGL context" << std::endl;
+		ReleaseDC(hwnd_, hdc_);
+		DestroyWindow(hwnd_);
+		hwnd_ = nullptr;
+		hdc_ = nullptr;
+		return false;
+	}
+
+	wglMakeCurrent(hdc_, gl_context_);
 
 	texture_width_ = width_;
 	texture_height_ = height_;
@@ -209,6 +224,11 @@ bool Overlay_HTML_Texture_Renderer::create(HWND parent, int x, int y, int width,
 
 	createBrowser();
 
+	if (previousContext && previousDC)
+	{
+		wglMakeCurrent(previousDC, previousContext);
+	}
+
 	return true;
 }
 
@@ -219,9 +239,16 @@ void Overlay_HTML_Texture_Renderer::destroy()
 		return;
 	}
 
-	std::cout << "[Overlay_HTML_Texture_Renderer][" << instance_id_ << "] Destroying instance for URL: " << html_url_ << std::endl;
-
 	being_destroyed_ = true;
+	rendering_enabled_ = false;
+	html_browser_ready_ = false;
+	
+	if (hwnd_)
+	{
+		ShowWindow(hwnd_, SW_HIDE);
+	}
+
+	std::cout << "[Overlay_HTML_Texture_Renderer][" << instance_id_ << "] Destroying instance for URL: " << html_url_ << std::endl;
 
 	if (browser_)
 	{
@@ -243,6 +270,9 @@ void Overlay_HTML_Texture_Renderer::destroy()
 
 	if (gl_context_)
 	{
+		HGLRC previousContext = wglGetCurrentContext();
+		HDC previousDC = wglGetCurrentDC();
+		
 		wglMakeCurrent(hdc_, gl_context_);
 
 		if (texture_id_ != 0)
@@ -270,6 +300,11 @@ void Overlay_HTML_Texture_Renderer::destroy()
 		wglMakeCurrent(nullptr, nullptr);
 		wglDeleteContext(gl_context_);
 		gl_context_ = nullptr;
+		
+		if (previousContext && previousDC && previousContext != gl_context_)
+		{
+			wglMakeCurrent(previousDC, previousContext);
+		}
 	}
 
 	if (hdc_)
@@ -449,10 +484,11 @@ void Overlay_HTML_Texture_Renderer::OnAfterCreated(CefRefPtr<CefBrowser> browser
 
 	html_browser_ready_ = true;
 	
-	// Show window now that HTML content is ready (avoid showing black background)
 	if (hwnd_ && rendering_enabled_)
 	{
 		ShowWindow(hwnd_, SW_SHOW);
+		InvalidateRect(hwnd_, nullptr, TRUE);
+		UpdateWindow(hwnd_);
 		std::cout << "[Overlay_HTML_Texture_Renderer] HTML content ready - showing window" << std::endl;
 	}
 }
@@ -492,12 +528,18 @@ void Overlay_HTML_Texture_Renderer::OnTitleChange(CefRefPtr<CefBrowser> browser,
 
 void Overlay_HTML_Texture_Renderer::render()
 {
+	if (being_destroyed_)
+	{
+		return;
+	}
+	
 	if (!hwnd_ || !rendering_enabled_)
 	{
 		return;
 	}
 	
-	// Don't render until HTML content is ready (avoid showing black/colored placeholder)
+	CefDoMessageLoopWork();
+	
 	if (!html_browser_ready_)
 	{
 		return;

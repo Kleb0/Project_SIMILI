@@ -17,6 +17,7 @@
 #include <memory>
 
 class SimpleWindowDelegate;
+class Overlay_HTML_Texture_Renderer;
 
 namespace SIMILI 
 {
@@ -163,6 +164,9 @@ private:
 	std::string last_detected_region_name_;
 	
 	SIMILI::Input::MouseControlToOverlay* mouse_control_to_overlay_;
+	
+	// Slot texture renderer
+	Overlay_HTML_Texture_Renderer* slot_texture_renderer_;
 
 	IMPLEMENT_REFCOUNTING(UIHandler);
 };

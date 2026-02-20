@@ -3,13 +3,279 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <cmath>
+#include <windows.h>
 
-HtmlTextureRenderer::HtmlTextureRenderer(TextureRendererTest* textureRenderer)
-	: texture_renderer_(textureRenderer)
+HtmlTextureRenderer::HtmlTextureRenderer()
+	: texture_id_(0)
+	, vao_(0)
+	, vbo_(0)
+	, shader_program_(0)
 	, width_(250)
 	, height_(100)
+	, texture_width_(250)
+	, texture_height_(100)
+	, initialized_(false)
+	, render_x_(10)
+	, render_y_(10)
+	, render_width_(250)
+	, render_height_(100)
 	, viewport_hwnd_(nullptr)
 {
+}
+
+HtmlTextureRenderer::~HtmlTextureRenderer()
+{
+	cleanup();
+}
+
+void HtmlTextureRenderer::initialize(int width, int height)
+{
+	if (initialized_) 
+	{
+		return;
+	}
+
+	width_ = width;
+	height_ = height;
+
+	createTexture(texture_width_, texture_height_);
+	createQuadMesh();
+	createShaderProgram();
+
+	initialized_ = true;
+}
+
+void HtmlTextureRenderer::cleanup()
+{
+	if (!initialized_) {
+		return;
+	}
+	
+	HGLRC currentContext = wglGetCurrentContext();
+	if (!currentContext) {
+		std::cerr << "[HtmlTextureRenderer] Warning: cleanup() called without active OpenGL context" << std::endl;
+		initialized_ = false;
+		return;
+	}
+
+	if (texture_id_ != 0) {
+		glDeleteTextures(1, &texture_id_);
+		texture_id_ = 0;
+	}
+
+	if (vao_ != 0) {
+		glDeleteVertexArrays(1, &vao_);
+		vao_ = 0;
+	}
+
+	if (vbo_ != 0) {
+		glDeleteBuffers(1, &vbo_);
+		vbo_ = 0;
+	}
+
+	if (shader_program_ != 0) {
+		glDeleteProgram(shader_program_);
+		shader_program_ = 0;
+	}
+
+	initialized_ = false;
+}
+
+void HtmlTextureRenderer::createTexture(int tex_width, int tex_height)
+{
+	texture_width_ = tex_width;
+	texture_height_ = tex_height;
+	
+	glGenTextures(1, &texture_id_);
+	glBindTexture(GL_TEXTURE_2D, texture_id_);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture_width_, texture_height_, 0, 
+				 GL_BGRA, GL_UNSIGNED_BYTE, nullptr);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void HtmlTextureRenderer::createQuadMesh()
+{
+	float vertices[] = 
+	{
+		0.0f, 1.0f, 0.0f,   0.0f, 1.0f, 
+		0.0f, 0.0f, 0.0f,   0.0f, 0.0f,  
+		1.0f, 0.0f, 0.0f,   1.0f, 0.0f,
+		 
+		0.0f, 1.0f, 0.0f,   0.0f, 1.0f,
+		1.0f, 0.0f, 0.0f,   1.0f, 0.0f, 
+		1.0f, 1.0f, 0.0f,   1.0f, 1.0f  
+	};
+
+	glGenVertexArrays(1, &vao_);
+	glGenBuffers(1, &vbo_);
+
+	glBindVertexArray(vao_);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo_);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);
+
+	glBindVertexArray(0);
+}
+
+GLuint HtmlTextureRenderer::compileShader(GLenum type, const char* source)
+{
+	GLuint shader = glCreateShader(type);
+	glShaderSource(shader, 1, &source, nullptr);
+	glCompileShader(shader);
+
+	GLint success;
+	glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+	if (!success) 
+	{
+		char infoLog[512];
+		glGetShaderInfoLog(shader, 512, nullptr, infoLog);
+		std::cerr << "[HtmlTextureRenderer] Shader compilation failed:\n" << infoLog << std::endl;
+	}
+
+	return shader;
+}
+
+void HtmlTextureRenderer::createShaderProgram()
+{
+	const char* vertexShaderSource = R"(
+		#version 460 core
+		layout (location = 0) in vec3 aPos;
+		layout (location = 1) in vec2 aTexCoord;
+		
+		out vec2 TexCoord;
+		
+		uniform vec2 viewportSize;
+		uniform vec2 rectSize;
+		uniform vec2 rectPos;
+		
+		void main()
+		{
+			vec2 pixelPos = aPos.xy * rectSize + rectPos;
+			vec2 ndc = (pixelPos / viewportSize) * 2.0 - 1.0;
+			ndc.y = -ndc.y;
+			
+			gl_Position = vec4(ndc, 0.0, 1.0);
+			TexCoord = aTexCoord;
+		}
+	)";
+
+	const char* fragmentShaderSource = R"(
+		#version 460 core
+		out vec4 FragColor;
+		
+		in vec2 TexCoord;
+		uniform sampler2D texture1;
+		
+		void main()
+		{
+			FragColor = texture(texture1, TexCoord);
+		}
+	)";
+
+	GLuint vertexShader = compileShader(GL_VERTEX_SHADER, vertexShaderSource);
+	GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragmentShaderSource);
+
+	shader_program_ = glCreateProgram();
+	glAttachShader(shader_program_, vertexShader);
+	glAttachShader(shader_program_, fragmentShader);
+	glLinkProgram(shader_program_);
+
+	GLint success;
+	glGetProgramiv(shader_program_, GL_LINK_STATUS, &success);
+	if (!success) {
+		char infoLog[512];
+		glGetProgramInfoLog(shader_program_, 512, nullptr, infoLog);
+		std::cerr << "[HtmlTextureRenderer] Shader linking failed:\n" << infoLog << std::endl;
+	}
+
+	glDeleteShader(vertexShader);
+	glDeleteShader(fragmentShader);
+}
+
+void HtmlTextureRenderer::render()
+{
+	if (!initialized_) {
+		return;
+	}
+
+	GLboolean depthTestEnabled;
+	glGetBooleanv(GL_DEPTH_TEST, &depthTestEnabled);
+	GLboolean blendEnabled;
+	glGetBooleanv(GL_BLEND, &blendEnabled);
+
+	glDisable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	glUseProgram(shader_program_);
+
+	glUniform2f(glGetUniformLocation(shader_program_, "viewportSize"), 
+				static_cast<float>(width_), static_cast<float>(height_));
+	glUniform2f(glGetUniformLocation(shader_program_, "rectSize"), 
+				static_cast<float>(render_width_), static_cast<float>(render_height_));
+	glUniform2f(glGetUniformLocation(shader_program_, "rectPos"), 
+				static_cast<float>(render_x_), static_cast<float>(render_y_));
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, texture_id_);
+	glUniform1i(glGetUniformLocation(shader_program_, "texture1"), 0);
+
+	glBindVertexArray(vao_);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+	glBindVertexArray(0);
+
+	if (depthTestEnabled) glEnable(GL_DEPTH_TEST);
+	if (!blendEnabled) glDisable(GL_BLEND);
+}
+
+void HtmlTextureRenderer::updateTexture(const void* buffer, int width, int height)
+{
+	if (!initialized_ || !buffer) {
+		return;
+	}
+	
+	if (width != texture_width_ || height != texture_height_) {
+		if (texture_id_ != 0) {
+			glDeleteTextures(1, &texture_id_);
+		}
+		createTexture(width, height);
+	}
+	
+	glBindTexture(GL_TEXTURE_2D, texture_id_);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texture_width_, texture_height_,
+					GL_BGRA, GL_UNSIGNED_BYTE, buffer);
+	glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void HtmlTextureRenderer::resize(int width, int height)
+{
+	if (width == width_ && height == height_) {
+		return;
+	}
+
+	width_ = width;
+	height_ = height;
+}
+
+void HtmlTextureRenderer::setRenderRect(int x, int y, int w, int h)
+{
+	render_x_ = x;
+	render_y_ = y;
+	render_width_ = w;
+	render_height_ = h;
 }
 
 void HtmlTextureRenderer::createBrowser(const std::string& url, int width, int height)
@@ -48,8 +314,8 @@ void HtmlTextureRenderer::GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& re
 void HtmlTextureRenderer::OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type,
 const RectList& dirtyRects, const void* buffer, int width, int height)
 {
-	if (type == PET_VIEW && texture_renderer_ && !being_destroyed_) {
-		texture_renderer_->updateTexture(buffer, width, height);
+	if (type == PET_VIEW && !being_destroyed_) {
+		updateTexture(buffer, width, height);
 	}
 }
 
@@ -80,7 +346,6 @@ void HtmlTextureRenderer::OnBeforeClose(CefRefPtr<CefBrowser> browser)
 {
 	std::cout << "[HtmlTextureRenderer] OnBeforeClose called - browser is fully closed" << std::endl;
 	being_destroyed_ = true;
-	texture_renderer_ = nullptr;
 	browser_ = nullptr;
 	browser_closed_ = true;
 }
@@ -131,11 +396,6 @@ void HtmlTextureRenderer::updateSize(int width, int height)
 	height_ = height;
 	
 	if (browser_ && browser_->GetHost()) {
-		// Update texture renderer size
-		if (texture_renderer_) {
-			texture_renderer_->initialize(width, height);
-		}
-		
 		// Force CEF to resize and repaint
 		browser_->GetHost()->WasResized();
 		browser_->GetHost()->NotifyScreenInfoChanged();

@@ -16,11 +16,8 @@
 #include "overlay_viewport.hpp"
 #include "CameraControl/CameraControl.hpp"
 #include "Raycasting/RaycastPerform.hpp"
-#include "HTMLTextureRenderer/TextureRendererTest.hpp"
 #include "HTMLTextureRenderer/HtmlTextureRenderer.hpp"
-#include "HTMLTextureRenderer/SlotTexture.hpp"
 #include "ClickHandling/OverlayClickHandler.hpp"
-#include "ContextualMenuLogic/ContextualMenuTextureTest.hpp"
 
 #include "../../Engine/ThreeDScene.hpp"
 #include "../../Engine/OpenGLContext.hpp"
@@ -84,7 +81,6 @@ OverlayViewport::OverlayViewport() : hwnd_(nullptr)
 	, selector_(nullptr)
 	, current_guizmo_operation_(ImGuizmo::TRANSLATE)
 	, current_guizmo_mode_(ImGuizmo::LOCAL)
-	, texture_renderer_test_(nullptr)
 	, html_texture_renderer_(nullptr)
 	, normal_mode_(nullptr)
 	, vertice_mode_(nullptr)
@@ -92,15 +88,10 @@ OverlayViewport::OverlayViewport() : hwnd_(nullptr)
 	, edge_mode_(nullptr)
 	, current_mode_(nullptr)
 	, was_using_gizmo_last_frame_(false)
-	, contextual_menu_texture_test_(nullptr)
-	, contextual_menu_texture_renderer_(nullptr)
-	, contextual_menu_html_renderer_(nullptr)
-	, slot_texture_(nullptr)
 {
 	selector_ = new ThreeDObjectSelector();
 	camera_control_ = new CameraControl(this);
 	raycast_performer_ = new RaycastPerform(this, selector_);
-	texture_renderer_test_ = new TextureRendererTest();
 	click_handler_ = new OverlayClickHandler(this);
 	
 	normal_mode_ = new Normal_Mode();
@@ -140,11 +131,6 @@ OverlayViewport::~OverlayViewport()
 		delete raycast_performer_;
 		raycast_performer_ = nullptr;
 	}
-	if (texture_renderer_test_) 
-	{
-		delete texture_renderer_test_;
-		texture_renderer_test_ = nullptr;
-	}
 	if (html_texture_renderer_) 
 	{
 		html_texture_renderer_ = nullptr; 
@@ -175,32 +161,6 @@ OverlayViewport::~OverlayViewport()
 	{
 		delete edge_mode_;
 		edge_mode_ = nullptr;
-	}
-	
-	if (contextual_menu_texture_test_) 
-	{
-		delete contextual_menu_texture_test_;
-		contextual_menu_texture_test_ = nullptr;
-	}
-	
-	if (contextual_menu_texture_renderer_) 
-	{
-		delete contextual_menu_texture_renderer_;
-		contextual_menu_texture_renderer_ = nullptr;
-	}
-	
-	if (contextual_menu_html_renderer_) 
-	{
-		contextual_menu_html_renderer_ = nullptr;
-	}
-	
-	{
-		std::lock_guard<std::mutex> lock(slot_texture_mutex_);
-		if (slot_texture_) 
-		{
-			delete slot_texture_;
-			slot_texture_ = nullptr;
-		}
 	}
 	
 	destroy();
@@ -264,7 +224,9 @@ bool OverlayViewport::create(HWND parent, int x, int y, int width, int height)
 	
 	// Ensure we don't have TOPMOST extended style
 	DWORD exStyle = GetWindowLongW(hwnd_, GWL_EXSTYLE);
-	if (exStyle & WS_EX_TOPMOST) {
+
+	if (exStyle & WS_EX_TOPMOST) 
+	{
 		SetWindowLongW(hwnd_, GWL_EXSTYLE, exStyle & ~WS_EX_TOPMOST);
 		std::cout << "[OverlayViewport] Removed WS_EX_TOPMOST flag" << std::endl;
 	}
@@ -341,20 +303,20 @@ void OverlayViewport::initializeOpenGL(HGLRC shareContext)
 		return;
 	}
 	
-	// Create OpenGL context SHARED with GLFW context
 	HGLRC tempContext = wglCreateContext(hdc_);
-	if (!tempContext) {
+	if (!tempContext) 
+	{
 		std::cerr << "[OverlayViewport] Failed to create temporary OpenGL context" << std::endl;
 		return;
 	}
 	
 	wglMakeCurrent(hdc_, tempContext);
 	
-	// Load wglCreateContextAttribsARB extension
 	PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = 
 		(PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
 	
-	if (wglCreateContextAttribsARB) {
+	if (wglCreateContextAttribsARB) 
+	{
 		int attribs[] = {
 			WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
 			WGL_CONTEXT_MINOR_VERSION_ARB, 3,
@@ -366,28 +328,30 @@ void OverlayViewport::initializeOpenGL(HGLRC shareContext)
 		
 		// CRITICAL: Share with GLFW context to access VAO/VBO/Shaders!
 		gl_context_ = wglCreateContextAttribsARB(hdc_, shareContext, attribs);
-		if (gl_context_) {
+		if (gl_context_) 
+		{
 			wglMakeCurrent(nullptr, nullptr);
 			wglDeleteContext(tempContext);
-			wglMakeCurrent(hdc_, gl_context_);
-			
-			if (shareContext) {
-				std::cout << "[OverlayViewport] ✓ OpenGL 3.3 Core context created SHARED with GLFW context " << shareContext << std::endl;
-			} else {
-				std::cout << "[OverlayViewport] ✗ OpenGL 3.3 Core context created WITHOUT sharing (shareContext was NULL)" << std::endl;
-			}
-		} else {
+			wglMakeCurrent(hdc_, gl_context_);			
+
+		} 
+		else
+		{
 			DWORD err = GetLastError();
 			std::cerr << "[OverlayViewport] Failed to create shared OpenGL 3.3 context (error: " << err << "), using compatibility context" << std::endl;
 			gl_context_ = tempContext;
 		}
-	} else {
+	} 
+	else 
+	{
 		std::cout << "[OverlayViewport] wglCreateContextAttribsARB not available, using compatibility context" << std::endl;
 		gl_context_ = tempContext;
 	}
 	
 	static bool glad_loaded = false;
-	if (!glad_loaded) {
+
+	if (!glad_loaded) 
+	{
 		if (!gladLoadGL()) 
 		{
 			std::cerr << "[OverlayViewport] Failed to load GLAD extensions" << std::endl;
@@ -407,61 +371,20 @@ void OverlayViewport::initializeOpenGL(HGLRC shareContext)
 	
 	std::cout << "[OverlayViewport] OpenGL state configured for 3D scene rendering" << std::endl;
 	
-	// Initialize ImGui after OpenGL context is ready
 	initializeImGui();
 	
-	// Initialize texture renderer test
-	if (texture_renderer_test_) {
-		texture_renderer_test_->initialize(width_, height_);
-		
-		html_texture_width_ = 350;
-		html_texture_height_ = height_;
-		html_texture_x_ = 10;
-		html_texture_y_ = 10;
-		
-		// Configure render rectangle for the texture
-		texture_renderer_test_->setRenderRect(html_texture_x_, html_texture_y_, 
+	html_texture_width_ = 350;
+	html_texture_height_ = height_;
+	html_texture_x_ = 10;
+	html_texture_y_ = 10;
+	
+	html_texture_renderer_ = new HtmlTextureRenderer();
+	html_texture_renderer_->initialize(html_texture_width_, html_texture_height_);
+	html_texture_renderer_->setRenderRect(html_texture_x_, html_texture_y_, 
 		html_texture_width_, html_texture_height_);
-		
-		html_texture_renderer_ = new HtmlTextureRenderer(texture_renderer_test_);
-		html_texture_renderer_->createBrowser("file:///ui/Mode_UI.html", html_texture_width_, html_texture_height_);
-		
-		// CRITICAL: Pass viewport HWND so renderer can trigger immediate redraws
-		html_texture_renderer_->setViewportWindow(hwnd_);
-	
-	}
-	
-	contextual_menu_width_ = 300;
-	contextual_menu_height_ = 200;
-	contextual_menu_x_ = 100;
-	contextual_menu_y_ = 100;
-	
-	contextual_menu_texture_test_ = new ContextualMenuTextureTest();
-	contextual_menu_texture_test_->initialize(contextual_menu_width_, contextual_menu_height_);
-	
-	contextual_menu_texture_renderer_ = new TextureRendererTest();
-	contextual_menu_texture_renderer_->initialize(width_, height_);
-	
-	contextual_menu_texture_renderer_->setRenderRect(contextual_menu_x_, contextual_menu_y_, 
-	contextual_menu_width_, contextual_menu_height_);
-	
-	contextual_menu_html_renderer_ = new HtmlTextureRenderer(contextual_menu_texture_renderer_);
-	
-	contextual_menu_html_renderer_->setOnBrowserCreatedCallback([this](CefRefPtr<CefBrowser> browser) 
-	{
-		if (contextual_menu_texture_test_) 
-		{
-			contextual_menu_texture_test_->setBrowser(browser);
-			std::cout << "[OverlayViewport] CEF browser connected to ContextualMenuTextureTest (browser valid: " 
-					  << (browser != nullptr) << ", host valid: " << (browser && browser->GetHost() != nullptr) << ")" << std::endl;
-		} 
-	});
-	
-	contextual_menu_html_renderer_->createBrowser("file:///ui/Contextual_Menu.html", 
-	contextual_menu_width_, contextual_menu_height_);
-
-	contextual_menu_html_renderer_->setViewportWindow(hwnd_);
-	}
+	html_texture_renderer_->createBrowser("file:///ui/Mode_UI.html", html_texture_width_, html_texture_height_);
+	html_texture_renderer_->setViewportWindow(hwnd_);
+}
 
 void OverlayViewport::initializeImGui() 
 {
@@ -631,34 +554,9 @@ void OverlayViewport::render()
 	
 	SIMILI::Input::KeyManager::getInstance().update();
 	
-	if (texture_renderer_test_) 
+	if (html_texture_renderer_) 
 	{
-		texture_renderer_test_->render();
-	}
-	
-	// Ensure SlotTexture remains on top after 3D scene rendering (less frequent)
-	static int z_order_check_counter = 0;
-	if (!is_destroying_slot_texture_)
-	{
-		std::lock_guard<std::mutex> lock(slot_texture_mutex_);
-		if (slot_texture_ && (z_order_check_counter % 60 == 0)) {
-			slot_texture_->ensureProperZOrder();
-		}
-	}
-	z_order_check_counter++;
-	
-	if (contextual_menu_visible_ && contextual_menu_texture_renderer_) 
-	{
-		contextual_menu_texture_renderer_->render();
-	}
-	
-	// Render SlotTexture (Layer 2 - Above everything else)
-	if (!is_destroying_slot_texture_)
-	{
-		std::lock_guard<std::mutex> lock(slot_texture_mutex_);
-		if (slot_texture_) {
-			slot_texture_->render();
-		}
+		html_texture_renderer_->render();
 	}
 	
 	if (imgui_initialized_) 
@@ -756,17 +654,7 @@ void OverlayViewport::setPosition(int x, int y, int width, int height)
 			{
 				three_d_scene_->getActiveCamera()->setResolution(width, height);
 			}
-		}
-		
-		if (texture_renderer_test_) 
-		{
-			texture_renderer_test_->resize(width, height);
-		}
-		
-		if (contextual_menu_texture_renderer_) 
-		{
-			contextual_menu_texture_renderer_->resize(width, height);
-		}
+		}	
 		
 	}
 }
@@ -776,12 +664,6 @@ void OverlayViewport::show(bool visible)
 	if (hwnd_) 
 	{
 		ShowWindow(hwnd_, visible ? SW_SHOW : SW_HIDE);
-		
-		// Re-assert Z-order after show/hide to maintain proper layering
-		if (visible) 
-		{
-			ensureProperZOrder();
-		}
 	}
 }
 
@@ -791,45 +673,6 @@ bool OverlayViewport::isVisible() const
 		return IsWindowVisible(hwnd_) != 0;
 	}
 	return false;
-}
-
-void OverlayViewport::ensureProperZOrder()
-{
-	if (!hwnd_ || !parent_) return;
-	
-	// Layer-based Z-order system:
-	// Layer 0: CEF browser (bottom)
-	// Layer 1: OpenGL overlay (on top of CEF)
-	// Higher layers = closer to user
-	
-	if (z_order_layer_ == 0) 
-	{
-		// Layer 0: Place at bottom of Z-order
-		SetWindowPos(hwnd_, HWND_BOTTOM, 0, 0, 0, 0, 
-					 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-	} 
-	else 
-	{
-		// Layer 1: Position after parent (CEF) but avoid constant repositioning
-		// Only reposition if we're not already in the right place
-		static bool positioned_once = false;
-		if (!positioned_once) {
-			SetWindowPos(hwnd_, parent_, 0, 0, 0, 0, 
-						 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-			positioned_once = true;
-			std::cout << "[OverlayViewport] Positioned after parent (Layer 1)" << std::endl;
-		}
-	}
-	
-	// Ensure TOPMOST flag is never set (prevents always-on-top behavior)
-	DWORD exStyle = GetWindowLongW(hwnd_, GWL_EXSTYLE);
-	if (exStyle & WS_EX_TOPMOST) 
-	{
-		SetWindowLongW(hwnd_, GWL_EXSTYLE, exStyle & ~WS_EX_TOPMOST);
-		SetWindowPos(hwnd_, HWND_NOTOPMOST, 0, 0, 0, 0, 
-					 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-		std::cout << "[OverlayViewport] Removed TOPMOST flag (layer=" << z_order_layer_ << ")" << std::endl;
-	}
 }
 
 void OverlayViewport::injectMouseInputs(int mouseX, int mouseY, bool leftDown, bool rightDown, bool middleDown, float wheelDelta)
@@ -904,11 +747,9 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 						}
 					}
 				
-					if (overlay->texture_renderer_test_) {
-						overlay->texture_renderer_test_->resize(newWidth, newHeight);
-					}
-					if (overlay->contextual_menu_texture_renderer_) {
-						overlay->contextual_menu_texture_renderer_->resize(newWidth, newHeight);
+					if (overlay->html_texture_renderer_) 
+					{
+						overlay->html_texture_renderer_->resize(newWidth, newHeight);
 					}
 				}
 				return 0;
@@ -933,11 +774,6 @@ LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LP
 			
 			case WM_ACTIVATE:
 			{
-				// Maintain Z-order after activation events
-				if (LOWORD(wParam) != WA_INACTIVE) 
-				{
-					overlay->ensureProperZOrder();
-				}
 				break;
 			}
 			
@@ -1115,158 +951,6 @@ void OverlayViewport::ThreeDWorldInteractions()
 	}	
 }
 
-
-// ============================================================================
-// CONTEXTUAL MENU MANAGEMENT
-// ============================================================================
-
-void OverlayViewport::setContextualMenuPosition(int x, int y)
-{
-	contextual_menu_x_ = x;
-	contextual_menu_y_ = y;
-	
-	if (contextual_menu_texture_renderer_) 
-	{
-		contextual_menu_texture_renderer_->setRenderRect(x, y, 
-			contextual_menu_width_, contextual_menu_height_);
-	}
-}
-
-// ============================================================================
-// SLOT TEXTURE MANAGEMENT (Layer 2 - Above Everything)
-// ============================================================================
-
-void OverlayViewport::createSlotTexture(int x, int y, int width, int height)
-{
-	if (!parent_) 
-	{
-		std::cerr << "[OverlayViewport] Cannot create SlotTexture - no parent window" << std::endl;
-		return;
-	}
-	
-	// First destroy existing SlotTexture with mutex protection
-	{
-		std::lock_guard<std::mutex> lock(slot_texture_mutex_);
-		if (slot_texture_) {
-			delete slot_texture_;
-			slot_texture_ = nullptr;
-		}
-	}
-	
-	// Create new SlotTexture without holding mutex (long operation)
-	SlotTexture* new_texture = new SlotTexture();
-	
-	if (new_texture->create(parent_, x, y, width, height, 2)) 
-	{
-		// Configure SlotTexture to display CEF HTML content
-		new_texture->loadHTML("file:///ui/hello_cef.html");
-		new_texture->setUseHTMLTexture(true);
-		
-		// Enable rendering
-		new_texture->enableRendering(true);
-				
-		// Show the window
-		new_texture->show(true);
-		
-		new_texture->ensureProperZOrder();
-		
-		// Force initial render
-		new_texture->render();
-		InvalidateRect(new_texture->getHandle(), nullptr, TRUE);
-		UpdateWindow(new_texture->getHandle());
-		
-		// Now atomically assign to slot_texture_ with mutex protection
-		{
-			std::lock_guard<std::mutex> lock(slot_texture_mutex_);
-			slot_texture_ = new_texture;
-		}
-		
-	} 
-	else
-	 {
-		std::cerr << "[OverlayViewport] Failed to create SlotTexture" << std::endl;
-		delete new_texture;
-	}
-}
-
-void OverlayViewport::destroySlotTexture()
-{
-	is_destroying_slot_texture_ = true;
-	
-	SlotTexture* texture_to_delete = nullptr;
-	
-	{
-		std::lock_guard<std::mutex> lock(slot_texture_mutex_);
-		if (slot_texture_)
-		{
-			texture_to_delete = slot_texture_;
-			slot_texture_ = nullptr;
-			texture_to_delete->enableRendering(false);
-		}
-	}
-	
-	if (texture_to_delete)
-	{
-		HGLRC prevContext = wglGetCurrentContext();
-		HDC prevDC = wglGetCurrentDC();
-		
-		delete texture_to_delete;
-		
-		if (prevContext && prevDC)
-		{
-			wglMakeCurrent(prevDC, prevContext);
-		}
-		
-		std::cout << "[OverlayViewport] SlotTexture deleted successfully" << std::endl;
-	}
-	
-	is_destroying_slot_texture_ = false;
-	std::cout << "[OverlayViewport] destroySlotTexture() completed" << std::endl;
-}
-
-void OverlayViewport::showSlotTexture(bool visible)
-{
-	std::lock_guard<std::mutex> lock(slot_texture_mutex_);
-	if (slot_texture_) 
-	{
-		slot_texture_->show(visible);
-		
-		if (visible) 
-		{
-			InvalidateRect(slot_texture_->getHandle(), nullptr, FALSE);
-		}
-	}
-}
-
-bool OverlayViewport::hasSlotTexture() const
-{
-	std::lock_guard<std::mutex> lock(slot_texture_mutex_);
-	return slot_texture_ != nullptr;
-}
-
-void OverlayViewport::enableSlotTextureRenderingInternal(bool enable)
-{
-	std::lock_guard<std::mutex> lock(slot_texture_mutex_);
-	if (slot_texture_)
-	{
-		slot_texture_->enableRendering(enable);
-	}
-}
-
-void OverlayViewport::showSlotTextureInternal(bool visible)
-{
-	std::lock_guard<std::mutex> lock(slot_texture_mutex_);
-	if (slot_texture_)
-	{
-		slot_texture_->show(visible);
-		if (visible)
-		{
-			InvalidateRect(slot_texture_->getHandle(), nullptr, FALSE);
-		}
-	}
-}
-
-// -------- Camera process 	------------ //
 
 void OverlayViewport::MoveCameraLaterally(int deltaX, int deltaY)
 {

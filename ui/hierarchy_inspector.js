@@ -64,6 +64,7 @@ function updateSlots(objects) {
                     if (e.shiftKey) {
                         e.preventDefault();
                     }
+                    enableSlotTextureRendering(true);
                 });
                 slot.parentNode.replaceChild(newSlot, slot);
             }
@@ -144,6 +145,7 @@ function displayObjects(objects) {
                 if (e.shiftKey) {
                     e.preventDefault();
                 }
+                enableSlotTextureRendering(true);
             });
         } else {
             slot.textContent = `| --- [slot ${i + 1}] --- |`;
@@ -202,8 +204,25 @@ async function selectObject(slotIndex, obj, event) {
     }, 200);
 }
 
+async function enableSlotTextureRendering(enable) {
+    try {
+        await fetch('http://localhost:8080/api/slot-texture/render', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ enable: enable })
+        });
+    } catch (error) {
+    }
+}
+
 fetchSceneObjects();
 
 setInterval(() => {
     fetchSceneObjects();
 }, 100);
+document.addEventListener('mouseup', () => {
+    enableSlotTextureRendering(false);
+});
+

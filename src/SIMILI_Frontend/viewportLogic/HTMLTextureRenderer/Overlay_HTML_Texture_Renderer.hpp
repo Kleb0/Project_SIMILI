@@ -19,7 +19,7 @@ public:
 	Overlay_HTML_Texture_Renderer(const std::string& htmlUrl);
 	~Overlay_HTML_Texture_Renderer();
 
-	bool create(HWND parent, int x, int y, int width, int height);
+	bool create(HWND parent, int x, int y, int width, int height, HGLRC shareContext = nullptr);
 	void destroy();
 
 	void setPosition(int x, int y, int width, int height);

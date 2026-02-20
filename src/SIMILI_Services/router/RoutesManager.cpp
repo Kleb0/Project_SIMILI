@@ -318,6 +318,48 @@ namespace SIMILI {
 				return resp;
 			}, "Toggle SlotTexture visibility");
 			
+			router.post("/api/slot-texture/render", [&handler](const Message& msg) -> Response 
+			{
+				Response resp;
+				resp.headers["Content-Type"] = "application/json";
+				resp.headers["Access-Control-Allow-Origin"] = "*";
+				
+				auto requestData = nlohmann::json::parse(msg.body, nullptr, false);
+				if (requestData.is_discarded() || !requestData.contains("enable")) 
+				{
+					resp.statusCode = 400;
+					resp.statusMessage = "Bad Request";
+					resp.body = "{\"error\": \"Invalid JSON\"}";
+					return resp;
+				}
+				
+				bool enable = requestData["enable"];
+				
+				if (handler)
+				{
+					if (enable)
+					{
+						handler->CallTestFromServer();
+					}
+					else
+					{
+						if (!CefCurrentlyOn(TID_UI))
+						{
+							CefPostTask(TID_UI, new TextureEnablerTask(handler, false));
+						}
+						else
+						{
+							handler->enableSlotTextureRendering(false);
+						}
+					}
+				}
+				
+				resp.statusCode = 200;
+				resp.statusMessage = "OK";
+				resp.body = "{\"success\": true, \"enabled\": " + std::string(enable ? "true" : "false") + "}";
+				return resp;
+			}, "Enable or disable SlotTexture rendering");
+			
 			std::cout << "[RoutesManager] Object routes registered" << std::endl;
 		}
 
