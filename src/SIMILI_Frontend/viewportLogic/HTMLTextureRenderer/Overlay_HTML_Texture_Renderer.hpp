@@ -9,6 +9,12 @@
 #include <string>
 #include <atomic>
 #include <functional>
+#include <d3d11.h>
+#include <d2d1.h>
+#include <d2d1_1.h>
+#include <d2d1_3.h>
+#include <dxgi1_2.h>
+#include <dcomp.h>
 #include "../../ThirdParty/CEF/cef_binary/include/cef_client.h"
 #include "../../ThirdParty/CEF/cef_binary/include/cef_render_handler.h"
 #include "../../ThirdParty/CEF/cef_binary/include/cef_life_span_handler.h"
@@ -21,6 +27,9 @@ public:
 
 	bool create(HWND parent, int x, int y, int width, int height, HGLRC shareContext = nullptr);
 	void destroy();
+
+	void enableDirectComposition(bool enable) { use_direct_composition_ = enable; }
+	bool isUsingDirectComposition() const { return use_direct_composition_; }
 
 	void setPosition(int x, int y, int width, int height);
 	void show(bool visible);
@@ -96,6 +105,12 @@ private:
 	void updateTexture(const void* buffer, int width, int height);
 	static std::string generateUniqueID();
 
+	void initializeDirectComposition();
+	void createDirectCompositionResources();
+	void renderDirectComposition();
+	void cleanupDirectComposition();
+	void updateD2DBitmap(const void* buffer, int width, int height);
+
 	std::string instance_id_;
 	std::string html_url_;
 
@@ -137,6 +152,19 @@ private:
 	int parent_width_;
 	int parent_height_;
 	float parent_dpi_scale_;
+
+	bool use_direct_composition_;
+	ID2D1Factory1* d2d_factory_;
+	ID3D11Device* d3d11_device_;
+	ID3D11DeviceContext* d3d11_device_context_;
+	IDXGIDevice1* dxgi_device_;
+	ID2D1Device* d2d_device_;
+	ID2D1DeviceContext3* d2d_device_context_;
+	IDXGISwapChain1* dxgi_swap_chain_;
+	ID2D1Bitmap1* d2d_target_bitmap_;
+	IDCompositionDevice* dcomp_device_;
+	IDCompositionTarget* dcomp_target_;
+	ID2D1Bitmap1* cef_bitmap_;
 
 	IMPLEMENT_REFCOUNTING(Overlay_HTML_Texture_Renderer);
 };

@@ -21,14 +21,16 @@
 typedef HGLRC (WINAPI * PFNWGLCREATECONTEXTATTRIBSARBPROC)(HDC hDC, HGLRC hShareContext, const int *attribList);
 
 namespace {
-	std::string generateRandomAlphanumericID(size_t length) {
+	std::string generateRandomAlphanumericID(size_t length) 
+	{
 		static const char alphanum[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 		std::string result;
 		result.reserve(length);
 		std::random_device rd;
 		std::mt19937 gen(rd());
 		std::uniform_int_distribution<> dis(0, sizeof(alphanum) - 2);
-		for (size_t i = 0; i < length; ++i) {
+		for (size_t i = 0; i < length; ++i) 
+		{
 			result += alphanum[dis(gen)];
 		}
 		return result;
@@ -101,6 +103,18 @@ Overlay_HTML_Texture_Renderer::Overlay_HTML_Texture_Renderer(const std::string& 
 	, parent_width_(0)
 	, parent_height_(0)
 	, parent_dpi_scale_(1.0f)
+	, use_direct_composition_(false)
+	, d2d_factory_(nullptr)
+	, d3d11_device_(nullptr)
+	, d3d11_device_context_(nullptr)
+	, dxgi_device_(nullptr)
+	, d2d_device_(nullptr)
+	, d2d_device_context_(nullptr)
+	, dxgi_swap_chain_(nullptr)
+	, d2d_target_bitmap_(nullptr)
+	, dcomp_device_(nullptr)
+	, dcomp_target_(nullptr)
+	, cef_bitmap_(nullptr)
 {
 	std::cout << "[Overlay_HTML_Texture_Renderer][" << instance_id_ << "] Instance created for URL: " << html_url_ << std::endl;
 }
@@ -171,63 +185,71 @@ bool Overlay_HTML_Texture_Renderer::create(HWND parent, int x, int y, int width,
 		return false;
 	}
 
-	PIXELFORMATDESCRIPTOR pfd = {};
-	pfd.nSize = sizeof(PIXELFORMATDESCRIPTOR);
-	pfd.nVersion = 1;
-	pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
-	pfd.iPixelType = PFD_TYPE_RGBA;
-	pfd.cColorBits = 32;
-	pfd.cDepthBits = 24;
-	pfd.cStencilBits = 8;
-	pfd.iLayerType = PFD_MAIN_PLANE;
-
-	int pixelFormat = ChoosePixelFormat(hdc_, &pfd);
-	if (!pixelFormat || !SetPixelFormat(hdc_, pixelFormat, &pfd))
+	if (use_direct_composition_)
 	{
-		std::cerr << "[Overlay_HTML_Texture_Renderer] Failed to set pixel format" << std::endl;
-		ReleaseDC(hwnd_, hdc_);
-		DestroyWindow(hwnd_);
-		hwnd_ = nullptr;
-		hdc_ = nullptr;
-		return false;
+		initializeDirectComposition();
+		createDirectCompositionResources();
 	}
-
-	HGLRC previousContext = wglGetCurrentContext();
-	HDC previousDC = wglGetCurrentDC();
-
-	initializeOpenGL(shareContext);
-
-	if (!gl_context_)
+	else
 	{
-		std::cerr << "[Overlay_HTML_Texture_Renderer] Failed to initialize OpenGL context" << std::endl;
-		ReleaseDC(hwnd_, hdc_);
-		DestroyWindow(hwnd_);
-		hwnd_ = nullptr;
-		hdc_ = nullptr;
-		return false;
+		PIXELFORMATDESCRIPTOR pfd = {};
+		pfd.nSize = sizeof(PIXELFORMATDESCRIPTOR);
+		pfd.nVersion = 1;
+		pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
+		pfd.iPixelType = PFD_TYPE_RGBA;
+		pfd.cColorBits = 32;
+		pfd.cDepthBits = 24;
+		pfd.cStencilBits = 8;
+		pfd.iLayerType = PFD_MAIN_PLANE;
+
+		int pixelFormat = ChoosePixelFormat(hdc_, &pfd);
+		if (!pixelFormat || !SetPixelFormat(hdc_, pixelFormat, &pfd))
+		{
+			std::cerr << "[Overlay_HTML_Texture_Renderer] Failed to set pixel format" << std::endl;
+			ReleaseDC(hwnd_, hdc_);
+			DestroyWindow(hwnd_);
+			hwnd_ = nullptr;
+			hdc_ = nullptr;
+			return false;
+		}
+
+		HGLRC previousContext = wglGetCurrentContext();
+		HDC previousDC = wglGetCurrentDC();
+
+		initializeOpenGL(shareContext);
+
+		if (!gl_context_)
+		{
+			std::cerr << "[Overlay_HTML_Texture_Renderer] Failed to initialize OpenGL context" << std::endl;
+			ReleaseDC(hwnd_, hdc_);
+			DestroyWindow(hwnd_);
+			hwnd_ = nullptr;
+			hdc_ = nullptr;
+			return false;
+		}
+
+		wglMakeCurrent(hdc_, gl_context_);
+
+		texture_width_ = width_;
+		texture_height_ = height_;
+		glGenTextures(1, &texture_id_);
+		glBindTexture(GL_TEXTURE_2D, texture_id_);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture_width_, texture_height_, 0, GL_BGRA, GL_UNSIGNED_BYTE, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glBindTexture(GL_TEXTURE_2D, 0);
+
+		createQuad();
+
+		if (previousContext && previousDC)
+		{
+			wglMakeCurrent(previousDC, previousContext);
+		}
 	}
-
-	wglMakeCurrent(hdc_, gl_context_);
-
-	texture_width_ = width_;
-	texture_height_ = height_;
-	glGenTextures(1, &texture_id_);
-	glBindTexture(GL_TEXTURE_2D, texture_id_);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture_width_, texture_height_, 0, GL_BGRA, GL_UNSIGNED_BYTE, nullptr);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	createQuad();
 
 	createBrowser();
-
-	if (previousContext && previousDC)
-	{
-		wglMakeCurrent(previousDC, previousContext);
-	}
 
 	return true;
 }
@@ -305,6 +327,11 @@ void Overlay_HTML_Texture_Renderer::destroy()
 		{
 			wglMakeCurrent(previousDC, previousContext);
 		}
+	}
+
+	if (use_direct_composition_)
+	{
+		cleanupDirectComposition();
 	}
 
 	if (hdc_)
@@ -448,17 +475,27 @@ void Overlay_HTML_Texture_Renderer::GetViewRect(CefRefPtr<CefBrowser> browser, C
 void Overlay_HTML_Texture_Renderer::OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type,
 const RectList& dirtyRects, const void* buffer, int width, int height)
 {
-	if (type == PET_VIEW && texture_id_ != 0 && !being_destroyed_)
+	if (type == PET_VIEW && !being_destroyed_)
 	{
-		HGLRC previousContext = wglGetCurrentContext();
-		HDC previousDC = wglGetCurrentDC();
-		
-		wglMakeCurrent(hdc_, gl_context_);
-		updateTexture(buffer, width, height);
-		
-		if (previousContext && previousDC)
+		if (use_direct_composition_)
 		{
-			wglMakeCurrent(previousDC, previousContext);
+			updateD2DBitmap(buffer, width, height);
+		}
+		else
+		{
+			if (texture_id_ != 0)
+			{
+				HGLRC previousContext = wglGetCurrentContext();
+				HDC previousDC = wglGetCurrentDC();
+				
+				wglMakeCurrent(hdc_, gl_context_);
+				updateTexture(buffer, width, height);
+				
+				if (previousContext && previousDC)
+				{
+					wglMakeCurrent(previousDC, previousContext);
+				}
+			}
 		}
 	}
 }
@@ -545,24 +582,31 @@ void Overlay_HTML_Texture_Renderer::render()
 		return;
 	}
 
-	if (gl_context_ && hdc_)
+	if (use_direct_composition_)
 	{
-		HGLRC previousContext = wglGetCurrentContext();
-		HDC previousDC = wglGetCurrentDC();
-		
-		wglMakeCurrent(hdc_, gl_context_);
-
-		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glViewport(0, 0, width_, height_);
-
-		renderQuad();
-
-		SwapBuffers(hdc_);
-		
-		if (previousContext && previousDC)
+		renderDirectComposition();
+	}
+	else
+	{
+		if (gl_context_ && hdc_)
 		{
-			wglMakeCurrent(previousDC, previousContext);
+			HGLRC previousContext = wglGetCurrentContext();
+			HDC previousDC = wglGetCurrentDC();
+			
+			wglMakeCurrent(hdc_, gl_context_);
+
+			glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			glViewport(0, 0, width_, height_);
+
+			renderQuad();
+
+			SwapBuffers(hdc_);
+			
+			if (previousContext && previousDC)
+			{
+				wglMakeCurrent(previousDC, previousContext);
+			}
 		}
 	}
 }
@@ -978,4 +1022,276 @@ LRESULT CALLBACK Overlay_HTML_Texture_Renderer::WndProc(HWND hwnd, UINT msg, WPA
 	}
 
 	return DefWindowProc(hwnd, msg, wParam, lParam);
+}
+void Overlay_HTML_Texture_Renderer::initializeDirectComposition()
+{
+HRESULT hr = S_OK;
+D2D1_FACTORY_OPTIONS options = {};
+options.debugLevel = D2D1_DEBUG_LEVEL_NONE;
+hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory1), &options, (void**)&d2d_factory_);
+
+if (SUCCEEDED(hr))
+{
+UINT creationFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+D3D_FEATURE_LEVEL featureLevels[] = {
+D3D_FEATURE_LEVEL_11_1,
+D3D_FEATURE_LEVEL_11_0,
+D3D_FEATURE_LEVEL_10_1,
+D3D_FEATURE_LEVEL_10_0,
+D3D_FEATURE_LEVEL_9_3,
+D3D_FEATURE_LEVEL_9_2,
+D3D_FEATURE_LEVEL_9_1
+};
+D3D_FEATURE_LEVEL featureLevel;
+hr = D3D11CreateDevice(
+nullptr,
+D3D_DRIVER_TYPE_HARDWARE,
+0,
+creationFlags,
+featureLevels,
+ARRAYSIZE(featureLevels),
+D3D11_SDK_VERSION,
+&d3d11_device_,
+&featureLevel,
+&d3d11_device_context_
+);
+}
+
+if (SUCCEEDED(hr))
+{
+hr = d3d11_device_->QueryInterface(__uuidof(IDXGIDevice1), (void**)&dxgi_device_);
+}
+
+if (SUCCEEDED(hr) && d2d_factory_)
+{
+hr = d2d_factory_->CreateDevice(dxgi_device_, &d2d_device_);
+}
+
+if (SUCCEEDED(hr))
+{
+ID2D1DeviceContext* pD2DDeviceContext = nullptr;
+hr = d2d_device_->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &pD2DDeviceContext);
+if (SUCCEEDED(hr))
+{
+hr = pD2DDeviceContext->QueryInterface(__uuidof(ID2D1DeviceContext3), (void**)&d2d_device_context_);
+pD2DDeviceContext->Release();
+}
+}
+}
+void Overlay_HTML_Texture_Renderer::createDirectCompositionResources()
+{
+	HRESULT hr = S_OK;
+	
+	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
+	swapChainDesc.Width = 1;
+	swapChainDesc.Height = 1;
+	swapChainDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+	swapChainDesc.Stereo = false;
+	swapChainDesc.SampleDesc.Count = 1;
+	swapChainDesc.SampleDesc.Quality = 0;
+	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+	swapChainDesc.BufferCount = 2;
+	swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
+	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
+	swapChainDesc.Flags = 0;
+	swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_PREMULTIPLIED;
+	
+	IDXGIAdapter* pDXGIAdapter = nullptr;
+	hr = dxgi_device_->GetAdapter(&pDXGIAdapter);
+	if (SUCCEEDED(hr))
+	{
+		IDXGIFactory2* pDXGIFactory2 = nullptr;
+		hr = pDXGIAdapter->GetParent(__uuidof(IDXGIFactory2), (void**)&pDXGIFactory2);
+		if (SUCCEEDED(hr))
+		{
+			hr = pDXGIFactory2->CreateSwapChainForComposition(d3d11_device_, &swapChainDesc, nullptr, &dxgi_swap_chain_);
+			if (SUCCEEDED(hr))
+			{
+				hr = dxgi_device_->SetMaximumFrameLatency(1);
+			}
+			pDXGIFactory2->Release();
+		}
+		pDXGIAdapter->Release();
+	}
+	
+	if (SUCCEEDED(hr))
+	{
+		D2D1_BITMAP_PROPERTIES1 bitmapProperties = D2D1::BitmapProperties1(
+			D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+			D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
+			0,
+			0,
+			nullptr
+		);
+		unsigned int nDPI = GetDpiForWindow(hwnd_);
+		bitmapProperties.dpiX = nDPI;
+		bitmapProperties.dpiY = nDPI;
+
+		IDXGISurface* pDXGISurface = nullptr;
+		if (dxgi_swap_chain_)
+		{
+			hr = dxgi_swap_chain_->GetBuffer(0, __uuidof(IDXGISurface), (void**)&pDXGISurface);
+			if (SUCCEEDED(hr))
+			{
+				hr = d2d_device_context_->CreateBitmapFromDxgiSurface(pDXGISurface, bitmapProperties, &d2d_target_bitmap_);
+				if (SUCCEEDED(hr))
+				{
+					d2d_device_context_->SetTarget(d2d_target_bitmap_);
+				}
+				pDXGISurface->Release();
+			}
+		}
+	}
+	
+	if (SUCCEEDED(hr))
+	{
+		hr = DCompositionCreateDevice(dxgi_device_, __uuidof(IDCompositionDevice), (void**)&dcomp_device_);
+		if (SUCCEEDED(hr))
+		{
+			hr = dcomp_device_->CreateTargetForHwnd(hwnd_, true, &dcomp_target_);
+			if (SUCCEEDED(hr))
+			{
+				IDCompositionVisual* pDCompositionVisual = nullptr;
+				hr = dcomp_device_->CreateVisual(&pDCompositionVisual);
+				if (SUCCEEDED(hr))
+				{
+					hr = pDCompositionVisual->SetContent(dxgi_swap_chain_);
+					hr = dcomp_target_->SetRoot(pDCompositionVisual);
+					hr = dcomp_device_->Commit();
+					pDCompositionVisual->Release();
+				}
+			}
+		}
+	}
+}
+
+void Overlay_HTML_Texture_Renderer::renderDirectComposition()
+{
+	if (!d2d_device_context_ || !dxgi_swap_chain_)
+	{
+		return;
+	}
+	
+	HRESULT hr = S_OK;
+	d2d_device_context_->BeginDraw();
+	
+	D2D1_SIZE_F size = d2d_device_context_->GetSize();
+	
+	d2d_device_context_->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
+	
+	if (cef_bitmap_)
+	{
+		D2D1_RECT_F destRect = D2D1::RectF(0.0f, 0.0f, size.width, size.height);
+		d2d_device_context_->DrawBitmap(cef_bitmap_, destRect, 1.0f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+	}
+	
+	hr = d2d_device_context_->EndDraw();
+	
+	if (SUCCEEDED(hr))
+	{
+		hr = dxgi_swap_chain_->Present(1, 0);
+	}
+}
+
+void Overlay_HTML_Texture_Renderer::cleanupDirectComposition()
+{
+	if (cef_bitmap_)
+	{
+		cef_bitmap_->Release();
+		cef_bitmap_ = nullptr;
+	}
+	if (dcomp_target_)
+	{
+		dcomp_target_->Release();
+		dcomp_target_ = nullptr;
+	}
+	if (dcomp_device_)
+	{
+		dcomp_device_->Release();
+		dcomp_device_ = nullptr;
+	}
+	if (d2d_target_bitmap_)
+	{
+		d2d_target_bitmap_->Release();
+		d2d_target_bitmap_ = nullptr;
+	}
+	if (dxgi_swap_chain_)
+	{
+		dxgi_swap_chain_->Release();
+		dxgi_swap_chain_ = nullptr;
+	}
+	if (d2d_device_context_)
+	{
+		d2d_device_context_->Release();
+		d2d_device_context_ = nullptr;
+	}
+	if (d2d_device_)
+	{
+		d2d_device_->Release();
+		d2d_device_ = nullptr;
+	}
+	if (dxgi_device_)
+	{
+		dxgi_device_->Release();
+		dxgi_device_ = nullptr;
+	}
+	if (d3d11_device_context_)
+	{
+		d3d11_device_context_->Release();
+		d3d11_device_context_ = nullptr;
+	}
+	if (d3d11_device_)
+	{
+		d3d11_device_->Release();
+		d3d11_device_ = nullptr;
+	}
+	if (d2d_factory_)
+	{
+		d2d_factory_->Release();
+		d2d_factory_ = nullptr;
+	}
+}
+
+void Overlay_HTML_Texture_Renderer::updateD2DBitmap(const void* buffer, int width, int height)
+{
+	if (!d2d_device_context_)
+	{
+		return;
+	}
+	
+	HRESULT hr = S_OK;
+	
+	if (!cef_bitmap_ || texture_width_ != width || texture_height_ != height)
+	{
+		if (cef_bitmap_)
+		{
+			cef_bitmap_->Release();
+			cef_bitmap_ = nullptr;
+		}
+		
+		texture_width_ = width;
+		texture_height_ = height;
+		
+		D2D1_BITMAP_PROPERTIES1 bitmapProperties = D2D1::BitmapProperties1(
+			D2D1_BITMAP_OPTIONS_NONE,
+			D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
+			0,
+			0,
+			nullptr
+		);
+		
+		hr = d2d_device_context_->CreateBitmap(
+			D2D1::SizeU(width, height),
+			nullptr,
+			0,
+			bitmapProperties,
+			&cef_bitmap_
+		);
+	}
+	
+	if (SUCCEEDED(hr) && cef_bitmap_)
+	{
+		D2D1_RECT_U destRect = D2D1::RectU(0, 0, width, height);
+		hr = cef_bitmap_->CopyFromMemory(&destRect, buffer, width * 4);
+	}
 }

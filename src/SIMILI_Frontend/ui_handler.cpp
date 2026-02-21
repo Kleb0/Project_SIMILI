@@ -68,13 +68,60 @@ UIHandler::UIHandler() : parent_hwnd_(nullptr), timer_id_(0),
 	last_detected_region_name_(""),
 	mouse_control_to_overlay_(nullptr),
 	slot_texture_renderer_(nullptr),
-	composite_test_renderer_(nullptr)
+	composite_test_renderer_(nullptr),
+	d3d11_device_(nullptr),
+	d3d11_device_context_(nullptr),
+	dxgi_device_(nullptr),
+	d2d_factory_(nullptr),
+	d2d_device_(nullptr)
 {
 	above_overlay_state_ = new SIMILI::Input::Mouse_Above_Overlay_State();
 	outside_overlay_state_ = new SIMILI::Input::Mouse_Outside_Overlay_State();	
 	mouse_control_to_overlay_ = new SIMILI::Input::MouseControlToOverlay();
 	
 	current_mouse_state_ = nullptr;
+
+	HRESULT hr = S_OK;
+	D2D1_FACTORY_OPTIONS options = {};
+	options.debugLevel = D2D1_DEBUG_LEVEL_NONE;
+	hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory1), &options, (void**)&d2d_factory_);
+	
+	if (SUCCEEDED(hr))
+	{
+		UINT creationFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+		D3D_FEATURE_LEVEL featureLevels[] = {
+			D3D_FEATURE_LEVEL_11_1,
+			D3D_FEATURE_LEVEL_11_0,
+			D3D_FEATURE_LEVEL_10_1,
+			D3D_FEATURE_LEVEL_10_0,
+			D3D_FEATURE_LEVEL_9_3,
+			D3D_FEATURE_LEVEL_9_2,
+			D3D_FEATURE_LEVEL_9_1
+		};
+		D3D_FEATURE_LEVEL featureLevel;
+		hr = D3D11CreateDevice(
+			nullptr,
+			D3D_DRIVER_TYPE_HARDWARE,
+			0,
+			creationFlags,
+			featureLevels,
+			ARRAYSIZE(featureLevels),
+			D3D11_SDK_VERSION,
+			&d3d11_device_,
+			&featureLevel,
+			&d3d11_device_context_
+		);
+	}
+	
+	if (SUCCEEDED(hr))
+	{
+		hr = d3d11_device_->QueryInterface(__uuidof(IDXGIDevice1), (void**)&dxgi_device_);
+	}
+	
+	if (SUCCEEDED(hr) && d2d_factory_)
+	{
+		hr = d2d_factory_->CreateDevice(dxgi_device_, &d2d_device_);
+	}
 	
 	s_instance_ = this;
 }
@@ -132,6 +179,32 @@ UIHandler::~UIHandler()
 		composite_test_renderer_ = nullptr;
 	}
 	current_mouse_state_ = nullptr;
+
+	if (d2d_device_)
+	{
+		d2d_device_->Release();
+		d2d_device_ = nullptr;
+	}
+	if (dxgi_device_)
+	{
+		dxgi_device_->Release();
+		dxgi_device_ = nullptr;
+	}
+	if (d3d11_device_context_)
+	{
+		d3d11_device_context_->Release();
+		d3d11_device_context_ = nullptr;
+	}
+	if (d3d11_device_)
+	{
+		d3d11_device_->Release();
+		d3d11_device_ = nullptr;
+	}
+	if (d2d_factory_)
+	{
+		d2d_factory_->Release();
+		d2d_factory_ = nullptr;
+	}
 	
 	if (s_instance_ == this)
 	{
@@ -633,12 +706,6 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 				SIMILI::Frontend::IFrameScreenData parentData;
 				if (handler->getFrameDatas()->getFrameData("viewport_panel", parentData))
 				{
-					// std::cout <<"\n ---------------------------------- " << std::endl;
-					// std::cout << "[UIHandler] Updating Composite_Test renderer with parent frame data: " 
-					// 	<< "X: " << parentData.screenX << ", Y: " << parentData.screenY 
-					// 	<< ", Width: " << parentData.width << ", Height: " << parentData.height 
-					// 	<< ", DPI Scale: " << parentData.dpiScale << std::endl;
-					// std::cout <<"---------------------------------- " << std::endl;
 
 					handler->composite_test_renderer_->UpdateParentData(
 						parentData.screenX,

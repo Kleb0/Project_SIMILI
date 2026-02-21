@@ -15,6 +15,12 @@
 #include <list>
 #include <sstream>
 #include <memory>
+#include <windows.h>
+#include <d3d11.h>
+#include <d2d1.h>
+#include <d2d1_1.h>
+#include <dxgi1_2.h>
+#include <dcomp.h>
 
 class SimpleWindowDelegate;
 class Overlay_HTML_Texture_Renderer;
@@ -124,7 +130,11 @@ public:
 	
 	SIMILI::Input::MouseControlToOverlay* getMouseControlToOverlay() const { return mouse_control_to_overlay_; }	
 
-	// Friend function to allow RenderTimerProc access to private members
+	ID3D11Device* getD3D11Device() const { return d3d11_device_; }
+	ID2D1Factory1* getD2D1Factory() const { return d2d_factory_; }
+	ID2D1Device* getD2D1Device() const { return d2d_device_; }
+	IDXGIDevice1* getDXGIDevice() const { return dxgi_device_; }
+
 	friend VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime);
 
 	void CallTestFromServer();
@@ -168,6 +178,12 @@ private:
 	
 	Overlay_HTML_Texture_Renderer* slot_texture_renderer_;
 	Overlay_HTML_Texture_Renderer* composite_test_renderer_;
+
+	ID3D11Device* d3d11_device_;
+	ID3D11DeviceContext* d3d11_device_context_;
+	IDXGIDevice1* dxgi_device_;
+	ID2D1Factory1* d2d_factory_;
+	ID2D1Device* d2d_device_;
 
 	IMPLEMENT_REFCOUNTING(UIHandler);
 };
