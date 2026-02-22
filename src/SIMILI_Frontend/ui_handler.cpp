@@ -800,26 +800,17 @@ void UIHandler::enableCompositeTestRenderer(bool enable)
 	{
 		if (!composite_test_renderer_)
 		{
-			HGLRC shareContext = nullptr;
-			if (overlay_viewport_)
-			{
-				overlay_viewport_->makeContextCurrent();
-				shareContext = overlay_viewport_->getGLContext();
-			}
-			
 			composite_test_renderer_ = new Overlay_HTML_Texture_Renderer("file:///ui/Composite_Test.html");
+			composite_test_renderer_->setSharedDevices(d3d11_device_, dxgi_device_, d2d_factory_, d2d_device_);
+			composite_test_renderer_->enableDirectComposition(true);
 			
-			if (composite_test_renderer_->create(parent_hwnd_, 0, 0, 500, 500, shareContext))
+			if (composite_test_renderer_->create(parent_hwnd_, 0, 0, 500, 500, nullptr))
 			{
 				composite_test_renderer_->SetParentByName("viewport_panel");
 				composite_test_renderer_->setCenterize();
+				composite_test_renderer_->EnableTransparency(0.5f);
 				composite_test_renderer_->enableRendering(true);
 				composite_test_renderer_->show(true);
-			}
-			else
-			{
-				delete composite_test_renderer_;
-				composite_test_renderer_ = nullptr;
 			}
 		}
 		else

@@ -40,8 +40,11 @@ void SimpleWindowDelegate::OnWindowCreated(CefRefPtr<CefWindow> window) {
 			
 			CefRefPtr<CefClient> client = browser->GetHost()->GetClient();
 			UIHandler* handler = static_cast<UIHandler*>(client.get());
+
 			if (handler) 
-			{				ui_handler_ = handler;				handler->createOverlayViewport(browser_hwnd);
+			{	
+				ui_handler_ = handler;				
+				handler->createOverlayViewport(browser_hwnd);
 			} 
 			else 
 			{

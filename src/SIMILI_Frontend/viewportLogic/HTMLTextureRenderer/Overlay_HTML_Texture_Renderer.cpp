@@ -115,6 +115,9 @@ Overlay_HTML_Texture_Renderer::Overlay_HTML_Texture_Renderer(const std::string& 
 	, dcomp_device_(nullptr)
 	, dcomp_target_(nullptr)
 	, cef_bitmap_(nullptr)
+	, transparency_enabled_(false)
+	, transparency_alpha_(1.0f)
+	, using_shared_devices_(false)
 {
 	std::cout << "[Overlay_HTML_Texture_Renderer][" << instance_id_ << "] Instance created for URL: " << html_url_ << std::endl;
 }
@@ -142,14 +145,13 @@ bool Overlay_HTML_Texture_Renderer::create(HWND parent, int x, int y, int width,
 
 	RegisterClassExW(&wc);
 
-	// Create as POPUP without parent first (like SlotTexture)
 	hwnd_ = CreateWindowExW(
-		0,  // No extended styles initially
+		0,
 		windowClassName.c_str(),
 		L"Overlay HTML Texture",
-		WS_POPUP,  // Hidden initially
+		WS_POPUP,
 		x, y, width, height,
-		nullptr,  // No parent initially - will be set with SetParent
+		use_direct_composition_ ? parent : nullptr,
 		nullptr,
 		GetModuleHandle(nullptr),
 		this
@@ -161,17 +163,23 @@ bool Overlay_HTML_Texture_Renderer::create(HWND parent, int x, int y, int width,
 		return false;
 	}
 
-	// Set parent AFTER creation (critical for proper coordinate handling)
-	SetParent(hwnd_, parent);
+	if (!use_direct_composition_)
+	{
+		SetParent(hwnd_, parent);
+	}
 	
-	// Add layered and transparent extended styles
 	DWORD exStyle = GetWindowLong(hwnd_, GWL_EXSTYLE);
-	SetWindowLong(hwnd_, GWL_EXSTYLE, exStyle | WS_EX_LAYERED | WS_EX_TRANSPARENT);
 	
-	// Set layered attributes
-	SetLayeredWindowAttributes(hwnd_, RGB(0, 0, 0), 255, LWA_ALPHA);
+	if (use_direct_composition_)
+	{
+		SetWindowLong(hwnd_, GWL_EXSTYLE, exStyle | WS_EX_NOREDIRECTIONBITMAP);
+	}
+	else
+	{
+		SetWindowLong(hwnd_, GWL_EXSTYLE, exStyle | WS_EX_LAYERED | WS_EX_TRANSPARENT);
+		SetLayeredWindowAttributes(hwnd_, RGB(0, 0, 0), 255, LWA_ALPHA);
+	}
 	
-	// Hide window initially - will be shown when HTML content is ready
 	ShowWindow(hwnd_, SW_HIDE);
 	
 	std::cout << "[Overlay_HTML_Texture_Renderer][" << instance_id_ << "] Window created for URL: " << html_url_ << std::endl;
@@ -749,7 +757,18 @@ void Overlay_HTML_Texture_Renderer::setPosition(int x, int y, int width, int hei
 {
 	if (hwnd_)
 	{
-		SetWindowPos(hwnd_, nullptr, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+		int finalX = x;
+		int finalY = y;
+		
+		if (use_direct_composition_ && parent_)
+		{
+			POINT pt = {x, y};
+			ClientToScreen(parent_, &pt);
+			finalX = pt.x;
+			finalY = pt.y;
+		}
+		
+		SetWindowPos(hwnd_, nullptr, finalX, finalY, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
 
 		if (width != width_ || height != height_)
 		{
@@ -780,6 +799,44 @@ void Overlay_HTML_Texture_Renderer::setPosition(int x, int y, int width, int hei
 			if (browser_ && browser_->GetHost())
 			{
 				browser_->GetHost()->WasResized();
+			}
+			
+			if (use_direct_composition_ && dxgi_swap_chain_ && d2d_device_context_)
+			{
+				d2d_device_context_->SetTarget(nullptr);
+				if (d2d_target_bitmap_)
+				{
+					d2d_target_bitmap_->Release();
+					d2d_target_bitmap_ = nullptr;
+				}
+				
+				HRESULT hr = dxgi_swap_chain_->ResizeBuffers(2, width_, height_, DXGI_FORMAT_B8G8R8A8_UNORM, 0);
+				
+				if (SUCCEEDED(hr))
+				{
+					D2D1_BITMAP_PROPERTIES1 bitmapProperties = D2D1::BitmapProperties1(
+						D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+						D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
+						0,
+						0,
+						nullptr
+					);
+					unsigned int nDPI = GetDpiForWindow(hwnd_);
+					bitmapProperties.dpiX = nDPI;
+					bitmapProperties.dpiY = nDPI;
+
+					IDXGISurface* pDXGISurface = nullptr;
+					hr = dxgi_swap_chain_->GetBuffer(0, __uuidof(IDXGISurface), (void**)&pDXGISurface);
+					if (SUCCEEDED(hr))
+					{
+						hr = d2d_device_context_->CreateBitmapFromDxgiSurface(pDXGISurface, bitmapProperties, &d2d_target_bitmap_);
+						if (SUCCEEDED(hr))
+						{
+							d2d_device_context_->SetTarget(d2d_target_bitmap_);
+						}
+						pDXGISurface->Release();
+					}
+				}
 			}
 		}
 	}
@@ -1025,66 +1082,74 @@ LRESULT CALLBACK Overlay_HTML_Texture_Renderer::WndProc(HWND hwnd, UINT msg, WPA
 }
 void Overlay_HTML_Texture_Renderer::initializeDirectComposition()
 {
-HRESULT hr = S_OK;
-D2D1_FACTORY_OPTIONS options = {};
-options.debugLevel = D2D1_DEBUG_LEVEL_NONE;
-hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory1), &options, (void**)&d2d_factory_);
+	HRESULT hr = S_OK;
+	
+	if (!using_shared_devices_)
+	{
+		D2D1_FACTORY_OPTIONS options = {};
+		options.debugLevel = D2D1_DEBUG_LEVEL_NONE;
+		hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory1), &options, (void**)&d2d_factory_);
+	}
+	else
+	{
+		hr = S_OK;
+	}
+	
+	if (SUCCEEDED(hr) && !using_shared_devices_)
+	{
+		UINT creationFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+		D3D_FEATURE_LEVEL featureLevels[] = {
+			D3D_FEATURE_LEVEL_11_1,
+			D3D_FEATURE_LEVEL_11_0,
+			D3D_FEATURE_LEVEL_10_1,
+			D3D_FEATURE_LEVEL_10_0,
+			D3D_FEATURE_LEVEL_9_3,
+			D3D_FEATURE_LEVEL_9_2,
+			D3D_FEATURE_LEVEL_9_1
+		};
+		D3D_FEATURE_LEVEL featureLevel;
+		hr = D3D11CreateDevice(
+			nullptr,
+			D3D_DRIVER_TYPE_HARDWARE,
+			0,
+			creationFlags,
+			featureLevels,
+			ARRAYSIZE(featureLevels),
+			D3D11_SDK_VERSION,
+			&d3d11_device_,
+			&featureLevel,
+			&d3d11_device_context_
+		);
 
-if (SUCCEEDED(hr))
-{
-UINT creationFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
-D3D_FEATURE_LEVEL featureLevels[] = {
-D3D_FEATURE_LEVEL_11_1,
-D3D_FEATURE_LEVEL_11_0,
-D3D_FEATURE_LEVEL_10_1,
-D3D_FEATURE_LEVEL_10_0,
-D3D_FEATURE_LEVEL_9_3,
-D3D_FEATURE_LEVEL_9_2,
-D3D_FEATURE_LEVEL_9_1
-};
-D3D_FEATURE_LEVEL featureLevel;
-hr = D3D11CreateDevice(
-nullptr,
-D3D_DRIVER_TYPE_HARDWARE,
-0,
-creationFlags,
-featureLevels,
-ARRAYSIZE(featureLevels),
-D3D11_SDK_VERSION,
-&d3d11_device_,
-&featureLevel,
-&d3d11_device_context_
-);
-}
+		if (SUCCEEDED(hr))
+		{
+			hr = d3d11_device_->QueryInterface(__uuidof(IDXGIDevice1), (void**)&dxgi_device_);
+		}
+	}
 
-if (SUCCEEDED(hr))
-{
-hr = d3d11_device_->QueryInterface(__uuidof(IDXGIDevice1), (void**)&dxgi_device_);
-}
+	if (SUCCEEDED(hr) && d2d_factory_ && !using_shared_devices_)
+	{
+		hr = d2d_factory_->CreateDevice(dxgi_device_, &d2d_device_);
+	}
 
-if (SUCCEEDED(hr) && d2d_factory_)
-{
-hr = d2d_factory_->CreateDevice(dxgi_device_, &d2d_device_);
-}
-
-if (SUCCEEDED(hr))
-{
-ID2D1DeviceContext* pD2DDeviceContext = nullptr;
-hr = d2d_device_->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &pD2DDeviceContext);
-if (SUCCEEDED(hr))
-{
-hr = pD2DDeviceContext->QueryInterface(__uuidof(ID2D1DeviceContext3), (void**)&d2d_device_context_);
-pD2DDeviceContext->Release();
-}
-}
+	if (SUCCEEDED(hr) && d2d_device_)
+	{
+		ID2D1DeviceContext* pD2DDeviceContext = nullptr;
+		hr = d2d_device_->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &pD2DDeviceContext);
+		if (SUCCEEDED(hr))
+		{
+			hr = pD2DDeviceContext->QueryInterface(__uuidof(ID2D1DeviceContext3), (void**)&d2d_device_context_);
+			pD2DDeviceContext->Release();
+		}
+	}
 }
 void Overlay_HTML_Texture_Renderer::createDirectCompositionResources()
 {
 	HRESULT hr = S_OK;
 	
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
-	swapChainDesc.Width = 1;
-	swapChainDesc.Height = 1;
+	swapChainDesc.Width = width_;
+	swapChainDesc.Height = height_;
 	swapChainDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
 	swapChainDesc.Stereo = false;
 	swapChainDesc.SampleDesc.Count = 1;
@@ -1225,31 +1290,67 @@ void Overlay_HTML_Texture_Renderer::cleanupDirectComposition()
 		d2d_device_context_->Release();
 		d2d_device_context_ = nullptr;
 	}
-	if (d2d_device_)
+	
+	if (!using_shared_devices_)
 	{
-		d2d_device_->Release();
+		if (d2d_device_)
+		{
+			d2d_device_->Release();
+			d2d_device_ = nullptr;
+		}
+		if (dxgi_device_)
+		{
+			dxgi_device_->Release();
+			dxgi_device_ = nullptr;
+		}
+		if (d3d11_device_context_)
+		{
+			d3d11_device_context_->Release();
+			d3d11_device_context_ = nullptr;
+		}
+		if (d3d11_device_)
+		{
+			d3d11_device_->Release();
+			d3d11_device_ = nullptr;
+		}
+		if (d2d_factory_)
+		{
+			d2d_factory_->Release();
+			d2d_factory_ = nullptr;
+		}
+	}
+	else
+	{
 		d2d_device_ = nullptr;
-	}
-	if (dxgi_device_)
-	{
-		dxgi_device_->Release();
 		dxgi_device_ = nullptr;
-	}
-	if (d3d11_device_context_)
-	{
-		d3d11_device_context_->Release();
 		d3d11_device_context_ = nullptr;
-	}
-	if (d3d11_device_)
-	{
-		d3d11_device_->Release();
 		d3d11_device_ = nullptr;
-	}
-	if (d2d_factory_)
-	{
-		d2d_factory_->Release();
 		d2d_factory_ = nullptr;
 	}
+}
+
+void Overlay_HTML_Texture_Renderer::EnableTransparency(float alpha)
+{
+	transparency_enabled_ = true;
+	transparency_alpha_ = alpha;
+	
+	if (use_direct_composition_ && hwnd_)
+	{
+		DWORD exStyle = GetWindowLong(hwnd_, GWL_EXSTYLE);
+		exStyle &= ~WS_EX_LAYERED;
+		exStyle &= ~WS_EX_TRANSPARENT;
+		exStyle |= WS_EX_NOREDIRECTIONBITMAP;
+		SetWindowLong(hwnd_, GWL_EXSTYLE, exStyle);
+	}
+}
+
+void Overlay_HTML_Texture_Renderer::setSharedDevices(ID3D11Device* d3d11Device, IDXGIDevice1* dxgiDevice, ID2D1Factory1* d2dFactory, ID2D1Device* d2dDevice)
+{
+	using_shared_devices_ = true;
+	d3d11_device_ = d3d11Device;
+	dxgi_device_ = dxgiDevice;
+	d2d_factory_ = d2dFactory;
+	d2d_device_ = d2dDevice;
 }
 
 void Overlay_HTML_Texture_Renderer::updateD2DBitmap(const void* buffer, int width, int height)
@@ -1292,6 +1393,44 @@ void Overlay_HTML_Texture_Renderer::updateD2DBitmap(const void* buffer, int widt
 	if (SUCCEEDED(hr) && cef_bitmap_)
 	{
 		D2D1_RECT_U destRect = D2D1::RectU(0, 0, width, height);
-		hr = cef_bitmap_->CopyFromMemory(&destRect, buffer, width * 4);
+		
+		if (transparency_enabled_)
+		{
+			int pixelCount = width * height;
+			unsigned char* modifiedBuffer = new unsigned char[pixelCount * 4];
+			memcpy(modifiedBuffer, buffer, pixelCount * 4);
+			
+			for (int i = 0; i < pixelCount; ++i)
+			{
+				int idx = i * 4;
+				unsigned char b = modifiedBuffer[idx];
+				unsigned char g = modifiedBuffer[idx + 1];
+				unsigned char r = modifiedBuffer[idx + 2];
+				unsigned char a = modifiedBuffer[idx + 3];
+				
+				if (r < 10 && g < 10 && b < 10)
+				{
+					modifiedBuffer[idx] = 0;
+					modifiedBuffer[idx + 1] = 0;
+					modifiedBuffer[idx + 2] = 0;
+					modifiedBuffer[idx + 3] = 0;
+				}
+				else
+				{
+					float finalAlpha = (a / 255.0f) * transparency_alpha_;
+					modifiedBuffer[idx] = static_cast<unsigned char>(b * finalAlpha);
+					modifiedBuffer[idx + 1] = static_cast<unsigned char>(g * finalAlpha);
+					modifiedBuffer[idx + 2] = static_cast<unsigned char>(r * finalAlpha);
+					modifiedBuffer[idx + 3] = static_cast<unsigned char>(a * transparency_alpha_);
+				}
+			}
+			
+			hr = cef_bitmap_->CopyFromMemory(&destRect, modifiedBuffer, width * 4);
+			delete[] modifiedBuffer;
+		}
+		else
+		{
+			hr = cef_bitmap_->CopyFromMemory(&destRect, buffer, width * 4);
+		}
 	}
 }

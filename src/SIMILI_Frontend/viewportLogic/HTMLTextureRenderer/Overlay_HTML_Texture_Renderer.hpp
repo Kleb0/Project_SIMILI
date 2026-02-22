@@ -72,6 +72,9 @@ public:
 		on_browser_created_callback_ = callback;
 	}
 
+	void EnableTransparency(float alpha);
+	void setSharedDevices(ID3D11Device* d3d11Device, IDXGIDevice1* dxgiDevice, ID2D1Factory1* d2dFactory, ID2D1Device* d2dDevice);
+
 	virtual CefRefPtr<CefRenderHandler> GetRenderHandler() override { return this; }
 	virtual CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override { return this; }
 	virtual CefRefPtr<CefDisplayHandler> GetDisplayHandler() override { return this; }
@@ -165,6 +168,10 @@ private:
 	IDCompositionDevice* dcomp_device_;
 	IDCompositionTarget* dcomp_target_;
 	ID2D1Bitmap1* cef_bitmap_;
+
+	bool transparency_enabled_;
+	float transparency_alpha_;
+	bool using_shared_devices_;
 
 	IMPLEMENT_REFCOUNTING(Overlay_HTML_Texture_Renderer);
 };
