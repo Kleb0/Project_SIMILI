@@ -762,10 +762,21 @@ void Overlay_HTML_Texture_Renderer::setPosition(int x, int y, int width, int hei
 		
 		if (use_direct_composition_ && parent_)
 		{
-			POINT pt = {x, y};
-			ClientToScreen(parent_, &pt);
-			finalX = pt.x;
-			finalY = pt.y;
+			RECT parentRect;
+			if (GetWindowRect(parent_, &parentRect))
+			{
+				int parentWidth = parentRect.right - parentRect.left;
+				int parentHeight = parentRect.bottom - parentRect.top;
+				
+				if (finalX < parentRect.left)
+					finalX = parentRect.left;
+				if (finalY < parentRect.top)
+					finalY = parentRect.top;
+				if (finalX + width > parentRect.right)
+					finalX = parentRect.right - width;
+				if (finalY + height > parentRect.bottom)
+					finalY = parentRect.bottom - height;
+			}
 		}
 		
 		SetWindowPos(hwnd_, nullptr, finalX, finalY, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
@@ -1029,6 +1040,27 @@ LRESULT CALLBACK Overlay_HTML_Texture_Renderer::WndProc(HWND hwnd, UINT msg, WPA
 			case WM_DESTROY:
 				return 0;
 
+			case WM_WINDOWPOSCHANGING:
+			{
+				if (renderer->use_direct_composition_ && renderer->parent_)
+				{
+					WINDOWPOS* pwp = reinterpret_cast<WINDOWPOS*>(lParam);
+					RECT parentRect;
+					if (GetWindowRect(renderer->parent_, &parentRect))
+					{
+						if (pwp->x < parentRect.left)
+							pwp->x = parentRect.left;
+						if (pwp->y < parentRect.top)
+							pwp->y = parentRect.top;
+						if (pwp->x + pwp->cx > parentRect.right)
+							pwp->x = parentRect.right - pwp->cx;
+						if (pwp->y + pwp->cy > parentRect.bottom)
+							pwp->y = parentRect.bottom - pwp->cy;
+					}
+				}
+				break;
+			}
+			
 			case WM_LBUTTONDOWN:
 			case WM_LBUTTONUP:
 			case WM_RBUTTONDOWN:
