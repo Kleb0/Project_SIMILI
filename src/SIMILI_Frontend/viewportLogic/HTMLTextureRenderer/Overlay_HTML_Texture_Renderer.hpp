@@ -73,6 +73,8 @@ public:
 	}
 
 	void EnableTransparency(float alpha);
+	void FilterColor(int r, int g, int b);
+	void DisableColorFilter();
 	void setSharedDevices(ID3D11Device* d3d11Device, IDXGIDevice1* dxgiDevice, ID2D1Factory1* d2dFactory, ID2D1Device* d2dDevice);
 
 	virtual CefRefPtr<CefRenderHandler> GetRenderHandler() override { return this; }
@@ -172,6 +174,11 @@ private:
 	bool transparency_enabled_;
 	float transparency_alpha_;
 	bool using_shared_devices_;
+
+	bool filter_color_enabled_;
+	int filter_r_;
+	int filter_g_;
+	int filter_b_;
 
 	IMPLEMENT_REFCOUNTING(Overlay_HTML_Texture_Renderer);
 };

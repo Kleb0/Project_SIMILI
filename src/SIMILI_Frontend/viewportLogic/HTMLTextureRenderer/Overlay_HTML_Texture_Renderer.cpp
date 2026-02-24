@@ -118,6 +118,10 @@ Overlay_HTML_Texture_Renderer::Overlay_HTML_Texture_Renderer(const std::string& 
 	, transparency_enabled_(false)
 	, transparency_alpha_(1.0f)
 	, using_shared_devices_(false)
+	, filter_color_enabled_(false)
+	, filter_r_(0)
+	, filter_g_(0)
+	, filter_b_(0)
 {
 	std::cout << "[Overlay_HTML_Texture_Renderer][" << instance_id_ << "] Instance created for URL: " << html_url_ << std::endl;
 }
@@ -1376,6 +1380,28 @@ void Overlay_HTML_Texture_Renderer::EnableTransparency(float alpha)
 	}
 }
 
+void Overlay_HTML_Texture_Renderer::FilterColor(int r, int g, int b)
+{
+	filter_color_enabled_ = true;
+	filter_r_ = r;
+	filter_g_ = g;
+	filter_b_ = b;
+	
+	if (use_direct_composition_ && hwnd_)
+	{
+		DWORD exStyle = GetWindowLong(hwnd_, GWL_EXSTYLE);
+		exStyle &= ~WS_EX_LAYERED;
+		exStyle &= ~WS_EX_TRANSPARENT;
+		exStyle |= WS_EX_NOREDIRECTIONBITMAP;
+		SetWindowLong(hwnd_, GWL_EXSTYLE, exStyle);
+	}
+}
+
+void Overlay_HTML_Texture_Renderer::DisableColorFilter()
+{
+	filter_color_enabled_ = false;
+}
+
 void Overlay_HTML_Texture_Renderer::setSharedDevices(ID3D11Device* d3d11Device, IDXGIDevice1* dxgiDevice, ID2D1Factory1* d2dFactory, ID2D1Device* d2dDevice)
 {
 	using_shared_devices_ = true;
@@ -1426,7 +1452,7 @@ void Overlay_HTML_Texture_Renderer::updateD2DBitmap(const void* buffer, int widt
 	{
 		D2D1_RECT_U destRect = D2D1::RectU(0, 0, width, height);
 		
-		if (transparency_enabled_)
+		if (transparency_enabled_ || filter_color_enabled_)
 		{
 			int pixelCount = width * height;
 			unsigned char* modifiedBuffer = new unsigned char[pixelCount * 4];
@@ -1440,20 +1466,43 @@ void Overlay_HTML_Texture_Renderer::updateD2DBitmap(const void* buffer, int widt
 				unsigned char r = modifiedBuffer[idx + 2];
 				unsigned char a = modifiedBuffer[idx + 3];
 				
-				if (r < 10 && g < 10 && b < 10)
+				bool shouldFilter = false;
+				
+				if (filter_color_enabled_)
+				{
+					int tolerance = 10;
+					if (abs(r - filter_r_) <= tolerance && 
+						abs(g - filter_g_) <= tolerance && 
+						abs(b - filter_b_) <= tolerance)
+					{
+						shouldFilter = true;
+					}
+				}
+				
+				if (shouldFilter)
 				{
 					modifiedBuffer[idx] = 0;
 					modifiedBuffer[idx + 1] = 0;
 					modifiedBuffer[idx + 2] = 0;
 					modifiedBuffer[idx + 3] = 0;
 				}
-				else
+				else if (transparency_enabled_)
 				{
-					float finalAlpha = (a / 255.0f) * transparency_alpha_;
-					modifiedBuffer[idx] = static_cast<unsigned char>(b * finalAlpha);
-					modifiedBuffer[idx + 1] = static_cast<unsigned char>(g * finalAlpha);
-					modifiedBuffer[idx + 2] = static_cast<unsigned char>(r * finalAlpha);
-					modifiedBuffer[idx + 3] = static_cast<unsigned char>(a * transparency_alpha_);
+					if (r < 10 && g < 10 && b < 10)
+					{
+						modifiedBuffer[idx] = 0;
+						modifiedBuffer[idx + 1] = 0;
+						modifiedBuffer[idx + 2] = 0;
+						modifiedBuffer[idx + 3] = 0;
+					}
+					else
+					{
+						float finalAlpha = (a / 255.0f) * transparency_alpha_;
+						modifiedBuffer[idx] = static_cast<unsigned char>(b * finalAlpha);
+						modifiedBuffer[idx + 1] = static_cast<unsigned char>(g * finalAlpha);
+						modifiedBuffer[idx + 2] = static_cast<unsigned char>(r * finalAlpha);
+						modifiedBuffer[idx + 3] = static_cast<unsigned char>(a * transparency_alpha_);
+					}
 				}
 			}
 			

@@ -808,7 +808,7 @@ void UIHandler::enableCompositeTestRenderer(bool enable)
 			{
 				composite_test_renderer_->SetParentByName("viewport_panel");
 				composite_test_renderer_->setCenterize();
-				composite_test_renderer_->EnableTransparency(0.5f);
+				composite_test_renderer_->FilterColor(250, 0, 0);
 				composite_test_renderer_->enableRendering(true);
 				composite_test_renderer_->show(true);
 			}
