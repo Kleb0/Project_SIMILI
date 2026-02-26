@@ -82,6 +82,8 @@ Overlay_HTML_Texture_Renderer::Overlay_HTML_Texture_Renderer(const std::string& 
 	, gl_context_(nullptr)
 	, width_(100)
 	, height_(100)
+	, base_width_(100)
+	, base_height_(100)
 	, vao_(0)
 	, vbo_(0)
 	, shader_program_(0)
@@ -122,6 +124,7 @@ Overlay_HTML_Texture_Renderer::Overlay_HTML_Texture_Renderer(const std::string& 
 	, filter_r_(0)
 	, filter_g_(0)
 	, filter_b_(0)
+	, scale_factor_(1.0f)
 {
 	std::cout << "[Overlay_HTML_Texture_Renderer][" << instance_id_ << "] Instance created for URL: " << html_url_ << std::endl;
 }
@@ -131,11 +134,13 @@ Overlay_HTML_Texture_Renderer::~Overlay_HTML_Texture_Renderer()
 	destroy();
 }
 
-bool Overlay_HTML_Texture_Renderer::create(HWND parent, int x, int y, int width, int height, HGLRC shareContext)
+void Overlay_HTML_Texture_Renderer::create(HWND parent, int x, int y, int width, int height, HGLRC shareContext)
 {
 	parent_ = parent;
-	width_ = width;
-	height_ = height;
+	base_width_ = width;
+	base_height_ = height;
+	width_ = static_cast<int>(width * scale_factor_);
+	height_ = static_cast<int>(height * scale_factor_);
 
 	std::wstring windowClassName = L"Overlay_HTML_Texture_Renderer_" + std::wstring(instance_id_.begin(), instance_id_.end());
 
@@ -164,7 +169,7 @@ bool Overlay_HTML_Texture_Renderer::create(HWND parent, int x, int y, int width,
 	if (!hwnd_)
 	{
 		std::cerr << "[Overlay_HTML_Texture_Renderer] Failed to create window" << std::endl;
-		return false;
+		return;
 	}
 
 	if (!use_direct_composition_)
@@ -194,7 +199,7 @@ bool Overlay_HTML_Texture_Renderer::create(HWND parent, int x, int y, int width,
 		std::cerr << "[Overlay_HTML_Texture_Renderer] Failed to get DC" << std::endl;
 		DestroyWindow(hwnd_);
 		hwnd_ = nullptr;
-		return false;
+		return;
 	}
 
 	if (use_direct_composition_)
@@ -222,7 +227,7 @@ bool Overlay_HTML_Texture_Renderer::create(HWND parent, int x, int y, int width,
 			DestroyWindow(hwnd_);
 			hwnd_ = nullptr;
 			hdc_ = nullptr;
-			return false;
+			return;
 		}
 
 		HGLRC previousContext = wglGetCurrentContext();
@@ -237,7 +242,7 @@ bool Overlay_HTML_Texture_Renderer::create(HWND parent, int x, int y, int width,
 			DestroyWindow(hwnd_);
 			hwnd_ = nullptr;
 			hdc_ = nullptr;
-			return false;
+			return;
 		}
 
 		wglMakeCurrent(hdc_, gl_context_);
@@ -262,8 +267,6 @@ bool Overlay_HTML_Texture_Renderer::create(HWND parent, int x, int y, int width,
 	}
 
 	createBrowser();
-
-	return true;
 }
 
 void Overlay_HTML_Texture_Renderer::destroy()
@@ -1400,6 +1403,42 @@ void Overlay_HTML_Texture_Renderer::FilterColor(int r, int g, int b)
 void Overlay_HTML_Texture_Renderer::DisableColorFilter()
 {
 	filter_color_enabled_ = false;
+}
+
+void Overlay_HTML_Texture_Renderer::changeScaleByValue(float scale)
+{
+	scale_factor_ *= scale;
+	if (scale_factor_ < 0.1f)
+	{
+		scale_factor_ = 0.1f;
+	}
+	if (scale_factor_ > 10.0f)
+	{
+		scale_factor_ = 10.0f;
+	}
+	
+	int new_width = static_cast<int>(base_width_ * scale_factor_);
+	int new_height = static_cast<int>(base_height_ * scale_factor_);
+	
+	if (new_width != width_ || new_height != height_)
+	{
+		if (hwnd_)
+		{
+			RECT rect;
+			GetWindowRect(hwnd_, &rect);
+			int current_x = rect.left;
+			int current_y = rect.top;
+			
+			int offset_x = (width_ - new_width) / 2;
+			int offset_y = (height_ - new_height) / 2;
+			
+			setPosition(current_x + offset_x, current_y + offset_y, new_width, new_height);
+		}
+		else
+		{
+			updateHTMLTextureSize(new_width, new_height);
+		}
+	}
 }
 
 void Overlay_HTML_Texture_Renderer::setSharedDevices(ID3D11Device* d3d11Device, IDXGIDevice1* dxgiDevice, ID2D1Factory1* d2dFactory, ID2D1Device* d2dDevice)

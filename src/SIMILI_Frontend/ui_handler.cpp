@@ -717,6 +717,7 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 					handler->composite_test_renderer_->setCenterize();
 				}
 			}
+			
 			handler->composite_test_renderer_->render();
 		}
 	}
@@ -748,19 +749,10 @@ void UIHandler::enableSlotTextureRendering(bool enable)
 			}
 			
 			slot_texture_renderer_ = new Overlay_HTML_Texture_Renderer("file:///ui/hello_cef.html");
-			
-			if (slot_texture_renderer_->create(parent_hwnd_, 0, 50, 1920, 150, shareContext))
-			{
-				slot_texture_renderer_->enableRendering(true);
-				slot_texture_renderer_->show(true);
-				std::cout << "[UIHandler] Overlay_HTML_Texture_Renderer created and shown" << std::endl;
-			}
-			else
-			{
-				std::cerr << "[UIHandler] Failed to create Overlay_HTML_Texture_Renderer" << std::endl;
-				delete slot_texture_renderer_;
-				slot_texture_renderer_ = nullptr;
-			}
+			slot_texture_renderer_->create(parent_hwnd_, 0, 50, 1920, 150, shareContext);
+			slot_texture_renderer_->enableRendering(true);
+			slot_texture_renderer_->show(true);
+			std::cout << "[UIHandler] Overlay_HTML_Texture_Renderer created and shown" << std::endl;
 		} 
 		else 
 		{
@@ -803,15 +795,12 @@ void UIHandler::enableCompositeTestRenderer(bool enable)
 			composite_test_renderer_ = new Overlay_HTML_Texture_Renderer("file:///ui/Composite_Test.html");
 			composite_test_renderer_->setSharedDevices(d3d11_device_, dxgi_device_, d2d_factory_, d2d_device_);
 			composite_test_renderer_->enableDirectComposition(true);
-			
-			if (composite_test_renderer_->create(parent_hwnd_, 0, 0, 500, 500, nullptr))
-			{
-				composite_test_renderer_->SetParentByName("viewport_panel");
-				composite_test_renderer_->setCenterize();
-				composite_test_renderer_->FilterColor(250, 0, 0);
-				composite_test_renderer_->enableRendering(true);
-				composite_test_renderer_->show(true);
-			}
+			composite_test_renderer_->SetParentByName("viewport_panel");
+			composite_test_renderer_->FilterColor(0, 0, 250);
+			composite_test_renderer_->changeScaleByValue(0.8f);
+			composite_test_renderer_->create(parent_hwnd_, 0, 0, 500, 500, nullptr);
+			composite_test_renderer_->enableRendering(true);
+			composite_test_renderer_->show(true);
 		}
 		else
 		{

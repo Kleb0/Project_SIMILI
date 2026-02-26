@@ -25,7 +25,7 @@ public:
 	Overlay_HTML_Texture_Renderer(const std::string& htmlUrl);
 	~Overlay_HTML_Texture_Renderer();
 
-	bool create(HWND parent, int x, int y, int width, int height, HGLRC shareContext = nullptr);
+	void create(HWND parent, int x, int y, int width, int height, HGLRC shareContext = nullptr);
 	void destroy();
 
 	void enableDirectComposition(bool enable) { use_direct_composition_ = enable; }
@@ -77,6 +77,8 @@ public:
 	void DisableColorFilter();
 	void setSharedDevices(ID3D11Device* d3d11Device, IDXGIDevice1* dxgiDevice, ID2D1Factory1* d2dFactory, ID2D1Device* d2dDevice);
 
+	void changeScaleByValue(float scale);
+
 	virtual CefRefPtr<CefRenderHandler> GetRenderHandler() override { return this; }
 	virtual CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override { return this; }
 	virtual CefRefPtr<CefDisplayHandler> GetDisplayHandler() override { return this; }
@@ -126,6 +128,8 @@ private:
 
 	int width_;
 	int height_;
+	int base_width_;
+	int base_height_;
 
 	GLuint vao_;
 	GLuint vbo_;
@@ -179,6 +183,8 @@ private:
 	int filter_r_;
 	int filter_g_;
 	int filter_b_;
+
+	float scale_factor_;
 
 	IMPLEMENT_REFCOUNTING(Overlay_HTML_Texture_Renderer);
 };
