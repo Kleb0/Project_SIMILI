@@ -125,6 +125,7 @@ Overlay_HTML_Texture_Renderer::Overlay_HTML_Texture_Renderer(const std::string& 
 	, filter_g_(0)
 	, filter_b_(0)
 	, scale_factor_(1.0f)
+	, maximised_(false)
 {
 	std::cout << "[Overlay_HTML_Texture_Renderer][" << instance_id_ << "] Instance created for URL: " << html_url_ << std::endl;
 }
@@ -484,7 +485,16 @@ void Overlay_HTML_Texture_Renderer::createBrowser()
 
 void Overlay_HTML_Texture_Renderer::GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect)
 {
-	rect = CefRect(0, 0, width_, height_);
+	if (maximised_ && scale_factor_ > 0.0f)
+	{
+		int render_width = static_cast<int>(width_ / scale_factor_);
+		int render_height = static_cast<int>(height_ / scale_factor_);
+		rect = CefRect(0, 0, render_width, render_height);
+	}
+	else
+	{
+		rect = CefRect(0, 0, width_, height_);
+	}
 }
 
 void Overlay_HTML_Texture_Renderer::OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type,
@@ -673,6 +683,15 @@ void Overlay_HTML_Texture_Renderer::UpdateParentData(int parentX, int parentY, i
 	parent_width_ = parentWidth;
 	parent_height_ = parentHeight;
 	parent_dpi_scale_ = dpiScale;
+}
+
+void Overlay_HTML_Texture_Renderer::maximise()
+{
+	maximised_ = true;
+	if (browser_)
+	{
+		browser_->GetHost()->WasResized();
+	}
 }
 
 void Overlay_HTML_Texture_Renderer::setTopLeft()

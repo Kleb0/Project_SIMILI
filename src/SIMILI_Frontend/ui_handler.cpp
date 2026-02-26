@@ -790,28 +790,18 @@ void UIHandler::enableCompositeTestRenderer(bool enable)
 	
 	if (enable)
 	{
-		if (!composite_test_renderer_)
-		{
-			composite_test_renderer_ = new Overlay_HTML_Texture_Renderer("file:///ui/Composite_Test.html");
-			composite_test_renderer_->setSharedDevices(d3d11_device_, dxgi_device_, d2d_factory_, d2d_device_);
-			composite_test_renderer_->enableDirectComposition(true);
-			composite_test_renderer_->SetParentByName("viewport_panel");
-			composite_test_renderer_->FilterColor(0, 0, 250);
-			composite_test_renderer_->changeScaleByValue(0.8f);
-			composite_test_renderer_->create(parent_hwnd_, 0, 0, 500, 500, nullptr);
-			composite_test_renderer_->enableRendering(true);
-			composite_test_renderer_->show(true);
-		}
-		else
-		{
-			composite_test_renderer_->enableRendering(true);
-			composite_test_renderer_->show(true);
-			
-			if (composite_test_renderer_->getHandle())
-			{
-				InvalidateRect(composite_test_renderer_->getHandle(), nullptr, TRUE);
-			}
-		}
+		composite_test_renderer_ = new Overlay_HTML_Texture_Renderer("file:///ui/Composite_Test.html");
+
+		composite_test_renderer_->setSharedDevices(d3d11_device_, dxgi_device_, d2d_factory_, d2d_device_);
+		composite_test_renderer_->enableDirectComposition(true);
+		composite_test_renderer_->SetParentByName("viewport_panel");
+		composite_test_renderer_->FilterColor(0, 0, 250);
+		composite_test_renderer_->changeScaleByValue(0.8f);
+		composite_test_renderer_->maximise();
+		composite_test_renderer_->create(parent_hwnd_, 0, 0, 500, 500, nullptr);
+		composite_test_renderer_->enableRendering(true);
+		composite_test_renderer_->show(true);
+
 	}
 	else
 	{
