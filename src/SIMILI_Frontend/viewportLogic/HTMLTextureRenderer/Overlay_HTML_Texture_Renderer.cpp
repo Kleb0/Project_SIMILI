@@ -1546,21 +1546,11 @@ void Overlay_HTML_Texture_Renderer::updateD2DBitmap(const void* buffer, int widt
 				}
 				else if (transparency_enabled_)
 				{
-					if (r < 10 && g < 10 && b < 10)
-					{
-						modifiedBuffer[idx] = 0;
-						modifiedBuffer[idx + 1] = 0;
-						modifiedBuffer[idx + 2] = 0;
-						modifiedBuffer[idx + 3] = 0;
-					}
-					else
-					{
-						float finalAlpha = (a / 255.0f) * transparency_alpha_;
-						modifiedBuffer[idx] = static_cast<unsigned char>(b * finalAlpha);
-						modifiedBuffer[idx + 1] = static_cast<unsigned char>(g * finalAlpha);
-						modifiedBuffer[idx + 2] = static_cast<unsigned char>(r * finalAlpha);
-						modifiedBuffer[idx + 3] = static_cast<unsigned char>(a * transparency_alpha_);
-					}
+					float finalAlpha = (a / 255.0f) * transparency_alpha_;
+					modifiedBuffer[idx] = static_cast<unsigned char>(b * finalAlpha);
+					modifiedBuffer[idx + 1] = static_cast<unsigned char>(g * finalAlpha);
+					modifiedBuffer[idx + 2] = static_cast<unsigned char>(r * finalAlpha);
+					modifiedBuffer[idx + 3] = static_cast<unsigned char>(a * transparency_alpha_);
 				}
 			}
 			

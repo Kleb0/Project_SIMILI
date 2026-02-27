@@ -795,7 +795,8 @@ void UIHandler::enableCompositeTestRenderer(bool enable)
 		composite_test_renderer_->setSharedDevices(d3d11_device_, dxgi_device_, d2d_factory_, d2d_device_);
 		composite_test_renderer_->enableDirectComposition(true);
 		composite_test_renderer_->SetParentByName("viewport_panel");
-		composite_test_renderer_->FilterColor(0, 0, 250);
+		// composite_test_renderer_->FilterColor(0, 0, 250);
+		composite_test_renderer_->EnableTransparency(0.7f);
 		composite_test_renderer_->changeScaleByValue(0.8f);
 		composite_test_renderer_->maximise();
 		composite_test_renderer_->create(parent_hwnd_, 0, 0, 500, 500, nullptr);

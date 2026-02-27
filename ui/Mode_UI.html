@@ -10,7 +10,7 @@
     <div class="square">2</div>
     <div class="square">3</div>
     <div class="square">4</div>
-    <div id="mode-text">normal mode</div>
+    <div id="mode-text">-- Normal Mode</div>
 </body>
 
 <style>
@@ -59,16 +59,16 @@
     
 </style>
 <script>
-    let currentMode = 'normal';
+    let currentMode = '-- Normal Mode';
     const modeText = document.getElementById('mode-text');
     const squares = document.querySelectorAll('.square');
     
     // Map modes to square indices
     const modeToSquare = {
-        'normal': 0,
-        'mode 2': 1,
-        'mode 3': 2,
-        'mode 4': 3
+        '-- Normal Mode': 0,
+        '-- Edge Mode': 1,
+        '-- Vertice Mode': 2,
+        '-- Face Mode': 3
     };
     
     function updateMode(mode) 
@@ -90,7 +90,7 @@
     }
     
     // Initialize with normal mode
-    updateMode('normal');
+    updateMode('-- Normal Mode');
     
     let keyPressCount = 0;
     document.addEventListener('keydown', (event) => {
