@@ -350,6 +350,9 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     OpenSSL::Crypto
     ws2_32
     crypt32
+    d3d11
+    d2d1
+    dcomp
 )
 
 # Link CEF if enabled

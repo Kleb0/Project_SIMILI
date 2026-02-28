@@ -718,6 +718,7 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 				}
 			}
 			
+			handler->composite_test_renderer_->updateMouseInteraction();
 			handler->composite_test_renderer_->render();
 		}
 	}
@@ -796,9 +797,10 @@ void UIHandler::enableCompositeTestRenderer(bool enable)
 		composite_test_renderer_->enableDirectComposition(true);
 		composite_test_renderer_->SetParentByName("viewport_panel");
 		// composite_test_renderer_->FilterColor(0, 0, 250);
-		composite_test_renderer_->EnableTransparency(0.7f);
-		composite_test_renderer_->changeScaleByValue(0.8f);
+		composite_test_renderer_->EnableTransparency(0.8f);
+		// composite_test_renderer_->changeScaleByValue(0.8f);
 		composite_test_renderer_->maximise();
+		composite_test_renderer_->enableBrowserClassicEvent(true);
 		composite_test_renderer_->create(parent_hwnd_, 0, 0, 500, 500, nullptr);
 		composite_test_renderer_->enableRendering(true);
 		composite_test_renderer_->show(true);

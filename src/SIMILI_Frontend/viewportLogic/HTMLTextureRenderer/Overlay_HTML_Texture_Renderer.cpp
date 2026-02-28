@@ -126,6 +126,7 @@ Overlay_HTML_Texture_Renderer::Overlay_HTML_Texture_Renderer(const std::string& 
 	, filter_b_(0)
 	, scale_factor_(1.0f)
 	, maximised_(false)
+	, browser_events_enabled_(false)
 {
 	std::cout << "[Overlay_HTML_Texture_Renderer][" << instance_id_ << "] Instance created for URL: " << html_url_ << std::endl;
 }
@@ -1561,5 +1562,50 @@ void Overlay_HTML_Texture_Renderer::updateD2DBitmap(const void* buffer, int widt
 		{
 			hr = cef_bitmap_->CopyFromMemory(&destRect, buffer, width * 4);
 		}
+	}
+}
+
+void Overlay_HTML_Texture_Renderer::enableBrowserClassicEvent(bool enable)
+{
+	browser_events_enabled_ = enable;
+}
+
+void Overlay_HTML_Texture_Renderer::updateMouseInteraction()
+{
+	if (!browser_events_enabled_ || !browser_ || !hwnd_)
+	{
+		return;
+	}
+	
+	POINT cursorPos;
+	if (!GetCursorPos(&cursorPos))
+	{
+		return;
+	}
+	
+	RECT windowRect;
+	if (!GetWindowRect(hwnd_, &windowRect))
+	{
+		return;
+	}
+	
+	if (cursorPos.x < windowRect.left || cursorPos.x >= windowRect.right ||
+		cursorPos.y < windowRect.top || cursorPos.y >= windowRect.bottom)
+	{
+		return;
+	}
+	
+	int localX = cursorPos.x - windowRect.left;
+	int localY = cursorPos.y - windowRect.top;
+	
+	CefMouseEvent mouseEvent;
+	mouseEvent.x = localX;
+	mouseEvent.y = localY;
+	mouseEvent.modifiers = 0;
+	
+	CefRefPtr<CefBrowserHost> host = browser_->GetHost();
+	if (host)
+	{
+		host->SendMouseMoveEvent(mouseEvent, false);
 	}
 }

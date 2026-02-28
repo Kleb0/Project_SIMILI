@@ -80,6 +80,9 @@ public:
 	void changeScaleByValue(float scale);
 	void maximise();
 
+	void enableBrowserClassicEvent(bool enable);
+	void updateMouseInteraction();
+
 	virtual CefRefPtr<CefRenderHandler> GetRenderHandler() override { return this; }
 	virtual CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override { return this; }
 	virtual CefRefPtr<CefDisplayHandler> GetDisplayHandler() override { return this; }
@@ -187,6 +190,8 @@ private:
 
 	float scale_factor_;
 	bool maximised_;
+
+	bool browser_events_enabled_;
 
 	IMPLEMENT_REFCOUNTING(Overlay_HTML_Texture_Renderer);
 };

@@ -14,6 +14,7 @@
             align-items: center;
             height: 100vh;
             gap: 20px;
+            position: relative;
         }
         .carre {
             width: 150px;
@@ -25,10 +26,28 @@
         .rouge {
             background-color: rgb(255, 0, 0);
         }
+        .action-btn {
+            position: absolute;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 16px 38px;
+            border: 0;
+            border-radius: 8px;
+            background-color: rgb(255, 255, 255);
+            color: rgb(0, 0, 0);
+            font-size: 18px;
+            cursor: pointer;
+        }
+        .action-btn:hover {
+            background-color: rgb(60, 0, 255);
+            color: rgb(255, 255, 255);
+        }
     </style>
 </head>
 <body>
     <div class="carre bleu"></div>
     <div class="carre rouge"></div>
+    <button class="action-btn" type="button">Action</button>
 </body>
 </html>
