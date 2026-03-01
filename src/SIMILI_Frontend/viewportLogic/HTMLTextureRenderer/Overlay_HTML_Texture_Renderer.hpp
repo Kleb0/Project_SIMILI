@@ -81,7 +81,6 @@ public:
 	void maximise();
 
 	void enableBrowserClassicEvent(bool enable);
-	void updateMouseInteraction();
 
 	virtual CefRefPtr<CefRenderHandler> GetRenderHandler() override { return this; }
 	virtual CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override { return this; }

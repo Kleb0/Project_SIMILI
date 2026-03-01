@@ -716,9 +716,7 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 					);
 					handler->composite_test_renderer_->setCenterize();
 				}
-			}
-			
-			handler->composite_test_renderer_->updateMouseInteraction();
+			}			
 			handler->composite_test_renderer_->render();
 		}
 	}
