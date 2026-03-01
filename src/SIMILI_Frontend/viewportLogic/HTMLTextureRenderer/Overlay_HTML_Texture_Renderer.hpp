@@ -59,6 +59,9 @@ public:
 	HWND getHandle() const { return hwnd_; }
 	int getWidth() const { return width_; }
 	int getHeight() const { return height_; }
+	int getScreenX() const;
+	int getScreenY() const;
+	bool isActive() const { return rendering_enabled_ && hwnd_ != nullptr; }
 
 	CefRefPtr<CefBrowser> getBrowser() { return browser_; }
 

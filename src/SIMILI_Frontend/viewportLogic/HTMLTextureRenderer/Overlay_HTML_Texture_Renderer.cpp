@@ -589,6 +589,34 @@ void Overlay_HTML_Texture_Renderer::OnTitleChange(CefRefPtr<CefBrowser> browser,
 {
 }
 
+int Overlay_HTML_Texture_Renderer::getScreenX() const
+{
+	if (!hwnd_)
+	{
+		return 0;
+	}
+	RECT windowRect;
+	if (GetWindowRect(hwnd_, &windowRect))
+	{
+		return windowRect.left;
+	}
+	return 0;
+}
+
+int Overlay_HTML_Texture_Renderer::getScreenY() const
+{
+	if (!hwnd_)
+	{
+		return 0;
+	}
+	RECT windowRect;
+	if (GetWindowRect(hwnd_, &windowRect))
+	{
+		return windowRect.top;
+	}
+	return 0;
+}
+
 void Overlay_HTML_Texture_Renderer::render()
 {
 	if (being_destroyed_)

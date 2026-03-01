@@ -1075,6 +1075,36 @@ void UIHandler::captureIFramePositions()
 	
 	frame_datas_->captureAllFrames(parent_hwnd_);
 	
+	if (composite_test_renderer_ && composite_test_renderer_->isActive())
+	{
+		SIMILI::Frontend::IFrameScreenData panelData;
+		if (frame_datas_->getFrameData("panel_above_UI", panelData))
+		{
+			
+			int screenX = composite_test_renderer_->getScreenX();
+			int screenY = composite_test_renderer_->getScreenY();
+			int width = composite_test_renderer_->getWidth();
+			int height = composite_test_renderer_->getHeight();
+			
+			RECT parentRect;
+			if (GetWindowRect(parent_hwnd_, &parentRect))
+			{
+				int relativeX = screenX - parentRect.left;
+				int relativeY = screenY - parentRect.top;
+				
+				frame_datas_->updateFrameData("panel_above_UI", relativeX, relativeY, width, height, relativeX, relativeY, parent_hwnd_);
+				
+				std::cout <<"\n [UIHandler] -------------- Test Panel Above UI Frame Data --------------" << std::endl;
+				std::cout << "[UIHandler] panel_above_UI updated - RelativeX: " << relativeX 
+						  << ", RelativeY: " << relativeY 
+						  << ", Width: " << width 
+						  << ", Height: " << height 
+						  << " (ScreenX: " << screenX << ", ScreenY: " << screenY << ")" << std::endl;
+				std::cout << "-------------------------------------------------------------\n" << std::endl;
+			}
+		}
+	}
+	
 	updateIFrameMouseDetectorFromFrameDatas();
 	
 	if (overlay_viewport_ && three_d_scene_ && three_d_scene_->getActiveCamera())

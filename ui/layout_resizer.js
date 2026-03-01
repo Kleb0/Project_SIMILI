@@ -292,7 +292,8 @@
             { selector: '.viewport-panel iframe', name: 'viewport_panel' },
             { selector: '.object-inspector-panel iframe', name: 'object_inspector_panel' },
             { selector: '.history-panel iframe', name: 'history_panel' },
-            { selector: '.project-viewer-panel iframe', name: 'project_viewer_panel' }
+            { selector: '.project-viewer-panel iframe', name: 'project_viewer_panel' },
+            { selector: '.panel_above_UI iframe', name: 'panel_above_UI' }
         ];
         
         const iframeData = [];

@@ -104,6 +104,14 @@ iframe
     flex: 1.2;
 }
 
+.panel_above_UI {
+    display: none;
+    position: absolute;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
 /* Splitter Styles */
 .splitter {
     background-color: #000000;
