@@ -807,7 +807,7 @@ void UIHandler::enableCompositeTestRenderer(bool enable)
 		composite_test_renderer_->SetParentByName("viewport_panel");
 		// composite_test_renderer_->FilterColor(0, 0, 250);
 		composite_test_renderer_->EnableTransparency(0.8f);
-		// composite_test_renderer_->changeScaleByValue(0.8f);
+		// composite_test_renderer_->changeScaleByValue(0.5f);
 		composite_test_renderer_->maximise();
 		composite_test_renderer_->enableBrowserClassicEvent(true);
 		composite_test_renderer_->create(parent_hwnd_, 0, 0, 500, 500, nullptr);
@@ -1112,17 +1112,20 @@ void UIHandler::captureIFramePositions()
 			ReleaseDC(parent_hwnd_, hdc);
 		}
 		
+		// Convert physical pixels to CSS pixels for coordinates AND dimensions
 		int relativeX = static_cast<int>(topLeft.x / dpiScale);
 		int relativeY = static_cast<int>(topLeft.y / dpiScale);
+		int cssWidth = static_cast<int>(width / dpiScale);
+		int cssHeight = static_cast<int>(height / dpiScale);
 		
-		frame_datas_->updateFrameData("panel_above_UI", relativeX, relativeY, width, height, relativeX, relativeY, parent_hwnd_);
+		frame_datas_->updateFrameData("panel_above_UI", relativeX, relativeY, cssWidth, cssHeight, relativeX, relativeY, parent_hwnd_);
 		
 		std::cout <<"\n [UIHandler] -------------- Test Panel Above UI Frame Data --------------" << std::endl;
 		std::cout << "[UIHandler] panel_above_UI updated - RelativeX: " << relativeX 
 				  << ", RelativeY: " << relativeY 
-				  << ", Width: " << width 
-				  << ", Height: " << height 
-				  << " (ScreenX: " << screenX << ", ScreenY: " << screenY << ")" << std::endl;
+				  << ", Width (CSS): " << cssWidth 
+				  << ", Height (CSS): " << cssHeight 
+				  << " (Physical: " << width << "x" << height << ", DPI: " << dpiScale << ")" << std::endl;
 		std::cout << "-------------------------------------------------------------\n" << std::endl;
 		}
 	}
@@ -1196,17 +1199,20 @@ void UIHandler::captureIFramePositions()
 				POINT newTopLeft = { newScreenX, newScreenY };
 				ScreenToClient(parent_hwnd_, &newTopLeft);
 				
+				// Convert physical pixels to CSS pixels for coordinates AND dimensions
 				int newRelativeX = static_cast<int>(newTopLeft.x / dpiScale);
 				int newRelativeY = static_cast<int>(newTopLeft.y / dpiScale);
+				int newCssWidth = static_cast<int>(newWidth / dpiScale);
+				int newCssHeight = static_cast<int>(newHeight / dpiScale);
 				
-				frame_datas_->updateFrameData("panel_above_UI", newRelativeX, newRelativeY, newWidth, newHeight, newRelativeX, newRelativeY, parent_hwnd_);
+				frame_datas_->updateFrameData("panel_above_UI", newRelativeX, newRelativeY, newCssWidth, newCssHeight, newRelativeX, newRelativeY, parent_hwnd_);
 				
 				std::cout << "\n[UIHandler] -------------- Panel Above UI UPDATED After Reposition --------------" << std::endl;
 				std::cout << "[UIHandler] panel_above_UI NEW position - RelativeX: " << newRelativeX 
 						  << ", RelativeY: " << newRelativeY 
-						  << ", Width: " << newWidth 
-						  << ", Height: " << newHeight 
-						  << " (ScreenX: " << newScreenX << ", ScreenY: " << newScreenY << ")" << std::endl;
+						  << ", Width (CSS): " << newCssWidth 
+						  << ", Height (CSS): " << newCssHeight 
+						  << " (Physical: " << newWidth << "x" << newHeight << ", DPI: " << dpiScale << ")" << std::endl;
 				std::cout << "-------------------------------------------------------------\n" << std::endl;
 				
 				// Update IFrameMouseDetector with new coordinates

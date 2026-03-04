@@ -738,10 +738,27 @@ void Overlay_HTML_Texture_Renderer::SetParentByName(const std::string& parentNam
 
 void Overlay_HTML_Texture_Renderer::UpdateParentData(int parentX, int parentY, int parentWidth, int parentHeight, float dpiScale)
 {
-	parent_x_ = parentX;
-	parent_y_ = parentY;
-	parent_width_ = parentWidth;
-	parent_height_ = parentHeight;
+	if (parent_)
+	{
+		RECT parentRect;
+		if (GetWindowRect(parent_, &parentRect))
+		{
+			parent_x_ = parentRect.left + static_cast<int>(parentX * dpiScale);
+			parent_y_ = parentRect.top + static_cast<int>(parentY * dpiScale);
+		}
+		else
+		{
+			parent_x_ = static_cast<int>(parentX * dpiScale);
+			parent_y_ = static_cast<int>(parentY * dpiScale);
+		}
+	}
+	else
+	{
+		parent_x_ = static_cast<int>(parentX * dpiScale);
+		parent_y_ = static_cast<int>(parentY * dpiScale);
+	}
+	parent_width_ = static_cast<int>(parentWidth * dpiScale);
+	parent_height_ = static_cast<int>(parentHeight * dpiScale);
 	parent_dpi_scale_ = dpiScale;
 }
 

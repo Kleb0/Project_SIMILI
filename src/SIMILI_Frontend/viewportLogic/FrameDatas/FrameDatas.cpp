@@ -198,8 +198,8 @@ namespace SIMILI {
 				RECT windowRect;
 				GetWindowRect(cefWindowHandle, &windowRect);
 				
-				data.screenX = windowRect.left + clientX;
-				data.screenY = windowRect.top + clientY;
+				data.screenX = windowRect.left + static_cast<int>(clientX * data.dpiScale);
+				data.screenY = windowRect.top + static_cast<int>(clientY * data.dpiScale);
 			}
 			else
 			{
@@ -217,8 +217,8 @@ namespace SIMILI {
 				RECT windowRect;
 				GetWindowRect(cefWindowHandle, &windowRect);
 				
-				newData.screenX = windowRect.left + clientX;
-				newData.screenY = windowRect.top + clientY;
+				newData.screenX = windowRect.left + static_cast<int>(clientX * newData.dpiScale);
+				newData.screenY = windowRect.top + static_cast<int>(clientY * newData.dpiScale);
 				
 				frameDataMap_[name] = newData;
 			}
