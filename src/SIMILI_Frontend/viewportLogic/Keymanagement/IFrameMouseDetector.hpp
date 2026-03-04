@@ -26,6 +26,7 @@ namespace SIMILI
 			ObjectInspectorPanel,
 			HistoryPanel,
 			ProjectViewerPanel,
+			PanelAboveUI,
 			Splitter,
 			Unknown
 		};
@@ -52,6 +53,7 @@ namespace SIMILI
 			ViewportBounds objectInspector;
 			ViewportBounds history;
 			ViewportBounds projectViewer;
+			ViewportBounds panelAboveUI;
 			
 			PanelBounds() = default;
 		};

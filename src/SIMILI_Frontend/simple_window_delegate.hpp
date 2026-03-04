@@ -35,7 +35,7 @@ public:
     void getMaximizedBorderOffsets(int& offsetX, int& offsetY, int& offsetWidth, int& offsetHeight) const;
     HWND getWindowHandle() const { return window_hwnd_; }
     
-    void checkAndCaptureIfMaximized();
+    void checkAndCaptureWindowStateChange();
     void setUIHandler(UIHandler* handler) { ui_handler_ = handler; }
     
     // IFrame management methods
@@ -51,7 +51,7 @@ private:
     CefRefPtr<CefBrowserView> browser_view_;
     HWND window_hwnd_;
     UIHandler* ui_handler_;
-    bool maximization_captured_;
+    bool last_maximized_state_;
     int last_window_x_;
     int last_window_y_;
     

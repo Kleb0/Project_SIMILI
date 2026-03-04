@@ -5,7 +5,7 @@
 #pragma comment(lib, "comctl32.lib")
 
 SimpleWindowDelegate::SimpleWindowDelegate(CefRefPtr<CefBrowserView> browser_view)
-	: browser_view_(browser_view), window_hwnd_(nullptr), ui_handler_(nullptr), maximization_captured_(false),
+	: browser_view_(browser_view), window_hwnd_(nullptr), ui_handler_(nullptr), last_maximized_state_(false),
 	  last_window_x_(0), last_window_y_(0) {
 }
 
@@ -139,17 +139,35 @@ void SimpleWindowDelegate::getMaximizedBorderOffsets(int& offsetX, int& offsetY,
               << " H=" << offsetHeight << std::endl;
 }
 
-void SimpleWindowDelegate::checkAndCaptureIfMaximized()
+void SimpleWindowDelegate::checkAndCaptureWindowStateChange()
 {
-	if (maximization_captured_ || !window_hwnd_ || !ui_handler_)
+	if (!window_hwnd_ || !ui_handler_)
 	{
 		return;
 	}
 	
-	if (isWindowMaximized())
+	bool current_maximized = isWindowMaximized();
+	
+	// Detect state change (maximize or restore)
+	if (current_maximized != last_maximized_state_)
 	{
-		std::cout << "\n[SimpleWindowDelegate] Window maximized detected - recapturing iframe positions..." << std::endl;
-		maximization_captured_ = true;
+		last_maximized_state_ = current_maximized;
+		
+		if (current_maximized)
+		{
+			std::cout << "\n[SimpleWindowDelegate] Window MAXIMIZED - repositioning panel..." << std::endl;
+		}
+		else
+		{
+			std::cout << "\n[SimpleWindowDelegate] Window RESTORED - repositioning panel..." << std::endl;
+		}
+		
+		// Request panel repositioning before capturing positions
+		if (auto renderer = ui_handler_->getCompositeTestRenderer())
+		{
+			renderer->RequestPanelPositionUpdate(PanelAnchorPosition::CurrentAnchorState);
+		}
+		
 		ui_handler_->captureIFramePositions();
 	}
 }
@@ -180,6 +198,12 @@ LRESULT CALLBACK SimpleWindowDelegate::WindowSubclassProc(HWND hwnd, UINT msg, W
 						std::cout << "[SimpleWindowDelegate] Window moved to (" << newX << ", " << newY 
 						          << ") - recapturing iframe positions..." << std::endl;
 						
+						// Request panel repositioning before capturing positions
+						if (auto renderer = delegate->ui_handler_->getCompositeTestRenderer())
+						{
+							renderer->RequestPanelPositionUpdate(PanelAnchorPosition::CurrentAnchorState);
+						}
+						
 						delegate->ui_handler_->captureIFramePositions();
 					}
 				}
@@ -194,10 +218,10 @@ LRESULT CALLBACK SimpleWindowDelegate::WindowSubclassProc(HWND hwnd, UINT msg, W
 			{
 				WINDOWPOS* pos = reinterpret_cast<WINDOWPOS*>(lParam);
 				
-				// Check if position changed (not just size)
-				if (pos && !(pos->flags & SWP_NOMOVE))
+				// Check for window state changes (maximize/restore)
+				if (pos && !(pos->flags & SWP_NOSIZE))
 				{
-					delegate->checkAndCaptureIfMaximized();
+					delegate->checkAndCaptureWindowStateChange();
 				}
 			}
 			break;

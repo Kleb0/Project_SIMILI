@@ -69,6 +69,13 @@ namespace SIMILI {
 					panel_bounds_.projectViewer.width = data.width;
 					panel_bounds_.projectViewer.height = data.height;
 				}
+				else if (data.name == "panel_above_UI")
+				{
+					panel_bounds_.panelAboveUI.x = data.clientX;
+					panel_bounds_.panelAboveUI.y = data.clientY;
+					panel_bounds_.panelAboveUI.width = data.width;
+					panel_bounds_.panelAboveUI.height = data.height;
+				}
 			}			
 		}
 
@@ -186,6 +193,14 @@ namespace SIMILI {
 			
 			int clientX, clientY;
 			screenToClient(screenX, screenY, clientX, clientY);			
+
+			if (panel_bounds_.panelAboveUI.width > 0 && panel_bounds_.panelAboveUI.height > 0)
+			{
+				if (panel_bounds_.panelAboveUI.contains(clientX, clientY))
+				{
+					return MouseRegion::PanelAboveUI;
+				}
+			}
 
 			if (panel_bounds_.viewport.contains(clientX, clientY))
 			{

@@ -12,6 +12,8 @@
 #include "viewportLogic/Keymanagement/MouseStates/Mouse_State.hpp"
 #include "viewportLogic/Keymanagement/MouseStates/Mouse_Above_Overlay_State.hpp"
 #include "viewportLogic/Keymanagement/MouseStates/Mouse_Outside_Overlay_State.hpp"
+#include "viewportLogic/Keymanagement/MouseStates/Mouse_Above_UI_Panel_State.hpp"
+#include "viewportLogic/HTMLTextureRenderer/Overlay_HTML_Texture_Renderer.hpp"
 #include <list>
 #include <sstream>
 #include <memory>
@@ -23,7 +25,6 @@
 #include <dcomp.h>
 
 class SimpleWindowDelegate;
-class Overlay_HTML_Texture_Renderer;
 
 namespace SIMILI 
 {
@@ -117,18 +118,24 @@ public:
 	void updateIFrameMouseDetectorFromFrameDatas();
 	SIMILI::Frontend::FrameDatas* getFrameDatas() { return frame_datas_; }
 	
+	// Camera operation lock
+	bool isCameraOperationLocked() const { return is_camera_operation_locked_; }
+	
 	void transitionMouseState(const std::string& regionName);
 	SIMILI::Input::Mouse_State* getCurrentMouseState() const { return current_mouse_state_; }
 	
 	// Mouse state getters
 	SIMILI::Input::Mouse_Above_Overlay_State* getAboveOverlayState() const { return above_overlay_state_; }
 	SIMILI::Input::Mouse_Outside_Overlay_State* getOutsideOverlayState() const { return outside_overlay_state_; }
+	SIMILI::Input::Mouse_Above_UI_Panel_State* getAboveUIPanelState() const { return above_ui_panel_state_; }
 	
 	// Last detected region name accessors
 	std::string getLastDetectedRegionName() const { return last_detected_region_name_; }
 	void setLastDetectedRegionName(const std::string& regionName) { last_detected_region_name_ = regionName; }
 	
 	SIMILI::Input::MouseControlToOverlay* getMouseControlToOverlay() const { return mouse_control_to_overlay_; }	
+	
+	Overlay_HTML_Texture_Renderer* getCompositeTestRenderer() const { return composite_test_renderer_; }
 
 	ID3D11Device* getD3D11Device() const { return d3d11_device_; }
 	ID2D1Factory1* getD2D1Factory() const { return d2d_factory_; }
@@ -172,9 +179,13 @@ private:
 	SIMILI::Input::Mouse_State* current_mouse_state_;
 	SIMILI::Input::Mouse_Above_Overlay_State* above_overlay_state_;
 	SIMILI::Input::Mouse_Outside_Overlay_State* outside_overlay_state_;
+	SIMILI::Input::Mouse_Above_UI_Panel_State* above_ui_panel_state_;
 	std::string last_detected_region_name_;
 	
 	SIMILI::Input::MouseControlToOverlay* mouse_control_to_overlay_;
+	
+	// Camera operation lock
+	bool is_camera_operation_locked_;
 	
 	Overlay_HTML_Texture_Renderer* slot_texture_renderer_;
 	Overlay_HTML_Texture_Renderer* composite_test_renderer_;

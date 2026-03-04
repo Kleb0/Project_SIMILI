@@ -421,6 +421,13 @@ namespace SIMILI {
 					if (handler) 
 					{
 						handler->updatePanelBoundsFromStocker();
+						
+						// Request panel repositioning before capturing positions
+						if (auto renderer = handler->getCompositeTestRenderer())
+						{
+							renderer->RequestPanelPositionUpdate(PanelAnchorPosition::CurrentAnchorState);
+						}
+						
 						handler->captureIFramePositions();
 					}
 					

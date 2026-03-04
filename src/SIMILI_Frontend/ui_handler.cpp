@@ -65,8 +65,10 @@ UIHandler::UIHandler() : parent_hwnd_(nullptr), timer_id_(0),
 	current_mouse_state_(nullptr),
 	above_overlay_state_(nullptr),
 	outside_overlay_state_(nullptr),
+	above_ui_panel_state_(nullptr),
 	last_detected_region_name_(""),
 	mouse_control_to_overlay_(nullptr),
+	is_camera_operation_locked_(false),
 	slot_texture_renderer_(nullptr),
 	composite_test_renderer_(nullptr),
 	d3d11_device_(nullptr),
@@ -76,7 +78,8 @@ UIHandler::UIHandler() : parent_hwnd_(nullptr), timer_id_(0),
 	d2d_device_(nullptr)
 {
 	above_overlay_state_ = new SIMILI::Input::Mouse_Above_Overlay_State();
-	outside_overlay_state_ = new SIMILI::Input::Mouse_Outside_Overlay_State();	
+	outside_overlay_state_ = new SIMILI::Input::Mouse_Outside_Overlay_State();
+	above_ui_panel_state_ = new SIMILI::Input::Mouse_Above_UI_Panel_State();	
 	mouse_control_to_overlay_ = new SIMILI::Input::MouseControlToOverlay();
 	
 	current_mouse_state_ = nullptr;
@@ -157,6 +160,11 @@ UIHandler::~UIHandler()
 	{
 		delete outside_overlay_state_;
 		outside_overlay_state_ = nullptr;
+	}
+	if (above_ui_panel_state_)
+	{
+		delete above_ui_panel_state_;
+		above_ui_panel_state_ = nullptr;
 	}
 	if (mouse_control_to_overlay_)
 	{
@@ -586,6 +594,9 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 					case SIMILI::Input::MouseRegion::ProjectViewerPanel:
 						regionName = "Project Viewer Panel";
 						break;
+					case SIMILI::Input::MouseRegion::PanelAboveUI:
+						regionName = "Panel Above UI";
+						break;
 					case SIMILI::Input::MouseRegion::Splitter:
 						regionName = "Splitter";
 						break;
@@ -596,19 +607,35 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 				}
 				
 				if (regionName != handler->getLastDetectedRegionName())
-				{					
-					handler->transitionMouseState(regionName);
+				{		
+					// Only allow state transitions if camera is not being panned
+					if (!handler->isCameraOperationLocked())
+					{
+						handler->transitionMouseState(regionName);
+					}
 				}				
 			}
 		}
 		
+		// Camera lateral movement (panning)
 		if (handler->getMouseControlToOverlay()->isShiftLeftClickActive() && handler->getCurrentMouseState() == handler->getAboveOverlayState())
 		{
+			// Lock state transitions during camera panning
+			handler->is_camera_operation_locked_ = true;
+			
 			if (handler->getOverlay())
 			{
 				int deltaX = handler->getMouseControlToOverlay()->getMouseDeltaX();
 				int deltaY = handler->getMouseControlToOverlay()->getMouseDeltaY();
 				handler->getOverlay()->MoveCameraLaterally(deltaX, deltaY);
+			}
+		}
+		else
+		{
+			// Unlock state transitions when camera panning stops
+			if (handler->is_camera_operation_locked_)
+			{
+				handler->is_camera_operation_locked_ = false;
 			}
 		}
 		
@@ -701,22 +728,6 @@ static VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWO
 		
 		if (handler->composite_test_renderer_ && handler->composite_test_renderer_->isRenderingEnabled())
 		{
-			if (handler->composite_test_renderer_->hasParent() && handler->getFrameDatas())
-			{
-				SIMILI::Frontend::IFrameScreenData parentData;
-				if (handler->getFrameDatas()->getFrameData("viewport_panel", parentData))
-				{
-
-					handler->composite_test_renderer_->UpdateParentData(
-						parentData.screenX,
-						parentData.screenY,
-						parentData.width,
-						parentData.height,
-						parentData.dpiScale
-					);
-					handler->composite_test_renderer_->setCenterize();
-				}
-			}			
 			handler->composite_test_renderer_->render();
 		}
 	}
@@ -802,6 +813,9 @@ void UIHandler::enableCompositeTestRenderer(bool enable)
 		composite_test_renderer_->create(parent_hwnd_, 0, 0, 500, 500, nullptr);
 		composite_test_renderer_->enableRendering(true);
 		composite_test_renderer_->show(true);
+		
+		composite_test_renderer_->RequestPanelPositionUpdate(PanelAnchorPosition::CurrentAnchorState);
+		captureIFramePositions();
 
 	}
 	else
@@ -1086,22 +1100,30 @@ void UIHandler::captureIFramePositions()
 			int width = composite_test_renderer_->getWidth();
 			int height = composite_test_renderer_->getHeight();
 			
-			RECT parentRect;
-			if (GetWindowRect(parent_hwnd_, &parentRect))
-			{
-				int relativeX = screenX - parentRect.left;
-				int relativeY = screenY - parentRect.top;
-				
-				frame_datas_->updateFrameData("panel_above_UI", relativeX, relativeY, width, height, relativeX, relativeY, parent_hwnd_);
-				
-				std::cout <<"\n [UIHandler] -------------- Test Panel Above UI Frame Data --------------" << std::endl;
-				std::cout << "[UIHandler] panel_above_UI updated - RelativeX: " << relativeX 
-						  << ", RelativeY: " << relativeY 
-						  << ", Width: " << width 
-						  << ", Height: " << height 
-						  << " (ScreenX: " << screenX << ", ScreenY: " << screenY << ")" << std::endl;
-				std::cout << "-------------------------------------------------------------\n" << std::endl;
-			}
+		POINT topLeft = { screenX, screenY };
+		ScreenToClient(parent_hwnd_, &topLeft);
+		
+		HDC hdc = GetDC(parent_hwnd_);
+		float dpiScale = 1.0f;
+		if (hdc)
+		{
+			int dpiX = GetDeviceCaps(hdc, LOGPIXELSX);
+			dpiScale = dpiX / 96.0f;
+			ReleaseDC(parent_hwnd_, hdc);
+		}
+		
+		int relativeX = static_cast<int>(topLeft.x / dpiScale);
+		int relativeY = static_cast<int>(topLeft.y / dpiScale);
+		
+		frame_datas_->updateFrameData("panel_above_UI", relativeX, relativeY, width, height, relativeX, relativeY, parent_hwnd_);
+		
+		std::cout <<"\n [UIHandler] -------------- Test Panel Above UI Frame Data --------------" << std::endl;
+		std::cout << "[UIHandler] panel_above_UI updated - RelativeX: " << relativeX 
+				  << ", RelativeY: " << relativeY 
+				  << ", Width: " << width 
+				  << ", Height: " << height 
+				  << " (ScreenX: " << screenX << ", ScreenY: " << screenY << ")" << std::endl;
+		std::cout << "-------------------------------------------------------------\n" << std::endl;
 		}
 	}
 	
@@ -1118,14 +1140,79 @@ void UIHandler::captureIFramePositions()
 			int Height = static_cast<int>(ViewportPanelSize.height * dpiScale);
 			
 			Camera* cam = three_d_scene_->getActiveCamera();
-			if (cam)
-			{
-				cam->setResolution(Width, Height, dpiScale);
-				std::cout << "[UIHandler] Camera resolution updated: " << "x : " << ViewportPanelSize.height << " y : " << ViewportPanelSize.width
-						  << " DPI scale: " << dpiScale  << std::endl;
-			}
+
+			cam->setResolution(Width, Height, dpiScale);
+
+			std::cout << "[UIHandler] Camera resolution updated: " << "x : " << ViewportPanelSize.height << " y : " << ViewportPanelSize.width
+			<< " DPI scale: " << dpiScale  << std::endl;
 			
 			overlay_viewport_->updateViewportDimensions(Width, Height);
+
+			// Handle panel repositioning if requested
+			if (composite_test_renderer_ && composite_test_renderer_->needs_repositioning())
+			{
+				composite_test_renderer_->UpdateParentData(
+					ViewportPanelSize.clientX,
+					ViewportPanelSize.clientY,
+					ViewportPanelSize.width,
+					ViewportPanelSize.height,
+					dpiScale
+				);
+
+				// Apply the requested anchor position
+				switch (composite_test_renderer_->anchor_position())
+				{
+					case PanelAnchorPosition::Centerize:
+						composite_test_renderer_->setCenterize();
+						break;
+					case PanelAnchorPosition::TopLeft:
+						composite_test_renderer_->setTopLeft();
+						break;
+					case PanelAnchorPosition::TopRight:
+						composite_test_renderer_->setTopRight();
+						break;
+					case PanelAnchorPosition::BottomLeft:
+						composite_test_renderer_->setBottomLeft();
+						break;
+					case PanelAnchorPosition::BottomRight:
+						composite_test_renderer_->setBottomRight();
+						break;
+					case PanelAnchorPosition::MiddleLeft:
+						composite_test_renderer_->setMiddleLeft();
+						break;
+					case PanelAnchorPosition::MiddleRight:
+						composite_test_renderer_->setMiddleRight();
+						break;
+				}
+
+				composite_test_renderer_->clearRepositioningFlag();
+				std::cout << "[UIHandler] Panel repositioned on viewport" << std::endl;
+				
+				int newScreenX = composite_test_renderer_->getScreenX();
+				int newScreenY = composite_test_renderer_->getScreenY();
+				int newWidth = composite_test_renderer_->getWidth();
+				int newHeight = composite_test_renderer_->getHeight();
+				
+				POINT newTopLeft = { newScreenX, newScreenY };
+				ScreenToClient(parent_hwnd_, &newTopLeft);
+				
+				int newRelativeX = static_cast<int>(newTopLeft.x / dpiScale);
+				int newRelativeY = static_cast<int>(newTopLeft.y / dpiScale);
+				
+				frame_datas_->updateFrameData("panel_above_UI", newRelativeX, newRelativeY, newWidth, newHeight, newRelativeX, newRelativeY, parent_hwnd_);
+				
+				std::cout << "\n[UIHandler] -------------- Panel Above UI UPDATED After Reposition --------------" << std::endl;
+				std::cout << "[UIHandler] panel_above_UI NEW position - RelativeX: " << newRelativeX 
+						  << ", RelativeY: " << newRelativeY 
+						  << ", Width: " << newWidth 
+						  << ", Height: " << newHeight 
+						  << " (ScreenX: " << newScreenX << ", ScreenY: " << newScreenY << ")" << std::endl;
+				std::cout << "-------------------------------------------------------------\n" << std::endl;
+				
+				// Update IFrameMouseDetector with new coordinates
+				updateIFrameMouseDetectorFromFrameDatas();
+			}
+
 		}
 	}
 }
@@ -1171,6 +1258,10 @@ void UIHandler::transitionMouseState(const std::string& regionName)
 	if (regionName == "Viewport Panel")
 	{
 		newState = above_overlay_state_;
+	}
+	else if (regionName == "Panel Above UI")
+	{
+		newState = above_ui_panel_state_;
 	}
 	else
 	{

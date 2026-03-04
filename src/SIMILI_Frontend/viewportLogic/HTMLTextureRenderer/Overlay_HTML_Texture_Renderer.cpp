@@ -105,6 +105,8 @@ Overlay_HTML_Texture_Renderer::Overlay_HTML_Texture_Renderer(const std::string& 
 	, parent_width_(0)
 	, parent_height_(0)
 	, parent_dpi_scale_(1.0f)
+	, needs_repositioning_(false)
+	, anchor_position_(PanelAnchorPosition::Centerize)
 	, use_direct_composition_(false)
 	, d2d_factory_(nullptr)
 	, d3d11_device_(nullptr)
@@ -835,6 +837,15 @@ void Overlay_HTML_Texture_Renderer::setCenterize()
 	int x = parent_x_ + (parent_width_ - width_) / 2;
 	int y = parent_y_ + (parent_height_ - height_) / 2;
 	setPosition(x, y, width_, height_);
+}
+
+void Overlay_HTML_Texture_Renderer::RequestPanelPositionUpdate(PanelAnchorPosition anchor)
+{
+	if (anchor != PanelAnchorPosition::CurrentAnchorState)
+	{
+		anchor_position_ = anchor;
+	}
+	needs_repositioning_ = true;
 }
 
 void Overlay_HTML_Texture_Renderer::setPosition(int x, int y, int width, int height)

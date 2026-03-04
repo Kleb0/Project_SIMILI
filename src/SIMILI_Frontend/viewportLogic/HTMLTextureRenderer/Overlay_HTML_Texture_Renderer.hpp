@@ -20,6 +20,17 @@
 #include "../../ThirdParty/CEF/cef_binary/include/cef_life_span_handler.h"
 #include "../../ThirdParty/CEF/cef_binary/include/cef_display_handler.h"
 
+enum class PanelAnchorPosition {
+	CurrentAnchorState,
+	Centerize,
+	TopLeft,
+	TopRight,
+	BottomLeft,
+	BottomRight,
+	MiddleLeft,
+	MiddleRight
+};
+
 class Overlay_HTML_Texture_Renderer : public CefClient, public CefRenderHandler, public CefLifeSpanHandler, public CefDisplayHandler {
 public:
 	Overlay_HTML_Texture_Renderer(const std::string& htmlUrl);
@@ -50,6 +61,12 @@ public:
 	void setMiddleLeft();
 	void setMiddleRight();
 	void setCenterize();
+
+	void RequestPanelPositionUpdate(PanelAnchorPosition anchor = PanelAnchorPosition::CurrentAnchorState);
+	
+	bool needs_repositioning() const { return needs_repositioning_; }
+	void clearRepositioningFlag() { needs_repositioning_ = false; }
+	PanelAnchorPosition anchor_position() const { return anchor_position_; }
 
 	void setCanReceiveInputs(bool canReceive) { can_receive_inputs_ = canReceive; }
 	bool canReceiveInputs() const { return can_receive_inputs_; }
@@ -167,6 +184,9 @@ private:
 	int parent_width_;
 	int parent_height_;
 	float parent_dpi_scale_;
+
+	bool needs_repositioning_;
+	PanelAnchorPosition anchor_position_;
 
 	bool use_direct_composition_;
 	ID2D1Factory1* d2d_factory_;
