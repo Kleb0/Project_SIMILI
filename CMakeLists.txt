@@ -34,14 +34,47 @@ if(USE_CEF)
 endif()
 
 
-#please download the SDL3-devel-3.2.14-VC.zip from its official github page and create on your C drive the following folder configuration:
-#set SDl3
-set(SDL3_INCLUDE_DIR "C:/libs/SDL3/include")
-set(SDL3_LIBRARY "C:/libs/SDL3/lib/x64/SDL3.lib")
+# SDL3 configuration - Auto-detect SDL3-devel-*-VC installation
+set(SDL3_BASE_DIR "C:/SDL3")
 
-if(NOT EXISTS ${SDL3_LIBRARY})
-    message(FATAL_ERROR "SDL3 library not found at ${SDL3_LIBRARY}")
+# Find SDL3-devel-*-VC folder automatically
+file(GLOB SDL3_CANDIDATES "${SDL3_BASE_DIR}/SDL3-devel-*-VC")
+list(LENGTH SDL3_CANDIDATES SDL3_CANDIDATES_COUNT)
+
+if(SDL3_CANDIDATES_COUNT EQUAL 0)
+    message(FATAL_ERROR 
+        "SDL3 not found in ${SDL3_BASE_DIR}\n"
+        "Expected folder pattern: SDL3-devel-[version]-VC\n"
+        "Please run the 'Download SDL3' task to install SDL3 automatically."
+    )
+elseif(SDL3_CANDIDATES_COUNT GREATER 1)
+    # Multiple versions found - use the first one (could be enhanced to pick latest)
+    list(GET SDL3_CANDIDATES 0 SDL3_ROOT_DIR)
+    message(WARNING 
+        "Multiple SDL3 installations found in ${SDL3_BASE_DIR}\n"
+        "Using: ${SDL3_ROOT_DIR}\n"
+        "Consider removing older versions."
+    )
+else()
+    # Single version found
+    list(GET SDL3_CANDIDATES 0 SDL3_ROOT_DIR)
 endif()
+
+set(SDL3_INCLUDE_DIR "${SDL3_ROOT_DIR}/include")
+set(SDL3_LIBRARY "${SDL3_ROOT_DIR}/lib/x64/SDL3.lib")
+
+# Verify SDL3 installation
+if(NOT EXISTS ${SDL3_LIBRARY})
+    message(FATAL_ERROR 
+        "SDL3 library not found at ${SDL3_LIBRARY}\n"
+        "SDL3 root: ${SDL3_ROOT_DIR}\n"
+        "Please verify your SDL3 installation or run the 'Download SDL3' task."
+    )
+endif()
+
+message(STATUS "SDL3 found: ${SDL3_ROOT_DIR}")
+message(STATUS "SDL3 include: ${SDL3_INCLUDE_DIR}")
+message(STATUS "SDL3 library: ${SDL3_LIBRARY}")
 
 
 #then save save this file to create the build folder.

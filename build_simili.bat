@@ -37,7 +37,33 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-if not exist "Release\SDL3.dll" copy "C:\libs\SDL3\lib\x64\SDL3.dll" "Release\SDL3.dll" >nul
+REM Auto-detect SDL3 installation for DLL deployment
+set "SDL3_BASE=C:\SDL3"
+set "SDL3_DLL_PATH="
+
+for /d %%d in ("%SDL3_BASE%\SDL3-devel-*-VC") do (
+    if exist "%%d\lib\x64\SDL3.dll" (
+        set "SDL3_DLL_PATH=%%d\lib\x64\SDL3.dll"
+        goto :sdl3_found
+    )
+)
+
+:sdl3_found
+if "%SDL3_DLL_PATH%"=="" (
+    echo WARNING: SDL3.dll not found in %SDL3_BASE%
+    echo Expected pattern: SDL3-devel-[version]-VC\lib\x64\SDL3.dll
+    echo Please run the 'Download SDL3' task to install SDL3.
+) else (
+    if not exist "Release\SDL3.dll" (
+        echo Copying SDL3.dll from detected installation...
+        copy "%SDL3_DLL_PATH%" "Release\SDL3.dll" >nul
+        if %errorlevel% neq 0 (
+            echo WARNING: Failed to copy SDL3.dll
+        ) else (
+            echo   + SDL3.dll deployed
+        )
+    )
+)
 
 if not exist "src\resources" mkdir src\resources
 if not exist "src\resources\default_imgui_layout.ini" copy "..\src\resources\default_imgui_layout.ini" "src\resources\default_imgui_layout.ini" >nul

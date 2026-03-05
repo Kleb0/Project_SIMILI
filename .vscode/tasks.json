@@ -149,6 +149,24 @@
             "detail": "Install OpenSSL via vcpkg (required for HTTPS)"
         },
         {
+            "label": "Download SDL3",
+            "type": "shell",
+            "command": "${workspaceFolder}\\donwload_SDL3.bat",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "shell": {
+                    "executable": "cmd.exe",
+                    "args": [
+                        "/d",
+                        "/c"
+                    ]
+                }
+            },
+            "problemMatcher": [],
+            "group": "none",
+            "detail": "Download and extract SDL3 (Devel VC) from GitHub releases"
+        },
+        {
             "type": "cppbuild",
             "label": "C/C++: g++.exe build active file",
             "command": "C:\\msys64\\mingw64\\bin\\g++.exe",
