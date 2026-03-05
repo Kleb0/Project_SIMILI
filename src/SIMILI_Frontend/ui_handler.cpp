@@ -27,32 +27,11 @@
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "winmm.lib")
 
-// Static map to associate timer IDs with UIHandler instances
 static std::unordered_map<UINT_PTR, UIHandler*> g_timerHandlerMap;
 
-// Global mouse hook for capturing wheel events before CEF consumes them
-static HHOOK g_mouseHook = NULL;
 static UIHandler* g_activeHandler = nullptr;
 
 UIHandler* UIHandler::s_instance_ = nullptr;
-
-// Low-level mouse hook procedure
-LRESULT CALLBACK LowLevelMouseProc(int nCode, WPARAM wParam, LPARAM lParam)
-{
-	if (nCode == HC_ACTION && wParam == WM_MOUSEWHEEL)
-	{
-		if (g_activeHandler && g_activeHandler->getMouseControlToOverlay())
-		{
-			// Only process wheel input when mouse is above overlay
-			if (g_activeHandler->getCurrentMouseState() == g_activeHandler->getAboveOverlayState())
-			{
-				MSLLHOOKSTRUCT* pMouseStruct = (MSLLHOOKSTRUCT*)lParam;
-				g_activeHandler->getMouseControlToOverlay()->processMouseWheelInput(WM_MOUSEWHEEL, pMouseStruct->mouseData);
-			}
-		}
-	}
-	return CallNextHookEx(g_mouseHook, nCode, wParam, lParam);
-}
 
 UIHandler::UIHandler() : parent_hwnd_(nullptr), timer_id_(0),
 	last_viewport_update_time_(0), last_viewport_x_(0), last_viewport_y_(0), 
@@ -135,13 +114,7 @@ UIHandler::~UIHandler()
 	{
 		KillTimer(nullptr, timer_id_);
 		timeEndPeriod(1);
-		g_timerHandlerMap.erase(timer_id_);
-		
-		if (g_mouseHook)
-		{
-			UnhookWindowsHookEx(g_mouseHook);
-			g_mouseHook = NULL;
-		}
+		g_timerHandlerMap.erase(timer_id_);		
 		
 		if (g_activeHandler == this)
 		{
@@ -501,7 +474,7 @@ void UIHandler::createOverlayViewport(HWND parent_hwnd)
 		{
 			g_timerHandlerMap[timer_id_] = this;
 			g_activeHandler = this;
-			g_mouseHook = SetWindowsHookEx(WH_MOUSE_LL, LowLevelMouseProc, GetModuleHandle(nullptr), 0);
+			// g_mouseHook = SetWindowsHookEx(WH_MOUSE_LL, LowLevelMouseProc, GetModuleHandle(nullptr), 0);
 			std::cout << "[UIHandler] Render timer started with ID " << timer_id_ << std::endl;
 		}
 	}
@@ -807,7 +780,7 @@ void UIHandler::enableCompositeTestRenderer(bool enable)
 		composite_test_renderer_->SetParentByName("viewport_panel");
 		// composite_test_renderer_->FilterColor(0, 0, 250);
 		composite_test_renderer_->EnableTransparency(0.8f);
-		// composite_test_renderer_->changeScaleByValue(0.5f);
+		composite_test_renderer_->changeScaleByValue(0.5f);
 		composite_test_renderer_->maximise();
 		composite_test_renderer_->enableBrowserClassicEvent(true);
 		composite_test_renderer_->create(parent_hwnd_, 0, 0, 500, 500, nullptr);
@@ -1205,15 +1178,7 @@ void UIHandler::captureIFramePositions()
 				int newCssHeight = static_cast<int>(newHeight / dpiScale);
 				
 				frame_datas_->updateFrameData("panel_above_UI", newRelativeX, newRelativeY, newCssWidth, newCssHeight, newRelativeX, newRelativeY, parent_hwnd_);
-				
-				std::cout << "\n[UIHandler] -------------- Panel Above UI UPDATED After Reposition --------------" << std::endl;
-				std::cout << "[UIHandler] panel_above_UI NEW position - RelativeX: " << newRelativeX 
-						  << ", RelativeY: " << newRelativeY 
-						  << ", Width (CSS): " << newCssWidth 
-						  << ", Height (CSS): " << newCssHeight 
-						  << " (Physical: " << newWidth << "x" << newHeight << ", DPI: " << dpiScale << ")" << std::endl;
-				std::cout << "-------------------------------------------------------------\n" << std::endl;
-				
+								
 				// Update IFrameMouseDetector with new coordinates
 				updateIFrameMouseDetectorFromFrameDatas();
 			}
@@ -1325,15 +1290,11 @@ void UIHandler::transitionMouseState(const std::string& regionName)
 
 void UIHandler::CallTestFromServer()
 {
-	std::cout <<" \n ----------------------------------------------------------------------------------------- " << std::endl;
-	std::cout << "[UIHandler] \n CallTestFromServer invoked - this is a test function callable from CEF" << std::endl;
-
 	
 	if (!CefCurrentlyOn(TID_UI))
 	{
 		// the texture need to be rendered on the UI thread, so we post a task to enable it there
 		CefPostTask(TID_UI, base::BindOnce(&UIHandler::enableSlotTextureRendering, base::Unretained(this), true));
-		std::cout << "[UIHandler] Posted enableSlotTextureRendering to UI thread" << std::endl;
 		return;
 	}
 	

@@ -642,8 +642,8 @@ void Overlay_HTML_Texture_Renderer::render()
 				if (cursorPos.x >= windowRect.left && cursorPos.x < windowRect.right &&
 					cursorPos.y >= windowRect.top && cursorPos.y < windowRect.bottom)
 				{
-					int localX = cursorPos.x - windowRect.left;
-					int localY = cursorPos.y - windowRect.top;
+					int localX = static_cast<int>((cursorPos.x - windowRect.left) / scale_factor_);
+					int localY = static_cast<int>((cursorPos.y - windowRect.top) / scale_factor_);
 					
 					CefMouseEvent mouseEvent;
 					mouseEvent.x = localX;
@@ -1183,8 +1183,8 @@ LRESULT CALLBACK Overlay_HTML_Texture_Renderer::WndProc(HWND hwnd, UINT msg, WPA
 				if (renderer->can_receive_inputs_ && renderer->browser_ && renderer->browser_->GetHost())
 				{
 					CefMouseEvent mouse_event;
-					mouse_event.x = GET_X_LPARAM(lParam);
-					mouse_event.y = GET_Y_LPARAM(lParam);
+					mouse_event.x = static_cast<int>(GET_X_LPARAM(lParam) / renderer->scale_factor_);
+					mouse_event.y = static_cast<int>(GET_Y_LPARAM(lParam) / renderer->scale_factor_);
 
 					if (msg == WM_MOUSEWHEEL)
 					{
