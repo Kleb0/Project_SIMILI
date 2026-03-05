@@ -1189,8 +1189,7 @@ void UIHandler::captureIFramePositions()
 				}
 
 				composite_test_renderer_->clearRepositioningFlag();
-				std::cout << "[UIHandler] Panel repositioned on viewport" << std::endl;
-				
+
 				int newScreenX = composite_test_renderer_->getScreenX();
 				int newScreenY = composite_test_renderer_->getScreenY();
 				int newWidth = composite_test_renderer_->getWidth();
@@ -1230,7 +1229,6 @@ void UIHandler::updateIFrameMouseDetectorFromFrameDatas()
 		return;
 	}
 	
-	// Convert FrameDatas to IFrameMouseDetector format
 	std::map<std::string, SIMILI::Input::IFrameScreenDataSimple> simpleFrameData;
 	
 	const auto& frameDataMap = frame_datas_->getFrameData();
@@ -1241,15 +1239,45 @@ void UIHandler::updateIFrameMouseDetectorFromFrameDatas()
 		SIMILI::Input::IFrameScreenDataSimple simple;
 		
 		simple.name = data.name;
-		simple.clientX = data.clientX;
-		simple.clientY = data.clientY;
-		simple.width = data.width;
-		simple.height = data.height;
+		
+		if (data.name == "panel_above_UI" && composite_test_renderer_ && composite_test_renderer_->isActive())
+		{
+			int screenX = composite_test_renderer_->getScreenX();
+			int screenY = composite_test_renderer_->getScreenY();
+			int width = composite_test_renderer_->getWidth();
+			int height = composite_test_renderer_->getHeight();
+			
+			POINT topLeft = { screenX, screenY };
+			if (parent_hwnd_)
+			{
+				ScreenToClient(parent_hwnd_, &topLeft);
+			}
+			
+			HDC hdc = GetDC(parent_hwnd_);
+			float dpiScale = 1.0f;
+			if (hdc)
+			{
+				int dpiX = GetDeviceCaps(hdc, LOGPIXELSX);
+				dpiScale = dpiX / 96.0f;
+				ReleaseDC(parent_hwnd_, hdc);
+			}
+			
+			simple.clientX = static_cast<int>(topLeft.x / dpiScale);
+			simple.clientY = static_cast<int>(topLeft.y / dpiScale);
+			simple.width = static_cast<int>(width / dpiScale);
+			simple.height = static_cast<int>(height / dpiScale);
+		}
+		else
+		{
+			simple.clientX = data.clientX;
+			simple.clientY = data.clientY;
+			simple.width = data.width;
+			simple.height = data.height;
+		}
 		
 		simpleFrameData[data.name] = simple;
 	}
 	
-	// Update IFrameMouseDetector with the converted data
 	iframe_mouse_detector_->updatePanelBoundsFromFrameData(simpleFrameData);
 	
 }
