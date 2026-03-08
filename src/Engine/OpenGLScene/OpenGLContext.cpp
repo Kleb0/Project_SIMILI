@@ -6,7 +6,7 @@
 #include <random>
 #include <sstream>
 #include <iomanip>
-#include "Engine/OpenGLContext.hpp"
+#include "Engine/OpenGLScene/OpenGLContext.hpp"
 
 std::string OpenGLContext::generateContextID()
 {

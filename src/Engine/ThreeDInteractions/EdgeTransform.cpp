@@ -4,7 +4,7 @@
 #include "WorldObjects/Basic/Vertice.hpp"
 #include "WorldObjects/Mesh/Mesh.hpp"
 
-#include "Engine/ThreeDScene.hpp"
+#include "Engine/OpenGLScene/ThreeDScene.hpp"
 // #include "UI/ThreeDWindow/ThreeDWindow.hpp"
 #include "Engine/Guizmo.hpp"
 #include "Engine/MeshEdit/EdgeLoop.hpp"

@@ -17,7 +17,7 @@
 #include <list>
 #include <sstream>
 #include <memory>
-#include <windows.h>
+#include <SDL3/SDL.h>
 #include <d3d11.h>
 #include <d2d1.h>
 #include <d2d1_1.h>
@@ -90,13 +90,13 @@ public:
 		CefEventHandle os_event) override;
 
 	void CloseAllBrowsers(bool force_close);
-	void createOverlayViewport(HWND parent_hwnd);
+	void createOverlayViewport(SDL_Window* parent_window);
 	void updateOverlayPosition();
 	bool isOverlayRenderingEnabled() const;
 	void enableSlotTextureRendering(bool enable);
 	void enableCompositeTestRenderer(bool enable);
 	OverlayViewport* getOverlay() { return overlay_viewport_.get(); }
-	HWND getParentHWND() const { return parent_hwnd_; }
+	SDL_Window* getParentWindow() const { return parent_window_; }
 	SIMILI::Input::IFrameMouseDetector* getIFrameMouseDetector() { return iframe_mouse_detector_; }
 	
 	void setThreeDScene(ThreeDScene* scene) { three_d_scene_ = scene; }
@@ -120,6 +120,7 @@ public:
 	
 	// Camera operation lock
 	bool isCameraOperationLocked() const { return is_camera_operation_locked_; }
+	void setCameraOperationLocked(bool locked) { is_camera_operation_locked_ = locked; }
 	
 	void transitionMouseState(const std::string& regionName);
 	SIMILI::Input::Mouse_State* getCurrentMouseState() const { return current_mouse_state_; }
@@ -135,6 +136,7 @@ public:
 	
 	SIMILI::Input::MouseControlToOverlay* getMouseControlToOverlay() const { return mouse_control_to_overlay_; }	
 	
+	Overlay_HTML_Texture_Renderer* getSlotTextureRenderer() const { return slot_texture_renderer_; }
 	Overlay_HTML_Texture_Renderer* getCompositeTestRenderer() const { return composite_test_renderer_; }
 
 	ID3D11Device* getD3D11Device() const { return d3d11_device_; }
@@ -142,7 +144,7 @@ public:
 	ID2D1Device* getD2D1Device() const { return d2d_device_; }
 	IDXGIDevice1* getDXGIDevice() const { return dxgi_device_; }
 
-	friend VOID CALLBACK RenderTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime);
+	friend Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 interval);
 
 	void CallTestFromServer();
 
@@ -152,8 +154,8 @@ private:
 	typedef std::list<CefRefPtr<CefBrowser>> BrowserList;
 	BrowserList browser_list_;
 	std::unique_ptr<OverlayViewport> overlay_viewport_;
-	HWND parent_hwnd_;
-	UINT_PTR timer_id_;
+	SDL_Window* parent_window_;
+	SDL_TimerID timer_id_;
 	ThreeDScene* three_d_scene_;
 	
 
@@ -162,7 +164,7 @@ private:
 	Mesh** cube_mesh_ptr_;
 	bool scene_initialized_;
 	
-	DWORD last_viewport_update_time_;
+	Uint64 last_viewport_update_time_;
 	int last_viewport_x_;
 	int last_viewport_y_;
 	int last_viewport_width_;

@@ -1,6 +1,6 @@
 #include "OverlayClickHandler.hpp"
 #include "overlay_viewport.hpp"
-#include "../../../Engine/ThreeDScene.hpp"
+#include "../../../Engine/OpenGLScene/ThreeDScene.hpp"
 #include "../../../WorldObjects/Mesh/Mesh.hpp"
 #include "../../../WorldObjects/Basic/Vertice.hpp"
 #include "../../../WorldObjects/Basic/Face.hpp"
@@ -8,6 +8,7 @@
 #include "../../../WorldObjects/Camera/Camera.hpp"
 #include "../../../Engine/ThreeDObjectSelector.hpp"
 #include "../../../Engine/ThreeDModes/Normal_Mode.hpp"
+#include <SDL3/SDL.h>
 #include "../../../Engine/ThreeDModes/Vertice_Mode.hpp"
 #include "../../../Engine/ThreeDModes/Face_Mode.hpp"
 #include "../../../Engine/ThreeDModes/Edge_Mode.hpp"
@@ -55,27 +56,18 @@ void OverlayClickHandler::handle()
 		return;
 	}
 
-	POINT cursor_pos;
-	if (!GetCursorPos(&cursor_pos)) 
-	{
-		std::cerr << "[OVERLAY CLICK HANDLER] Error: Failed to get cursor position" << std::endl;
-		return;
-	}
+	float mouseXfloat, mouseYfloat;
+	SDL_GetMouseState(&mouseXfloat, &mouseYfloat);
 	
-	HWND hwnd = viewport->getHandle();
-	if (!hwnd) 
+	SDL_Window* window = viewport->getHandle();
+	if (!window) 
 	{
 		std::cerr << "[OVERLAY CLICK HANDLER] Error: Invalid window handle" << std::endl;
 		return;
 	}
 	
-	if (!ScreenToClient(hwnd, &cursor_pos)) {
-		std::cerr << "[OVERLAY CLICK HANDLER] Error: Failed to convert screen to client coords" << std::endl;
-		return;
-	}
-	
-	int mouseX = cursor_pos.x;
-	int mouseY = cursor_pos.y;
+	int mouseX = static_cast<int>(mouseXfloat);
+	int mouseY = static_cast<int>(mouseYfloat);
 
 	if (mouseX < 0 || mouseX >= viewport->getWidth() ||
 		mouseY < 0 || mouseY >= viewport->getHeight())

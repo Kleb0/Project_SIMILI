@@ -1,6 +1,6 @@
 #pragma once
 
-#include <windows.h>
+#include <SDL3/SDL.h>
 #include <vector>
 #include <list>
 #include <mutex>
@@ -33,6 +33,7 @@ class Vertice;
 class Face;
 class Edge;
 class UIHandler;
+class Mesh;
 
 class OverlayViewport 
 {
@@ -41,7 +42,7 @@ class OverlayViewport
 		OverlayViewport();
 		~OverlayViewport();
 
-		bool create(HWND parent, int x, int y, int width, int height);
+		bool create(SDL_Window* parent, int x, int y, int width, int height);
 		void destroy();
 		
 		// ----------- Window Management -----------
@@ -49,7 +50,7 @@ class OverlayViewport
 		void show(bool visible);
 		bool isVisible() const;
 		
-		HWND getHandle() const { return hwnd_; }
+		SDL_Window* getHandle() const { return sdl_window_; }
 		int getWidth() const { return width_; }
 		int getHeight() const { return height_; }
 		
@@ -57,16 +58,15 @@ class OverlayViewport
 		
 		// ----------- Rendering Control -----------
 		void render();
+		// handle of of SDL3 events (keyboard, window resize, etc.)
+		void handleEvents(); 
 		void enableRendering(bool enable) { rendering_enabled_ = enable; }
 		bool isRenderingEnabled() const { return rendering_enabled_; }
 		
 		// ----------- OpenGL Context Management -----------
 		void makeContextCurrent();
 		void releaseContext();
-		HGLRC getGLContext() const { return gl_context_; }
-		
-		// ----------- Mesh OpenGL Resource Management -----------
-		void reinitializeMeshComponents(class Mesh* mesh);
+		SDL_GLContext getGLContext() const { return gl_context_; }
 		
 		// ----------- 3D Scene Management -----------
 		void setThreeDScene(ThreeDScene* scene) { three_d_scene_ = scene; }
@@ -105,6 +105,9 @@ class OverlayViewport
 		// ----------- HTML Texture Rendering -----------
 		HtmlTextureRenderer* getHtmlTextureRenderer() const { return html_texture_renderer_; }
 		
+		// ----------- Mesh Management -----------
+		void reinitializeMeshComponents(Mesh* mesh);
+		
 		// ----- Manipulation in scene -----
 		void MoveCameraLaterally(int deltaX, int deltaY);
 		void ProcessWheelInput(int wheelDirection);
@@ -113,10 +116,9 @@ class OverlayViewport
 		void ProcessCameraOrbiting(int deltaX, int deltaY);
 		void shootRaycastFromUIHandler(int mouseX, int mouseY);
 		void injectMouseInputs(int mouseX, int mouseY, bool leftDown, bool rightDown, bool middleDown, float wheelDelta);
-		static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 		
 		// ----------- Initialization & Cleanup -----------
-		void initializeOpenGL(HGLRC shareContext = nullptr);
+		void initializeOpenGL(SDL_GLContext shareContext = nullptr);
 		void initializeImGui();
 		void shutdownImGui();
 		
@@ -126,14 +128,11 @@ class OverlayViewport
 		void update_Scene_Rendering();
 		
 		// ----------- Window & OpenGL Context -----------
-		HWND hwnd_;
-		HWND parent_;
-		HDC hdc_;
-		HGLRC gl_context_;
-		
+		SDL_Window* sdl_window_;
+		SDL_Window* parent_window_;
+		SDL_GLContext gl_context_;
 		int width_;
 		int height_;
-		
 		bool rendering_enabled_;
 		bool imgui_initialized_;
 		
@@ -142,7 +141,7 @@ class OverlayViewport
 		UIHandler* ui_handler_ = nullptr;
 		
 		// ----------- Pending Meshes (Thread-Safe Queue) -----------
-		std::vector<class Mesh*> pending_meshes_to_finalize_;
+		std::vector<Mesh*> pending_meshes_to_finalize_;
 		std::mutex pending_meshes_mutex_;
 		std::atomic<bool> has_pending_meshes_{false};
 		

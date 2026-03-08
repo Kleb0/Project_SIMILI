@@ -1,15 +1,14 @@
 #include "simple_window_delegate.hpp"
 #include "ui_handler.hpp"
-#include <commctrl.h>
-
-#pragma comment(lib, "comctl32.lib")
+#include <SDL3/SDL.h>
 
 SimpleWindowDelegate::SimpleWindowDelegate(CefRefPtr<CefBrowserView> browser_view)
-	: browser_view_(browser_view), window_hwnd_(nullptr), ui_handler_(nullptr), last_maximized_state_(false),
-	  last_window_x_(0), last_window_y_(0) {
+	: browser_view_(browser_view), cef_window_(nullptr), sdl_window_(nullptr), ui_handler_(nullptr), 
+	  last_maximized_state_(false), last_window_x_(0), last_window_y_(0) {
 }
 
-void SimpleWindowDelegate::OnWindowCreated(CefRefPtr<CefWindow> window) {
+void SimpleWindowDelegate::OnWindowCreated(CefRefPtr<CefWindow> window) 
+{
 	window->AddChildView(browser_view_);
 	
 	window->SetTitle("SIMLI PROJECT");
@@ -18,33 +17,35 @@ void SimpleWindowDelegate::OnWindowCreated(CefRefPtr<CefWindow> window) {
 	
 	browser_view_->RequestFocus();
 	
-	window_hwnd_ = window->GetWindowHandle();
+	// Store CEF window reference
+	cef_window_ = window;
 	
-	if (window_hwnd_) 
+	// Create an independent SDL3 window for the overlay viewport
+	// We'll create this as a separate window that can be positioned independently
+	sdl_window_ = SDL_CreateWindow(
+		"SIMILI Overlay",
+		800, 600,
+		SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN | SDL_WINDOW_BORDERLESS | SDL_WINDOW_ALWAYS_ON_TOP
+	);
+	
+	if (sdl_window_) 
 	{
-		// Initialize last window position
-		RECT windowRect;
-		if (GetWindowRect(window_hwnd_, &windowRect))
-		{
-			last_window_x_ = windowRect.left;
-			last_window_y_ = windowRect.top;
-		}
+		// Set initial window position
+		SDL_SetWindowPosition(sdl_window_, 100, 100);
 		
-		// Install subclass to monitor window movement
-		SetWindowSubclass(window_hwnd_, WindowSubclassProc, 1, reinterpret_cast<DWORD_PTR>(this));
+		// Initialize last window position from SDL window
+		SDL_GetWindowPosition(sdl_window_, &last_window_x_, &last_window_y_);
 		
 		CefRefPtr<CefBrowser> browser = browser_view_->GetBrowser();
 		if (browser) 
 		{
-			HWND browser_hwnd = browser->GetHost()->GetWindowHandle();
-			
 			CefRefPtr<CefClient> client = browser->GetHost()->GetClient();
 			UIHandler* handler = static_cast<UIHandler*>(client.get());
 
 			if (handler) 
 			{	
-				ui_handler_ = handler;				
-				handler->createOverlayViewport(browser_hwnd);
+				ui_handler_ = handler;
+				handler->createOverlayViewport(sdl_window_);
 			} 
 			else 
 			{
@@ -58,17 +59,18 @@ void SimpleWindowDelegate::OnWindowCreated(CefRefPtr<CefWindow> window) {
 	} 
 	else 
 	{
-		std::cout << "[SimpleWindowDelegate] HWND is NULL!" << std::endl;
+		std::cout << "[SimpleWindowDelegate] SDL_Window creation failed: " << SDL_GetError() << std::endl;
 	}
 }
 
 void SimpleWindowDelegate::OnWindowDestroyed(CefRefPtr<CefWindow> window) {
-	if (window_hwnd_)
+	if (sdl_window_)
 	{
-		// Remove subclass before window destruction
-		RemoveWindowSubclass(window_hwnd_, WindowSubclassProc, 1);
-		std::cout << "[SimpleWindowDelegate] Window subclass removed" << std::endl;
+		SDL_DestroyWindow(sdl_window_);
+		sdl_window_ = nullptr;
+		std::cout << "[SimpleWindowDelegate] SDL window destroyed" << std::endl;
 	}
+	cef_window_ = nullptr;
 	browser_view_ = nullptr;
 }
 
@@ -86,18 +88,12 @@ CefSize SimpleWindowDelegate::GetPreferredSize(CefRefPtr<CefView> view) {
 
 bool SimpleWindowDelegate::isWindowMaximized() const
 {
-    if (!window_hwnd_) {
+    if (!sdl_window_) {
         return false;
     }
     
-    WINDOWPLACEMENT placement;
-    placement.length = sizeof(WINDOWPLACEMENT);
-    
-    if (GetWindowPlacement(window_hwnd_, &placement)) {
-        return placement.showCmd == SW_SHOWMAXIMIZED;
-    }
-    
-    return false;
+    Uint32 flags = SDL_GetWindowFlags(sdl_window_);
+    return (flags & SDL_WINDOW_MAXIMIZED) != 0;
 }
 
 void SimpleWindowDelegate::getMaximizedBorderOffsets(int& offsetX, int& offsetY, int& offsetWidth, int& offsetHeight) const
@@ -107,41 +103,38 @@ void SimpleWindowDelegate::getMaximizedBorderOffsets(int& offsetX, int& offsetY,
     offsetWidth = 0;
     offsetHeight = 0;
     
-    if (!window_hwnd_ || !isWindowMaximized()) {
+    if (!sdl_window_ || !isWindowMaximized()) {
         return;
     }
     
-    // When maximized, Windows adds invisible borders
-    // Get the window frame size
-    RECT windowRect, clientRect;
-    GetWindowRect(window_hwnd_, &windowRect);
-    GetClientRect(window_hwnd_, &clientRect);
+    // When maximized on Windows, SDL windows may have invisible borders
+    // Get the window size vs client size using SDL3
+    int windowWidth, windowHeight;
+    SDL_GetWindowSize(sdl_window_, &windowWidth, &windowHeight);
     
-    POINT clientOrigin = {0, 0};
-    ClientToScreen(window_hwnd_, &clientOrigin);
+    int windowX, windowY;
+    SDL_GetWindowPosition(sdl_window_, &windowX, &windowY);
     
-    // Calculate the offset (invisible border size)
-    offsetX = clientOrigin.x - windowRect.left;
-    offsetY = clientOrigin.y - windowRect.top;
-    
-    // Width and height offsets (borders on both sides)
-    int windowWidth = windowRect.right - windowRect.left;
-    int windowHeight = windowRect.bottom - windowRect.top;
-    int clientWidth = clientRect.right - clientRect.left;
-    int clientHeight = clientRect.bottom - clientRect.top;
-    
-    offsetWidth = windowWidth - clientWidth;
-    offsetHeight = windowHeight - clientHeight;
-    
-    std::cout << "[SimpleWindowDelegate] Maximized border offsets: X=" << offsetX 
-              << " Y=" << offsetY 
-              << " W=" << offsetWidth 
-              << " H=" << offsetHeight << std::endl;
+    // In SDL3, the decorated window size already accounts for borders
+    // For a borderless window, these should be zero, but we calculate just in case
+    SDL_Rect borderSize;
+    if (SDL_GetWindowBordersSize(sdl_window_, &borderSize.y, &borderSize.x, &borderSize.h, &borderSize.w) == 0)
+    {
+        offsetX = borderSize.x;
+        offsetY = borderSize.y;
+        offsetWidth = borderSize.x + borderSize.w;
+        offsetHeight = borderSize.y + borderSize.h;
+        
+        std::cout << "[SimpleWindowDelegate] Maximized border offsets: X=" << offsetX 
+                  << " Y=" << offsetY 
+                  << " W=" << offsetWidth 
+                  << " H=" << offsetHeight << std::endl;
+    }
 }
 
 void SimpleWindowDelegate::checkAndCaptureWindowStateChange()
 {
-	if (!window_hwnd_ || !ui_handler_)
+	if (!sdl_window_ || !ui_handler_)
 	{
 		return;
 	}
@@ -172,63 +165,36 @@ void SimpleWindowDelegate::checkAndCaptureWindowStateChange()
 	}
 }
 
-LRESULT CALLBACK SimpleWindowDelegate::WindowSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
+void SimpleWindowDelegate::pollWindowEvents()
 {
-	SimpleWindowDelegate* delegate = reinterpret_cast<SimpleWindowDelegate*>(dwRefData);
-	
-	switch (msg)
+	if (!sdl_window_ || !ui_handler_)
 	{
-		case WM_EXITSIZEMOVE:
-		{
-			// Called ONLY when user finishes moving or resizing the window
-			if (delegate && delegate->ui_handler_)
-			{
-				RECT windowRect;
-				if (GetWindowRect(hwnd, &windowRect))
-				{
-					int newX = windowRect.left;
-					int newY = windowRect.top;
-					
-					// Check if window actually moved (avoid redundant captures)
-					if (newX != delegate->last_window_x_ || newY != delegate->last_window_y_)
-					{
-						delegate->last_window_x_ = newX;
-						delegate->last_window_y_ = newY;
-						
-						std::cout << "[SimpleWindowDelegate] Window moved to (" << newX << ", " << newY 
-						          << ") - recapturing iframe positions..." << std::endl;
-						
-						// Request panel repositioning before capturing positions
-						if (auto renderer = delegate->ui_handler_->getCompositeTestRenderer())
-						{
-							renderer->RequestPanelPositionUpdate(PanelAnchorPosition::CurrentAnchorState);
-						}
-						
-						delegate->ui_handler_->captureIFramePositions();
-					}
-				}
-			}
-			break;
-		}
-		
-		case WM_WINDOWPOSCHANGED:
-		{
-			// Handle window state changes (maximize/restore)
-			if (delegate && delegate->ui_handler_)
-			{
-				WINDOWPOS* pos = reinterpret_cast<WINDOWPOS*>(lParam);
-				
-				// Check for window state changes (maximize/restore)
-				if (pos && !(pos->flags & SWP_NOSIZE))
-				{
-					delegate->checkAndCaptureWindowStateChange();
-				}
-			}
-			break;
-		}
+		return;
 	}
 	
-	return DefSubclassProc(hwnd, msg, wParam, lParam);
+	// Check for window position changes
+	int currentX, currentY;
+	SDL_GetWindowPosition(sdl_window_, &currentX, &currentY);
+	
+	if (currentX != last_window_x_ || currentY != last_window_y_)
+	{
+		last_window_x_ = currentX;
+		last_window_y_ = currentY;
+		
+		std::cout << "[SimpleWindowDelegate] Window moved to (" << currentX << ", " << currentY 
+		          << ") - recapturing iframe positions..." << std::endl;
+		
+		// Request panel repositioning before capturing positions
+		if (auto renderer = ui_handler_->getCompositeTestRenderer())
+		{
+			renderer->RequestPanelPositionUpdate(PanelAnchorPosition::CurrentAnchorState);
+		}
+		
+		ui_handler_->captureIFramePositions();
+	}
+	
+	// Check for window state changes (maximize/restore)
+	checkAndCaptureWindowStateChange();
 }
 
 void SimpleWindowDelegate::updateIFrameData(const std::string& name, int x, int y, int width, int height, int clientX, int clientY)

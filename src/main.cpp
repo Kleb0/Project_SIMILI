@@ -13,8 +13,8 @@
 #include "SIMILI_Services/router/RoutesManager.hpp"
 #include "SIMILI_Services/types/RouterTypes.hpp"
 #include "SIMILI_Services/middleware/SimpleHttpServer.hpp"
-#include "Engine/OpenGLContext.hpp"
-#include "Engine/ThreeDScene.hpp"
+#include "Engine/OpenGLScene/OpenGLContext.hpp"
+#include "Engine/OpenGLScene/ThreeDScene.hpp"
 #include "WorldObjects/Camera/Camera.hpp"
 #include "WorldObjects/Mesh/Mesh.hpp"
 #include "Engine/PrimitivesCreation/CreatePrimitive.hpp"
@@ -32,69 +32,51 @@
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <SDL3/SDL.h>
+
+#ifdef _MSC_VER
+#pragma comment(linker, "/SUBSYSTEM:CONSOLE")
+#endif
 
 namespace fs = std::filesystem;
 fs::path gExecutableDir;
 
-#ifdef _WIN32
-#include <windows.h>
-
-BOOL WINAPI ConsoleCtrlHandler(DWORD dwCtrlType) {
-	if (dwCtrlType == CTRL_CLOSE_EVENT || dwCtrlType == CTRL_C_EVENT || 
-		dwCtrlType == CTRL_BREAK_EVENT || dwCtrlType == CTRL_LOGOFF_EVENT || 
-		dwCtrlType == CTRL_SHUTDOWN_EVENT) {
-		
-		std::cout << "[ConsoleCtrl] Cleanup signal received..." << std::endl;
-		return TRUE;
-	}
-	return FALSE;
-}
-
-int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine, int nCmdShow)
+int main(int argc, char* argv[])
 {
-	UNREFERENCED_PARAMETER(hPrevInstance);
-	UNREFERENCED_PARAMETER(lpCmdLine);
+	CefMainArgs main_args(GetModuleHandle(nullptr));
 
-	// Check if this is a CEF sub-process by checking command line
-	std::wstring cmdLine(GetCommandLineW());
-	bool isSubProcess = (cmdLine.find(L"--type=") != std::wstring::npos);
-
-	// Only allocate console in the main browser process
-	if (!isSubProcess)
-	{
-		static bool console_allocated = false;
-		if (!console_allocated) 
-		{
-			AllocConsole();
-			FILE* fp;
-			freopen_s(&fp, "CONOUT$", "w", stdout);
-			freopen_s(&fp, "CONOUT$", "w", stderr);
-			console_allocated = true;
-		}
-	}
-
-	CefMainArgs main_args(hInstance);
 	CefRefPtr<UIHandler> handler(new UIHandler);
 
-	// Check if this is a CEF sub-process (render, GPU, etc.)
 	int exit_code = CefExecuteProcess(main_args, handler, nullptr);
 	if (exit_code >= 0) 
 	{
-		// This is a sub-process, exit without further processing
 		return exit_code;
 	}
 
-	wchar_t exePath[MAX_PATH];
-	GetModuleFileNameW(NULL, exePath, MAX_PATH);
-	gExecutableDir = fs::path(exePath).parent_path();
-
-	SetConsoleCtrlHandler(ConsoleCtrlHandler, TRUE);
+	const char* basePath = SDL_GetBasePath();
+	if (basePath)
+	{
+		gExecutableDir = fs::path(basePath);
+		SDL_free((void*)basePath);
+	}
+	else
+	{
+		gExecutableDir = fs::current_path();
+	}
 
 	std::cout << "[Main] Starting SIMILI with CEF..." << std::endl;
+
+	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
+	{
+		std::cerr << "[Main] Failed to initialize SDL3: " << SDL_GetError() << std::endl;
+		return -1;
+	}
+	std::cout << "[Main] SDL3 initialized" << std::endl;
 
 	if (!glfwInit()) 
 	{
 		std::cerr << "[Main] Failed to initialize GLFW" << std::endl;
+		SDL_Quit();
 		return -1;
 	}
 	std::cout << "[Main] GLFW initialized" << std::endl;
@@ -215,6 +197,8 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmd
 	glfwTerminate();
 	std::cout << "[Main] GLFW terminated" << std::endl;
 
+	SDL_Quit();
+	std::cout << "[Main] SDL3 terminated" << std::endl;
+
 	return 0;
 }
-#endif

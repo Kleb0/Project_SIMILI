@@ -11,11 +11,11 @@ namespace SIMILI {
 			{
 			}
 
-				void FrameDatas::captureAllFrames(HWND cefWindowHandle)
-				{
-					if (!cefWindowHandle)
+void FrameDatas::captureAllFrames(SDL_Window* sdlWindow)
+			{
+					if (!sdlWindow)
 					{
-						std::cout << "[FrameDatas] Invalid HWND provided" << std::endl;
+						std::cout << "[FrameDatas] Invalid SDL_Window provided" << std::endl;
 						return;
 					}
 				
@@ -48,13 +48,13 @@ namespace SIMILI {
 					screenData.clientX = frameData.clientX;
 					screenData.clientY = frameData.clientY;
 				
-					captureWindowData(cefWindowHandle, screenData);
+					captureWindowData(sdlWindow, screenData);
 					
-					RECT windowRect;
-					GetWindowRect(cefWindowHandle, &windowRect);
+					int wx, wy;
+					SDL_GetWindowPosition(sdlWindow, &wx, &wy);
 					
-					screenData.screenX = windowRect.left + frameData.clientX;
-					screenData.screenY = windowRect.top + frameData.clientY;
+					screenData.screenX = wx + frameData.clientX;
+					screenData.screenY = wy + frameData.clientY;
 					
 					frameDataMap_[frameData.name] = screenData;
 				}
@@ -96,87 +96,66 @@ namespace SIMILI {
 				std::cout << "\n========================================================\n" << std::endl;
 			}
 
-			float FrameDatas::getDPIScale(HWND hwnd) const
+			float FrameDatas::getDPIScale(SDL_Window* sdlWindow) const
 			{
-				if (!hwnd)
+				if (!sdlWindow)
 				{
 					return 1.0f;
 				}
 				
-				HMONITOR hMonitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-				if (!hMonitor)
+				int displayIndex = SDL_GetDisplayForWindow(sdlWindow);
+				if (displayIndex < 0)
 				{
 					return 1.0f;
 				}
 				
-				typedef HRESULT(WINAPI* GetDpiForMonitorFunc)(HMONITOR, int, UINT*, UINT*);
-				HMODULE shcore = LoadLibraryA("Shcore.dll");
-				if (!shcore)
+				float ddpi = SDL_GetDisplayContentScale(displayIndex);
+				if (ddpi > 0.0f)
 				{
-					HDC hdc = GetDC(hwnd);
-					if (!hdc)
-					{
-						return 1.0f;
-					}
-					int dpiX = GetDeviceCaps(hdc, LOGPIXELSX);
-					ReleaseDC(hwnd, hdc);
-					return static_cast<float>(dpiX) / 96.0f;
+					return ddpi;
 				}
 				
-				GetDpiForMonitorFunc getDpiForMonitor = (GetDpiForMonitorFunc)GetProcAddress(shcore, "GetDpiForMonitor");
-				if (!getDpiForMonitor)
-				{
-					FreeLibrary(shcore);
-					HDC hdc = GetDC(hwnd);
-					if (!hdc)
-					{
-						return 1.0f;
-					}
-					int dpiX = GetDeviceCaps(hdc, LOGPIXELSX);
-					ReleaseDC(hwnd, hdc);
-					return static_cast<float>(dpiX) / 96.0f;
-				}
-				
-				UINT dpiX = 96;
-				UINT dpiY = 96;
-				HRESULT hr = getDpiForMonitor(hMonitor, 0, &dpiX, &dpiY);
-				
-				FreeLibrary(shcore);
-				
-				if (SUCCEEDED(hr))
-				{
-					return static_cast<float>(dpiX) / 96.0f;
-				}
-				
-				HDC hdc = GetDC(hwnd);
-				if (!hdc)
-				{
-					return 1.0f;
-				}
-				int dpi = GetDeviceCaps(hdc, LOGPIXELSX);
-				ReleaseDC(hwnd, hdc);
-				return static_cast<float>(dpi) / 96.0f;
+				return 1.0f;
 			}
 
-			void FrameDatas::captureWindowData(HWND hwnd, IFrameScreenData& data)
+			void FrameDatas::captureWindowData(SDL_Window* sdlWindow, IFrameScreenData& data)
 			{
-				RECT windowRect;
-				GetWindowRect(hwnd, &windowRect);
+				int wx, wy, ww, wh;
+				SDL_GetWindowPosition(sdlWindow, &wx, &wy);
+				SDL_GetWindowSize(sdlWindow, &ww, &wh);
 				
-				data.windowX = windowRect.left;
-				data.windowY = windowRect.top;
-				data.windowWidth = windowRect.right - windowRect.left;
-				data.windowHeight = windowRect.bottom - windowRect.top;
+				data.windowX = wx;
+				data.windowY = wy;
+				data.windowWidth = ww;
+				data.windowHeight = wh;
 				
-				data.dpiScale = getDPIScale(hwnd);
+				data.dpiScale = getDPIScale(sdlWindow);
 				
-				data.screenWidth = GetSystemMetrics(SM_CXSCREEN);
-				data.screenHeight = GetSystemMetrics(SM_CYSCREEN);
+				int displayIndex = SDL_GetDisplayForWindow(sdlWindow);
+				if (displayIndex >= 0)
+				{
+					const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(displayIndex);
+					if (mode)
+					{
+						data.screenWidth = mode->w;
+						data.screenHeight = mode->h;
+					}
+					else
+					{
+						data.screenWidth = 1920;
+						data.screenHeight = 1080;
+					}
+				}
+				else
+				{
+					data.screenWidth = 1920;
+					data.screenHeight = 1080;
+				}
 			}
 
-		void FrameDatas::updateFrameData(const std::string& name, int relativeX, int relativeY, int width, int height, int clientX, int clientY, HWND cefWindowHandle)
+		void FrameDatas::updateFrameData(const std::string& name, int relativeX, int relativeY, int width, int height, int clientX, int clientY, SDL_Window* sdlWindow)
 		{
-			if (!cefWindowHandle)
+			if (!sdlWindow)
 			{
 				return;
 			}
@@ -193,13 +172,13 @@ namespace SIMILI {
 				data.clientX = clientX;
 				data.clientY = clientY;
 				
-				captureWindowData(cefWindowHandle, data);
+				captureWindowData(sdlWindow, data);
 				
-				RECT windowRect;
-				GetWindowRect(cefWindowHandle, &windowRect);
+				int wx, wy;
+				SDL_GetWindowPosition(sdlWindow, &wx, &wy);
 				
-				data.screenX = windowRect.left + static_cast<int>(clientX * data.dpiScale);
-				data.screenY = windowRect.top + static_cast<int>(clientY * data.dpiScale);
+				data.screenX = wx + static_cast<int>(clientX * data.dpiScale);
+				data.screenY = wy + static_cast<int>(clientY * data.dpiScale);
 			}
 			else
 			{
@@ -212,13 +191,13 @@ namespace SIMILI {
 				newData.clientX = clientX;
 				newData.clientY = clientY;
 				
-				captureWindowData(cefWindowHandle, newData);
+				captureWindowData(sdlWindow, newData);
 				
-				RECT windowRect;
-				GetWindowRect(cefWindowHandle, &windowRect);
+				int wx, wy;
+				SDL_GetWindowPosition(sdlWindow, &wx, &wy);
 				
-				newData.screenX = windowRect.left + static_cast<int>(clientX * newData.dpiScale);
-				newData.screenY = windowRect.top + static_cast<int>(clientY * newData.dpiScale);
+				newData.screenX = wx + static_cast<int>(clientX * newData.dpiScale);
+				newData.screenY = wy + static_cast<int>(clientY * newData.dpiScale);
 				
 				frameDataMap_[name] = newData;
 			}

@@ -1,21 +1,18 @@
 #include "CameraControl.hpp"
 #include "overlay_viewport.hpp"
-#include "../../Engine/ThreeDScene.hpp"
+#include "../../Engine/OpenGLScene/ThreeDScene.hpp"
 #include "../../WorldObjects/Camera/Camera.hpp"
+#include <SDL3/SDL.h>
 
 CameraControl::CameraControl(OverlayViewport* overlay)
-    : overlay_(overlay), is_dragging_(false)
+    : overlay_(overlay), is_dragging_(false), last_mouse_x_(0), last_mouse_y_(0)
 {
-    last_mouse_pos_.x = 0;
-    last_mouse_pos_.y = 0;
 }
 
 CameraControl::~CameraControl() {}
 
-void CameraControl::onMouseWheel(WPARAM wParam)
+void CameraControl::onMouseWheel(float wheel)
 {
-    int delta = GET_WHEEL_DELTA_WPARAM(wParam);
-    float wheel = delta / 120.0f;
     if (!overlay_) return;
     ThreeDScene* scene = overlay_->getThreeDScene();
     if (scene) {
@@ -23,7 +20,6 @@ void CameraControl::onMouseWheel(WPARAM wParam)
         if (cam && cam->isSoftwareCamera()) 
         {
             cam->moveForward(wheel * 0.5f);
-            InvalidateRect(overlay_->getHandle(), nullptr, FALSE);
         }
     }
 }
@@ -31,12 +27,11 @@ void CameraControl::onMouseWheel(WPARAM wParam)
 void CameraControl::onMiddleButtonDown()
 {
     if (!overlay_) return;
-    SetCapture(overlay_->getHandle());
     is_dragging_ = true;
-    POINT p;
-    GetCursorPos(&p);
-    ScreenToClient(overlay_->getHandle(), &p);
-    last_mouse_pos_ = p;
+    float mouseXfloat, mouseYfloat;
+    SDL_GetMouseState(&mouseXfloat, &mouseYfloat);
+    last_mouse_x_ = static_cast<int>(mouseXfloat);
+    last_mouse_y_ = static_cast<int>(mouseYfloat);
 }
 
 void CameraControl::onMiddleButtonUp()
@@ -44,11 +39,10 @@ void CameraControl::onMiddleButtonUp()
     if (is_dragging_) 
     {
         is_dragging_ = false;
-        ReleaseCapture();
     }
 }
 
-void CameraControl::onMouseMove(WPARAM /*wParam*/, LPARAM /*lParam*/)
+void CameraControl::onMouseMove()
 {
     if (!overlay_ || !is_dragging_) return;
     ThreeDScene* scene = overlay_->getThreeDScene();
@@ -56,25 +50,26 @@ void CameraControl::onMouseMove(WPARAM /*wParam*/, LPARAM /*lParam*/)
     Camera* cam = scene->getActiveCamera();
     if (!cam || !cam->isSoftwareCamera()) return;
 
-    POINT current_pos;
-    GetCursorPos(&current_pos);
-    ScreenToClient(overlay_->getHandle(), &current_pos);
+    float mouseXfloat, mouseYfloat;
+    SDL_GetMouseState(&mouseXfloat, &mouseYfloat);
+    int current_x = static_cast<int>(mouseXfloat);
+    int current_y = static_cast<int>(mouseYfloat);
 
-    float deltaX = static_cast<float>(current_pos.x - last_mouse_pos_.x);
-    float deltaY = static_cast<float>(current_pos.y - last_mouse_pos_.y);
+    float deltaX = static_cast<float>(current_x - last_mouse_x_);
+    float deltaY = static_cast<float>(current_y - last_mouse_y_);
 
     if (deltaX != 0.0f || deltaY != 0.0f) {
-        bool shiftPressed = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+        bool shiftPressed = SDL_GetModState() & SDL_KMOD_SHIFT;
         if (!shiftPressed) {
             cam->prepareOrbit();
             cam->orbitAroundTarget(deltaX, deltaY);
         } else {
             cam->lateralMovement(deltaX, deltaY);
         }
-        InvalidateRect(overlay_->getHandle(), nullptr, FALSE);
     }
 
-    last_mouse_pos_ = current_pos;
+    last_mouse_x_ = current_x;
+    last_mouse_y_ = current_y;
 }
 
 void CameraControl::onZoom(int wheelDirection)
@@ -86,5 +81,4 @@ void CameraControl::onZoom(int wheelDirection)
     if (!cam || !cam->isSoftwareCamera()) return;
 
     cam->zoom(static_cast<float>(wheelDirection));
-    InvalidateRect(overlay_->getHandle(), nullptr, FALSE);
 }

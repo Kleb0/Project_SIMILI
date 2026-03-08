@@ -8,6 +8,7 @@
         "${workspaceFolder}/src",
         "${workspaceFolder}/src/UnitTest",
         "${workspaceFolder}/src/Engine",
+        "${workspaceFolder}/src/Engine/OpenGLScene",
         "${workspaceFolder}/src/Engine/ThreeDInteractions",
         "${workspaceFolder}/src/Engine/ThreeDModes",
         "${workspaceFolder}/src/Engine/ThreeDScene_DNA",

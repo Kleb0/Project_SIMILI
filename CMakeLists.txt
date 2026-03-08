@@ -88,6 +88,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/OpenGLScene
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDInteractions
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDModes
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/MeshEdit
@@ -182,15 +183,14 @@ list(APPEND SOURCES
 
 file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS src/*.hpp)
 
-# ImGui sources (including Win32 backend for OverlayViewport)
+# ImGui sources (including SDL3 backend for OverlayViewport)
 file(GLOB IMGUI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/imgui.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/imgui_draw.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/imgui_tables.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/imgui_widgets.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/backends/imgui_impl_glfw.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/backends/imgui_impl_sdl3.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/backends/imgui_impl_opengl3.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/backends/imgui_impl_win32.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/imgui_demo.cpp
 )
 
@@ -198,11 +198,14 @@ add_library(imgui STATIC
     ${IMGUI_SOURCES}
 )
 
-
-
 target_include_directories(imgui PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/backends
+    ${SDL3_INCLUDE_DIR}
+)
+
+target_link_libraries(imgui PRIVATE
+    ${SDL3_LIBRARY}
 )
 
 target_compile_definitions(imgui PRIVATE IMGUI_USER_CONFIG="my_imgui_config.h")
@@ -314,6 +317,7 @@ target_precompile_headers(${PROJECT_NAME} PRIVATE
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/OpenGLScene
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDInteractions
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDSceneDNA
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/SaveLoadSystem

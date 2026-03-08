@@ -7,6 +7,7 @@
 #include <string>
 #include <map>
 #include <mutex>
+#include <SDL3/SDL.h>
 
 class UIHandler;
 
@@ -33,7 +34,8 @@ public:
     // New methods for maximized state detection
     bool isWindowMaximized() const;
     void getMaximizedBorderOffsets(int& offsetX, int& offsetY, int& offsetWidth, int& offsetHeight) const;
-    HWND getWindowHandle() const { return window_hwnd_; }
+    SDL_Window* getSDLWindow() const { return sdl_window_; }
+    CefRefPtr<CefWindow> getCefWindow() const { return cef_window_; }
     
     void checkAndCaptureWindowStateChange();
     void setUIHandler(UIHandler* handler) { ui_handler_ = handler; }
@@ -44,12 +46,13 @@ public:
     std::map<std::string, IFrameData> getAllIFrames() const;
     void clearAllIFrames();
     
-    // Window movement detection
-    static LRESULT CALLBACK WindowSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
+    // Window state monitoring
+    void pollWindowEvents();
 
 private:
     CefRefPtr<CefBrowserView> browser_view_;
-    HWND window_hwnd_;
+    CefRefPtr<CefWindow> cef_window_;
+    SDL_Window* sdl_window_;
     UIHandler* ui_handler_;
     bool last_maximized_state_;
     int last_window_x_;

@@ -263,11 +263,6 @@ namespace SIMILI {
 						
 						handler->getOverlay()->setMultipleSelectedObjects(selectedList);
 						
-						HWND overlayHwnd = handler->getOverlay()->getHandle();
-						if (overlayHwnd) 
-						{
-							RedrawWindow(overlayHwnd, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOCHILDREN);
-						}
 						
 						std::cout << "[RoutesManager] " << selectedList.size() << " object(s) selected, gizmo render forced" << std::endl;
 					}
@@ -409,17 +404,11 @@ namespace SIMILI {
 							
 							windowDelegate->updateIFrameData(name, x, y, width, height, clientX, clientY);
 
-							if (handler && handler->getFrameDatas() && handler->getParentHWND())
-							{
-								handler->getFrameDatas()->updateFrameData(name, x, y, width, height, clientX, clientY, handler->getParentHWND());
-							}
-
+						if (handler && handler->getFrameDatas() && handler->getParentWindow())
+						{
+							handler->getFrameDatas()->updateFrameData(name, x, y, width, height, clientX, clientY, handler->getParentWindow());
 						}
 					}
-					
-					// Force immediate update of panel bounds in UIHandler
-					if (handler) 
-					{
 						handler->updatePanelBoundsFromStocker();
 						
 						// Request panel repositioning before capturing positions

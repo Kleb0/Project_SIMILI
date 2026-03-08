@@ -6,7 +6,7 @@ namespace SIMILI {
 
 		IFrameMouseDetector::IFrameMouseDetector()
 			: window_handle_(nullptr)
-			, window_rect_{}
+			, window_rect_{0, 0, 0, 0}
 			, panel_bounds_{}
 			, dpi_scale_(1.0f)
 			, is_maximized_(false)
@@ -15,9 +15,9 @@ namespace SIMILI {
 		{
 		}
 
-		void IFrameMouseDetector::setWindowHandle(HWND hwnd)
+		void IFrameMouseDetector::setWindowHandle(SDL_Window* sdlWindow)
 		{
-			window_handle_ = hwnd;
+			window_handle_ = sdlWindow;
 			updateWindowRect();
 			updateDpiScale();
 		}
@@ -83,7 +83,11 @@ namespace SIMILI {
 		{
 			if (window_handle_)
 			{
-				GetWindowRect(window_handle_, &window_rect_);
+				SDL_GetWindowPosition(window_handle_, &window_rect_.x, &window_rect_.y);
+				int w, h;
+				SDL_GetWindowSize(window_handle_, &w, &h);
+				window_rect_.w = w;
+				window_rect_.h = h;
 			}
 		}
 
@@ -95,12 +99,18 @@ namespace SIMILI {
 				return;
 			}
 
-			HDC hdc = GetDC(window_handle_);
-			if (hdc)
+			int displayIndex = SDL_GetDisplayForWindow(window_handle_);
+			if (displayIndex >= 0)
 			{
-				int dpiX = GetDeviceCaps(hdc, LOGPIXELSX);
-				dpi_scale_ = dpiX / 96.0f;
-				ReleaseDC(window_handle_, hdc);
+				float ddpi = SDL_GetDisplayContentScale(displayIndex);
+				if (ddpi > 0.0f)
+				{
+					dpi_scale_ = ddpi;
+				}
+				else
+				{
+					dpi_scale_ = 1.0f;
+				}
 			}
 			else
 			{
@@ -120,14 +130,18 @@ namespace SIMILI {
 				return false;
 			}
 			
-			RECT rect = window_rect_;
+			SDL_Rect rect = window_rect_;
 			if (window_handle_)
 			{
-				GetWindowRect(window_handle_, &rect);
+				SDL_GetWindowPosition(window_handle_, &rect.x, &rect.y);
+				int w, h;
+				SDL_GetWindowSize(window_handle_, &w, &h);
+				rect.w = w;
+				rect.h = h;
 			}
 			
-			return screenX >= rect.left && screenX < rect.right &&
-				screenY >= rect.top && screenY < rect.bottom;
+			return screenX >= rect.x && screenX < (rect.x + rect.w) &&
+				screenY >= rect.y && screenY < (rect.y + rect.h);
 		}
 
 		bool IFrameMouseDetector::isMouseOnViewport(int screenX, int screenY) const
@@ -161,11 +175,11 @@ namespace SIMILI {
 				return;
 			}
 			
-			POINT pt = { screenX, screenY };
-			ScreenToClient(window_handle_, &pt);
+			int wx, wy;
+			SDL_GetWindowPosition(window_handle_, &wx, &wy);
 				
-			clientX = static_cast<int>(pt.x / dpi_scale_);
-			clientY = static_cast<int>(pt.y / dpi_scale_);
+			clientX = static_cast<int>((screenX - wx) / dpi_scale_);
+			clientY = static_cast<int>((screenY - wy) / dpi_scale_);
 		}
 
 		void IFrameMouseDetector::getRelativePosition(int screenX, int screenY, int& relativeX, int& relativeY) const

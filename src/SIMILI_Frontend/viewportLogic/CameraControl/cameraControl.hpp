@@ -1,6 +1,6 @@
 #pragma once
 
-#include <windows.h>
+#include <SDL3/SDL.h>
 
 class OverlayViewport;
 
@@ -9,14 +9,15 @@ public:
     explicit CameraControl(OverlayViewport* overlay);
     ~CameraControl();
 
-    void onMouseWheel(WPARAM wParam);
+    void onMouseWheel(float wheel);
     void onMiddleButtonDown();
     void onMiddleButtonUp();
-    void onMouseMove(WPARAM wParam, LPARAM lParam);
+    void onMouseMove();
     void onZoom(int wheelDirection);
 
 private:
     OverlayViewport* overlay_;
     bool is_dragging_;
-    POINT last_mouse_pos_;
+    int last_mouse_x_;
+    int last_mouse_y_;
 };

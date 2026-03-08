@@ -1,6 +1,6 @@
 #include <fstream>
 #include "Engine/ThreeDScene_DNA/ThreeDScene_DNA.hpp"
-#include "Engine/ThreeDScene.hpp"
+#include "Engine/OpenGLScene/ThreeDScene.hpp"
 #include "WorldObjects/Entities/ThreeDObject.hpp"
 #include <algorithm>
 #include <iostream>

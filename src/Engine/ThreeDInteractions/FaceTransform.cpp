@@ -3,8 +3,8 @@
 #include "WorldObjects/Basic/Vertice.hpp"
 #include "WorldObjects/Entities/ThreeDObject.hpp"
 #include "WorldObjects/Mesh/Mesh.hpp" 
-#include "Engine/OpenGLContext.hpp"
-#include "Engine/ThreeDScene.hpp"
+#include "Engine/OpenGLScene/OpenGLContext.hpp"
+#include "Engine/OpenGLScene/ThreeDScene.hpp"
 #include "Engine/Guizmo.hpp"
 #include "SIMILI_Frontend/viewportLogic/Keymanagement/KeyManager.hpp"
 

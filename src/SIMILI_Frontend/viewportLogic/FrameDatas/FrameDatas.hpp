@@ -1,6 +1,6 @@
 #pragma once
 
-#include <windows.h>
+#include <SDL3/SDL.h>
 #include <string>
 #include <map>
 
@@ -39,7 +39,7 @@ namespace SIMILI {
 			FrameDatas(SimpleWindowDelegate* windowDelegate);
 			~FrameDatas() = default;
 
-			void captureAllFrames(HWND cefWindowHandle);
+			void captureAllFrames(SDL_Window* sdlWindow);
 			
 			const std::map<std::string, IFrameScreenData>& getFrameData() const { return frameDataMap_; }
 			
@@ -47,12 +47,12 @@ namespace SIMILI {
 			
 			void printAllFrameData() const;
 			
-			void updateFrameData(const std::string& name, int relativeX, int relativeY, int width, int height, int clientX, int clientY, HWND cefWindowHandle);
+			void updateFrameData(const std::string& name, int relativeX, int relativeY, int width, int height, int clientX, int clientY, SDL_Window* sdlWindow);
 
 		private:
-			float getDPIScale(HWND hwnd) const;
+			float getDPIScale(SDL_Window* sdlWindow) const;
 			
-			void captureWindowData(HWND hwnd, IFrameScreenData& data);
+			void captureWindowData(SDL_Window* sdlWindow, IFrameScreenData& data);
 			
 			std::map<std::string, IFrameScreenData> frameDataMap_;
 			SimpleWindowDelegate* windowDelegate_;

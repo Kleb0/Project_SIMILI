@@ -5,7 +5,7 @@
 #include "WorldObjects/Basic/Quad.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
 #include "WorldObjects/Mesh_DNA/Mesh_DNA.hpp"
-#include "Engine/ThreeDScene.hpp"
+#include "Engine/OpenGLScene/ThreeDScene.hpp"
 #include <vector>
 #include <unordered_set>
 #include <imgui.h>

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <windows.h>
+#include <SDL3/SDL.h>
 #include <string>
 #include <map>
 
@@ -64,7 +64,7 @@ namespace SIMILI
 				IFrameMouseDetector();
 				~IFrameMouseDetector() = default;
 				
-				void setWindowHandle(HWND hwnd);
+				void setWindowHandle(SDL_Window* sdlWindow);
 				void updatePanelBounds(const PanelBounds& bounds);
 				
 				// Update panel bounds from FrameDatas map
@@ -81,8 +81,8 @@ namespace SIMILI
 				const PanelBounds& getPanelBounds() const { return panel_bounds_; }
 
 			private:
-				HWND window_handle_;
-				RECT window_rect_;
+				SDL_Window* window_handle_;
+				SDL_Rect window_rect_;
 				PanelBounds panel_bounds_;
 				float dpi_scale_;
 				

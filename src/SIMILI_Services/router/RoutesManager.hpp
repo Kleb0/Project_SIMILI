@@ -1,8 +1,8 @@
 #pragma once
 
 #include "RouterSim.hpp"
-#include "../../Engine/OpenGLContext.hpp"
-#include "../../Engine/ThreeDScene.hpp"
+#include "../../Engine/OpenGLScene/OpenGLContext.hpp"
+#include "../../Engine/OpenGLScene/ThreeDScene.hpp"
 #include "../../SIMILI_Frontend/ui_handler.hpp"
 
 struct GLFWwindow;

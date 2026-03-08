@@ -1,6 +1,6 @@
 #include "Engine/ThreeDInteractions/VerticeTransform.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
-#include "Engine/ThreeDScene.hpp"
+#include "Engine/OpenGLScene/ThreeDScene.hpp"
 #include "Engine/Guizmo.hpp"
 #include "SIMILI_Frontend/viewportLogic/Keymanagement/KeyManager.hpp"
 

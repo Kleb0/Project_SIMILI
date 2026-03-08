@@ -1,7 +1,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "Engine/ThreeDInteractions/MeshTransform.hpp"
-#include "Engine/OpenGLContext.hpp"
-#include "Engine/ThreeDScene.hpp"
+#include "Engine/OpenGLScene/OpenGLContext.hpp"
+#include "Engine/OpenGLScene/ThreeDScene.hpp"
 #include "Engine/ThreeDScene_DNA/ThreeDScene_DNA.hpp"
 #include "Engine/Guizmo.hpp"
 #include "WorldObjects/Mesh/Mesh.hpp" 

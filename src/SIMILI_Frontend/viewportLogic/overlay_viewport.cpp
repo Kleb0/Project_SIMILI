@@ -4,7 +4,7 @@
 // ImGui MUST be included BEFORE ImGuizmo
 #include <imgui.h>
 #include <imgui_impl_opengl3.h>
-#include <imgui_impl_win32.h>
+#include <imgui_impl_sdl3.h>
 #include <ImGuizmo.h>
 
 #include <glm/glm.hpp>
@@ -19,8 +19,8 @@
 #include "HTMLTextureRenderer/HtmlTextureRenderer.hpp"
 #include "ClickHandling/OverlayClickHandler.hpp"
 
-#include "../../Engine/ThreeDScene.hpp"
-#include "../../Engine/OpenGLContext.hpp"
+#include "../../Engine/OpenGLScene/ThreeDScene.hpp"
+#include "../../Engine/OpenGLScene/OpenGLContext.hpp"
 #include "../../Engine/ThreeDObjectSelector.hpp"
 #include "../../Engine/ThreeDInteractions/MeshTransform.hpp"
 #include "../../Engine/Guizmo.hpp"
@@ -44,34 +44,13 @@
 #include "Keymanagement/MouseControlToOverlay.hpp"
 #include "FrameDatas/FrameDatas.hpp"
 #include "../ui_handler.hpp"
-
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
-#include <commctrl.h> 
-#include <windowsx.h> 
-#pragma comment(lib, "comctl32.lib")
-
-#ifndef WGL_CONTEXT_MAJOR_VERSION_ARB
-#define WGL_CONTEXT_MAJOR_VERSION_ARB 0x2091
-#define WGL_CONTEXT_MINOR_VERSION_ARB 0x2092
-#define WGL_CONTEXT_PROFILE_MASK_ARB 0x9126
-#define WGL_CONTEXT_CORE_PROFILE_BIT_ARB 0x00000001
-#endif
-
-typedef HGLRC (WINAPI * PFNWGLCREATECONTEXTATTRIBSARBPROC)(HDC hDC, HGLRC hShareContext, const int *attribList);
-
-namespace 
-{
-	const wchar_t* kOverlayClassName = L"SIMILI_OpenGL_Overlay";
-}
 // ============================================================================
 // LIFECYCLE MANAGEMENT
 // ============================================================================
 
 
-OverlayViewport::OverlayViewport() : hwnd_(nullptr) 
-	, parent_(nullptr)
-	, hdc_(nullptr)
+OverlayViewport::OverlayViewport() : sdl_window_(nullptr) 
+	, parent_window_(nullptr)
 	, gl_context_(nullptr)
 	, width_(800)
 	, height_(600)
@@ -170,69 +149,35 @@ OverlayViewport::~OverlayViewport()
 // WINDOW CREATION & MANAGEMENT
 // ============================================================================
 
-bool OverlayViewport::create(HWND parent, int x, int y, int width, int height) 
+bool OverlayViewport::create(SDL_Window* parent, int x, int y, int width, int height) 
 {
-	parent_ = parent;
+	parent_window_ = parent;
 	width_ = width;
 	height_ = height;
 	
-	// Register window class
-	WNDCLASSEXW wc = {};
-	wc.cbSize = sizeof(WNDCLASSEX);
-	wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
-	wc.lpfnWndProc = WndProc;
-	wc.hInstance = GetModuleHandle(nullptr);
-	wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-	wc.hbrBackground = nullptr;
-	wc.lpszClassName = kOverlayClassName;
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 	
-	static bool class_registered = false;
-
-	if (!class_registered) 
-	{
-		if (!RegisterClassExW(&wc)) 
-		{
-			DWORD err = GetLastError();
-			return false;
-		}
-		class_registered = true;
-	}
+	SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 1);
 	
-	hwnd_ = CreateWindowExW(
-		0,  // No extended styles - standard child window
-		kOverlayClassName,
-		L"OpenGL Overlay",
-		WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,  // CHILD window that clips siblings
-		x, y, width, height,
-		parent,
-		nullptr,
-		GetModuleHandle(nullptr),
-		this
+	sdl_window_ = SDL_CreateWindow(
+		"OpenGL Overlay",
+		width, height,
+		SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN
 	);
 	
-	if (!hwnd_) 
+	if (!sdl_window_) 
 	{
-		DWORD error = GetLastError();
-		std::cerr << "[OverlayViewport] Failed to create window, error: " << error << std::endl;
+		std::cerr << "[OverlayViewport] Failed to create SDL window: " << SDL_GetError() << std::endl;
 		return false;
 	}
 	
-	// Set as top within parent's child windows (NOT TOPMOST to avoid always-on-top behavior)
-	// Using HWND_TOP keeps it above siblings without making it globally topmost
-	SetWindowPos(hwnd_, HWND_TOP, 0, 0, 0, 0, 
-				 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+	SDL_SetWindowPosition(sdl_window_, x, y);
 	
-	// Ensure we don't have TOPMOST extended style
-	DWORD exStyle = GetWindowLongW(hwnd_, GWL_EXSTYLE);
-
-	if (exStyle & WS_EX_TOPMOST) 
-	{
-		SetWindowLongW(hwnd_, GWL_EXSTYLE, exStyle & ~WS_EX_TOPMOST);
-		std::cout << "[OverlayViewport] Removed WS_EX_TOPMOST flag" << std::endl;
-	}
-	
-	std::cout << "[OverlayViewport] Created as CHILD window with Z-order control (NOT always-on-top)" << std::endl;
-		
 	if (!click_handler_) 
 	{
 		std::cerr << "[OverlayViewport] WARNING: Click handler not initialized!" << std::endl;
@@ -242,14 +187,13 @@ bool OverlayViewport::create(HWND parent, int x, int y, int width, int height)
 		std::cout << "[OverlayViewport] Click handler ready" << std::endl;
 	}
 	
-	// Get GLFW context from current thread to share resources
-	HGLRC glfwContext = wglGetCurrentContext();
-	if (glfwContext) 
+	SDL_GLContext currentContext = SDL_GL_GetCurrentContext();
+	if (currentContext) 
 	{
-		std::cout << "[OverlayViewport] Sharing GLFW context: " << glfwContext << std::endl;
+		std::cout << "[OverlayViewport] Sharing current GL context" << std::endl;
 	}
 	
-	initializeOpenGL(glfwContext);		
+	initializeOpenGL(currentContext);		
 	return true;
 }
 
@@ -257,95 +201,33 @@ void OverlayViewport::destroy()
 {
 	std::cout << "[OverlayViewport] Destroying overlay viewport..." << std::endl;
 	
-	
 	shutdownImGui();
 	
 	if (gl_context_) {
-		wglMakeCurrent(nullptr, nullptr);
-		wglDeleteContext(gl_context_);
+		SDL_GL_DestroyContext(gl_context_);
 		gl_context_ = nullptr;
 	}
 	
-	if (hdc_) 
-	{
-		ReleaseDC(hwnd_, hdc_);
-		hdc_ = nullptr;
-	}
-	
-	if (hwnd_) {
-		DestroyWindow(hwnd_);
-		hwnd_ = nullptr;
+	if (sdl_window_) {
+		SDL_DestroyWindow(sdl_window_);
+		sdl_window_ = nullptr;
 	}
 }
 
-void OverlayViewport::initializeOpenGL(HGLRC shareContext) 
+void OverlayViewport::initializeOpenGL(SDL_GLContext shareContext) 
 {
-	hdc_ = GetDC(hwnd_);
+	gl_context_ = SDL_GL_CreateContext(sdl_window_);
 	
-	PIXELFORMATDESCRIPTOR pfd = {};
-	pfd.nSize = sizeof(PIXELFORMATDESCRIPTOR);
-	pfd.nVersion = 1;
-	pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
-	pfd.iPixelType = PFD_TYPE_RGBA;
-	pfd.cColorBits = 32;
-	pfd.cDepthBits = 24;
-	pfd.cStencilBits = 8;
-	pfd.iLayerType = PFD_MAIN_PLANE;
-	
-	int pixelFormat = ChoosePixelFormat(hdc_, &pfd);
-	if (!pixelFormat) {
-		std::cerr << "[OverlayViewport] Failed to choose pixel format" << std::endl;
+	if (!gl_context_)
+	{
+		std::cerr << "[OverlayViewport] Failed to create OpenGL context: " << SDL_GetError() << std::endl;
 		return;
 	}
 	
-	if (!SetPixelFormat(hdc_, pixelFormat, &pfd)) {
-		std::cerr << "[OverlayViewport] Failed to set pixel format" << std::endl;
+	if (SDL_GL_MakeCurrent(sdl_window_, gl_context_) != 0)
+	{
+		std::cerr << "[OverlayViewport] Failed to make context current: " << SDL_GetError() << std::endl;
 		return;
-	}
-	
-	HGLRC tempContext = wglCreateContext(hdc_);
-	if (!tempContext) 
-	{
-		std::cerr << "[OverlayViewport] Failed to create temporary OpenGL context" << std::endl;
-		return;
-	}
-	
-	wglMakeCurrent(hdc_, tempContext);
-	
-	PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = 
-		(PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
-	
-	if (wglCreateContextAttribsARB) 
-	{
-		int attribs[] = {
-			WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
-			WGL_CONTEXT_MINOR_VERSION_ARB, 3,
-			WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
-			0
-		};
-		
-		std::cout << "[OverlayViewport] Attempting to create shared context with GLFW context: " << shareContext << std::endl;
-		
-		// CRITICAL: Share with GLFW context to access VAO/VBO/Shaders!
-		gl_context_ = wglCreateContextAttribsARB(hdc_, shareContext, attribs);
-		if (gl_context_) 
-		{
-			wglMakeCurrent(nullptr, nullptr);
-			wglDeleteContext(tempContext);
-			wglMakeCurrent(hdc_, gl_context_);			
-
-		} 
-		else
-		{
-			DWORD err = GetLastError();
-			std::cerr << "[OverlayViewport] Failed to create shared OpenGL 3.3 context (error: " << err << "), using compatibility context" << std::endl;
-			gl_context_ = tempContext;
-		}
-	} 
-	else 
-	{
-		std::cout << "[OverlayViewport] wglCreateContextAttribsARB not available, using compatibility context" << std::endl;
-		gl_context_ = tempContext;
 	}
 	
 	static bool glad_loaded = false;
@@ -360,7 +242,7 @@ void OverlayViewport::initializeOpenGL(HGLRC shareContext)
 		glad_loaded = true;
 	}
 	
-	std::cout << "[OverlayViewport] Shared OpenGL context created - " 
+	std::cout << "[OverlayViewport] OpenGL context created - " 
 			  << glGetString(GL_VERSION) << " - " << glGetString(GL_RENDERER) << std::endl;
 	
 	glEnable(GL_DEPTH_TEST);
@@ -383,7 +265,6 @@ void OverlayViewport::initializeOpenGL(HGLRC shareContext)
 	html_texture_renderer_->setRenderRect(html_texture_x_, html_texture_y_, 
 		html_texture_width_, html_texture_height_);
 	html_texture_renderer_->createBrowser("file:///ui/Mode_UI.html", html_texture_width_, html_texture_height_);
-	html_texture_renderer_->setViewportWindow(hwnd_);
 }
 
 void OverlayViewport::initializeImGui() 
@@ -400,10 +281,9 @@ void OverlayViewport::initializeImGui()
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad; 
 
 	ImGui::StyleColorsDark();
-	ImGui_ImplWin32_Init(hwnd_);
+	ImGui_ImplSDL3_InitForOpenGL(sdl_window_, gl_context_);
 	ImGui_ImplOpenGL3_Init("#version 460");
 	
-	// Initialize ImGuizmo
 	ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
 	
 	imgui_initialized_ = true;
@@ -416,7 +296,7 @@ void OverlayViewport::shutdownImGui()
 	}
 		
 	ImGui_ImplOpenGL3_Shutdown();
-	ImGui_ImplWin32_Shutdown();
+	ImGui_ImplSDL3_Shutdown();
 	ImGui::DestroyContext();
 	
 	imgui_initialized_ = false;
@@ -427,22 +307,18 @@ void OverlayViewport::shutdownImGui()
 // ============================================================================
 
 void OverlayViewport::makeContextCurrent() {
-	if (hdc_ && gl_context_) {
-		BOOL result = wglMakeCurrent(hdc_, gl_context_);
-		if (!result) {
-			DWORD error = GetLastError();
-			std::cerr << "[OverlayViewport::makeContextCurrent] FAILED! Error code: " << error << std::endl;
-			std::cerr << "[OverlayViewport::makeContextCurrent] HDC: " << hdc_ << ", Context: " << gl_context_ << std::endl;
+	if (sdl_window_ && gl_context_) {
+		int result = SDL_GL_MakeCurrent(sdl_window_, gl_context_);
+		if (result != 0) {
+			std::cerr << "[OverlayViewport::makeContextCurrent] FAILED! Error: " << SDL_GetError() << std::endl;
 		}
-		// Success log removed to reduce console spam
 	} else {
-		std::cerr << "[OverlayViewport::makeContextCurrent] ERROR: Invalid HDC or GL context!" << std::endl;
-		std::cerr << "[OverlayViewport::makeContextCurrent] HDC: " << hdc_ << ", Context: " << gl_context_ << std::endl;
+		std::cerr << "[OverlayViewport::makeContextCurrent] ERROR: Invalid SDL_Window or GL context!" << std::endl;
 	}
 }
 
 void OverlayViewport::releaseContext() {
-	wglMakeCurrent(nullptr, nullptr);
+	SDL_GL_MakeCurrent(nullptr, nullptr);
 }
 
 // ============================================================================
@@ -452,7 +328,7 @@ void OverlayViewport::releaseContext() {
 void OverlayViewport::reinitializeMeshComponents(Mesh* mesh)
 {
 	if (!mesh) 
-{
+	{
 		std::cerr << "[OverlayViewport] ERROR: Cannot reinitialize null mesh" << std::endl;
 		return;
 	}
@@ -497,7 +373,7 @@ void OverlayViewport::update_Scene_Rendering()
 
 void OverlayViewport::render() 
 {
-	if (!hwnd_ || !rendering_enabled_) 
+	if (!sdl_window_ || !rendering_enabled_) 
 	{
 		return;
 	}
@@ -521,7 +397,7 @@ void OverlayViewport::render()
 		}
 		
 		ImGui_ImplOpenGL3_NewFrame();
-		ImGui_ImplWin32_NewFrame();
+		ImGui_ImplSDL3_NewFrame();
 		ImGui::NewFrame();
 		ImGuizmo::BeginFrame();
 		
@@ -566,7 +442,7 @@ void OverlayViewport::render()
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 	}
 	
-	SwapBuffers(hdc_);
+	SDL_GL_SwapWindow(sdl_window_);
 }
 
 void OverlayViewport::updateViewportDimensions(int width, int height)
@@ -631,12 +507,10 @@ void OverlayViewport::renderScene()
 
 void OverlayViewport::setPosition(int x, int y, int width, int height) 
 {
-	if (hwnd_ && parent_) 
+	if (sdl_window_) 
 	{
-		// Use client coordinates since we're a CHILD window
-		// HWND_TOP keeps it above siblings without global topmost
-		SetWindowPos(hwnd_, HWND_TOP, x, y, width, height, 
-					 SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_NOZORDER);
+		SDL_SetWindowPosition(sdl_window_, x, y);
+		SDL_SetWindowSize(sdl_window_, width, height);
 		
 		width_ = width;
 		height_ = height;
@@ -661,16 +535,23 @@ void OverlayViewport::setPosition(int x, int y, int width, int height)
 
 void OverlayViewport::show(bool visible) 
 {
-	if (hwnd_) 
+	if (sdl_window_) 
 	{
-		ShowWindow(hwnd_, visible ? SW_SHOW : SW_HIDE);
+		if (visible)
+		{
+			SDL_ShowWindow(sdl_window_);
+		}
+		else
+		{
+			SDL_HideWindow(sdl_window_);
+		}
 	}
 }
 
 bool OverlayViewport::isVisible() const
 {
-	if (hwnd_) {
-		return IsWindowVisible(hwnd_) != 0;
+	if (sdl_window_) {
+		return (SDL_GetWindowFlags(sdl_window_) & SDL_WINDOW_HIDDEN) == 0;
 	}
 	return false;
 }
@@ -686,127 +567,75 @@ void OverlayViewport::injectMouseInputs(int mouseX, int mouseY, bool leftDown, b
 	has_injected_inputs_ = true;
 }
 
+// ============================================================================
+// SDL3 EVENT HANDLING
+// ============================================================================
 
-LRESULT CALLBACK OverlayViewport::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
+void OverlayViewport::handleEvents()
 {
-	OverlayViewport* overlay = nullptr;
+	Uint32 windowID = SDL_GetWindowID(sdl_window_);
 	
-	if (msg == WM_CREATE) 
+	SDL_Event event;
+	while (SDL_PollEvent(&event))
 	{
-		CREATESTRUCT* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
-		overlay = static_cast<OverlayViewport*>(cs->lpCreateParams);
-		SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(overlay));
-	} 
-	else 
-	{
-		overlay = reinterpret_cast<OverlayViewport*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
-	}
-	
-	ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
-	
-	bool shouldProcessEvent = true;
-	if (msg == WM_LBUTTONDOWN || msg == WM_LBUTTONUP) 
-	{
-		if (ImGuizmo::IsUsing()) 
+		bool isEventForThisWindow = false;
+		
+		if (event.type >= SDL_EVENT_WINDOW_FIRST && event.type <= SDL_EVENT_WINDOW_LAST)
 		{
-			shouldProcessEvent = false;
+			isEventForThisWindow = (event.window.windowID == windowID);
 		}
-	}
-	
-	if (overlay) 
-	{
-		switch (msg) 
+		else if (event.type >= SDL_EVENT_KEY_DOWN && event.type <= SDL_EVENT_KEY_UP)
 		{
-			case WM_PAINT: 
-			{
-				PAINTSTRUCT ps;
-				BeginPaint(hwnd, &ps);
-				EndPaint(hwnd, &ps);
-				return 0;
-			}
+			isEventForThisWindow = true;
+		}
+		else if (event.type >= SDL_EVENT_MOUSE_MOTION && event.type <= SDL_EVENT_MOUSE_WHEEL)
+		{
+			isEventForThisWindow = true;
+		}
+		
+		if (isEventForThisWindow)
+		{
+			ImGui_ImplSDL3_ProcessEvent(&event);
+		}
+		
+		if (event.type == SDL_EVENT_WINDOW_RESIZED && event.window.windowID == windowID)
+		{
+			int newWidth = event.window.data1;
+			int newHeight = event.window.data2;
 			
-			case WM_SIZE:
+			if (newWidth > 0 && newHeight > 0)
 			{
-				// Handle overlay viewport size changes
-				int newWidth = LOWORD(lParam);
-				int newHeight = HIWORD(lParam);
+				width_ = newWidth;
+				height_ = newHeight;
 				
-				if (newWidth > 0 && newHeight > 0) {
-					// Update internal dimensions IMMEDIATELY
-					overlay->width_ = newWidth;
-					overlay->height_ = newHeight;
-					
-					if (overlay->gl_context_) 
+				if (gl_context_)
+				{
+					SDL_GLContext prevContext = SDL_GL_GetCurrentContext();
+					SDL_Window* prevWindow = SDL_GL_GetCurrentWindow();
+					SDL_GL_MakeCurrent(sdl_window_, gl_context_);
+					glViewport(0, 0, newWidth, newHeight);
+					if (prevContext && prevWindow)
 					{
-						HGLRC prevContext = wglGetCurrentContext();
-						HDC prevDC = wglGetCurrentDC();
-						wglMakeCurrent(overlay->hdc_, overlay->gl_context_);
-						glViewport(0, 0, newWidth, newHeight);
-						if (prevContext && prevDC) {
-							wglMakeCurrent(prevDC, prevContext);
-						}
-					}
-				
-					if (overlay->html_texture_renderer_) 
-					{
-						overlay->html_texture_renderer_->resize(newWidth, newHeight);
+						SDL_GL_MakeCurrent(prevWindow, prevContext);
 					}
 				}
-				return 0;
-			}
-			
-			case WM_ERASEBKGND:
-				return 1;
-			
-			case WM_WINDOWPOSCHANGING:
-			{
-				// Intercept window position changes to prevent unwanted Z-order modifications
-				WINDOWPOS* wp = reinterpret_cast<WINDOWPOS*>(lParam);
 				
-				// If someone tries to set us as TOPMOST, prevent it
-				if (wp->hwndInsertAfter == HWND_TOPMOST) 
+				if (html_texture_renderer_)
 				{
-					wp->hwndInsertAfter = HWND_TOP;
-					std::cout << "[OverlayViewport] Prevented TOPMOST positioning" << std::endl;
+					html_texture_renderer_->resize(newWidth, newHeight);
 				}
-				break;
 			}
-			
-			case WM_ACTIVATE:
-			{
-				break;
-			}
-			
-			case WM_NCHITTEST:
-			{
-				return HTTRANSPARENT;
-			}
-			
-			// ------ MODE SWITCHING -----
-			
-			case WM_KEYDOWN:
-			case WM_KEYUP:
-			case WM_SYSKEYDOWN:
-			case WM_SYSKEYUP:
-			case WM_CHAR:
-			{
-				ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
-				
-				if (msg == WM_KEYDOWN)
-				{
-					SIMILI::Input::KeyManager::getInstance().handleKeyDown(static_cast<int>(wParam), lParam);
-				}
-				else if (msg == WM_KEYUP)
-				{
-					SIMILI::Input::KeyManager::getInstance().handleKeyUp(static_cast<int>(wParam));
-				}
-				return 0;
-			}		
-
+		}
+		
+		if (event.type == SDL_EVENT_KEY_DOWN)
+		{
+			SIMILI::Input::KeyManager::getInstance().handleKeyDown(static_cast<int>(event.key.key), 0);
+		}
+		else if (event.type == SDL_EVENT_KEY_UP)
+		{
+			SIMILI::Input::KeyManager::getInstance().handleKeyUp(static_cast<int>(event.key.key));
 		}
 	}
-	
-	return DefWindowProc(hwnd, msg, wParam, lParam);
 }
 
 // ============================================================================
@@ -964,7 +793,7 @@ void OverlayViewport::MoveCameraLaterally(int deltaX, int deltaY)
 	float dy = static_cast<float>(deltaY) * sensitivity;
 	
 	cam->lateralMovement(dx, dy);
-	InvalidateRect(hwnd_, nullptr, FALSE);
+	// No need to manually invalidate with SDL3 - continuous render loop handles updates
 }
 
 void OverlayViewport::ProcessWheelInput(int wheelDirection)
@@ -991,14 +820,14 @@ void OverlayViewport::ProcessCameraOrbiting(int deltaX, int deltaY)
 	
 	cam->prepareOrbit();
 	cam->orbitAroundTarget(static_cast<float>(deltaX), static_cast<float>(deltaY));
-	InvalidateRect(hwnd_, nullptr, FALSE);
+	// No need to manually invalidate with SDL3 - continuous render loop handles updates
 }
 
 // ---------- Raycast process ------------- //
 
 void OverlayViewport::shootRaycastFromUIHandler(int mouseX, int mouseY)
 {
-	if (!three_d_scene_ || !selector_ || !hwnd_)
+	if (!three_d_scene_ || !selector_ || !sdl_window_)
 	{
 		return;
 	}
@@ -1009,14 +838,12 @@ void OverlayViewport::shootRaycastFromUIHandler(int mouseX, int mouseY)
 		return;
 	}
 	
-	POINT screenPos = {mouseX, mouseY};
-	POINT clientPos = screenPos;
-	
-	if (ScreenToClient(hwnd_, &clientPos))
-	{
-		int localMouseX = clientPos.x;
-		int localMouseY = clientPos.y;
+		int wx, wy;
+		SDL_GetWindowPosition(sdl_window_, &wx, &wy);
 		
+		int localMouseX = mouseX - wx;
+		int localMouseY = mouseY - wy;
+			
 		float dpiScale = cam->getDpiScale();
 		int resolutionWidth = cam->getResolutionWidth();
 		int resolutionHeight = cam->getResolutionHeight();
@@ -1106,5 +933,4 @@ void OverlayViewport::shootRaycastFromUIHandler(int mouseX, int mouseY)
 			}
 		
 		}
-	}
 }

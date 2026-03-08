@@ -6,19 +6,9 @@
 #include <thread>
 #include <chrono>
 #include <random>
-#include <windowsx.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-
-#ifndef WGL_CONTEXT_MAJOR_VERSION_ARB
-#define WGL_CONTEXT_MAJOR_VERSION_ARB 0x2091
-#define WGL_CONTEXT_MINOR_VERSION_ARB 0x2092
-#define WGL_CONTEXT_PROFILE_MASK_ARB 0x9126
-#define WGL_CONTEXT_CORE_PROFILE_BIT_ARB 0x00000001
-#endif
-
-typedef HGLRC (WINAPI * PFNWGLCREATECONTEXTATTRIBSARBPROC)(HDC hDC, HGLRC hShareContext, const int *attribList);
 
 namespace {
 	std::string generateRandomAlphanumericID(size_t length) 
@@ -76,9 +66,8 @@ void main()
 Overlay_HTML_Texture_Renderer::Overlay_HTML_Texture_Renderer(const std::string& htmlUrl)
 	: instance_id_(generateRandomAlphanumericID(16))
 	, html_url_(htmlUrl)
-	, hwnd_(nullptr)
-	, parent_(nullptr)
-	, hdc_(nullptr)
+	, sdl_window_(nullptr)
+	, parent_window_(nullptr)
 	, gl_context_(nullptr)
 	, width_(100)
 	, height_(100)
@@ -138,73 +127,41 @@ Overlay_HTML_Texture_Renderer::~Overlay_HTML_Texture_Renderer()
 	destroy();
 }
 
-void Overlay_HTML_Texture_Renderer::create(HWND parent, int x, int y, int width, int height, HGLRC shareContext)
+void Overlay_HTML_Texture_Renderer::create(SDL_Window* parent, int x, int y, int width, int height, SDL_GLContext shareContext)
 {
-	parent_ = parent;
+	parent_window_ = parent;
 	base_width_ = width;
 	base_height_ = height;
 	width_ = static_cast<int>(width * scale_factor_);
 	height_ = static_cast<int>(height * scale_factor_);
 
-	std::wstring windowClassName = L"Overlay_HTML_Texture_Renderer_" + std::wstring(instance_id_.begin(), instance_id_.end());
-
-	WNDCLASSEXW wc = {};
-	wc.cbSize = sizeof(WNDCLASSEXW);
-	wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
-	wc.lpfnWndProc = WndProc;
-	wc.hInstance = GetModuleHandle(nullptr);
-	wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-	wc.lpszClassName = windowClassName.c_str();
-
-	RegisterClassExW(&wc);
-
-	hwnd_ = CreateWindowExW(
-		0,
-		windowClassName.c_str(),
-		L"Overlay HTML Texture",
-		WS_POPUP,
-		x, y, width, height,
-		use_direct_composition_ ? parent : nullptr,
-		nullptr,
-		GetModuleHandle(nullptr),
-		this
-	);
-
-	if (!hwnd_)
-	{
-		std::cerr << "[Overlay_HTML_Texture_Renderer] Failed to create window" << std::endl;
-		return;
-	}
-
-	if (!use_direct_composition_)
-	{
-		SetParent(hwnd_, parent);
-	}
-	
-	DWORD exStyle = GetWindowLong(hwnd_, GWL_EXSTYLE);
-	
+	// Create SDL3 child window for HTML rendering
+	SDL_WindowFlags flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN;
 	if (use_direct_composition_)
 	{
-		SetWindowLong(hwnd_, GWL_EXSTYLE, exStyle | WS_EX_NOREDIRECTIONBITMAP);
+		flags |= SDL_WINDOW_TRANSPARENT;
 	}
-	else
-	{
-		SetWindowLong(hwnd_, GWL_EXSTYLE, exStyle | WS_EX_LAYERED | WS_EX_TRANSPARENT);
-		SetLayeredWindowAttributes(hwnd_, RGB(0, 0, 0), 255, LWA_ALPHA);
-	}
-	
-	ShowWindow(hwnd_, SW_HIDE);
-	
-	std::cout << "[Overlay_HTML_Texture_Renderer][" << instance_id_ << "] Window created for URL: " << html_url_ << std::endl;
 
-	hdc_ = GetDC(hwnd_);
-	if (!hdc_)
+	sdl_window_ = SDL_CreateWindow(
+		("Overlay HTML Texture - " + instance_id_).c_str(),
+		width_, height_,
+		flags
+	);
+
+	if (!sdl_window_)
 	{
-		std::cerr << "[Overlay_HTML_Texture_Renderer] Failed to get DC" << std::endl;
-		DestroyWindow(hwnd_);
-		hwnd_ = nullptr;
+		std::cerr << "[Overlay_HTML_Texture_Renderer] Failed to create SDL window: " << SDL_GetError() << std::endl;
 		return;
 	}
+
+	// Set window as child of parent
+	if (parent)
+	{
+		SDL_SetWindowParent(sdl_window_, parent);
+		SDL_SetWindowPosition(sdl_window_, x, y);
+	}
+
+	std::cout << "[Overlay_HTML_Texture_Renderer][" << instance_id_ << "] Window created for URL: " << html_url_ << std::endl;
 
 	if (use_direct_composition_)
 	{
@@ -213,44 +170,23 @@ void Overlay_HTML_Texture_Renderer::create(HWND parent, int x, int y, int width,
 	}
 	else
 	{
-		PIXELFORMATDESCRIPTOR pfd = {};
-		pfd.nSize = sizeof(PIXELFORMATDESCRIPTOR);
-		pfd.nVersion = 1;
-		pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
-		pfd.iPixelType = PFD_TYPE_RGBA;
-		pfd.cColorBits = 32;
-		pfd.cDepthBits = 24;
-		pfd.cStencilBits = 8;
-		pfd.iLayerType = PFD_MAIN_PLANE;
-
-		int pixelFormat = ChoosePixelFormat(hdc_, &pfd);
-		if (!pixelFormat || !SetPixelFormat(hdc_, pixelFormat, &pfd))
-		{
-			std::cerr << "[Overlay_HTML_Texture_Renderer] Failed to set pixel format" << std::endl;
-			ReleaseDC(hwnd_, hdc_);
-			DestroyWindow(hwnd_);
-			hwnd_ = nullptr;
-			hdc_ = nullptr;
-			return;
-		}
-
-		HGLRC previousContext = wglGetCurrentContext();
-		HDC previousDC = wglGetCurrentDC();
+		// Initialize OpenGL context
+		SDL_GLContext prevContext = SDL_GL_GetCurrentContext();
+		SDL_Window* prevWindow = SDL_GL_GetCurrentWindow();
 
 		initializeOpenGL(shareContext);
 
 		if (!gl_context_)
 		{
 			std::cerr << "[Overlay_HTML_Texture_Renderer] Failed to initialize OpenGL context" << std::endl;
-			ReleaseDC(hwnd_, hdc_);
-			DestroyWindow(hwnd_);
-			hwnd_ = nullptr;
-			hdc_ = nullptr;
+			SDL_DestroyWindow(sdl_window_);
+			sdl_window_ = nullptr;
 			return;
 		}
 
-		wglMakeCurrent(hdc_, gl_context_);
+		SDL_GL_MakeCurrent(sdl_window_, gl_context_);
 
+		// Create texture for HTML content
 		texture_width_ = width_;
 		texture_height_ = height_;
 		glGenTextures(1, &texture_id_);
@@ -264,9 +200,10 @@ void Overlay_HTML_Texture_Renderer::create(HWND parent, int x, int y, int width,
 
 		createQuad();
 
-		if (previousContext && previousDC)
+		// Restore previous context
+		if (prevContext && prevWindow)
 		{
-			wglMakeCurrent(previousDC, previousContext);
+			SDL_GL_MakeCurrent(prevWindow, prevContext);
 		}
 	}
 
@@ -284,13 +221,14 @@ void Overlay_HTML_Texture_Renderer::destroy()
 	rendering_enabled_ = false;
 	html_browser_ready_ = false;
 	
-	if (hwnd_)
+	if (sdl_window_)
 	{
-		ShowWindow(hwnd_, SW_HIDE);
+		SDL_HideWindow(sdl_window_);
 	}
 
 	std::cout << "[Overlay_HTML_Texture_Renderer][" << instance_id_ << "] Destroying instance for URL: " << html_url_ << std::endl;
 
+	// Close CEF browser
 	if (browser_)
 	{
 		if (browser_->GetHost())
@@ -309,12 +247,13 @@ void Overlay_HTML_Texture_Renderer::destroy()
 		browser_ = nullptr;
 	}
 
+	// Clean up OpenGL resources
 	if (gl_context_)
 	{
-		HGLRC previousContext = wglGetCurrentContext();
-		HDC previousDC = wglGetCurrentDC();
+		SDL_GLContext prevContext = SDL_GL_GetCurrentContext();
+		SDL_Window* prevWindow = SDL_GL_GetCurrentWindow();
 		
-		wglMakeCurrent(hdc_, gl_context_);
+		SDL_GL_MakeCurrent(sdl_window_, gl_context_);
 
 		if (texture_id_ != 0)
 		{
@@ -338,14 +277,14 @@ void Overlay_HTML_Texture_Renderer::destroy()
 			shader_program_ = 0;
 		}
 
-		wglMakeCurrent(nullptr, nullptr);
-		wglDeleteContext(gl_context_);
-		gl_context_ = nullptr;
-		
-		if (previousContext && previousDC && previousContext != gl_context_)
+		// Restore previous context before deleting
+		if (prevContext && prevWindow)
 		{
-			wglMakeCurrent(previousDC, previousContext);
+			SDL_GL_MakeCurrent(prevWindow, prevContext);
 		}
+		
+		SDL_GL_DestroyContext(gl_context_);
+		gl_context_ = nullptr;
 	}
 
 	if (use_direct_composition_)
@@ -353,66 +292,48 @@ void Overlay_HTML_Texture_Renderer::destroy()
 		cleanupDirectComposition();
 	}
 
-	if (hdc_)
+	// Destroy SDL window
+	if (sdl_window_)
 	{
-		ReleaseDC(hwnd_, hdc_);
-		hdc_ = nullptr;
-	}
-
-	if (hwnd_)
-	{
-		DestroyWindow(hwnd_);
-		hwnd_ = nullptr;
+		SDL_DestroyWindow(sdl_window_);
+		sdl_window_ = nullptr;
 	}
 }
 
-void Overlay_HTML_Texture_Renderer::initializeOpenGL(HGLRC shareContext)
+void Overlay_HTML_Texture_Renderer::initializeOpenGL(SDL_GLContext shareContext)
 {
-	HGLRC tempContext = wglCreateContext(hdc_);
-	if (!tempContext)
+	// Set OpenGL attributes before creating context
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 6);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+	
+	if (shareContext)
 	{
-		std::cerr << "[Overlay_HTML_Texture_Renderer] Failed to create temp OpenGL context" << std::endl;
+		SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 1);
+		SDL_GL_MakeCurrent(SDL_GL_GetCurrentWindow(), shareContext);
+	}
+
+	// Create OpenGL context for this window
+	gl_context_ = SDL_GL_CreateContext(sdl_window_);
+	if (!gl_context_)
+	{
+		std::cerr << "[Overlay_HTML_Texture_Renderer] Failed to create OpenGL context: " << SDL_GetError() << std::endl;
 		return;
 	}
 
-	wglMakeCurrent(hdc_, tempContext);
+	SDL_GL_MakeCurrent(sdl_window_, gl_context_);
 
-	PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = 
-		(PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
-
-	if (wglCreateContextAttribsARB)
-	{
-		int attribs[] = {
-			WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
-			WGL_CONTEXT_MINOR_VERSION_ARB, 6,
-			WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
-			0
-		};
-
-		gl_context_ = wglCreateContextAttribsARB(hdc_, shareContext, attribs);
-
-		if (gl_context_)
-		{
-			wglMakeCurrent(nullptr, nullptr);
-			wglDeleteContext(tempContext);
-			wglMakeCurrent(hdc_, gl_context_);
-		}
-		else
-		{
-			gl_context_ = tempContext;
-		}
-	}
-	else
-	{
-		gl_context_ = tempContext;
-	}
-
-	if (!gladLoadGLLoader((GLADloadproc)wglGetProcAddress))
+	// Initialize GLAD
+	if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress))
 	{
 		std::cerr << "[Overlay_HTML_Texture_Renderer] Failed to initialize GLAD" << std::endl;
 		return;
 	}
 
+	// Enable blending for transparency
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
@@ -513,15 +434,15 @@ const RectList& dirtyRects, const void* buffer, int width, int height)
 		{
 			if (texture_id_ != 0)
 			{
-				HGLRC previousContext = wglGetCurrentContext();
-				HDC previousDC = wglGetCurrentDC();
+				SDL_GLContext previousContext = SDL_GL_GetCurrentContext();
+				SDL_Window* previousWindow = SDL_GL_GetCurrentWindow();
 				
-				wglMakeCurrent(hdc_, gl_context_);
+				SDL_GL_MakeCurrent(sdl_window_, gl_context_);
 				updateTexture(buffer, width, height);
 				
-				if (previousContext && previousDC)
+				if (previousContext && previousWindow)
 				{
-					wglMakeCurrent(previousDC, previousContext);
+					SDL_GL_MakeCurrent(previousWindow, previousContext);
 				}
 			}
 		}
@@ -549,12 +470,18 @@ void Overlay_HTML_Texture_Renderer::OnAfterCreated(CefRefPtr<CefBrowser> browser
 
 	html_browser_ready_ = true;
 	
-	if (hwnd_ && rendering_enabled_)
+	if (sdl_window_ && rendering_enabled_)
 	{
-		ShowWindow(hwnd_, SW_SHOW);
-		InvalidateRect(hwnd_, nullptr, TRUE);
-		UpdateWindow(hwnd_);
+		SDL_GLContext prevContext = SDL_GL_GetCurrentContext();
+		SDL_Window* prevWindow = SDL_GL_GetCurrentWindow();
+		
+		SDL_ShowWindow(sdl_window_);
 		std::cout << "[Overlay_HTML_Texture_Renderer] HTML content ready - showing window" << std::endl;
+		
+		if (prevContext && prevWindow)
+		{
+			SDL_GL_MakeCurrent(prevWindow, prevContext);
+		}
 	}
 }
 
@@ -593,30 +520,24 @@ void Overlay_HTML_Texture_Renderer::OnTitleChange(CefRefPtr<CefBrowser> browser,
 
 int Overlay_HTML_Texture_Renderer::getScreenX() const
 {
-	if (!hwnd_)
+	if (!sdl_window_)
 	{
 		return 0;
 	}
-	RECT windowRect;
-	if (GetWindowRect(hwnd_, &windowRect))
-	{
-		return windowRect.left;
-	}
-	return 0;
+	int x, y;
+	SDL_GetWindowPosition(sdl_window_, &x, &y);
+	return x;
 }
 
 int Overlay_HTML_Texture_Renderer::getScreenY() const
 {
-	if (!hwnd_)
+	if (!sdl_window_)
 	{
 		return 0;
 	}
-	RECT windowRect;
-	if (GetWindowRect(hwnd_, &windowRect))
-	{
-		return windowRect.top;
-	}
-	return 0;
+	int x, y;
+	SDL_GetWindowPosition(sdl_window_, &x, &y);
+	return y;
 }
 
 void Overlay_HTML_Texture_Renderer::render()
@@ -626,36 +547,35 @@ void Overlay_HTML_Texture_Renderer::render()
 		return;
 	}
 	
-	if (!hwnd_ || !rendering_enabled_)
+	if (!sdl_window_ || !rendering_enabled_)
 	{
 		return;
 	}
 	
 	if (browser_events_enabled_ && browser_)
 	{
-		POINT cursorPos;
-		if (GetCursorPos(&cursorPos))
+		float mouseX, mouseY;
+		SDL_GetGlobalMouseState(&mouseX, &mouseY);
+		
+		int windowX, windowY, windowW, windowH;
+		SDL_GetWindowPosition(sdl_window_, &windowX, &windowY);
+		SDL_GetWindowSize(sdl_window_, &windowW, &windowH);
+		
+		if (mouseX >= windowX && mouseX < windowX + windowW &&
+			mouseY >= windowY && mouseY < windowY + windowH)
 		{
-			RECT windowRect;
-			if (GetWindowRect(hwnd_, &windowRect))
+			int localX = static_cast<int>((mouseX - windowX) / scale_factor_);
+			int localY = static_cast<int>((mouseY - windowY) / scale_factor_);
+			
+			CefMouseEvent mouseEvent;
+			mouseEvent.x = localX;
+			mouseEvent.y = localY;
+			mouseEvent.modifiers = 0;
+			
+			CefRefPtr<CefBrowserHost> host = browser_->GetHost();
+			if (host)
 			{
-				if (cursorPos.x >= windowRect.left && cursorPos.x < windowRect.right &&
-					cursorPos.y >= windowRect.top && cursorPos.y < windowRect.bottom)
-				{
-					int localX = static_cast<int>((cursorPos.x - windowRect.left) / scale_factor_);
-					int localY = static_cast<int>((cursorPos.y - windowRect.top) / scale_factor_);
-					
-					CefMouseEvent mouseEvent;
-					mouseEvent.x = localX;
-					mouseEvent.y = localY;
-					mouseEvent.modifiers = 0;
-					
-					CefRefPtr<CefBrowserHost> host = browser_->GetHost();
-					if (host)
-					{
-						host->SendMouseMoveEvent(mouseEvent, false);
-					}
-				}
+				host->SendMouseMoveEvent(mouseEvent, false);
 			}
 		}
 	}
@@ -673,12 +593,19 @@ void Overlay_HTML_Texture_Renderer::render()
 	}
 	else
 	{
-		if (gl_context_ && hdc_)
+		if (gl_context_ && sdl_window_)
 		{
-			HGLRC previousContext = wglGetCurrentContext();
-			HDC previousDC = wglGetCurrentDC();
+			SDL_GLContext previousContext = SDL_GL_GetCurrentContext();
+			SDL_Window* previousWindow = SDL_GL_GetCurrentWindow();
 			
-			wglMakeCurrent(hdc_, gl_context_);
+			if (SDL_GL_MakeCurrent(sdl_window_, gl_context_) != 0)
+			{
+				if (previousContext && previousWindow)
+				{
+					SDL_GL_MakeCurrent(previousWindow, previousContext);
+				}
+				return;
+			}
 
 			glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -686,11 +613,11 @@ void Overlay_HTML_Texture_Renderer::render()
 
 			renderQuad();
 
-			SwapBuffers(hdc_);
+			SDL_GL_SwapWindow(sdl_window_);
 			
-			if (previousContext && previousDC)
+			if (previousContext && previousWindow)
 			{
-				wglMakeCurrent(previousDC, previousContext);
+				SDL_GL_MakeCurrent(previousWindow, previousContext);
 			}
 		}
 	}
@@ -738,19 +665,12 @@ void Overlay_HTML_Texture_Renderer::SetParentByName(const std::string& parentNam
 
 void Overlay_HTML_Texture_Renderer::UpdateParentData(int parentX, int parentY, int parentWidth, int parentHeight, float dpiScale)
 {
-	if (parent_)
+	if (parent_window_)
 	{
-		RECT parentRect;
-		if (GetWindowRect(parent_, &parentRect))
-		{
-			parent_x_ = parentRect.left + static_cast<int>(parentX * dpiScale);
-			parent_y_ = parentRect.top + static_cast<int>(parentY * dpiScale);
-		}
-		else
-		{
-			parent_x_ = static_cast<int>(parentX * dpiScale);
-			parent_y_ = static_cast<int>(parentY * dpiScale);
-		}
+		int parentPosX, parentPosY;
+		SDL_GetWindowPosition(parent_window_, &parentPosX, &parentPosY);
+		parent_x_ = parentPosX + static_cast<int>(parentX * dpiScale);
+		parent_y_ = parentPosY + static_cast<int>(parentY * dpiScale);
 	}
 	else
 	{
@@ -867,40 +787,39 @@ void Overlay_HTML_Texture_Renderer::RequestPanelPositionUpdate(PanelAnchorPositi
 
 void Overlay_HTML_Texture_Renderer::setPosition(int x, int y, int width, int height)
 {
-	if (hwnd_)
+	if (sdl_window_)
 	{
 		int finalX = x;
 		int finalY = y;
 		
-		if (use_direct_composition_ && parent_)
+		if (use_direct_composition_ && parent_window_)
 		{
-			RECT parentRect;
-			if (GetWindowRect(parent_, &parentRect))
-			{
-				int parentWidth = parentRect.right - parentRect.left;
-				int parentHeight = parentRect.bottom - parentRect.top;
-				
-				if (finalX < parentRect.left)
-					finalX = parentRect.left;
-				if (finalY < parentRect.top)
-					finalY = parentRect.top;
-				if (finalX + width > parentRect.right)
-					finalX = parentRect.right - width;
-				if (finalY + height > parentRect.bottom)
-					finalY = parentRect.bottom - height;
-			}
+			int parentX, parentY, parentWidth, parentHeight;
+			SDL_GetWindowPosition(parent_window_, &parentX, &parentY);
+			SDL_GetWindowSize(parent_window_, &parentWidth, &parentHeight);
+			
+			// Clamp position to parent bounds
+			if (finalX < parentX)
+				finalX = parentX;
+			if (finalY < parentY)
+				finalY = parentY;
+			if (finalX + width > parentX + parentWidth)
+				finalX = parentX + parentWidth - width;
+			if (finalY + height > parentY + parentHeight)
+				finalY = parentY + parentHeight - height;
 		}
 		
-		SetWindowPos(hwnd_, nullptr, finalX, finalY, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+		SDL_SetWindowPosition(sdl_window_, finalX, finalY);
+		SDL_SetWindowSize(sdl_window_, width, height);
 
 		if (width != width_ || height != height_)
 		{
 			width_ = width;
 			height_ = height;
 
-			if (gl_context_)
+			if (gl_context_ && sdl_window_)
 			{
-				wglMakeCurrent(hdc_, gl_context_);
+				SDL_GL_MakeCurrent(sdl_window_, gl_context_);
 				glViewport(0, 0, width_, height_);
 			}
 
@@ -944,10 +863,17 @@ void Overlay_HTML_Texture_Renderer::setPosition(int x, int y, int width, int hei
 						0,
 						nullptr
 					);
-					unsigned int nDPI = GetDpiForWindow(hwnd_);
-					bitmapProperties.dpiX = nDPI;
-					bitmapProperties.dpiY = nDPI;
-
+				// Get DPI using SDL3
+				float dpiScale = 1.0f;
+				if (sdl_window_)
+				{
+					SDL_DisplayID displayID = SDL_GetDisplayForWindow(sdl_window_);
+					if (displayID != 0)
+					{
+						dpiScale = SDL_GetDisplayContentScale(displayID);
+					}
+				}
+				unsigned int nDPI = static_cast<unsigned int>(96.0f * dpiScale);
 					IDXGISurface* pDXGISurface = nullptr;
 					hr = dxgi_swap_chain_->GetBuffer(0, __uuidof(IDXGISurface), (void**)&pDXGISurface);
 					if (SUCCEEDED(hr))
@@ -967,7 +893,7 @@ void Overlay_HTML_Texture_Renderer::setPosition(int x, int y, int width, int hei
 
 void Overlay_HTML_Texture_Renderer::show(bool visible)
 {
-	if (hwnd_)
+	if (sdl_window_)
 	{
 		// Only show window if HTML content is ready (avoid showing black background)
 		if (visible && !html_browser_ready_)
@@ -977,21 +903,22 @@ void Overlay_HTML_Texture_Renderer::show(bool visible)
 			return;
 		}
 		
-		ShowWindow(hwnd_, visible ? SW_SHOW : SW_HIDE);
-
 		if (visible)
 		{
-			InvalidateRect(hwnd_, nullptr, TRUE);
-			UpdateWindow(hwnd_);
+			SDL_ShowWindow(sdl_window_);
+		}
+		else
+		{
+			SDL_HideWindow(sdl_window_);
 		}
 	}
 }
 
 bool Overlay_HTML_Texture_Renderer::isVisible() const
 {
-	if (hwnd_)
+	if (sdl_window_)
 	{
-		return IsWindowVisible(hwnd_) != 0;
+		return (SDL_GetWindowFlags(sdl_window_) & SDL_WINDOW_HIDDEN) == 0;
 	}
 	return false;
 }
@@ -1000,10 +927,7 @@ void Overlay_HTML_Texture_Renderer::enableRendering(bool enable)
 {
 	rendering_enabled_ = enable;
 
-	if (enable && hwnd_)
-	{
-		InvalidateRect(hwnd_, nullptr, TRUE);
-	}
+	// SDL3 doesn't require manual invalidation like Win32
 }
 
 void Overlay_HTML_Texture_Renderer::updateHTMLTextureSize(int width, int height)
@@ -1114,116 +1038,42 @@ void Overlay_HTML_Texture_Renderer::updateTexture(const void* buffer, int width,
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-LRESULT CALLBACK Overlay_HTML_Texture_Renderer::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+void Overlay_HTML_Texture_Renderer::handleEvents()
 {
-	Overlay_HTML_Texture_Renderer* renderer = nullptr;
-
-	if (msg == WM_CREATE)
+	if (!sdl_window_)
 	{
-		CREATESTRUCT* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
-		renderer = static_cast<Overlay_HTML_Texture_Renderer*>(cs->lpCreateParams);
-		SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(renderer));
+		return;
 	}
-	else
-	{
-		renderer = reinterpret_cast<Overlay_HTML_Texture_Renderer*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
-	}
+	
+	Uint32 windowID = SDL_GetWindowID(sdl_window_);
+	
+	SDL_Event event;
 
-	if (renderer)
+	while (SDL_PollEvent(&event))
 	{
-		switch (msg)
+		if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == windowID)
 		{
-			case WM_PAINT:
-			{
-				PAINTSTRUCT ps;
-				BeginPaint(hwnd, &ps);
-				renderer->render();
-				EndPaint(hwnd, &ps);
-				return 0;
-			}
-
-			case WM_ERASEBKGND:
-				return 1;
-
-			case WM_CLOSE:
-				renderer->show(false);
-				return 0;
-
-			case WM_DESTROY:
-				return 0;
-
-			case WM_WINDOWPOSCHANGING:
-			{
-				if (renderer->use_direct_composition_ && renderer->parent_)
-				{
-					WINDOWPOS* pwp = reinterpret_cast<WINDOWPOS*>(lParam);
-					RECT parentRect;
-					if (GetWindowRect(renderer->parent_, &parentRect))
-					{
-						if (pwp->x < parentRect.left)
-							pwp->x = parentRect.left;
-						if (pwp->y < parentRect.top)
-							pwp->y = parentRect.top;
-						if (pwp->x + pwp->cx > parentRect.right)
-							pwp->x = parentRect.right - pwp->cx;
-						if (pwp->y + pwp->cy > parentRect.bottom)
-							pwp->y = parentRect.bottom - pwp->cy;
-					}
-				}
-				break;
-			}
+			SDL_HideWindow(sdl_window_);
+		}
+		else if (event.type == SDL_EVENT_WINDOW_RESIZED && event.window.windowID == windowID)
+		{
+			int newWidth = event.window.data1;
+			int newHeight = event.window.data2;
 			
-			case WM_LBUTTONDOWN:
-			case WM_LBUTTONUP:
-			case WM_RBUTTONDOWN:
-			case WM_RBUTTONUP:
-			case WM_MOUSEMOVE:
-			case WM_MOUSEWHEEL:
+			if (newWidth > 0 && newHeight > 0)
 			{
-				if (renderer->can_receive_inputs_ && renderer->browser_ && renderer->browser_->GetHost())
+				width_ = newWidth;
+				height_ = newHeight;
+				
+				if (browser_ && browser_->GetHost())
 				{
-					CefMouseEvent mouse_event;
-					mouse_event.x = static_cast<int>(GET_X_LPARAM(lParam) / renderer->scale_factor_);
-					mouse_event.y = static_cast<int>(GET_Y_LPARAM(lParam) / renderer->scale_factor_);
-
-					if (msg == WM_MOUSEWHEEL)
-					{
-						int delta = GET_WHEEL_DELTA_WPARAM(wParam);
-						renderer->browser_->GetHost()->SendMouseWheelEvent(mouse_event, 0, delta);
-					}
-					else
-					{
-						CefBrowserHost::MouseButtonType button_type = MBT_LEFT;
-						bool mouse_up = false;
-
-						if (msg == WM_LBUTTONDOWN || msg == WM_LBUTTONUP)
-						{
-							button_type = MBT_LEFT;
-							mouse_up = (msg == WM_LBUTTONUP);
-						}
-						else if (msg == WM_RBUTTONDOWN || msg == WM_RBUTTONUP)
-						{
-							button_type = MBT_RIGHT;
-							mouse_up = (msg == WM_RBUTTONUP);
-						}
-
-						if (msg == WM_MOUSEMOVE)
-						{
-							renderer->browser_->GetHost()->SendMouseMoveEvent(mouse_event, false);
-						}
-						else
-						{
-							renderer->browser_->GetHost()->SendMouseClickEvent(mouse_event, button_type, mouse_up, 1);
-						}
-					}
+					browser_->GetHost()->WasResized();
 				}
-				return 0;
 			}
 		}
 	}
-
-	return DefWindowProc(hwnd, msg, wParam, lParam);
 }
+
 void Overlay_HTML_Texture_Renderer::initializeDirectComposition()
 {
 	HRESULT hr = S_OK;
@@ -1287,6 +1137,7 @@ void Overlay_HTML_Texture_Renderer::initializeDirectComposition()
 		}
 	}
 }
+
 void Overlay_HTML_Texture_Renderer::createDirectCompositionResources()
 {
 	HRESULT hr = S_OK;
@@ -1332,7 +1183,17 @@ void Overlay_HTML_Texture_Renderer::createDirectCompositionResources()
 			0,
 			nullptr
 		);
-		unsigned int nDPI = GetDpiForWindow(hwnd_);
+		// Get DPI using SDL3
+		float dpiScale = 1.0f;
+		if (sdl_window_)
+		{
+			SDL_DisplayID displayID = SDL_GetDisplayForWindow(sdl_window_);
+			if (displayID != 0)
+			{
+				dpiScale = SDL_GetDisplayContentScale(displayID);
+			}
+		}
+		unsigned int nDPI = static_cast<unsigned int>(96.0f * dpiScale);
 		bitmapProperties.dpiX = nDPI;
 		bitmapProperties.dpiY = nDPI;
 
@@ -1355,20 +1216,18 @@ void Overlay_HTML_Texture_Renderer::createDirectCompositionResources()
 	if (SUCCEEDED(hr))
 	{
 		hr = DCompositionCreateDevice(dxgi_device_, __uuidof(IDCompositionDevice), (void**)&dcomp_device_);
-		if (SUCCEEDED(hr))
+		if (SUCCEEDED(hr) && dcomp_device_ && dxgi_swap_chain_)
 		{
-			hr = dcomp_device_->CreateTargetForHwnd(hwnd_, true, &dcomp_target_);
-			if (SUCCEEDED(hr))
+			IDCompositionVisual* pDCompositionVisual = nullptr;
+			hr = dcomp_device_->CreateVisual(&pDCompositionVisual);
+			if (SUCCEEDED(hr) && pDCompositionVisual)
 			{
-				IDCompositionVisual* pDCompositionVisual = nullptr;
-				hr = dcomp_device_->CreateVisual(&pDCompositionVisual);
+				hr = pDCompositionVisual->SetContent(dxgi_swap_chain_);
 				if (SUCCEEDED(hr))
 				{
-					hr = pDCompositionVisual->SetContent(dxgi_swap_chain_);
-					hr = dcomp_target_->SetRoot(pDCompositionVisual);
 					hr = dcomp_device_->Commit();
-					pDCompositionVisual->Release();
 				}
+				pDCompositionVisual->Release();
 			}
 		}
 	}
@@ -1478,14 +1337,8 @@ void Overlay_HTML_Texture_Renderer::EnableTransparency(float alpha)
 	transparency_enabled_ = true;
 	transparency_alpha_ = alpha;
 	
-	if (use_direct_composition_ && hwnd_)
-	{
-		DWORD exStyle = GetWindowLong(hwnd_, GWL_EXSTYLE);
-		exStyle &= ~WS_EX_LAYERED;
-		exStyle &= ~WS_EX_TRANSPARENT;
-		exStyle |= WS_EX_NOREDIRECTIONBITMAP;
-		SetWindowLong(hwnd_, GWL_EXSTYLE, exStyle);
-	}
+	// SDL3 window transparency is set via SDL_WINDOW_TRANSPARENT flag at creation
+	// Runtime transparency is handled through DirectComposition rendering
 }
 
 void Overlay_HTML_Texture_Renderer::FilterColor(int r, int g, int b)
@@ -1495,14 +1348,8 @@ void Overlay_HTML_Texture_Renderer::FilterColor(int r, int g, int b)
 	filter_g_ = g;
 	filter_b_ = b;
 	
-	if (use_direct_composition_ && hwnd_)
-	{
-		DWORD exStyle = GetWindowLong(hwnd_, GWL_EXSTYLE);
-		exStyle &= ~WS_EX_LAYERED;
-		exStyle &= ~WS_EX_TRANSPARENT;
-		exStyle |= WS_EX_NOREDIRECTIONBITMAP;
-		SetWindowLong(hwnd_, GWL_EXSTYLE, exStyle);
-	}
+	// SDL3 window properties are set via flags at creation
+	// Color filtering is handled through Direct2D rendering
 }
 
 void Overlay_HTML_Texture_Renderer::DisableColorFilter()
@@ -1527,12 +1374,11 @@ void Overlay_HTML_Texture_Renderer::changeScaleByValue(float scale)
 	
 	if (new_width != width_ || new_height != height_)
 	{
-		if (hwnd_)
+		if (sdl_window_)
 		{
-			RECT rect;
-			GetWindowRect(hwnd_, &rect);
-			int current_x = rect.left;
-			int current_y = rect.top;
+			// Get current window position
+			int current_x, current_y;
+			SDL_GetWindowPosition(sdl_window_, &current_x, &current_y);
 			
 			int offset_x = (width_ - new_width) / 2;
 			int offset_y = (height_ - new_height) / 2;

@@ -4,7 +4,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #endif
 
-#include <windows.h>
+#include <SDL3/SDL.h>
 #include <glad/glad.h>
 #include <string>
 #include <atomic>
@@ -36,7 +36,7 @@ public:
 	Overlay_HTML_Texture_Renderer(const std::string& htmlUrl);
 	~Overlay_HTML_Texture_Renderer();
 
-	void create(HWND parent, int x, int y, int width, int height, HGLRC shareContext = nullptr);
+	void create(SDL_Window* parent, int x, int y, int width, int height, SDL_GLContext shareContext = nullptr);
 	void destroy();
 
 	void enableDirectComposition(bool enable) { use_direct_composition_ = enable; }
@@ -73,12 +73,12 @@ public:
 
 	void updateHTMLTextureSize(int width, int height);
 
-	HWND getHandle() const { return hwnd_; }
+	SDL_Window* getHandle() const { return sdl_window_; }
 	int getWidth() const { return width_; }
 	int getHeight() const { return height_; }
 	int getScreenX() const;
 	int getScreenY() const;
-	bool isActive() const { return rendering_enabled_ && hwnd_ != nullptr; }
+	bool isActive() const { return rendering_enabled_ && sdl_window_ != nullptr; }
 
 	CefRefPtr<CefBrowser> getBrowser() { return browser_; }
 
@@ -125,14 +125,13 @@ public:
 	bool isBrowserClosed() const { return browser_closed_; }
 
 private:
-	static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
-	void initializeOpenGL(HGLRC shareContext = nullptr);
+	void initializeOpenGL(SDL_GLContext shareContext = nullptr);
 	void createQuad();
 	void renderQuad();
 	void createBrowser();
 	void injectScrollbarEliminationCSS();
 	void updateTexture(const void* buffer, int width, int height);
+	void handleEvents();
 	static std::string generateUniqueID();
 
 	void initializeDirectComposition();
@@ -144,10 +143,9 @@ private:
 	std::string instance_id_;
 	std::string html_url_;
 
-	HWND hwnd_;
-	HWND parent_;
-	HDC hdc_;
-	HGLRC gl_context_;
+	SDL_Window* sdl_window_;
+	SDL_Window* parent_window_;
+	SDL_GLContext gl_context_;
 
 	int width_;
 	int height_;
