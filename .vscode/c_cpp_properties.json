@@ -1,0 +1,58 @@
+{
+  "configurations": [
+    {
+      "name": "MSVC config",
+      "compilerPath": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.36.32532/bin/Hostx64/x64/cl.exe",
+      "intelliSenseMode": "windows-msvc-x64",
+         "includePath": [
+        "${workspaceFolder}/src",
+        "${workspaceFolder}/src/UnitTest",
+        "${workspaceFolder}/src/Engine",
+        "${workspaceFolder}/src/Engine/OpenGLScene",
+        "${workspaceFolder}/src/Engine/ThreeDInteractions",
+        "${workspaceFolder}/src/Engine/ThreeDModes",
+        "${workspaceFolder}/src/Engine/ThreeDScene_DNA",
+        "${workspaceFolder}/src/Engine/SaveLoadSystem",
+        "${workspaceFolder}/src/Engine/MeshEdit",
+        "${workspaceFolder}/src/Engine/ViewportLogic",
+        "${workspaceFolder}/src/SIMILI_Frontend/viewportLogic",
+        "${workspaceFolder}/src/SIMILI_Frontend/viewportLogic/viewportRendering",
+        "${workspaceFolder}/src/SIMILI_Frontend/viewportLogic/FrameDatas",
+        "${workspaceFolder}/src/Engine/PrimitivesCreation",
+        "${workspaceFolder}/src/Layout_Theme",
+        "${workspaceFolder}/src/WorldObjects",
+        "${workspaceFolder}/src/WorldObjects/Basic",
+        "${workspaceFolder}/src/WorldObjects/Camera",
+        "${workspaceFolder}/src/WorldObjects/Entities",
+        "${workspaceFolder}/src/WorldObjects/Mesh_DNA",
+        "${workspaceFolder}/src/Resources",
+        "${workspaceFolder}/src/ThirdParty",
+        "${workspaceFolder}/src/ThirdParty/imgui",
+        "${workspaceFolder}/src/ThirdParty/imgui/backends",
+        "${workspaceFolder}/src/ThirdParty/ImGuizmo",
+        "${workspaceFolder}/src/ThirdParty/glad/include",
+        "${workspaceFolder}/src/ThirdParty/glm",
+        "${workspaceFolder}/src/ThirdParty/GLFW/include",
+        "${workspaceFolder}/src/ThirdParty/CEF/cef_binary",
+        "${workspaceFolder}/src/Engine/VulkanScene",
+        "C:/SDL3/SDL3-devel-*/include",
+        "C:/VulkanSDK/*/Include",
+        "C:/vcpkg/installed/x64-windows-static/include",
+        "${workspaceFolder}/build_test/_deps/googletest-src/googletest/include",
+        "${workspaceFolder}/build_test/_deps/googletest-src/googlemock/include"
+      ],
+      "defines": [],
+      "cppStandard": "c++17",
+      "cStandard": "c11",
+      "compileCommands": "${workspaceFolder}/build/compile_commands.json",
+      "browse": {
+        "path": [
+          "${workspaceFolder}/src",
+          "${workspaceFolder}/src/ThirdParty"
+        ],
+        "limitSymbolsToIncludedHeaders": true
+      }
+    }
+  ],
+  "version": 4
+}

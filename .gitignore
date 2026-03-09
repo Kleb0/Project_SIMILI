@@ -43,9 +43,6 @@ imgui.ini
 !my_custom_ui.ini
 
 # IDE
-.vscode/
-!.vscode/tasks.json
-!.vscode/c_cpp_properties.json
 .idea/
 
 # OS
