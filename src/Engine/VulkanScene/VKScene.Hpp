@@ -1,0 +1,75 @@
+#pragma once
+
+#include <vector>
+#include <vulkan/vulkan.h>
+#include <glm/glm.hpp>
+#include <WorldObjects/Entities/ThreeDObject.hpp>
+#include <iostream>
+#include <list>
+#include <string>
+
+class VKContext;
+class Camera;
+class Vertice;
+class Edge;
+class Face;
+
+struct VKGraveyardEntry 
+{
+    ThreeDObject* object;
+    std::vector<Vertice*> vertices;
+    std::vector<Edge*> edges;
+    std::vector<Face*> faces;
+};
+
+class VKScene
+{
+public:
+    VKScene();
+    ~VKScene();
+
+    void setVKContext(VKContext* ctx) { vkctx = ctx; }
+    VKContext* getVKContext() const { return vkctx; }
+
+    glm::mat4 getViewMatrix() const;
+    glm::mat4 getProjectionMatrix() const;
+    glm::mat4 getViewProjMatrix() const;
+
+    void initialize();
+    void resize(int w, int h);
+    void render(int width, int height);
+
+    std::list<ThreeDObject*>& getObjectsRef() { return objects; }
+    void addObject(ThreeDObject* object);
+    bool removeObject(ThreeDObject* object);
+
+    void pushInGraveyard(ThreeDObject* obj);
+    const std::list<ThreeDObject*>& getGraveyard() const { return graveyard; }
+    const std::vector<VKGraveyardEntry>& getMeshGraveyard() const { return meshGraveyard; }
+
+    void setActiveCamera(Camera* cam);
+    Camera* getActiveCamera() const { return activeCamera; }
+
+    bool containsObject(const ThreeDObject* obj) const;
+
+    std::string getSceneID() const { return sceneID; }
+
+private:
+    glm::mat4 lastViewProj{1.0f};
+    std::list<ThreeDObject*> objects;
+    std::list<ThreeDObject*> graveyard;
+    std::vector<VKGraveyardEntry> meshGraveyard;
+
+    Camera* activeCamera{nullptr};
+    VKContext* vkctx{nullptr};
+
+    std::string sceneID;
+    std::string generateSceneID();
+
+    VkPipeline graphicsPipeline;
+    VkPipelineLayout pipelineLayout;
+    VkRenderPass renderPass;
+    VkBuffer gridVertexBuffer;
+    VkDeviceMemory gridVertexBufferMemory;
+    uint32_t gridVertexCount;
+};

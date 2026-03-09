@@ -15,6 +15,8 @@
 #include "SIMILI_Services/middleware/SimpleHttpServer.hpp"
 #include "Engine/OpenGLScene/OpenGLContext.hpp"
 #include "Engine/OpenGLScene/ThreeDScene.hpp"
+#include "Engine/VulkanScene/VKcontext.hpp"
+#include "Engine/VulkanScene/VKScene.Hpp"
 #include "WorldObjects/Camera/Camera.hpp"
 #include "WorldObjects/Mesh/Mesh.hpp"
 #include "Engine/PrimitivesCreation/CreatePrimitive.hpp"
@@ -132,6 +134,16 @@ int main(int argc, char* argv[])
 
 	OpenGLContext renderer;
 	std::cout << "[Main] OpenGL Context ID: " << renderer.getContextID() << std::endl;
+
+	VKContext vkRenderer;
+	vkRenderer.initialize();
+	std::cout << "[Main] Instance of Vulkan created successfully !" << std::endl;
+
+	VKScene myVKScene;
+	myVKScene.setVKContext(&vkRenderer);
+	myVKScene.initialize();
+	myVKScene.setActiveCamera(&mainCamera);
+	std::cout << "[Main] VKScene initialized with ID: " << myVKScene.getSceneID() << std::endl;
 
 	myThreeDScene.setOpenGLContext(&renderer);
 	myThreeDScene.initizalize();
