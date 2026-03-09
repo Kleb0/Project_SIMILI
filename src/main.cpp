@@ -33,6 +33,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <SDL3/SDL.h>
+#include <vulkan/vulkan.h>
 
 #ifdef _MSC_VER
 #pragma comment(linker, "/SUBSYSTEM:CONSOLE")
@@ -65,6 +66,7 @@ int main(int argc, char* argv[])
 	}
 
 	std::cout << "[Main] Starting SIMILI with CEF..." << std::endl;
+	std::cout << "[Main] Vulkan API version: " << VK_API_VERSION_1_0 << std::endl;
 
 	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
 	{

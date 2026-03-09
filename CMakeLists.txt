@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
 project("Project_SIMILI")
 add_definitions(-DUNICODE -D_UNICODE)
+add_definitions(-DWIN32_LEAN_AND_MEAN)
+add_definitions(-DNOMINMAX)
+add_definitions(-D_WIN32_WINNT=0x0A00)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -76,6 +79,31 @@ message(STATUS "SDL3 found: ${SDL3_ROOT_DIR}")
 message(STATUS "SDL3 include: ${SDL3_INCLUDE_DIR}")
 message(STATUS "SDL3 library: ${SDL3_LIBRARY}")
 
+set(VULKAN_SDK_BASE "C:/VulkanSDK")
+file(GLOB VULKAN_CANDIDATES "${VULKAN_SDK_BASE}/*")
+list(LENGTH VULKAN_CANDIDATES VULKAN_CANDIDATES_COUNT)
+
+if(VULKAN_CANDIDATES_COUNT EQUAL 0)
+	message(WARNING 
+		"Vulkan SDK not found in ${VULKAN_SDK_BASE}\n"
+		"Please run the 'Download Vulkan SDK' task to install it automatically."
+	)
+else()
+	list(GET VULKAN_CANDIDATES 0 VULKAN_SDK_DIR)
+	set(ENV{VULKAN_SDK} "${VULKAN_SDK_DIR}")
+	message(STATUS "Vulkan SDK hint: ${VULKAN_SDK_DIR}")
+endif()
+
+find_package(Vulkan REQUIRED)
+if(NOT Vulkan_FOUND)
+	message(FATAL_ERROR 
+		"Vulkan SDK not found. Please install Vulkan SDK from:\n"
+		"https://vulkan.lunarg.com/sdk/home\n"
+		"Or run the 'Download Vulkan SDK' task"
+	)
+endif()
+message(STATUS "Vulkan found: ${Vulkan_INCLUDE_DIRS}")
+message(STATUS "Vulkan library: ${Vulkan_LIBRARIES}")
 
 #then save save this file to create the build folder.
 #This project has been made and tested with VS code. So please use CTRL + Shift + P and choose : C/C++: Select Configuration
@@ -114,27 +142,26 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glad
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glm
     ${SDL3_INCLUDE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty
+	${Vulkan_INCLUDE_DIRS}
+	${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/VulkanScene
+	${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty
 )
 
-# Source files
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp)
 
-# Exclude LEGACY folders and _LEGACY files explicitly
 set(EXCLUDE_DIRS "LEGACY" "legacy" "UnitTest" "unitTest" "test" "tests" "Test")
 foreach(TMP_PATH ${SOURCES})
-    foreach(EXCLUDE_DIR ${EXCLUDE_DIRS})
-        string(FIND ${TMP_PATH} "/${EXCLUDE_DIR}/" EXCLUDE_DIR_FOUND)
-        if(NOT ${EXCLUDE_DIR_FOUND} EQUAL -1)
-            list(REMOVE_ITEM SOURCES ${TMP_PATH})
-            break()
-        endif()
-    endforeach()
-    # Also exclude _LEGACY suffix files
-    string(FIND ${TMP_PATH} "_LEGACY.cpp" LEGACY_SUFFIX_FOUND)
-    if(NOT ${LEGACY_SUFFIX_FOUND} EQUAL -1)
-        list(REMOVE_ITEM SOURCES ${TMP_PATH})
-    endif()
+	foreach(EXCLUDE_DIR ${EXCLUDE_DIRS})
+		string(FIND ${TMP_PATH} "/${EXCLUDE_DIR}/" EXCLUDE_DIR_FOUND)
+		if(NOT ${EXCLUDE_DIR_FOUND} EQUAL -1)
+			list(REMOVE_ITEM SOURCES ${TMP_PATH})
+			break()
+		endif()
+	endforeach()
+	string(FIND ${TMP_PATH} "_LEGACY.cpp" LEGACY_SUFFIX_FOUND)
+	if(NOT ${LEGACY_SUFFIX_FOUND} EQUAL -1)
+		list(REMOVE_ITEM SOURCES ${TMP_PATH})
+	endif()
 endforeach()
 
 list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/ImGuizmo/vcpkg-example/main.cpp")
@@ -302,22 +329,26 @@ else()
     )
 endif()
 
-# Unity builds for faster compilation (optional - can be disabled if causing issues)
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+	NOMINMAX
+	_WIN32_WINNT=0x0A00
+	UNICODE
+	_UNICODE
+	BOOST_USE_WINDOWS_H
+)
 set_target_properties(${PROJECT_NAME} PROPERTIES
-    UNITY_BUILD ON
-    UNITY_BUILD_BATCH_SIZE 16
+	UNITY_BUILD ON
+	UNITY_BUILD_BATCH_SIZE 16
 )
 
-# Precompiled Headers (PCH) for faster compilation
-# Only for C++ files, exclude C files like GLAD
 target_precompile_headers(${PROJECT_NAME} PRIVATE
-    "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/src/pch.hpp>"
+	"$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/src/pch.hpp>"
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/OpenGLScene
+	${CMAKE_CURRENT_SOURCE_DIR}/src
+	${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
+	${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/OpenGLScene    
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDInteractions
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDSceneDNA
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/SaveLoadSystem
@@ -356,9 +387,10 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/ContextualMenuLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/FrameDatas
     ${SDL3_INCLUDE_DIR}
-    ${Boost_INCLUDE_DIRS}
-    ${OPENSSL_INCLUDE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/tinyfiledialogs
+	${Vulkan_INCLUDE_DIRS}
+	${Boost_INCLUDE_DIRS}
+	${OPENSSL_INCLUDE_DIR}
+	${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/tinyfiledialogs
 )
 
 # Add CEF include directories if enabled
@@ -383,14 +415,15 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     imgui
     tinyfiledialogs
     ${SDL3_LIBRARY}
-    Boost::system
-    OpenSSL::SSL
-    OpenSSL::Crypto
-    ws2_32
-    crypt32
-    d3d11
-    d2d1
-    dcomp
+	${Vulkan_LIBRARIES}
+	Boost::system
+	OpenSSL::SSL
+	OpenSSL::Crypto
+	ws2_32
+	crypt32
+	d3d11
+	d2d1
+	dcomp
 )
 
 # Link CEF if enabled

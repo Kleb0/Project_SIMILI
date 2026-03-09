@@ -1,5 +1,11 @@
 #pragma once
 
+#include <stdio.h>
+
+#if defined(_MSC_VER)
+#define snprintf _snprintf
+#endif
+
 #include <string>
 #include <vector>
 #include <memory>
