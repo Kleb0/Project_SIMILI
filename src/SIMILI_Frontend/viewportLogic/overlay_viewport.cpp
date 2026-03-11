@@ -19,8 +19,8 @@
 #include "HTMLTextureRenderer/HtmlTextureRenderer.hpp"
 #include "ClickHandling/OverlayClickHandler.hpp"
 
-#include "../../Engine/OpenGLScene/ThreeDScene.hpp"
-#include "../../Engine/OpenGLScene/OpenGLContext.hpp"
+#include "../../Engine/VulkanScene/VKScene.Hpp"
+#include "../../Engine/VulkanScene/VKcontext.hpp"
 #include "../../Engine/ThreeDObjectSelector.hpp"
 #include "../../Engine/ThreeDInteractions/MeshTransform.hpp"
 #include "../../Engine/Guizmo.hpp"
@@ -54,7 +54,7 @@ OverlayViewport::OverlayViewport() : sdl_window_(nullptr)
 	, gl_context_(nullptr)
 	, width_(800)
 	, height_(600)
-	, three_d_scene_(nullptr)
+	, vk_scene_(nullptr)
 	, rendering_enabled_(true)
 	, imgui_initialized_(false)
 	, selector_(nullptr)
@@ -452,9 +452,9 @@ void OverlayViewport::updateViewportDimensions(int width, int height)
 		width_ = width;
 		height_ = height;
 		
-		if (three_d_scene_ && three_d_scene_->getOpenGLContext())
+		if (vk_scene_ && vk_scene_->getVKContext())
 		{
-			three_d_scene_->getOpenGLContext()->resize(width_, height_);
+			vk_scene_->getVKContext()->resize(width_, height_);
 		}
 	}
 }
@@ -467,7 +467,7 @@ void OverlayViewport::renderScene()
 	// CRITICAL: Ensure our OpenGL context is current before rendering
 	makeContextCurrent();
 	
-	if (three_d_scene_) 
+	if (vk_scene_) 
 	{
 		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -482,7 +482,7 @@ void OverlayViewport::renderScene()
 		glEnable(GL_DEPTH_TEST);
 		glDepthFunc(GL_LESS);
 		
-		three_d_scene_->render(width_, height_);
+		vk_scene_->render(width_, height_);
 		
 		if (should_debug) 
 		{
@@ -517,16 +517,16 @@ void OverlayViewport::setPosition(int x, int y, int width, int height)
 		
 		glViewport(0, 0, width, height);
 		
-		if (three_d_scene_ && three_d_scene_->getActiveCamera() && ui_handler_ && ui_handler_->getFrameDatas())
+		if (vk_scene_ && vk_scene_->getActiveCamera() && ui_handler_ && ui_handler_->getFrameDatas())
 		{
 			SIMILI::Frontend::IFrameScreenData viewportData;
 			if (ui_handler_->getFrameDatas()->getFrameData("viewport_docking", viewportData))
 			{
-				three_d_scene_->getActiveCamera()->setResolution(width, height, viewportData.dpiScale);
+				vk_scene_->getActiveCamera()->setResolution(width, height, viewportData.dpiScale);
 			}
 			else
 			{
-				three_d_scene_->getActiveCamera()->setResolution(width, height);
+				vk_scene_->getActiveCamera()->setResolution(width, height);
 			}
 		}	
 		
@@ -644,12 +644,12 @@ void OverlayViewport::handleEvents()
 
 void OverlayViewport::performRaycast(int mouseX, int mouseY) 
 {
-	if (!selector_ || !three_d_scene_)
+	if (!selector_ || !vk_scene_)
 	{
 		return;
 	}
 	
-	Camera* camera = three_d_scene_->getActiveCamera();
+	Camera* camera = vk_scene_->getActiveCamera();
 	if (!camera)
 	{
 		return;
@@ -659,7 +659,7 @@ void OverlayViewport::performRaycast(int mouseX, int mouseY)
 	glm::mat4 view = camera->getViewMatrix();
 	glm::mat4 projection = camera->getProjectionMatrix(aspect);
 	
-	auto& objects = three_d_scene_->getObjectsRef();
+	auto& objects = vk_scene_->getObjectsRef();
 	std::vector<ThreeDObject*> objectsVector(objects.begin(), objects.end());
 	
 	selector_->pickUpMesh(mouseX, mouseY, width_, height_, view, projection, objectsVector);
@@ -714,10 +714,10 @@ void OverlayViewport::switchModeByKey(int keyNumber)
 
 void OverlayViewport::ThreeDWorldInteractions()
 {
-	if (!three_d_scene_)
+	if (!vk_scene_)
 		return;
 	
-	Camera* camera = three_d_scene_->getActiveCamera();
+	Camera* camera = vk_scene_->getActiveCamera();
 	if (!camera)
 		return;
 	
@@ -731,7 +731,7 @@ void OverlayViewport::ThreeDWorldInteractions()
 	if (current_mode_ == normal_mode_)
 	{
 		MeshTransform::manipulateMesh(
-			three_d_scene_,
+			vk_scene_,
 			multiple_selected_objects_,
 			oglChildPos,
 			oglChildSize,
@@ -743,7 +743,7 @@ void OverlayViewport::ThreeDWorldInteractions()
 	else if (current_mode_ == vertice_mode_)
 	{
 		VerticeTransform::manipulateVertices(
-			three_d_scene_,
+			vk_scene_,
 			multiple_selected_vertices_,
 			oglChildPos,
 			oglChildSize,
@@ -755,7 +755,7 @@ void OverlayViewport::ThreeDWorldInteractions()
 	else if (current_mode_ == face_mode_)
 	{
 		FaceTransform::manipulateFaces(
-			three_d_scene_,
+			vk_scene_,
 			multiple_selected_faces_,
 			oglChildPos,
 			oglChildSize,
@@ -768,7 +768,7 @@ void OverlayViewport::ThreeDWorldInteractions()
 	else if (current_mode_ == edge_mode_)
 	{
 		EdgeTransform::manipulateEdges(
-			three_d_scene_,
+			vk_scene_,
 			multiple_selected_edges_,
 			oglChildPos,
 			oglChildSize,
@@ -783,8 +783,8 @@ void OverlayViewport::ThreeDWorldInteractions()
 
 void OverlayViewport::MoveCameraLaterally(int deltaX, int deltaY)
 {
-	if (!three_d_scene_) return;
-	Camera* cam = three_d_scene_->getActiveCamera();
+	if (!vk_scene_) return;
+	Camera* cam = vk_scene_->getActiveCamera();
 	if (!cam || !cam->isSoftwareCamera()) return;
 	
 	const float sensitivity = 1.0f;
@@ -814,8 +814,8 @@ void OverlayViewport::ProcessMouseMovementWhileLeftClicking(int deltaX, int delt
 
 void OverlayViewport::ProcessCameraOrbiting(int deltaX, int deltaY)
 {
-	if (!three_d_scene_) return;
-	Camera* cam = three_d_scene_->getActiveCamera();
+	if (!vk_scene_) return;
+	Camera* cam = vk_scene_->getActiveCamera();
 	if (!cam || !cam->isSoftwareCamera()) return;
 	
 	cam->prepareOrbit();
@@ -827,12 +827,12 @@ void OverlayViewport::ProcessCameraOrbiting(int deltaX, int deltaY)
 
 void OverlayViewport::shootRaycastFromUIHandler(int mouseX, int mouseY)
 {
-	if (!three_d_scene_ || !selector_ || !sdl_window_)
+	if (!vk_scene_ || !selector_ || !sdl_window_)
 	{
 		return;
 	}
 	
-	Camera* cam = three_d_scene_->getActiveCamera();
+	Camera* cam = vk_scene_->getActiveCamera();
 	if (!cam)
 	{
 		return;
@@ -852,16 +852,16 @@ void OverlayViewport::shootRaycastFromUIHandler(int mouseX, int mouseY)
 		float aspectRatio = static_cast<float>(resolutionWidth) / static_cast<float>(resolutionHeight);
 		glm::mat4 projection = cam->getProjectionMatrix(aspectRatio);
 		
-		auto& objects = three_d_scene_->getObjectsRef();
+		auto& objects = vk_scene_->getObjectsRef();
 		std::vector<ThreeDObject*> objectsVector(objects.begin(), objects.end());
 		
 		if (current_mode_ == normal_mode_)
 		{
 			selector_->pickUpMesh(localMouseX, localMouseY, resolutionWidth, resolutionHeight, view, projection, objectsVector);
 			
-			if (three_d_scene_ && selector_)
+			if (vk_scene_ && selector_)
 			{
-				auto& objects = three_d_scene_->getObjectsRef();
+				auto& objects = vk_scene_->getObjectsRef();
 				ThreeDObject* clickedObject = selector_->getSelectedObject();
 				
 				for (auto* obj : objects)

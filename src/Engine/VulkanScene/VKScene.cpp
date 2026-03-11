@@ -1,5 +1,6 @@
 #include "VKScene.Hpp"
 #include "VKcontext.hpp"
+#include "../SceneObjectContainer/SceneObjectContainer.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
@@ -37,7 +38,8 @@ VKScene::VKScene()
 	  renderPass(VK_NULL_HANDLE),
 	  gridVertexBuffer(VK_NULL_HANDLE),
 	  gridVertexBufferMemory(VK_NULL_HANDLE),
-	  gridVertexCount(0)
+	  gridVertexCount(0),
+	  objectContainer_(nullptr)
 {
 	sceneID = generateSceneID();
 	std::cout << "[VKScene] Created with ID: " << sceneID << std::endl;
@@ -96,6 +98,13 @@ void VKScene::setActiveCamera(Camera* cam)
 		return;
 	}
 	activeCamera = cam;
+	cam->set_Vulkan_Scene(this);
+}
+
+void VKScene::setSceneObjectContainer(SceneObjectContainer* container)
+{
+	objectContainer_ = container;
+	std::cout << "[VKScene] SceneObjectContainer set" << std::endl;
 }
 
 static inline void clearSelectionRecursive(ThreeDObject* o)
@@ -119,7 +128,18 @@ static inline void collectAllChildrenRecursive(ThreeDObject* obj, std::vector<Th
 
 bool VKScene::containsObject(const ThreeDObject* obj) const
 {
+	if (objectContainer_) {
+		return objectContainer_->containsObject(obj);
+	}
 	return std::find(objects.begin(), objects.end(), obj) != objects.end();
+}
+
+std::list<ThreeDObject*>& VKScene::getObjectsRef()
+{
+	if (objectContainer_) {
+		return objectContainer_->getObjectsRef();
+	}
+	return objects;
 }
 
 void VKScene::pushInGraveyard(ThreeDObject* obj)
@@ -131,13 +151,15 @@ void VKScene::pushInGraveyard(ThreeDObject* obj)
 	std::vector<ThreeDObject*> allChildren;
 	collectAllChildrenRecursive(obj, allChildren);
 	
+	std::list<ThreeDObject*>& objectsList = getObjectsRef();
+	
 	for (auto* child : allChildren)
 	{
-		erasePtr(objects, child);
+		erasePtr(objectsList, child);
 		graveyard.push_back(child);
 	}
 	
-	erasePtr(objects, obj);
+	erasePtr(objectsList, obj);
 	graveyard.push_back(obj);
 
 	if (auto* mesh = dynamic_cast<Mesh*>(obj))
@@ -199,7 +221,8 @@ void VKScene::render(int width, int height)
 	glm::mat4 proj = activeCamera->getProjectionMatrix(aspect);
 	glm::mat4 viewProj = proj * view;
 
-	for (auto* obj : objects) {
+	std::list<ThreeDObject*>& objectsList = getObjectsRef();
+	for (auto* obj : objectsList) {
 		obj->render(viewProj);
 	}
 }
@@ -208,7 +231,12 @@ void VKScene::addObject(ThreeDObject* object)
 {
 	if (!object) return;
 
-	objects.push_back(object);
+	if (objectContainer_) {
+		objectContainer_->addObject(object);
+	} else {
+		objects.push_back(object);
+	}
+	
 	std::cout << "[VKScene] Adding object: " << object->getName() << std::endl;
 
 	object->initialize();
@@ -220,8 +248,7 @@ bool VKScene::removeObject(ThreeDObject* object)
 		return false;
 	}
 
-	auto it = std::find(objects.begin(), objects.end(), object);
-	if (it == objects.end())
+	if (!containsObject(object))
 	{
 		return false;
 	}

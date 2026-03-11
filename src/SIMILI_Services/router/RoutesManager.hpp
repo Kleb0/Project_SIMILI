@@ -1,8 +1,8 @@
 #pragma once
 
 #include "RouterSim.hpp"
-#include "../../Engine/OpenGLScene/OpenGLContext.hpp"
-#include "../../Engine/OpenGLScene/ThreeDScene.hpp"
+#include "../../Engine/VulkanScene/VKcontext.hpp"
+#include "../../Engine/VulkanScene/VKScene.Hpp"
 #include "../../SIMILI_Frontend/ui_handler.hpp"
 
 struct GLFWwindow;
@@ -20,17 +20,17 @@ namespace SIMILI
 
 				void initializeRoutes(
 					RouterSim& router,
-					OpenGLContext& renderer,
-					ThreeDScene& scene,
+					VKContext& vkRenderer,
+					VKScene& scene,
 					CefRefPtr<UIHandler>& handler,
 					GLFWwindow* glfwWindow
 				);
 
 			private:
-				void registerContextRoutes(RouterSim& router, OpenGLContext& renderer);
-				void registerSceneRoutes(RouterSim& router, ThreeDScene& scene, OpenGLContext& renderer);
-				void registerObjectRoutes(RouterSim& router, ThreeDScene& scene, CefRefPtr<UIHandler>& handler, GLFWwindow* glfwWindow);
-				void registerIFrameRoutes(RouterSim& router, CefRefPtr<UIHandler>& handler);
+			void registerContextRoutes(RouterSim& router, VKContext& vkRenderer);
+			void registerSceneRoutes(RouterSim& router, VKScene& scene, VKContext& vkRenderer);
+			void registerObjectRoutes(RouterSim& router, VKScene& scene, CefRefPtr<UIHandler>& handler, GLFWwindow* glfwWindow);
+			void registerIFrameRoutes(RouterSim& router, CefRefPtr<UIHandler>& handler);
 		};
 
 	} 

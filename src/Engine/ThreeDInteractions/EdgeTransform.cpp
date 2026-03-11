@@ -4,7 +4,7 @@
 #include "WorldObjects/Basic/Vertice.hpp"
 #include "WorldObjects/Mesh/Mesh.hpp"
 
-#include "Engine/OpenGLScene/ThreeDScene.hpp"
+#include "Engine/VulkanScene/VKScene.Hpp"
 // #include "UI/ThreeDWindow/ThreeDWindow.hpp"
 #include "Engine/Guizmo.hpp"
 #include "Engine/MeshEdit/EdgeLoop.hpp"
@@ -33,7 +33,7 @@ namespace EdgeTransform
 		return true;
 	}
 
-	glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, ThreeDScene* scene,
+	glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, VKScene* scene,
 	const std::list<Edge*>& edges,const ImVec2& oglChildPos, const ImVec2& oglChildSize)
 	{
 		glm::mat4 view = scene->getViewMatrix();
@@ -43,7 +43,7 @@ namespace EdgeTransform
 		return model;
 	}
 
-	void manipulateEdges(ThreeDScene* scene, std::list<Edge*>& selectedEdges,
+	void manipulateEdges(VKScene* scene, std::list<Edge*>& selectedEdges,
 	const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, ThreeDWindow* threeDWindow,
 	const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
 	{
@@ -295,7 +295,7 @@ namespace EdgeTransform
 	}       
 
 
-	void EnableEdgeLoop(ThreeDScene* scene, std::list<Edge*>& selectedEdges, const ImVec2& oglChildPos, 
+	void EnableEdgeLoop(VKScene* scene, std::list<Edge*>& selectedEdges, const ImVec2& oglChildPos, 
 	const ImVec2& oglChildSize, ThreeDWindow* window)
 	{
 		static bool showEdgeLoop = false;

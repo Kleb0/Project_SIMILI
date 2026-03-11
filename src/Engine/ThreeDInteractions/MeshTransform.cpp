@@ -1,7 +1,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "Engine/ThreeDInteractions/MeshTransform.hpp"
-#include "Engine/OpenGLScene/OpenGLContext.hpp"
-#include "Engine/OpenGLScene/ThreeDScene.hpp"
+#include "Engine/VulkanScene/VKContext.hpp"
+#include "Engine/VulkanScene/VKScene.Hpp"
 #include "Engine/ThreeDScene_DNA/ThreeDScene_DNA.hpp"
 #include "Engine/Guizmo.hpp"
 #include "WorldObjects/Mesh/Mesh.hpp" 
@@ -39,7 +39,7 @@ namespace MeshTransform
 		}
 	}
 
-	void applyGizmoTransformation(ThreeDScene* scene, const glm::mat4& delta, const std::list<ThreeDObject*>& selectedObjects, ImGuizmo::OPERATION op)
+	void applyGizmoTransformation(VKScene* scene, const glm::mat4& delta, const std::list<ThreeDObject*>& selectedObjects, ImGuizmo::OPERATION op)
 	{
 		const float epsilon = 1e-5f;
 		const glm::mat4 I(1.0f);
@@ -95,7 +95,7 @@ namespace MeshTransform
 	}
 
 
-	glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, ThreeDScene* scene, const std::list<ThreeDObject*>& selectedObjects, 
+	glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, VKScene* scene, const std::list<ThreeDObject*>& selectedObjects, 
 	const ImVec2& oglChildPos, const ImVec2& oglChildSize)
 	{
 		glm::mat4 view = scene->getViewMatrix();
@@ -104,7 +104,7 @@ namespace MeshTransform
 		return Guizmo::renderGizmoForObject(selectedObjects, op, view, proj, oglChildPos, oglChildSize);
 	}
 
-	void MeshTransform::manipulateMesh(ThreeDScene* scene, const std::list<ThreeDObject*>& selectedObjects,
+	void MeshTransform::manipulateMesh(VKScene* scene, const std::list<ThreeDObject*>& selectedObjects,
 	const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame,
 	const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
 	{
@@ -208,7 +208,7 @@ namespace MeshTransform
 		wasUsingGizmoLastFrame = isUsing;
 	}
 
-	void MeshTransform::trackMeshTransformOnRelease(ThreeDScene* scene, const std::list<ThreeDObject*>& selectedObjects,
+	void MeshTransform::trackMeshTransformOnRelease(VKScene* scene, const std::list<ThreeDObject*>& selectedObjects,
 	const glm::mat4& totalDelta, ImGuizmo::OPERATION op)
 	{
 		const glm::mat4 I(1.0f);
@@ -238,10 +238,11 @@ namespace MeshTransform
 		for (ThreeDObject* obj : selectedObjects)
 		{
 			uint64_t transformID = 0;
-			if (scene && scene->getSceneDNA())
-			{
-				transformID = scene->getSceneDNA()->generateTransformID();
-			}
+			// TODO: VKScene doesn't have SceneDNA yet - add this functionality later
+			// if (scene && scene->getSceneDNA())
+			// {
+			// 	transformID = scene->getSceneDNA()->generateTransformID();
+			// }
 
 			if (auto* mesh = dynamic_cast<Mesh*>(obj))
 			{
@@ -255,12 +256,13 @@ namespace MeshTransform
 				}
 			}
 
-			if (scene && scene->getSceneDNA() && !obj->getParent())
-			{
-				glm::mat4 newTransform = obj->getModelMatrix();
-				glm::mat4 oldTransform = glm::inverse(totalDelta) * newTransform;
-				scene->getSceneDNA()->trackTransformChange(obj->getName(), obj, oldTransform, newTransform, transformID);
-			}
+			// TODO: VKScene doesn't have SceneDNA yet - add this functionality later
+			// if (scene && scene->getSceneDNA() && !obj->getParent())
+			// {
+			// 	glm::mat4 newTransform = obj->getModelMatrix();
+			// 	glm::mat4 oldTransform = glm::inverse(totalDelta) * newTransform;
+			// 	scene->getSceneDNA()->trackTransformChange(obj->getName(), obj, oldTransform, newTransform, transformID);
+			// }
 		}
 	}
 

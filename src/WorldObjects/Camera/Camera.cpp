@@ -1,4 +1,5 @@
 #include "WorldObjects/Camera/Camera.hpp"
+#include "Engine/VulkanScene/VKScene.Hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
 
@@ -108,4 +109,17 @@ void Camera::setResolution(int width, int height, float dpiScale)
     resolutionHeight_ = height;
     dpiScale_ = dpiScale;
     std::cout << "[Camera] Resolution updated: " << width << "x" << height << " (DPI Scale: " << dpiScale << ")" << std::endl;
+}
+
+void Camera::set_Vulkan_Scene(VKScene* scene)
+{
+    vulkanScene_ = scene;
+}
+
+void Camera::render_Vulkan_Scene()
+{
+    if (vulkanScene_)
+    {
+        vulkanScene_->render(resolutionWidth_, resolutionHeight_);
+    }
 }

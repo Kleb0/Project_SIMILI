@@ -13,6 +13,7 @@ class Camera;
 class Vertice;
 class Edge;
 class Face;
+class SceneObjectContainer;
 
 struct VKGraveyardEntry 
 {
@@ -39,9 +40,11 @@ public:
     void resize(int w, int h);
     void render(int width, int height);
 
-    std::list<ThreeDObject*>& getObjectsRef() { return objects; }
+    std::list<ThreeDObject*>& getObjectsRef();
     void addObject(ThreeDObject* object);
     bool removeObject(ThreeDObject* object);
+
+    void setSceneObjectContainer(SceneObjectContainer* container);
 
     void pushInGraveyard(ThreeDObject* obj);
     const std::list<ThreeDObject*>& getGraveyard() const { return graveyard; }
@@ -62,6 +65,7 @@ private:
 
     Camera* activeCamera{nullptr};
     VKContext* vkctx{nullptr};
+    SceneObjectContainer* objectContainer_{nullptr};
 
     std::string sceneID;
     std::string generateSceneID();

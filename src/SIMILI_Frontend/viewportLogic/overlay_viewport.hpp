@@ -16,7 +16,7 @@ namespace ImGuizmo
 	enum MODE;
 }
 
-class ThreeDScene;
+class VKScene;
 class ThreeDObject;
 class ThreeDObjectSelector;
 class Camera;
@@ -69,8 +69,8 @@ class OverlayViewport
 		SDL_GLContext getGLContext() const { return gl_context_; }
 		
 		// ----------- 3D Scene Management -----------
-		void setThreeDScene(ThreeDScene* scene) { three_d_scene_ = scene; }
-		ThreeDScene* getThreeDScene() const { return three_d_scene_; }
+		void setVKScene(VKScene* scene) { vk_scene_ = scene; }
+		VKScene* getVKScene() const { return vk_scene_; }
 		
 		// ----------- Raycast & Object Selection -----------
 		void performRaycast(int mouseX, int mouseY);
@@ -137,7 +137,7 @@ class OverlayViewport
 		bool imgui_initialized_;
 		
 		// ----------- 3D Scene -----------
-		ThreeDScene* three_d_scene_;
+		VKScene* vk_scene_;
 		UIHandler* ui_handler_ = nullptr;
 		
 		// ----------- Pending Meshes (Thread-Safe Queue) -----------

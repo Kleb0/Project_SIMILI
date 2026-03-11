@@ -3,7 +3,7 @@
 #include <ImGuizmo.h>
 
 class OverlayViewport;
-class ThreeDScene;
+class VKScene;
 
 class OverlayClickHandler {
 public:
@@ -12,5 +12,5 @@ public:
 
 private:
     OverlayViewport* viewport;
-    ThreeDScene* scene;
+    VKScene* scene;
 };

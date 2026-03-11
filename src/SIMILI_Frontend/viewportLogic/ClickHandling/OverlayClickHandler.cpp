@@ -1,6 +1,6 @@
 #include "OverlayClickHandler.hpp"
-#include "overlay_viewport.hpp"
-#include "../../../Engine/OpenGLScene/ThreeDScene.hpp"
+#include "../overlay_viewport.hpp"
+#include "../../../Engine/VulkanScene/VKScene.Hpp"
 #include "../../../WorldObjects/Mesh/Mesh.hpp"
 #include "../../../WorldObjects/Basic/Vertice.hpp"
 #include "../../../WorldObjects/Basic/Face.hpp"
@@ -49,10 +49,10 @@ static bool isShiftPressed()
 void OverlayClickHandler::handle() 
 {
 
-	scene = viewport->getThreeDScene();
+	scene = viewport->getVKScene();
 	if (!scene) 
 	{
-		std::cerr << "[OVERLAY CLICK HANDLER] Error: No ThreeDScene available" << std::endl;
+		std::cerr << "[OVERLAY CLICK HANDLER] Error: No VKScene available" << std::endl;
 		return;
 	}
 

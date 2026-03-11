@@ -5,7 +5,7 @@
 #include "WorldObjects/Basic/Quad.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
 #include "WorldObjects/Mesh_DNA/Mesh_DNA.hpp"
-#include "Engine/OpenGLScene/ThreeDScene.hpp"
+#include "Engine/VulkanScene/VKScene.Hpp"
 #include <vector>
 #include <unordered_set>
 #include <imgui.h>
@@ -13,7 +13,7 @@
 namespace MeshEdit 
 {
 	
-	std::vector<Edge*> FindLoop(Vertice* startVert, Edge* selectedEdge, Mesh* mesh, ThreeDScene* scene, const ImVec2& oglChildPos, const ImVec2& oglChildSize)		
+	std::vector<Edge*> FindLoop(Vertice* startVert, Edge* selectedEdge, Mesh* mesh, VKScene* scene, const ImVec2& oglChildPos, const ImVec2& oglChildSize)		
 	{
 
 		if(selectedEdge == nullptr)
@@ -390,7 +390,7 @@ namespace MeshEdit
 		return loop;
 	}
 
-	void CreatePerpendicularEdgeLoopGhost(const std::vector<Edge*>& directionA, const std::vector<Edge*>& directionB, ThreeDScene* scene, const ImVec2& oglChildPos, const ImVec2& oglChildSize)
+	void CreatePerpendicularEdgeLoopGhost(const std::vector<Edge*>& directionA, const std::vector<Edge*>& directionB, VKScene* scene, const ImVec2& oglChildPos, const ImVec2& oglChildSize)
 	{
 		if ((directionA.empty() && directionB.empty()) || !scene) return;
 		ImDrawList* drawList = ImGui::GetWindowDrawList();
@@ -571,7 +571,7 @@ namespace MeshEdit
 		createGhostVertices(directionA, directionB, scene, oglChildPos, oglChildSize);
 	}
 
-	void createGhostVertices(const std::vector<Edge*>& directionA, const std::vector<Edge*>& directionB, ThreeDScene* scene, const ImVec2& oglChildPos, const ImVec2& oglChildSize)
+	void createGhostVertices(const std::vector<Edge*>& directionA, const std::vector<Edge*>& directionB, VKScene* scene, const ImVec2& oglChildPos, const ImVec2& oglChildSize)
 	{
 		if ((directionA.empty() && directionB.empty()) || !scene) return;
 		ImDrawList* drawList = ImGui::GetWindowDrawList();

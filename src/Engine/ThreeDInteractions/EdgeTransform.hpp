@@ -4,19 +4,19 @@
 #include <imgui.h>
 #include <ImGuizmo.h>
 
-class ThreeDScene;
+class VKScene;
 class ThreeDWindow;
 class Edge;
 
 namespace EdgeTransform
 {
-   glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, ThreeDScene* scene,
+   glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, VKScene* scene,
    const std::list<Edge*>& edges, const ImVec2& oglChildPos, const ImVec2& oglChildSize);
 
-   void manipulateEdges(ThreeDScene* scene, std::list<Edge*>& selectedEdges,
+   void manipulateEdges(VKScene* scene, std::list<Edge*>& selectedEdges,
    const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, ThreeDWindow* threeDWindow,
    const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
 
-   void EnableEdgeLoop(ThreeDScene* scene, std::list<Edge*>& selectedEdges, const ImVec2& oglChildPos, const ImVec2& oglChildSize, ThreeDWindow* window);
+   void EnableEdgeLoop(VKScene* scene, std::list<Edge*>& selectedEdges, const ImVec2& oglChildPos, const ImVec2& oglChildSize, ThreeDWindow* window);
 
 }

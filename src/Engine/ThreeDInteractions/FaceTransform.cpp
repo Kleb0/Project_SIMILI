@@ -3,8 +3,8 @@
 #include "WorldObjects/Basic/Vertice.hpp"
 #include "WorldObjects/Entities/ThreeDObject.hpp"
 #include "WorldObjects/Mesh/Mesh.hpp" 
-#include "Engine/OpenGLScene/OpenGLContext.hpp"
-#include "Engine/OpenGLScene/ThreeDScene.hpp"
+#include "Engine/VulkanScene/VKContext.hpp"
+#include "Engine/VulkanScene/VKScene.Hpp"
 #include "Engine/Guizmo.hpp"
 #include "SIMILI_Frontend/viewportLogic/Keymanagement/KeyManager.hpp"
 
@@ -40,7 +40,7 @@ const std::list<Face*>& faces, const ImVec2& oglChildPos, const ImVec2& oglChild
     return Guizmo::renderGizmoForFaces(faces, op, view, proj, oglChildPos, oglChildSize);
 }
 
-void manipulateFaces(ThreeDScene* scene, std::list<Face*>& selectedFaces, const ImVec2& oglChildPos,
+void manipulateFaces(VKScene* scene, std::list<Face*>& selectedFaces, const ImVec2& oglChildPos,
 const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, bool bakeToVertices,
 const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
 {

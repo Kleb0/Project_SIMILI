@@ -3,6 +3,8 @@
 #include <string>
 #include "WorldObjects/Entities/ThreedObject.hpp"
 
+class VKScene;
+
 class Camera : public ThreeDObject
 {
 public:
@@ -41,6 +43,10 @@ public:
     int getResolutionHeight() const { return resolutionHeight_; }
     float getDpiScale() const { return dpiScale_; }
 
+    void set_Vulkan_Scene(VKScene* scene);
+    void render_Vulkan_Scene();
+    VKScene* getVulkanScene() const { return vulkanScene_; }
+
     float fov = 45.0f;
     float nearClip = 0.1f;
     float farClip = 100.0f;
@@ -55,4 +61,6 @@ private:
     int resolutionWidth_ = 800;
     int resolutionHeight_ = 600;
     float dpiScale_ = 1.0f;
+
+    VKScene* vulkanScene_ = nullptr;
 };

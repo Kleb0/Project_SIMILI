@@ -13,10 +13,9 @@
 #include "SIMILI_Services/router/RoutesManager.hpp"
 #include "SIMILI_Services/types/RouterTypes.hpp"
 #include "SIMILI_Services/middleware/SimpleHttpServer.hpp"
-#include "Engine/OpenGLScene/OpenGLContext.hpp"
-#include "Engine/OpenGLScene/ThreeDScene.hpp"
 #include "Engine/VulkanScene/VKcontext.hpp"
 #include "Engine/VulkanScene/VKScene.Hpp"
+#include "Engine/SceneObjectContainer/SceneObjectContainer.hpp"
 #include "WorldObjects/Camera/Camera.hpp"
 #include "WorldObjects/Mesh/Mesh.hpp"
 #include "Engine/PrimitivesCreation/CreatePrimitive.hpp"
@@ -112,19 +111,10 @@ int main(int argc, char* argv[])
 	std::cout << "[Main] OpenGL " << glGetString(GL_VERSION) << " initialized" << std::endl;
 	
 	std::cout << "[Main] Starting HTTP Server..." << std::endl;
-	try 
-	{
-		SIMILI::Server::SimpleHttpServer::getInstance().start(8080, 8443);
-		std::cout << "[Main] HTTP Server started on port 8080" << std::endl;
-	} 
-	catch (const std::exception& e) {
-		std::cerr << "[Main] ERROR starting HTTP Server: " << e.what() << std::endl;
-		glfwDestroyWindow(hidden_window);
-		glfwTerminate();
-		return -1;
-	}
 
-	ThreeDScene myThreeDScene;
+	SIMILI::Server::SimpleHttpServer::getInstance().start(8080, 8443);
+	std::cout << "[Main] HTTP Server started on port 8080" << std::endl;
+
 	Camera mainCamera;
 	mainCamera.setName("MainCamera");
 	mainCamera.initialize();
@@ -132,32 +122,24 @@ int main(int argc, char* argv[])
 	Mesh* cubeMesh1 = Primitives::CreateCubeMesh(1.0f, glm::vec3(0.0f, 0.0f, 0.0f), "Cube", true);
 	cubeMesh1->initialize();
 
-	OpenGLContext renderer;
-	std::cout << "[Main] OpenGL Context ID: " << renderer.getContextID() << std::endl;
-
 	VKContext vkRenderer;
 	vkRenderer.initialize();
-	std::cout << "[Main] Instance of Vulkan created successfully !" << std::endl;
+
+	SceneObjectContainer VKSceneObjectContainer;
 
 	VKScene myVKScene;
 	myVKScene.setVKContext(&vkRenderer);
+	myVKScene.setSceneObjectContainer(&VKSceneObjectContainer);
 	myVKScene.initialize();
-	myVKScene.setActiveCamera(&mainCamera);
+	myVKScene.setActiveCamera(&mainCamera);	
+	myVKScene.addObject(cubeMesh1);
+	myVKScene.addObject(&mainCamera);
+
 	std::cout << "[Main] VKScene initialized with ID: " << myVKScene.getSceneID() << std::endl;
 
-	myThreeDScene.setOpenGLContext(&renderer);
-	myThreeDScene.initizalize();
-	myThreeDScene.setActiveCamera(&mainCamera);
-	
-	myThreeDScene.addObject(cubeMesh1);
-	myThreeDScene.addObject(&mainCamera);
-
-	std::cout << "[Main] 3D Scene initialized with ID: " << myThreeDScene.getSceneID() << std::endl;
-
-	// Initialize all API routes via RoutesManager
 	auto& router = SIMILI::Server::SimpleHttpServer::getInstance().getRouter();
 	SIMILI::Router::RoutesManager routesManager;
-	routesManager.initializeRoutes(router, renderer, myThreeDScene, handler, hidden_window);
+	routesManager.initializeRoutes(router, vkRenderer, myVKScene, handler, hidden_window);
 	std::cout << "[Main] All API routes initialized via RoutesManager" << std::endl;
 
 	CefSettings settings;
@@ -171,11 +153,8 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 
-	handler->setThreeDScene(&myThreeDScene);
-	std::cout << "[Main] 3D Scene linked to UIHandler" << std::endl;
-
-	handler->setSceneObjects(&renderer, &myThreeDScene, &mainCamera, &cubeMesh1);
-	std::cout << "[Main] Scene objects passed to UIHandler" << std::endl;
+	handler->setVKScene(&myVKScene);
+	std::cout << "[Main] VKScene linked to UIHandler" << std::endl;
 
 	auto iframeMouseDetector = std::make_unique<SIMILI::Input::IFrameMouseDetector>();
 	handler->setIFrameMouseDetector(iframeMouseDetector.get());

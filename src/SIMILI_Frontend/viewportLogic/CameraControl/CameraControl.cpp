@@ -1,6 +1,6 @@
 #include "CameraControl.hpp"
-#include "overlay_viewport.hpp"
-#include "../../Engine/OpenGLScene/ThreeDScene.hpp"
+#include "../overlay_viewport.hpp"
+#include "../../Engine/VulkanScene/VKScene.Hpp"
 #include "../../WorldObjects/Camera/Camera.hpp"
 #include <SDL3/SDL.h>
 
@@ -14,7 +14,7 @@ CameraControl::~CameraControl() {}
 void CameraControl::onMouseWheel(float wheel)
 {
     if (!overlay_) return;
-    ThreeDScene* scene = overlay_->getThreeDScene();
+    VKScene* scene = overlay_->getVKScene();
     if (scene) {
         Camera* cam = scene->getActiveCamera();
         if (cam && cam->isSoftwareCamera()) 
@@ -45,7 +45,7 @@ void CameraControl::onMiddleButtonUp()
 void CameraControl::onMouseMove()
 {
     if (!overlay_ || !is_dragging_) return;
-    ThreeDScene* scene = overlay_->getThreeDScene();
+    VKScene* scene = overlay_->getVKScene();
     if (!scene) return;
     Camera* cam = scene->getActiveCamera();
     if (!cam || !cam->isSoftwareCamera()) return;
@@ -75,7 +75,7 @@ void CameraControl::onMouseMove()
 void CameraControl::onZoom(int wheelDirection)
 {
     if (!overlay_) return;
-    ThreeDScene* scene = overlay_->getThreeDScene();
+    VKScene* scene = overlay_->getVKScene();
     if (!scene) return;
     Camera* cam = scene->getActiveCamera();
     if (!cam || !cam->isSoftwareCamera()) return;

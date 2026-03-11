@@ -34,8 +34,8 @@ namespace SIMILI
 	}
 }
 
-class ThreeDScene;
-class OpenGLContext;
+class VKScene;
+class VKContext;
 class Camera;
 class Mesh;
 
@@ -99,10 +99,9 @@ public:
 	SDL_Window* getParentWindow() const { return parent_window_; }
 	SIMILI::Input::IFrameMouseDetector* getIFrameMouseDetector() { return iframe_mouse_detector_; }
 	
-	void setThreeDScene(ThreeDScene* scene) { three_d_scene_ = scene; }
-	ThreeDScene* getThreeDScene() const { return three_d_scene_; }
+	void setVKScene(VKScene* scene) { vk_scene_ = scene; }
+	VKScene* getVKScene() const { return vk_scene_; }
 	
-	void setSceneObjects(OpenGLContext* renderer, ThreeDScene* scene, Camera* camera, Mesh** cubeMesh);
 	void initializeSceneObjects();
 	void initializeFrameDatas(SimpleWindowDelegate* windowDelegate);
 	void reinitializeSingleObject(ThreeDObject* obj);
@@ -156,10 +155,10 @@ private:
 	std::unique_ptr<OverlayViewport> overlay_viewport_;
 	SDL_Window* parent_window_;
 	SDL_TimerID timer_id_;
-	ThreeDScene* three_d_scene_;
+	VKScene* vk_scene_;
 	
 
-	OpenGLContext* renderer_;
+	VKContext* vk_renderer_;
 	Camera* main_camera_;
 	Mesh** cube_mesh_ptr_;
 	bool scene_initialized_;

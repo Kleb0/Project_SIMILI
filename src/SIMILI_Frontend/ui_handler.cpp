@@ -4,8 +4,8 @@
 #include "viewportLogic/HTMLTextureRenderer/Overlay_HTML_Texture_Renderer.hpp"
 #include "viewportLogic/KeyManagement/KeyManager.hpp"
 #include "viewportLogic/Keymanagement/MouseControlToOverlay.hpp"
-#include "../../Engine/OpenGLScene/ThreeDScene.hpp"
-#include "../../Engine/OpenGLScene/OpenGLContext.hpp"
+#include "../../Engine/VulkanScene/VKScene.Hpp"
+#include "../../Engine/VulkanScene/VKcontext.hpp"
 #include "../../WorldObjects/Camera/Camera.hpp"
 #include "../../WorldObjects/Mesh/Mesh.hpp"
 #include "../../Engine/PrimitivesCreation/CreatePrimitive.hpp"
@@ -32,8 +32,8 @@ UIHandler* UIHandler::s_instance_ = nullptr;
 
 UIHandler::UIHandler() : parent_window_(nullptr), timer_id_(0),
 	last_viewport_update_time_(0), last_viewport_x_(0), last_viewport_y_(0), 
-	last_viewport_width_(0), last_viewport_height_(0), three_d_scene_(nullptr),
-	renderer_(nullptr), main_camera_(nullptr), cube_mesh_ptr_(nullptr), scene_initialized_(false),
+	last_viewport_width_(0), last_viewport_height_(0), vk_scene_(nullptr),
+	vk_renderer_(nullptr), main_camera_(nullptr), cube_mesh_ptr_(nullptr), scene_initialized_(false),
 	render_message_router_(nullptr), 
 	iframe_mouse_detector_(nullptr),
 	frame_datas_(nullptr),
@@ -292,61 +292,57 @@ void UIHandler::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& ti
 {
 	std::string title_str = title.ToString();
 	
-	if (title_str.find("VIEWPORT_RESIZE:") == 0) 
-	{
-		std::string coords = title_str.substr(16); 
-		
-		int js_x, js_y, width, height;
-		float dpiScale = 1.0f;
-		std::istringstream iss(coords);
-		char comma;
-		
-		if (iss >> js_x >> comma >> js_y >> comma >> width >> comma >> height) 
+		if (title_str.find("VIEWPORT_RESIZE:") == 0) 
 		{
-			if (iss >> comma >> dpiScale) 
+			std::string coords = title_str.substr(16); 
+			
+			int js_x, js_y, width, height;
+			float dpiScale = 1.0f;
+			std::istringstream iss(coords);
+			char comma;
+			
+			if (iss >> js_x >> comma >> js_y >> comma >> width >> comma >> height) 
 			{
-			}
-		
-			if (overlay_viewport_ && parent_window_ && browser) 
-			{
-				int final_x = static_cast<int>(js_x * dpiScale);
-				int final_y = static_cast<int>(js_y * dpiScale);
-				int final_width = static_cast<int>(width * dpiScale);
-				int final_height = static_cast<int>(height * dpiScale);
-				
-				Uint64 current_time = SDL_GetTicks();
-				bool position_changed = (abs(final_x - last_viewport_x_) > 2 || 
-										abs(final_y - last_viewport_y_) > 2 ||
-										abs(final_width - last_viewport_width_) > 2 ||
-										abs(final_height - last_viewport_height_) > 2);
-				bool time_elapsed = (current_time - last_viewport_update_time_) > 16;
-				
-				if (position_changed || time_elapsed || !overlay_viewport_->isVisible()) 
+				if (iss >> comma >> dpiScale) 
 				{
-					overlay_viewport_->setPosition(final_x, final_y, final_width, final_height);
+				}
+			
+				if (overlay_viewport_ && parent_window_ && browser) 
+				{
+					int final_x = static_cast<int>(js_x * dpiScale);
+					int final_y = static_cast<int>(js_y * dpiScale);
+					int final_width = static_cast<int>(width * dpiScale);
+					int final_height = static_cast<int>(height * dpiScale);
 					
-					if (mouse_control_to_overlay_)
+					Uint64 current_time = SDL_GetTicks();
+					bool position_changed = (abs(final_x - last_viewport_x_) > 2 || 
+											abs(final_y - last_viewport_y_) > 2 ||
+											abs(final_width - last_viewport_width_) > 2 ||
+											abs(final_height - last_viewport_height_) > 2);
+					bool time_elapsed = (current_time - last_viewport_update_time_) > 16;
+					
+					if (position_changed || time_elapsed || !overlay_viewport_->isVisible()) 
 					{
-						mouse_control_to_overlay_->resetMousePosition();
-					}
-					
-					if (three_d_scene_ && three_d_scene_->getActiveCamera())
+						overlay_viewport_->setPosition(final_x, final_y, final_width, final_height);
+						
+						if (mouse_control_to_overlay_)
+						{
+							mouse_control_to_overlay_->resetMousePosition();
+						}
+						
+					if (vk_scene_ && vk_scene_->getActiveCamera())
 					{
-						three_d_scene_->getActiveCamera()->setResolution(final_width, final_height, dpiScale);
-					}
-					
-					last_viewport_update_time_ = current_time;
-					last_viewport_x_ = final_x;
-					last_viewport_y_ = final_y;
-					last_viewport_width_ = final_width;
-					last_viewport_height_ = final_height;
-					
-					captureIFramePositions();
-					
-					if (!overlay_viewport_->isVisible()) 
-					{
-						overlay_viewport_->show(true);
-						std::cout << "[UIHandler] Overlay now visible" << std::endl;
+						vk_scene_->getActiveCamera()->setResolution(final_width, final_height, dpiScale);
+						last_viewport_width_ = final_width;
+						last_viewport_height_ = final_height;
+						
+						captureIFramePositions();
+						
+						if (!overlay_viewport_->isVisible()) 
+						{
+							overlay_viewport_->show(true);
+							std::cout << "[UIHandler] Overlay now visible" << std::endl;
+						}
 					}
 				}
 			}
@@ -440,9 +436,9 @@ void UIHandler::createOverlayViewport(SDL_Window* parent_window)
 	
 	overlay_viewport_->setUIHandler(this);
 	
-	if (three_d_scene_) 
+	if (vk_scene_) 
 	{
-		overlay_viewport_->setThreeDScene(three_d_scene_);
+		overlay_viewport_->setVKScene(vk_scene_);
 	}
 
 	overlay_viewport_->switchModeByKey(1);
@@ -810,19 +806,9 @@ void UIHandler::enableCompositeTestRenderer(bool enable)
 
 // ---------- Scene Update ------------ 
 
-void UIHandler::setSceneObjects(OpenGLContext* renderer, ThreeDScene* scene, Camera* camera, Mesh** cubeMesh) {
-	renderer_ = renderer;
-	three_d_scene_ = scene;
-	main_camera_ = camera;
-	cube_mesh_ptr_ = cubeMesh;
-	scene_initialized_ = false;
-	
-	std::cout << "[UIHandler] Scene objects stored for deferred initialization" << std::endl;
-}
-
 void UIHandler::initializeSceneObjects() 
 {
-	if (scene_initialized_ || !three_d_scene_ || !main_camera_) 
+	if (scene_initialized_ || !vk_scene_ || !main_camera_) 
 	{
 		std::cout << "[UIHandler] Scene already initialized or missing objects" << std::endl;
 		return;
@@ -834,19 +820,18 @@ void UIHandler::initializeSceneObjects()
 		return;
 	}
 	
-	std::cout << "[UIHandler] Initializing scene objects with OpenGL context..." << std::endl;
+	std::cout << "[UIHandler] Initializing scene objects with Vulkan context..." << std::endl;
 	
-	// Make overlay context current for scene initialization
 	overlay_viewport_->makeContextCurrent();
 	
-	if (three_d_scene_) 
+	if (vk_scene_) 
 	{
-		three_d_scene_->initizalize();
+		vk_scene_->initialize();
 	}
 	
-	if (three_d_scene_) 
+	if (vk_scene_) 
 	{
-		for (auto* obj : three_d_scene_->getObjectsRef()) 
+		for (auto* obj : vk_scene_->getObjectsRef()) 
 		{
 			if (obj && obj->getIsMesh()) 
 			{
@@ -856,11 +841,11 @@ void UIHandler::initializeSceneObjects()
 		}
 	}
 	
-	if (three_d_scene_ && main_camera_) 
+	if (vk_scene_ && main_camera_) 
 	{
-		overlay_viewport_->setThreeDScene(three_d_scene_);
-		std::cout << "[UIHandler] 3D Scene set to overlay viewport - Objects count: " << three_d_scene_->getObjectsRef().size() << std::endl;
-		std::cout << "[UIHandler] 3D Scene camera: " << (three_d_scene_->getActiveCamera() ? three_d_scene_->getActiveCamera()->getName() : "NULL") << std::endl;
+		overlay_viewport_->setVKScene(vk_scene_);
+		std::cout << "[UIHandler] VKScene set to overlay viewport - Objects count: " << vk_scene_->getObjectsRef().size() << std::endl;
+		std::cout << "[UIHandler] VKScene camera: " << (vk_scene_->getActiveCamera() ? vk_scene_->getActiveCamera()->getName() : "NULL") << std::endl;
 	}
 	
 	scene_initialized_ = true;
@@ -1098,7 +1083,7 @@ void UIHandler::captureIFramePositions()
 	
 	updateIFrameMouseDetectorFromFrameDatas();
 	
-	if (overlay_viewport_ && three_d_scene_ && three_d_scene_->getActiveCamera())
+	if (overlay_viewport_ && vk_scene_ && vk_scene_->getActiveCamera())
 	{
 		SIMILI::Frontend::IFrameScreenData ViewportPanelSize;
 
@@ -1108,7 +1093,7 @@ void UIHandler::captureIFramePositions()
 			int Width = static_cast<int>(ViewportPanelSize.width * dpiScale);
 			int Height = static_cast<int>(ViewportPanelSize.height * dpiScale);
 			
-			Camera* cam = three_d_scene_->getActiveCamera();
+			Camera* cam = vk_scene_->getActiveCamera();
 
 			cam->setResolution(Width, Height, dpiScale);
 

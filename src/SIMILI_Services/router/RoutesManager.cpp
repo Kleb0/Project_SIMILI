@@ -20,15 +20,15 @@ namespace SIMILI {
 
 		void RoutesManager::initializeRoutes(
 			RouterSim& router,
-			OpenGLContext& renderer,
-			ThreeDScene& scene,
+			VKContext& vkRenderer,
+			VKScene& scene,
 			CefRefPtr<UIHandler>& handler,
 			GLFWwindow* glfwWindow)
 		{
 			std::cout << "[RoutesManager] Initializing all routes..." << std::endl;
 			
-			registerContextRoutes(router, renderer);
-			registerSceneRoutes(router, scene, renderer);
+			registerContextRoutes(router, vkRenderer);
+			registerSceneRoutes(router, scene, vkRenderer);
 			registerObjectRoutes(router, scene, handler, glfwWindow);
 			registerIFrameRoutes(router, handler);
 			
@@ -36,25 +36,24 @@ namespace SIMILI {
 		}
 
 
-		void RoutesManager::registerContextRoutes(RouterSim& router, OpenGLContext& renderer)
+		void RoutesManager::registerContextRoutes(RouterSim& router, VKContext& vkRenderer)
 		{
-			router.get("/api/context", [&renderer](const Message& msg) -> Response 
+			router.get("/api/context", [&vkRenderer](const Message& msg) -> Response 
 			{
 				Response resp;
 				resp.statusCode = 200;
 				resp.statusMessage = "OK";
-				resp.body = "{\"contextId\": \"" + renderer.getContextID() + "\"}";
+				resp.body = "{\"contextId\": \"" + vkRenderer.getContextID() + "\"}";
 				resp.headers["Content-Type"] = "application/json";
 				return resp;
-			}, "Get OpenGL context ID");
+			}, "Get Vulkan context ID");
 			
 			std::cout << "[RoutesManager] Context routes registered" << std::endl;
 		}
 
 
-		void RoutesManager::registerSceneRoutes(RouterSim& router, ThreeDScene& scene, OpenGLContext& renderer)
+		void RoutesManager::registerSceneRoutes(RouterSim& router, VKScene& scene, VKContext& vkRenderer)
 		{
-			// Route: Get scene objects
 			router.get("/api/scene/objects", [&scene](const Message& msg) -> Response 
 			{
 				Response resp;
@@ -96,8 +95,7 @@ namespace SIMILI {
 				return resp;
 			}, "Get all scene objects");
 			
-			// Route: Get scene info (Scene ID + Context ID)
-			router.get("/api/scene-info", [&scene, &renderer](const Message& msg) -> Response 
+			router.get("/api/scene-info", [&scene, &vkRenderer](const Message& msg) -> Response 
 			{
 				Response resp;
 				resp.statusCode = 200;
@@ -106,7 +104,7 @@ namespace SIMILI {
 				std::ostringstream json;
 				json << "{"
 					<< "\"sceneID\":\"" << scene.getSceneID() << "\","
-					<< "\"contextID\":\"" << renderer.getContextID() << "\""
+					<< "\"contextID\":\"" << vkRenderer.getContextID() << "\""
 					<< "}";
 				
 				resp.body = json.str();
@@ -119,7 +117,7 @@ namespace SIMILI {
 		}
 
 
-		void RoutesManager::registerObjectRoutes(RouterSim& router, ThreeDScene& scene, CefRefPtr<UIHandler>& handler, GLFWwindow* glfwWindow)
+		void RoutesManager::registerObjectRoutes(RouterSim& router, VKScene& scene, CefRefPtr<UIHandler>& handler, GLFWwindow* glfwWindow)
 		{
 			router.post("/api/create-cube", [&scene, &handler, glfwWindow](const Message& msg) -> Response 
 			{

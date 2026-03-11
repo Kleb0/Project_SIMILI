@@ -1,6 +1,6 @@
 #include "Engine/ThreeDInteractions/VerticeTransform.hpp"
 #include "WorldObjects/Basic/Vertice.hpp"
-#include "Engine/OpenGLScene/ThreeDScene.hpp"
+#include "Engine/VulkanScene/VKScene.Hpp"
 #include "Engine/Guizmo.hpp"
 #include "SIMILI_Frontend/viewportLogic/Keymanagement/KeyManager.hpp"
 
@@ -25,7 +25,7 @@ namespace VerticeTransform
 	}
 
 
-	glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, ThreeDScene* scene, const std::list<Vertice*>& vertices,
+	glm::mat4 prepareGizmoFrame(ImGuizmo::OPERATION op, VKScene* scene, const std::list<Vertice*>& vertices,
 	const ImVec2& oglChildPos, const ImVec2& oglChildSize)
 	{
 			glm::mat4 view = scene->getViewMatrix();
@@ -35,7 +35,7 @@ namespace VerticeTransform
 			return model;
 	}
 
-	void manipulateVertices(ThreeDScene* scene, const std::list<Vertice*>& selectedVertices,
+	void manipulateVertices(VKScene* scene, const std::list<Vertice*>& selectedVertices,
 	const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame,
 	const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
 	{
