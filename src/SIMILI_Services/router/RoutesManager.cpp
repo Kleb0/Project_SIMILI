@@ -3,7 +3,6 @@
 #include "../../WorldObjects/Mesh/Mesh.hpp"
 #include "../../WorldObjects/Camera/Camera.hpp"
 #include "../../Engine/PrimitivesCreation/CreatePrimitive.hpp"
-#include "../../SIMILI_Frontend/simple_window_delegate.hpp"
 #include "../../SIMILI_Frontend/viewportLogic/HTMLTextureRenderer/TextureEnabler.hpp"
 #include <iostream>
 #include <sstream>
@@ -377,13 +376,11 @@ namespace SIMILI {
 						return resp;
 					}
 					
-					// Get window delegate from handler
-					SimpleWindowDelegate* windowDelegate = handler ? handler->getWindowDelegate() : nullptr;
-					if (!windowDelegate)
+					if (!handler)
 					{
 						resp.statusCode = 500;
 						resp.statusMessage = "Internal Server Error";
-						resp.body = "{\"success\": false, \"error\": \"Window delegate not available\"}";
+						resp.body = "{\"success\": false, \"error\": \"Handler not available\"}";
 						return resp;
 					}
 					
@@ -400,34 +397,29 @@ namespace SIMILI {
 							int clientX = iframe.contains("clientX") ? iframe["clientX"].get<int>() : x;
 							int clientY = iframe.contains("clientY") ? iframe["clientY"].get<int>() : y;
 							
-							windowDelegate->updateIFrameData(name, x, y, width, height, clientX, clientY);
-
-						if (handler && handler->getFrameDatas() && handler->getParentWindow())
-						{
-							handler->getFrameDatas()->updateFrameData(name, x, y, width, height, clientX, clientY, handler->getParentWindow());
+							IFrameData data;
+							data.name = name;
+							data.x = x;
+							data.y = y;
+							data.width = width;
+							data.height = height;
+							data.clientX = clientX;
+							data.clientY = clientY;
+							handler->iframe_data_map_[name] = data;
 						}
 					}
-						handler->updatePanelBoundsFromStocker();
-						
-						// Request panel repositioning before capturing positions
-						if (auto renderer = handler->getCompositeTestRenderer())
-						{
-							renderer->RequestPanelPositionUpdate(PanelAnchorPosition::CurrentAnchorState);
-						}
-						
-						handler->captureIFramePositions();
-					}
+					
+					handler->captureIFramePositions();
 					
 					resp.statusCode = 200;
 					resp.statusMessage = "OK";
 					resp.body = "{\"success\": true}";
 				}
-				catch (const json::exception& e)
+				catch (const std::exception& e)
 				{
-					std::cerr << "[RoutesManager] JSON parse error: " << e.what() << std::endl;
-					resp.statusCode = 400;
-					resp.statusMessage = "Bad Request";
-					resp.body = "{\"success\": false, \"error\": \"Invalid JSON\"}";
+					resp.statusCode = 500;
+					resp.statusMessage = "Internal Server Error";
+					resp.body = "{\"success\": false, \"error\": \"" + std::string(e.what()) + "\"}";
 				}
 				
 				return resp;
@@ -439,16 +431,15 @@ namespace SIMILI {
 				resp.headers["Access-Control-Allow-Origin"] = "*";
 				resp.headers["Content-Type"] = "application/json";
 				
-				SimpleWindowDelegate* windowDelegate = handler ? handler->getWindowDelegate() : nullptr;
-				if (!windowDelegate)
+				if (!handler)
 				{
 					resp.statusCode = 500;
 					resp.statusMessage = "Internal Server Error";
-					resp.body = "{\"success\": false, \"error\": \"Window delegate not available\"}";
+					resp.body = "{\"success\": false, \"error\": \"Handler not available\"}";
 					return resp;
 				}
 				
-				auto allIframes = windowDelegate->getAllIFrames();
+				const auto& allIframes = handler->getAllIFrames();
 				
 				json responseData = json::array();
 				

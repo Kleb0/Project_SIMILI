@@ -65,8 +65,7 @@ body
 
 .panel 
 {
-    border: 3px solid #000000;
-    overflow: auto;
+    overflow: hidden;
     position: relative;
     flex: 1;
     min-height: 100px;

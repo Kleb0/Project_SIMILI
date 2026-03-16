@@ -98,7 +98,16 @@ void VKScene::setActiveCamera(Camera* cam)
 		return;
 	}
 	activeCamera = cam;
-	cam->set_Vulkan_Scene(this);
+	cam->setVKScene(this);
+}
+
+void VKScene::setCameraToUse(Camera* cam)
+{
+	if (cam && objectContainer_)
+	{
+		setActiveCamera(cam);
+		std::cout << "[VKScene] Camera attached to scene: " << cam->getName() << std::endl;
+	}
 }
 
 void VKScene::setSceneObjectContainer(SceneObjectContainer* container)

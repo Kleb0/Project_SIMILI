@@ -43,8 +43,8 @@ public:
     int getResolutionHeight() const { return resolutionHeight_; }
     float getDpiScale() const { return dpiScale_; }
 
-    void set_Vulkan_Scene(VKScene* scene);
-    void render_Vulkan_Scene();
+    void setVKScene(VKScene* scene);
+    void renderAttachedVKScene();
     VKScene* getVulkanScene() const { return vulkanScene_; }
 
     float fov = 45.0f;

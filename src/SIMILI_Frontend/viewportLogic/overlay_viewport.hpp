@@ -56,8 +56,6 @@ class OverlayViewport
 		
 		void updateViewportDimensions(int width, int height);
 		
-		// ----------- Rendering Control -----------
-		void render();
 		// handle of of SDL3 events (keyboard, window resize, etc.)
 		void handleEvents(); 
 		void enableRendering(bool enable) { rendering_enabled_ = enable; }
@@ -71,6 +69,8 @@ class OverlayViewport
 		// ----------- 3D Scene Management -----------
 		void setVKScene(VKScene* scene) { vk_scene_ = scene; }
 		VKScene* getVKScene() const { return vk_scene_; }
+		void setCamera(Camera* cam);
+		Camera* getCamera() const { return camera_; }
 		
 		// ----------- Raycast & Object Selection -----------
 		void performRaycast(int mouseX, int mouseY);
@@ -78,8 +78,6 @@ class OverlayViewport
 		
 		void setMultipleSelectedObjects(const std::list<ThreeDObject*>& objects);
 		const std::list<ThreeDObject*>& getMultipleSelectedObjects() const { return multiple_selected_objects_; }
-		
-		void setUIHandler(UIHandler* handler) { ui_handler_ = handler; }
 		
 		std::list<Vertice*>& getMultipleSelectedVertices() { return multiple_selected_vertices_; }
 		std::list<Face*>& getMultipleSelectedFaces() { return multiple_selected_faces_; }
@@ -123,7 +121,6 @@ class OverlayViewport
 		void shutdownImGui();
 		
 		// ----------- Rendering Internal -----------
-		void renderScene();
 		void ThreeDWorldInteractions();
 		void update_Scene_Rendering();
 		
@@ -138,8 +135,8 @@ class OverlayViewport
 		
 		// ----------- 3D Scene -----------
 		VKScene* vk_scene_;
-		UIHandler* ui_handler_ = nullptr;
-		
+		Camera* camera_;
+	
 		// ----------- Pending Meshes (Thread-Safe Queue) -----------
 		std::vector<Mesh*> pending_meshes_to_finalize_;
 		std::mutex pending_meshes_mutex_;

@@ -231,9 +231,11 @@ namespace SIMILI
 			if (!req_.body().empty()) 
 			{
 				std::ostringstream bodyMsg;
-				bodyMsg << "\n [HttpSession] Received from JavaScript: " << req_.body();
+				std::cout << " ----------------------------------------- \n " << std::endl;
+				bodyMsg << "[HttpSession] Received from JavaScript: " << req_.body();
 				std::cout << bodyMsg.str() << std::endl;
 				ConsoleLogger::getInstance().addLog(bodyMsg.str(), "server");
+				std::cout <<" \n ----------------------------------------- \n " << std::endl;	
 			}
 			
 			auto& router = SimpleHttpServer::getInstance().getRouter();

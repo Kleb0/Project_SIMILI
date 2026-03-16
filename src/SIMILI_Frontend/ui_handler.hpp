@@ -6,8 +6,9 @@
 #include "include/wrapper/cef_message_router.h"
 #include "include/views/cef_browser_view.h"
 #include "include/views/cef_window.h"
+#include "SDL_ApplicationWindow.hpp"
+#include "CEF_Drawer.hpp"
 #include "viewportLogic/overlay_viewport.hpp"
-#include "viewportLogic/Keymanagement/IFrameMouseDetector.hpp"
 #include "viewportLogic/FrameDatas/FrameDatas.hpp"
 #include "viewportLogic/Keymanagement/MouseStates/Mouse_State.hpp"
 #include "viewportLogic/Keymanagement/MouseStates/Mouse_Above_Overlay_State.hpp"
@@ -26,11 +27,22 @@
 
 class SimpleWindowDelegate;
 
+struct IFrameData
+{
+	std::string name;
+	int x;
+	int y;
+	int width;
+	int height;
+	int clientX;
+	int clientY;
+};
+
 namespace SIMILI 
 {
 	namespace Input 
 	{
-		class MouseControlToOverlay;
+		class MouseController;
 	}
 }
 
@@ -73,6 +85,7 @@ public:
 	virtual CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override;
 	virtual CefRefPtr<CefLoadHandler> GetLoadHandler() override;
 	virtual CefRefPtr<CefKeyboardHandler> GetKeyboardHandler() override;
+	virtual CefRefPtr<CefRenderHandler> GetRenderHandler() override;
 
 	virtual void OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) override;
 
@@ -85,65 +98,60 @@ public:
 
 	// keyboard events
 	virtual bool OnPreKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& event,
-		CefEventHandle os_event, bool* is_keyboard_shortcut) override;
+	CefEventHandle os_event, bool* is_keyboard_shortcut) override;
+	
 	virtual bool OnKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& event,
-		CefEventHandle os_event) override;
+	CefEventHandle os_event) override;
 
 	void CloseAllBrowsers(bool force_close);
-	void createOverlayViewport(SDL_Window* parent_window);
-	void updateOverlayPosition();
 	bool isOverlayRenderingEnabled() const;
 	void enableSlotTextureRendering(bool enable);
 	void enableCompositeTestRenderer(bool enable);
-	OverlayViewport* getOverlay() { return overlay_viewport_.get(); }
+	OverlayViewport* getOverlay() { return overlay_viewport_; }
 	SDL_Window* getParentWindow() const { return parent_window_; }
-	SIMILI::Input::IFrameMouseDetector* getIFrameMouseDetector() { return iframe_mouse_detector_; }
+
+	void setParentWindow(SDL_Window* window) { parent_window_ = window; }
+	void set_Overlay_Viewport(OverlayViewport* viewport);
+	void Set_SDLParent(SDL_ApplicationWindow* parentWindow);
+	void Set_DOM(CEF_Drawer* drawer);
 	
 	void setVKScene(VKScene* scene) { vk_scene_ = scene; }
 	VKScene* getVKScene() const { return vk_scene_; }
+	
+	void startRenderTimer();
 	
 	void initializeSceneObjects();
 	void initializeFrameDatas(SimpleWindowDelegate* windowDelegate);
 	void reinitializeSingleObject(ThreeDObject* obj);
 	void notifySceneChanged();
-	void setIFrameMouseDetector(SIMILI::Input::IFrameMouseDetector* detector);
+	void set_MouseControl(SIMILI::Input::MouseController* mouseControl);
 	void setWindowDelegate(SimpleWindowDelegate* delegate) { window_delegate_ = delegate; }
 	SimpleWindowDelegate* getWindowDelegate() const { return window_delegate_; }
 	
-	void logIFrameSizes();
-	void updatePanelBoundsFromStocker();
 	
 	void captureIFramePositions();
-	void updateIFrameMouseDetectorFromFrameDatas();
 	SIMILI::Frontend::FrameDatas* getFrameDatas() { return frame_datas_; }
+
+	void setFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas) { frame_datas_ = frameDatas; }
 	
 	// Camera operation lock
 	bool isCameraOperationLocked() const { return is_camera_operation_locked_; }
 	void setCameraOperationLocked(bool locked) { is_camera_operation_locked_ = locked; }
 	
-	void transitionMouseState(const std::string& regionName);
-	SIMILI::Input::Mouse_State* getCurrentMouseState() const { return current_mouse_state_; }
-	
-	// Mouse state getters
-	SIMILI::Input::Mouse_Above_Overlay_State* getAboveOverlayState() const { return above_overlay_state_; }
-	SIMILI::Input::Mouse_Outside_Overlay_State* getOutsideOverlayState() const { return outside_overlay_state_; }
-	SIMILI::Input::Mouse_Above_UI_Panel_State* getAboveUIPanelState() const { return above_ui_panel_state_; }
-	
-	// Last detected region name accessors
-	std::string getLastDetectedRegionName() const { return last_detected_region_name_; }
-	void setLastDetectedRegionName(const std::string& regionName) { last_detected_region_name_ = regionName; }
-	
-	SIMILI::Input::MouseControlToOverlay* getMouseControlToOverlay() const { return mouse_control_to_overlay_; }	
+	SIMILI::Input::MouseController* getMouseController() const { return mouse_controller_; }	
 	
 	Overlay_HTML_Texture_Renderer* getSlotTextureRenderer() const { return slot_texture_renderer_; }
 	Overlay_HTML_Texture_Renderer* getCompositeTestRenderer() const { return composite_test_renderer_; }
+	
+	CEF_Drawer* getCEFDrawer() const { return cef_drawer_; }
+	void setCEFDrawer(CEF_Drawer* drawer) { cef_drawer_ = drawer; }
 
 	ID3D11Device* getD3D11Device() const { return d3d11_device_; }
 	ID2D1Factory1* getD2D1Factory() const { return d2d_factory_; }
 	ID2D1Device* getD2D1Device() const { return d2d_device_; }
 	IDXGIDevice1* getDXGIDevice() const { return dxgi_device_; }
 
-	friend Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 interval);
+	friend Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 interval, SDL_ApplicationWindow* parentWindow, CEF_Drawer* dom);
 
 	void CallTestFromServer();
 
@@ -152,8 +160,10 @@ private:
 
 	typedef std::list<CefRefPtr<CefBrowser>> BrowserList;
 	BrowserList browser_list_;
-	std::unique_ptr<OverlayViewport> overlay_viewport_;
+	OverlayViewport* overlay_viewport_;
+	SDL_ApplicationWindow* parent_sdl_window_;
 	SDL_Window* parent_window_;
+	SDL_Window* window_handle_;
 	SDL_TimerID timer_id_;
 	VKScene* vk_scene_;
 	
@@ -171,25 +181,18 @@ private:
 	
 	CefRefPtr<CefMessageRouterRendererSide> render_message_router_;
 	
-	// Mouse detection
-	SIMILI::Input::IFrameMouseDetector* iframe_mouse_detector_;
+	// Mouse control
 	SIMILI::Frontend::FrameDatas* frame_datas_;
 	SimpleWindowDelegate* window_delegate_;
 	
-	// Mouse states
-	SIMILI::Input::Mouse_State* current_mouse_state_;
-	SIMILI::Input::Mouse_Above_Overlay_State* above_overlay_state_;
-	SIMILI::Input::Mouse_Outside_Overlay_State* outside_overlay_state_;
-	SIMILI::Input::Mouse_Above_UI_Panel_State* above_ui_panel_state_;
-	std::string last_detected_region_name_;
-	
-	SIMILI::Input::MouseControlToOverlay* mouse_control_to_overlay_;
+	SIMILI::Input::MouseController* mouse_controller_;
 	
 	// Camera operation lock
 	bool is_camera_operation_locked_;
 	
 	Overlay_HTML_Texture_Renderer* slot_texture_renderer_;
 	Overlay_HTML_Texture_Renderer* composite_test_renderer_;
+	CEF_Drawer* cef_drawer_;
 
 	ID3D11Device* d3d11_device_;
 	ID3D11DeviceContext* d3d11_device_context_;
@@ -197,5 +200,11 @@ private:
 	ID2D1Factory1* d2d_factory_;
 	ID2D1Device* d2d_device_;
 
+public:
+	std::map<std::string, IFrameData> iframe_data_map_;
+	const std::map<std::string, IFrameData>& getAllIFrames() const { return iframe_data_map_; }
+	SDL_ApplicationWindow* getSDLParent() { return parent_sdl_window_; }
+
+private:
 	IMPLEMENT_REFCOUNTING(UIHandler);
 };

@@ -2,12 +2,12 @@
 #include "include/cef_app.h"
 #include "include/cef_client.h"
 #include "include/cef_sandbox_win.h"
-#include "include/views/cef_browser_view.h"
-#include "include/views/cef_window.h"
 #include "SIMILI_Frontend/ui_handler.hpp"
-#include "SIMILI_Frontend/simple_window_delegate.hpp"
-#include "SIMILI_Frontend/simple_browser_view_delegate.hpp"
-#include "SIMILI_Frontend/viewportLogic/Keymanagement/IFrameMouseDetector.hpp"
+#include "SIMILI_Frontend/SDL_ApplicationWindow.hpp"
+#include "SIMILI_Frontend/CEF_Drawer.hpp"
+#include "SIMILI_Frontend/viewportLogic/Keymanagement/MouseController.hpp"
+#include "SIMILI_Frontend/viewportLogic/overlay_viewport.hpp"
+#include "SIMILI_Frontend/viewportLogic/FrameDatas/FrameDatas.hpp"
 
 #include "SIMILI_Services/router/RouterSim.hpp"
 #include "SIMILI_Services/router/RoutesManager.hpp"
@@ -32,7 +32,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <glad/glad.h>
-#include <GLFW/glfw3.h>
 #include <SDL3/SDL.h>
 #include <vulkan/vulkan.h>
 
@@ -55,6 +54,13 @@ int main(int argc, char* argv[])
 		return exit_code;
 	}
 
+	auto MouseControl = new SIMILI::Input::MouseController();
+	handler->set_MouseControl(MouseControl);
+
+	OverlayViewport ThreeDViewport;
+
+	handler->set_Overlay_Viewport(&ThreeDViewport);
+
 	const char* basePath = SDL_GetBasePath();
 	if (basePath)
 	{
@@ -75,40 +81,69 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 	std::cout << "[Main] SDL3 initialized" << std::endl;
+	
+	// Create main SDL window
+	SDL_ApplicationWindow mainWindow;
 
-	if (!glfwInit()) 
+	if (!mainWindow.create("SIMILI PROJECT", 1920, 1080))
 	{
-		std::cerr << "[Main] Failed to initialize GLFW" << std::endl;
+		std::cerr << "[Main] Failed to create SDL application window" << std::endl;
 		SDL_Quit();
 		return -1;
 	}
-	std::cout << "[Main] GLFW initialized" << std::endl;
+	std::cout << "[Main] SDL Application Window created" << std::endl;
 
-	// Create hidden GLFW window for OpenGL context
-	glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	// Create OpenGL context for SDL window
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 	
-	GLFWwindow* hidden_window = glfwCreateWindow(800, 600, "SIMILI_Hidden_GL_Context", nullptr, nullptr);
-	if (!hidden_window) 
+	SDL_GLContext glContext = SDL_GL_CreateContext(mainWindow.getHandle());
+	if (!glContext)
 	{
-		std::cerr << "[Main] Failed to create GLFW window for OpenGL context" << std::endl;
-		glfwTerminate();
+		std::cerr << "[Main] Failed to create OpenGL context: " << SDL_GetError() << std::endl;
+		mainWindow.destroy();
+		SDL_Quit();
 		return -1;
 	}
 	
-	glfwMakeContextCurrent(hidden_window);
+	SDL_GL_MakeCurrent(mainWindow.getHandle(), glContext);
+	SDL_GL_SetSwapInterval(1); // Enable vsync
 	
-	// Initialize GLAD
-	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) 
+	// Initialize GLAD with SDL
+	if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress))
 	{
 		std::cerr << "[Main] Failed to initialize GLAD" << std::endl;
-		glfwDestroyWindow(hidden_window);
-		glfwTerminate();
+		SDL_GL_DestroyContext(glContext);
+		mainWindow.destroy();
+		SDL_Quit();
 		return -1;
 	}
 	std::cout << "[Main] OpenGL " << glGetString(GL_VERSION) << " initialized" << std::endl;
+	
+	// NOW initialize CEF drawer (requires active OpenGL context)
+	CefRefPtr<CEF_Drawer> cefDrawer(new CEF_Drawer());
+	if (!cefDrawer->initialize(mainWindow.getHandle()))
+	{
+		std::cerr << "[Main] Failed to initialize CEF Drawer" << std::endl;
+		SDL_GL_DestroyContext(glContext);
+		mainWindow.destroy();
+		SDL_Quit();
+		return -1;
+	}
+	handler->setCEFDrawer(cefDrawer.get());
+	std::cout << "[Main] CEF Drawer initialized" << std::endl;
+	
+	handler->Set_SDLParent(&mainWindow);
+	handler->Set_DOM(cefDrawer.get());
+	mainWindow.Set_UIHandler(handler.get());
+	
+	auto frameDatas = std::make_unique<SIMILI::Frontend::FrameDatas>(handler.get());
+	handler->setFrameDatas(frameDatas.get());
+	std::cout << "[Main] FrameDatas created and linked to UIHandler" << std::endl;
+	
+	SDL_StartTextInput(mainWindow.getHandle());
 	
 	std::cout << "[Main] Starting HTTP Server..." << std::endl;
 
@@ -131,15 +166,33 @@ int main(int argc, char* argv[])
 	myVKScene.setVKContext(&vkRenderer);
 	myVKScene.setSceneObjectContainer(&VKSceneObjectContainer);
 	myVKScene.initialize();
-	myVKScene.setActiveCamera(&mainCamera);	
 	myVKScene.addObject(cubeMesh1);
 	myVKScene.addObject(&mainCamera);
+
+	Camera* sceneCamera = nullptr;
+
+	for (auto* obj : VKSceneObjectContainer.getObjectsRef())
+	{
+		Camera* cam = dynamic_cast<Camera*>(obj);
+		if (cam && cam->getName() == "MainCamera")
+		{
+			sceneCamera = cam;
+			std::cout << "[Main] Found main camera in scene: " << cam->getName() << std::endl;
+			break;
+		}
+	}
+
+	if (sceneCamera)
+	{
+		myVKScene.setCameraToUse(sceneCamera);
+		ThreeDViewport.setCamera(myVKScene.getActiveCamera());
+	}
 
 	std::cout << "[Main] VKScene initialized with ID: " << myVKScene.getSceneID() << std::endl;
 
 	auto& router = SIMILI::Server::SimpleHttpServer::getInstance().getRouter();
 	SIMILI::Router::RoutesManager routesManager;
-	routesManager.initializeRoutes(router, vkRenderer, myVKScene, handler, hidden_window);
+	routesManager.initializeRoutes(router, vkRenderer, myVKScene, handler, nullptr);
 	std::cout << "[Main] All API routes initialized via RoutesManager" << std::endl;
 
 	CefSettings settings;
@@ -156,39 +209,60 @@ int main(int argc, char* argv[])
 	handler->setVKScene(&myVKScene);
 	std::cout << "[Main] VKScene linked to UIHandler" << std::endl;
 
-	auto iframeMouseDetector = std::make_unique<SIMILI::Input::IFrameMouseDetector>();
-	handler->setIFrameMouseDetector(iframeMouseDetector.get());
-	std::cout << "[Main] IFrameMouseDetector created and linked to UIHandler" << std::endl;
+	handler->startRenderTimer();
+	std::cout << "[Main] Render timer started" << std::endl;
 
-	CefBrowserSettings browser_settings;
-	browser_settings.windowless_frame_rate = 60;
+	int windowPixelWidth, windowPixelHeight;
+	SDL_GetWindowSizeInPixels(mainWindow.getHandle(), &windowPixelWidth, &windowPixelHeight);
+	std::cout << "[Main] Window pixel size: " << windowPixelWidth << "x" << windowPixelHeight << std::endl;
 
 	std::string url = "file:///ui/main_layout.html";
+	if (!cefDrawer->createBrowser(handler, url, windowPixelWidth, windowPixelHeight))
+	{
+		std::cerr << "[Main] Failed to create CEF browser" << std::endl;
+		CefShutdown();
+		mainWindow.destroy();
+		return -1;
+	}
 
-	CefRefPtr<SimpleBrowserViewDelegate> browser_view_delegate(new SimpleBrowserViewDelegate());
+	// Show SDL window
+	mainWindow.show();
+	handler->captureIFramePositions();
+	std::cout << "[Main] SDL window shown" << std::endl;
 
-	CefRefPtr<CefBrowserView> browser_view = CefBrowserView::CreateBrowserView(
-		handler, url, browser_settings, nullptr, nullptr, browser_view_delegate);
-
-	CefRefPtr<SimpleWindowDelegate> window_delegate(new SimpleWindowDelegate(browser_view));
-	handler->setWindowDelegate(window_delegate.get());
-	window_delegate->setUIHandler(handler.get());
+	// Main render loop
+	bool running = true;
+	SDL_Event event;
 	
-	// Initialize FrameDatas with window_delegate
-	handler->initializeFrameDatas(window_delegate.get());
-	
-	CefWindow::CreateTopLevelWindow(window_delegate);
-
-
-	std::cout << "[Main] CEF window created, entering message loop..." << std::endl;
-	CefRunMessageLoop();
+	while (running)
+	{
+		while (SDL_PollEvent(&event))
+		{
+			if (event.type == SDL_EVENT_QUIT)
+			{
+				running = false;
+			}
+			
+			cefDrawer->handleEvent(event);
+		}
+		
+		mainWindow.processEvents();
+		
+		CefDoMessageLoopWork();
+		
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
+		
+		cefDrawer->draw();
+		
+		SDL_GL_SwapWindow(mainWindow.getHandle());
+	}
 
 	std::cout << "[Main] Shutting down CEF..." << std::endl;
 	CefShutdown();
 
-	glfwDestroyWindow(hidden_window);
-	glfwTerminate();
-	std::cout << "[Main] GLFW terminated" << std::endl;
+	SDL_GL_DestroyContext(glContext);
+	std::cout << "[Main] OpenGL context destroyed" << std::endl;
 
 	SDL_Quit();
 	std::cout << "[Main] SDL3 terminated" << std::endl;

@@ -230,28 +230,19 @@
         const viewportPanel = document.querySelector('.viewport-panel');
         if (viewportPanel) {
             const rect = viewportPanel.getBoundingClientRect();
+                       
+            const borderWidth = 0;
             
-            // Get the actual dimensions without any adjustment
-            // getBoundingClientRect() already includes borders in the coordinates
-            // The overlay should be positioned at the INNER area of the panel (excluding border)
-            
-            // Panel border: 3px on each side
-            const borderWidth = 3;
-            
-            // Position: add border to get to inner area
             const adjustedX = Math.round(rect.left + borderWidth);
             const adjustedY = Math.round(rect.top + borderWidth);
             
-            // Size: subtract borders from both sides
             const adjustedWidth = Math.round(rect.width - (2 * borderWidth));
             const adjustedHeight = Math.round(rect.height - (2 * borderWidth));
-            
-            // Get DPI scaling factor (devicePixelRatio)
-            // e.g., 1.0 for 100%, 1.5 for 150%, 2.0 for 200%
+
             const dpiScale = window.devicePixelRatio || 1.0;
             
-            // Send viewport dimensions by setting a special document title
-            // Format: "VIEWPORT_RESIZE:x,y,width,height,dpiScale"
+            console.log(`[Layout] notifyViewportResize PANEL: X=${adjustedX} Y=${adjustedY} W=${adjustedWidth} H=${adjustedHeight}`);
+
             const message = 'VIEWPORT_RESIZE:' + 
                 adjustedX + ',' + 
                 adjustedY + ',' + 
@@ -265,6 +256,11 @@
 
     function handleMouseUp(e) 
     {
+        if (hasDragged)
+        {
+            sendIFrameSizesToServer();
+            hasDragged = false;
+        }
         if (!isDragging) return;
         
         isDragging = false;
@@ -287,7 +283,7 @@
     
     function sendIFrameSizesToServer()
     {
-        const iframes = [
+        const panels = [
             { selector: '.hierarchy-panel iframe', name: 'hierarchy_panel' },
             { selector: '.viewport-panel iframe', name: 'viewport_panel' },
             { selector: '.object-inspector-panel iframe', name: 'object_inspector_panel' },
@@ -298,15 +294,17 @@
         
         const iframeData = [];
         
-        iframes.forEach(item => {
-            const element = document.querySelector(item.selector);
-            if (element) {
-                const rect = element.getBoundingClientRect();
+        panels.forEach(item => {
+            const iframe = document.querySelector(item.selector);
+            if (iframe) {
+                const iframeRect = iframe.getBoundingClientRect();
+                const parentPanel = iframe.parentElement;
+                const panelRect = parentPanel.getBoundingClientRect();
                 
-                const logicalX = Math.round(rect.left);
-                const logicalY = Math.round(rect.top);
-                const logicalWidth = Math.round(rect.width);
-                const logicalHeight = Math.round(rect.height);
+                const logicalX = Math.round(iframeRect.left);
+                const logicalY = Math.round(iframeRect.top);
+                const logicalWidth = Math.round(iframeRect.width);
+                const logicalHeight = Math.round(iframeRect.height);
                 
                 iframeData.push({
                     name: item.name,
@@ -314,9 +312,11 @@
                     y: logicalY,
                     width: logicalWidth,
                     height: logicalHeight,
-                    clientX: logicalX,
-                    clientY: logicalY
-                });
+                    clientX: logicalX + 40,
+                    clientY: logicalY + 50,
+                    marginLeft: 40,
+                    marginRight: 40,
+                });                
 
             }
         });

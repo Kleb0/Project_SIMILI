@@ -1,35 +1,35 @@
 #include "FrameDatas.hpp"
-#include "../../simple_window_delegate.hpp"
+#include "../../ui_handler.hpp"
 #include <iostream>
 #include <iomanip>
 
 namespace SIMILI {
 	namespace Frontend {
 
-			FrameDatas::FrameDatas(SimpleWindowDelegate* windowDelegate)
-				: windowDelegate_(windowDelegate)
+			FrameDatas::FrameDatas(UIHandler* handler)
+				: ui_handler_(handler)
 			{
 			}
 
-void FrameDatas::captureAllFrames(SDL_Window* sdlWindow)
+			void FrameDatas::catchFrameData(SDL_Window* sdlWindow)
 			{
-					if (!sdlWindow)
-					{
-						std::cout << "[FrameDatas] Invalid SDL_Window provided" << std::endl;
-						return;
-					}
-				
-				if (!windowDelegate_)
+				if (!sdlWindow)
 				{
-					std::cout << "[FrameDatas] No window delegate available" << std::endl;
+					std::cout << "[FrameDatas] Invalid SDL_Window provided" << std::endl;
+					return;
+				}
+				
+				if (!ui_handler_)
+				{
+					std::cout << "[FrameDatas] No UI handler available" << std::endl;
 					return;
 				}
 
-				auto allFrames = windowDelegate_->getAllIFrames();
+				auto allFrames = ui_handler_->getAllIFrames();
 				
 				if (allFrames.empty())
 				{
-					std::cout << "[FrameDatas] No frames available in SimpleWindowDelegate" << std::endl;
+					std::cout << "[FrameDatas] No frames available in UIHandler" << std::endl;
 					return;
 				}
 
@@ -58,8 +58,7 @@ void FrameDatas::captureAllFrames(SDL_Window* sdlWindow)
 					
 					frameDataMap_[frameData.name] = screenData;
 				}
-					
-				// printAllFrameData();
+
 			}
 
 			bool FrameDatas::getFrameData(const std::string& name, IFrameScreenData& outData) const
@@ -152,55 +151,5 @@ void FrameDatas::captureAllFrames(SDL_Window* sdlWindow)
 					data.screenHeight = 1080;
 				}
 			}
-
-		void FrameDatas::updateFrameData(const std::string& name, int relativeX, int relativeY, int width, int height, int clientX, int clientY, SDL_Window* sdlWindow)
-		{
-			if (!sdlWindow)
-			{
-				return;
-			}
-
-			auto it = frameDataMap_.find(name);
-			if (it != frameDataMap_.end())
-			{
-				IFrameScreenData& data = it->second;
-				
-				data.relativeX = relativeX;
-				data.relativeY = relativeY;
-				data.width = width;
-				data.height = height;
-				data.clientX = clientX;
-				data.clientY = clientY;
-				
-				captureWindowData(sdlWindow, data);
-				
-				int wx, wy;
-				SDL_GetWindowPosition(sdlWindow, &wx, &wy);
-				
-				data.screenX = wx + static_cast<int>(clientX * data.dpiScale);
-				data.screenY = wy + static_cast<int>(clientY * data.dpiScale);
-			}
-			else
-			{
-				IFrameScreenData newData;
-				newData.name = name;
-				newData.relativeX = relativeX;
-				newData.relativeY = relativeY;
-				newData.width = width;
-				newData.height = height;
-				newData.clientX = clientX;
-				newData.clientY = clientY;
-				
-				captureWindowData(sdlWindow, newData);
-				
-				int wx, wy;
-				SDL_GetWindowPosition(sdlWindow, &wx, &wy);
-				
-				newData.screenX = wx + static_cast<int>(clientX * newData.dpiScale);
-				newData.screenY = wy + static_cast<int>(clientY * newData.dpiScale);
-				
-				frameDataMap_[name] = newData;
-			}
-		}
 	}	
 } 

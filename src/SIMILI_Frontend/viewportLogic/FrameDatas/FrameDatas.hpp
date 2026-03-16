@@ -4,7 +4,7 @@
 #include <string>
 #include <map>
 
-class SimpleWindowDelegate;
+class UIHandler;
 
 namespace SIMILI {
 	namespace Frontend {
@@ -36,18 +36,16 @@ namespace SIMILI {
 		class FrameDatas
 		{
 		public:
-			FrameDatas(SimpleWindowDelegate* windowDelegate);
+			FrameDatas(UIHandler* handler);
 			~FrameDatas() = default;
 
-			void captureAllFrames(SDL_Window* sdlWindow);
+			void catchFrameData(SDL_Window* sdlWindow);
 			
 			const std::map<std::string, IFrameScreenData>& getFrameData() const { return frameDataMap_; }
 			
 			bool getFrameData(const std::string& name, IFrameScreenData& outData) const;
 			
 			void printAllFrameData() const;
-			
-			void updateFrameData(const std::string& name, int relativeX, int relativeY, int width, int height, int clientX, int clientY, SDL_Window* sdlWindow);
 
 		private:
 			float getDPIScale(SDL_Window* sdlWindow) const;
@@ -55,7 +53,7 @@ namespace SIMILI {
 			void captureWindowData(SDL_Window* sdlWindow, IFrameScreenData& data);
 			
 			std::map<std::string, IFrameScreenData> frameDataMap_;
-			SimpleWindowDelegate* windowDelegate_;
+			UIHandler* ui_handler_;
 		};
 	}
 }

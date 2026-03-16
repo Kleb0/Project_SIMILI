@@ -1,9 +1,8 @@
 #include "ui_handler.hpp"
-#include "simple_window_delegate.hpp"
 #include "viewportLogic/HTMLTextureRenderer/HtmlTextureRenderer.hpp"
 #include "viewportLogic/HTMLTextureRenderer/Overlay_HTML_Texture_Renderer.hpp"
 #include "viewportLogic/KeyManagement/KeyManager.hpp"
-#include "viewportLogic/Keymanagement/MouseControlToOverlay.hpp"
+#include "viewportLogic/Keymanagement/MouseController.hpp"
 #include "../../Engine/VulkanScene/VKScene.Hpp"
 #include "../../Engine/VulkanScene/VKcontext.hpp"
 #include "../../WorldObjects/Camera/Camera.hpp"
@@ -30,35 +29,26 @@ static UIHandler* g_activeHandler = nullptr;
 
 UIHandler* UIHandler::s_instance_ = nullptr;
 
-UIHandler::UIHandler() : parent_window_(nullptr), timer_id_(0),
+UIHandler::UIHandler() : parent_sdl_window_(nullptr), parent_window_(nullptr), window_handle_(nullptr), timer_id_(0),
 	last_viewport_update_time_(0), last_viewport_x_(0), last_viewport_y_(0), 
 	last_viewport_width_(0), last_viewport_height_(0), vk_scene_(nullptr),
 	vk_renderer_(nullptr), main_camera_(nullptr), cube_mesh_ptr_(nullptr), scene_initialized_(false),
 	render_message_router_(nullptr), 
-	iframe_mouse_detector_(nullptr),
 	frame_datas_(nullptr),
 	window_delegate_(nullptr),
-	current_mouse_state_(nullptr),
-	above_overlay_state_(nullptr),
-	outside_overlay_state_(nullptr),
-	above_ui_panel_state_(nullptr),
-	last_detected_region_name_(""),
-	mouse_control_to_overlay_(nullptr),
+	mouse_controller_(nullptr),
 	is_camera_operation_locked_(false),
 	slot_texture_renderer_(nullptr),
 	composite_test_renderer_(nullptr),
+	cef_drawer_(nullptr),
 	d3d11_device_(nullptr),
 	d3d11_device_context_(nullptr),
 	dxgi_device_(nullptr),
 	d2d_factory_(nullptr),
-	d2d_device_(nullptr)
+	d2d_device_(nullptr),
+	overlay_viewport_(nullptr)
 {
-	above_overlay_state_ = new SIMILI::Input::Mouse_Above_Overlay_State();
-	outside_overlay_state_ = new SIMILI::Input::Mouse_Outside_Overlay_State();
-	above_ui_panel_state_ = new SIMILI::Input::Mouse_Above_UI_Panel_State();	
-	mouse_control_to_overlay_ = new SIMILI::Input::MouseControlToOverlay();
-	
-	current_mouse_state_ = nullptr;
+	mouse_controller_ = new SIMILI::Input::MouseController();
 
 	HRESULT hr = S_OK;
 	D2D1_FACTORY_OPTIONS options = {};
@@ -105,6 +95,35 @@ UIHandler::UIHandler() : parent_window_(nullptr), timer_id_(0),
 	s_instance_ = this;
 }
 
+void UIHandler::startRenderTimer()
+{
+	if (timer_id_ == 0)
+	{
+		auto timerCallback = [](void* param, SDL_TimerID timerID, Uint32 interval) -> Uint32
+		{
+			UIHandler* handler = static_cast<UIHandler*>(param);
+			if (handler)
+			{
+				return RenderTimerProc(param, timerID, interval, handler->parent_sdl_window_, handler->getCEFDrawer());
+			}
+			return 0;
+		};
+		
+		timer_id_ = SDL_AddTimer(16, timerCallback, this);
+		
+		if (timer_id_ != 0)
+		{
+			g_timerHandlerMap[timer_id_] = this;
+			g_activeHandler = this;
+			std::cout << "[UIHandler] Render timer started (ID: " << timer_id_ << ")" << std::endl;
+		}
+		else
+		{
+			std::cerr << "[UIHandler] Failed to create render timer" << std::endl;
+		}
+	}
+}
+
 UIHandler::~UIHandler() 
 {
 	if (timer_id_ != 0) 
@@ -120,25 +139,10 @@ UIHandler::~UIHandler()
 		timer_id_ = 0;
 	}
 	
-	if (above_overlay_state_) 
+	if (mouse_controller_)
 	{
-		delete above_overlay_state_;
-		above_overlay_state_ = nullptr;
-	}
-	if (outside_overlay_state_)
-	{
-		delete outside_overlay_state_;
-		outside_overlay_state_ = nullptr;
-	}
-	if (above_ui_panel_state_)
-	{
-		delete above_ui_panel_state_;
-		above_ui_panel_state_ = nullptr;
-	}
-	if (mouse_control_to_overlay_)
-	{
-		delete mouse_control_to_overlay_;
-		mouse_control_to_overlay_ = nullptr;
+		delete mouse_controller_;
+		mouse_controller_ = nullptr;
 	}
 	if (frame_datas_)
 	{
@@ -155,7 +159,10 @@ UIHandler::~UIHandler()
 		delete composite_test_renderer_;
 		composite_test_renderer_ = nullptr;
 	}
-	current_mouse_state_ = nullptr;
+	if (cef_drawer_)
+	{
+		cef_drawer_ = nullptr; // CEF will release it via reference counting
+	}
 
 	if (d2d_device_)
 	{
@@ -234,19 +241,40 @@ void UIHandler::OnContextInitialized()
 {
 }
 
+void UIHandler::set_Overlay_Viewport(OverlayViewport* viewport)
+{
+	overlay_viewport_ = viewport;
+}
+
+void UIHandler::Set_SDLParent(SDL_ApplicationWindow* parentWindow)
+{
+	parent_sdl_window_ = parentWindow;
+	if (parentWindow)
+	{
+		parent_window_ = parentWindow->getHandle();
+		if (mouse_controller_)
+		{
+			mouse_controller_->setWindowHandle(parent_window_);
+		}
+	}
+}
+
+void UIHandler::Set_DOM(CEF_Drawer* drawer)
+{
+	cef_drawer_ = drawer;
+}
+
 void UIHandler::OnContextCreated(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefV8Context> context) 
 {
 	if (!render_message_router_) 
 	{
 		CefMessageRouterConfig config;
 		render_message_router_ = CefMessageRouterRendererSide::Create(config);
-		std::cout << "[UIHandler] Message router created in render process" << std::endl;
 	}
 	
 	if (render_message_router_) 
 	{
 		render_message_router_->OnContextCreated(browser, frame, context);
-		std::cout << "[UIHandler] Context created for frame: " << frame->GetURL().ToString() << std::endl;
 	}
 }
 
@@ -287,67 +315,14 @@ CefRefPtr<CefKeyboardHandler> UIHandler::GetKeyboardHandler()
 {
 	return this;
 }
+CefRefPtr<CefRenderHandler> UIHandler::GetRenderHandler()
+{
+	return cef_drawer_;
+}
+
 
 void UIHandler::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) 
 {
-	std::string title_str = title.ToString();
-	
-		if (title_str.find("VIEWPORT_RESIZE:") == 0) 
-		{
-			std::string coords = title_str.substr(16); 
-			
-			int js_x, js_y, width, height;
-			float dpiScale = 1.0f;
-			std::istringstream iss(coords);
-			char comma;
-			
-			if (iss >> js_x >> comma >> js_y >> comma >> width >> comma >> height) 
-			{
-				if (iss >> comma >> dpiScale) 
-				{
-				}
-			
-				if (overlay_viewport_ && parent_window_ && browser) 
-				{
-					int final_x = static_cast<int>(js_x * dpiScale);
-					int final_y = static_cast<int>(js_y * dpiScale);
-					int final_width = static_cast<int>(width * dpiScale);
-					int final_height = static_cast<int>(height * dpiScale);
-					
-					Uint64 current_time = SDL_GetTicks();
-					bool position_changed = (abs(final_x - last_viewport_x_) > 2 || 
-											abs(final_y - last_viewport_y_) > 2 ||
-											abs(final_width - last_viewport_width_) > 2 ||
-											abs(final_height - last_viewport_height_) > 2);
-					bool time_elapsed = (current_time - last_viewport_update_time_) > 16;
-					
-					if (position_changed || time_elapsed || !overlay_viewport_->isVisible()) 
-					{
-						overlay_viewport_->setPosition(final_x, final_y, final_width, final_height);
-						
-						if (mouse_control_to_overlay_)
-						{
-							mouse_control_to_overlay_->resetMousePosition();
-						}
-						
-					if (vk_scene_ && vk_scene_->getActiveCamera())
-					{
-						vk_scene_->getActiveCamera()->setResolution(final_width, final_height, dpiScale);
-						last_viewport_width_ = final_width;
-						last_viewport_height_ = final_height;
-						
-						captureIFramePositions();
-						
-						if (!overlay_viewport_->isVisible()) 
-						{
-							overlay_viewport_->show(true);
-							std::cout << "[UIHandler] Overlay now visible" << std::endl;
-						}
-					}
-				}
-			}
-		}
-	}
 }
 
 void UIHandler::OnAfterCreated(CefRefPtr<CefBrowser> browser) 
@@ -412,86 +387,10 @@ void UIHandler::CloseAllBrowsers(bool force_close)
 	}
 }
 
+// ------------------- Render Timer Callback -------------------
 
-// -------- Rendering ------------
 
-void UIHandler::createOverlayViewport(SDL_Window* parent_window) 
-{
-	parent_window_ = parent_window;
-		
-	if (!overlay_viewport_) 
-	{
-		overlay_viewport_ = std::make_unique<OverlayViewport>();
-	}
-
-	int window_width, window_height;
-	SDL_GetWindowSize(parent_window, &window_width, &window_height);
-
-	int overlay_x = 0;
-	int overlay_y = 0;
-	int overlay_w = 100;
-	int overlay_h = 100;
-	
-	overlay_viewport_->create(parent_window, overlay_x, overlay_y, overlay_w, overlay_h);
-	
-	overlay_viewport_->setUIHandler(this);
-	
-	if (vk_scene_) 
-	{
-		overlay_viewport_->setVKScene(vk_scene_);
-	}
-
-	overlay_viewport_->switchModeByKey(1);
-	
-	initializeSceneObjects();
-	
-	overlay_viewport_->show(true);
-	
-	enableSlotTextureRendering(false);
-	enableCompositeTestRenderer(true);
-	
-	if (iframe_mouse_detector_) {
-		iframe_mouse_detector_->setWindowHandle(parent_window);
-	}		
-
-	if (timer_id_ == 0 && overlay_viewport_) 
-	{
-		timer_id_ = SDL_AddTimer(16, RenderTimerProc, this);
-		
-		if (timer_id_ != 0) 
-		{
-			g_timerHandlerMap[timer_id_] = this;
-			g_activeHandler = this;
-			std::cout << "[UIHandler] Render timer started with ID " << timer_id_ << std::endl;
-		}
-	}
-	
-	updatePanelBoundsFromStocker();
-}
-
-void UIHandler::updateOverlayPosition() 
-{
-	if (overlay_viewport_ && parent_window_) 
-	{
-		int window_width, window_height;
-		SDL_GetWindowSize(parent_window_, &window_width, &window_height);
-		
-		int left_panel_width = (int)(window_width * 0.15f);
-		int right_panel_width = (int)(window_width * 0.15f);
-		int viewport_width = window_width - left_panel_width - right_panel_width;
-		int viewport_height = (int)(window_height * 0.60f);
-		
-		const int inset = 5;
-		overlay_viewport_->setPosition(
-			left_panel_width + inset, 
-			inset, 
-			viewport_width - (2 * inset), 
-			viewport_height - (2 * inset)
-		);
-	}
-}
-
-static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 interval) 
+static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 interval, SDL_ApplicationWindow* parentWindow, CEF_Drawer* dom) 
 {
 	auto it = g_timerHandlerMap.find(timerID);
 	if (it == g_timerHandlerMap.end()) 
@@ -500,8 +399,6 @@ static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 i
 	}
 	
 	UIHandler* handler = it->second;
-
-
 	if (handler && handler->getOverlay()) 
 	{
 		SDL_Event event;
@@ -513,89 +410,28 @@ static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 i
 				return 0;
 			}
 		}
-		
-		if (auto windowDelegate = handler->getWindowDelegate())
+	
+		if (handler->getMouseController())
 		{
-			windowDelegate->pollWindowEvents();
-		}
-		
-		static int frameCounter = 0;
-		frameCounter++;		
-		
-		// Update mouse position tracking in MouseControlToOverlay
-		if (handler->getMouseControlToOverlay())
-		{
-			handler->getMouseControlToOverlay()->updateMousePosition();
-			
-			// Update wheel state to handle timeout
-			handler->getMouseControlToOverlay()->updateWheelState();
-		}
-		
-		auto mouseDetector = handler->getIFrameMouseDetector();	
+			handler->getMouseController()->updateMousePosition();
+			handler->getMouseController()->updateWheelState();
 
-		if (mouseDetector) 
-		{
-			// Get current mouse position in screen coordinates (global)
-			float mouseX, mouseY;
-			SDL_GetGlobalMouseState(&mouseX, &mouseY);
-			
-			// Detect the region at every frame for state management
-			auto region = mouseDetector->detectMouseRegion(static_cast<int>(mouseX), static_cast<int>(mouseY));
-			
-			// Convert enum to readable string
-			std::string regionName;
-			switch (region)
-			{
-				case SIMILI::Input::MouseRegion::Outside:
-					regionName = "Outside Window";
-					break;
-				case SIMILI::Input::MouseRegion::HierarchyPanel:
-					regionName = "Hierarchy Panel";
-					break;
-				case SIMILI::Input::MouseRegion::ViewportPanel:
-					regionName = "Viewport Panel";
-					break;
-				case SIMILI::Input::MouseRegion::ObjectInspectorPanel:
-					regionName = "Object Inspector Panel";
-					break;
-				case SIMILI::Input::MouseRegion::HistoryPanel:
-					regionName = "History Panel";
-					break;
-				case SIMILI::Input::MouseRegion::ProjectViewerPanel:
-					regionName = "Project Viewer Panel";
-					break;
-				case SIMILI::Input::MouseRegion::PanelAboveUI:
-					regionName = "Panel Above UI";
-					break;
-				case SIMILI::Input::MouseRegion::Splitter:
-					regionName = "Splitter";
-					break;
-				case SIMILI::Input::MouseRegion::Unknown:
-				default:
-					regionName = "Unknown";
-					break;
-			}
-			
-			if (regionName != handler->getLastDetectedRegionName())
-			{		
-				// Only allow state transitions if camera is not being panned
-				if (!handler->isCameraOperationLocked())
-				{
-					handler->transitionMouseState(regionName);
-				}
-			}
+			int mouseX = handler->getMouseController()->getCurrentMouseClientX();
+			int mouseY = handler->getMouseController()->getCurrentMouseClientY();
+			std::string regionName = handler->getMouseController()->detectMouseRegionFromClientCoordinates(mouseX, mouseY);
+			handler->getMouseController()->transitionMouseState(regionName, mouseX, mouseY);
 		}
 		
 		// Camera lateral movement (panning)
-		if (handler->getMouseControlToOverlay()->isShiftLeftClickActive() && handler->getCurrentMouseState() == handler->getAboveOverlayState())
+		if (handler->getMouseController()->isShiftLeftClickActive() && handler->getMouseController()->getCurrentMouseState() == handler->getMouseController()->getAboveOverlayState())
 		{
 			// Lock state transitions during camera panning
 			handler->setCameraOperationLocked(true);
 			
 			if (handler->getOverlay())
 			{
-				int deltaX = handler->getMouseControlToOverlay()->getMouseDeltaX();
-				int deltaY = handler->getMouseControlToOverlay()->getMouseDeltaY();
+				int deltaX = handler->getMouseController()->getMouseDeltaX();
+				int deltaY = handler->getMouseController()->getMouseDeltaY();
 				handler->getOverlay()->MoveCameraLaterally(deltaX, deltaY);
 			}
 		}
@@ -608,55 +444,54 @@ static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 i
 			}
 		}
 		
-		if (handler->getCurrentMouseState() == handler->getAboveOverlayState())
+		if (handler->getMouseController()->getCurrentMouseState() == handler->getMouseController()->getAboveOverlayState())
 		{
-			if (handler->getMouseControlToOverlay()->hasClickEvent())
+			if (handler->getMouseController()->hasClickEvent())
 			{
 				if (handler->getOverlay())
 				{
-					int mouseX = handler->getMouseControlToOverlay()->getCurrentMouseX();
-					int mouseY = handler->getMouseControlToOverlay()->getCurrentMouseY();
+					int mouseX = handler->getMouseController()->getCurrentMouseX();
+					int mouseY = handler->getMouseController()->getCurrentMouseY();
 					handler->getOverlay()->shootRaycastFromUIHandler(mouseX, mouseY);
 				}
 			}
 		}
 		
-		// Check Shift key state using SDL3
 		const bool* keystate = SDL_GetKeyboardState(NULL);
 		bool isShiftPressed = (keystate[SDL_SCANCODE_LSHIFT] || keystate[SDL_SCANCODE_RSHIFT]);
 
-		if (handler->getMouseControlToOverlay()->isLeftButtonClicking() && !isShiftPressed && handler->getCurrentMouseState() == handler->getAboveOverlayState())
+		if (handler->getMouseController()->isLeftButtonClicking() && !isShiftPressed && handler->getMouseController()->getCurrentMouseState() == handler->getMouseController()->getAboveOverlayState())
 		{
-			if (handler->getMouseControlToOverlay()->isClickHeldForDuration(200))
+			if (handler->getMouseController()->isClickHeldForDuration(200))
 			{
 				if (handler->getOverlay() && !handler->getOverlay()->isGizmoActive())
 				{
-					int deltaX = handler->getMouseControlToOverlay()->getMouseDeltaX();
-					int deltaY = handler->getMouseControlToOverlay()->getMouseDeltaY();
+					int deltaX = handler->getMouseController()->getMouseDeltaX();
+					int deltaY = handler->getMouseController()->getMouseDeltaY();
 					handler->getOverlay()->ProcessCameraOrbiting(deltaX, deltaY);
 				}
 			}
 		}
 		
 		// Process mouse wheel input ONLY when mouse is above overlay
-		if (handler->getCurrentMouseState() == handler->getAboveOverlayState())
+		if (handler->getMouseController()->getCurrentMouseState() == handler->getMouseController()->getAboveOverlayState())
 		{
-			if (handler->getMouseControlToOverlay()->hasWheelInput())
+			if (handler->getMouseController()->hasWheelInput())
 			{
-				int wheelDirection = handler->getMouseControlToOverlay()->getMouseWheelDirection();
+				int wheelDirection = handler->getMouseController()->getMouseWheelDirection();
 				handler->getOverlay()->ProcessZoom(wheelDirection);
 			}
 		}
 		else
 		{
 			// If mouse is not above overlay, clear any pending wheel input
-			if (handler->getMouseControlToOverlay()->hasWheelInput())
+			if (handler->getMouseController()->hasWheelInput())
 			{
-				handler->getMouseControlToOverlay()->resetWheelDirection();
+				handler->getMouseController()->resetWheelDirection();
 			}
 		}
 		
-		if (handler->getOverlay() && handler->getMouseControlToOverlay())
+		if (handler->getOverlay() && handler->getMouseController())
 		{
 			SDL_Window* overlayWindow = handler->getOverlay()->getHandle();
 
@@ -666,16 +501,16 @@ static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 i
 				float mouseX, mouseY;
 				Uint32 mouseState = SDL_GetMouseState(&mouseX, &mouseY);
 				
-				bool leftDown = handler->getMouseControlToOverlay()->isLeftButtonClicking();
+				bool leftDown = handler->getMouseController()->isLeftButtonClicking();
 				bool rightDown = (mouseState & SDL_BUTTON_RMASK) != 0;
 				bool middleDown = (mouseState & SDL_BUTTON_MMASK) != 0;
 					
-					float wheelDelta = 0.0f;
+				float wheelDelta = 0.0f;
 
-					if (handler->getMouseControlToOverlay()->hasWheelInput())
-					{
-						wheelDelta = static_cast<float>(handler->getMouseControlToOverlay()->getMouseWheelDirection());
-					}
+				// if (handler->getMouseController()->hasWheelInput())
+				// {
+				// 	wheelDelta = static_cast<float>(handler->getMouseController()->getMouseWheelDirection());
+				// }
 					
 				handler->getOverlay()->injectMouseInputs(
 					static_cast<int>(mouseX),
@@ -686,7 +521,7 @@ static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 i
 					wheelDelta
 				);
 				
-				handler->getOverlay()->render();
+				// handler->getOverlay()->render();
 			}
 		}
 		
@@ -701,9 +536,13 @@ static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 i
 		}
 	}
 	
-	return interval; // Continue timer with same interval
+	return interval; 
+
+	
 }
 
+
+// -------------------- End of Render Timer Callback --------------------
 
 bool UIHandler::isOverlayRenderingEnabled() const 
 {
@@ -801,8 +640,6 @@ void UIHandler::enableCompositeTestRenderer(bool enable)
 	}
 }
 
-// ---------- End of Rendering ----------
-
 
 // ---------- Scene Update ------------ 
 
@@ -859,8 +696,8 @@ void UIHandler::initializeFrameDatas(SimpleWindowDelegate* windowDelegate)
 		frame_datas_ = nullptr;
 	}
 	
-	frame_datas_ = new SIMILI::Frontend::FrameDatas(windowDelegate);
-	std::cout << "[UIHandler] FrameDatas initialized with SimpleWindowDelegate" << std::endl;
+	frame_datas_ = new SIMILI::Frontend::FrameDatas(this);
+	std::cout << "[UIHandler] FrameDatas initialized with UIHandler" << std::endl;
 }
 
 void UIHandler::reinitializeSingleObject(ThreeDObject* obj)
@@ -955,134 +792,97 @@ CefEventHandle os_event)
 	return false;
 }
 
-void UIHandler::updatePanelBoundsFromStocker()
+void UIHandler::set_MouseControl(SIMILI::Input::MouseController* mouseControl)
 {
-	if (!iframe_mouse_detector_ || !window_delegate_) {
-		return;
-	}
-	
-	SIMILI::Input::PanelBounds bounds;
-	
-	auto allFrames = window_delegate_->getAllIFrames();
-	
-	for (const auto& pair : allFrames) {
-		const std::string& name = pair.first;
-		const IFrameData& data = pair.second;
-		
-		if (name == "hierarchy_panel") 
-		{
-			bounds.hierarchy.x = data.x;
-			bounds.hierarchy.y = data.y;
-			bounds.hierarchy.width = data.width;
-			bounds.hierarchy.height = data.height;
-		}
-		else if (name == "viewport_panel") 
-		{
-			bounds.viewport.x = data.x;
-			bounds.viewport.y = data.y;
-			bounds.viewport.width = data.width;
-			bounds.viewport.height = data.height;
-		}
-		else if (name == "object_inspector_panel") 
-		{
-			bounds.objectInspector.x = data.x;
-			bounds.objectInspector.y = data.y;
-			bounds.objectInspector.width = data.width;
-			bounds.objectInspector.height = data.height;
-		}
-		else if (name == "history_panel") 
-		{
-			bounds.history.x = data.x;
-			bounds.history.y = data.y;
-			bounds.history.width = data.width;
-			bounds.history.height = data.height;
-		}
-		else if (name == "project_viewer_panel") 
-		{
-			bounds.projectViewer.x = data.x;
-			bounds.projectViewer.y = data.y;
-			bounds.projectViewer.width = data.width;
-			bounds.projectViewer.height = data.height;
-		}
-	}
-	
-	iframe_mouse_detector_->updatePanelBounds(bounds);
-	
-	std::cout << "[UIHandler] Panel bounds updated - Viewport at (" 
-			  << bounds.viewport.x << "," << bounds.viewport.y 
-			  << ") size " << bounds.viewport.width << "x" << bounds.viewport.height << std::endl;
-}
-
-void UIHandler::setIFrameMouseDetector(SIMILI::Input::IFrameMouseDetector* detector)
-{
-	iframe_mouse_detector_ = detector;
-}
-
-void UIHandler::logIFrameSizes()
-{
-	if (!window_delegate_) 
+	if (mouse_controller_ == mouseControl)
 	{
 		return;
 	}
-	
-	updatePanelBoundsFromStocker();
+
+	if (mouse_controller_)
+	{
+		delete mouse_controller_;
+		mouse_controller_ = nullptr;
+	}
+
+	mouse_controller_ = mouseControl;
+
+	if (mouse_controller_)
+	{
+		if (parent_window_)
+		{
+			mouse_controller_->setWindowHandle(parent_window_);
+		}
+	}
 }
+
 
 void UIHandler::captureIFramePositions()
 {
-	if (!frame_datas_ || !parent_window_)
+	if (!frame_datas_)
 	{
-		std::cout << "[UIHandler] Cannot capture iframe positions - invalid state" << std::endl;
+		std::cout << "[UIHandler] Cannot capture iframe positions - frame_datas_ not available" << std::endl;
 		return;
 	}
-	
-	frame_datas_->captureAllFrames(parent_window_);
-	
-	if (composite_test_renderer_ && composite_test_renderer_->isActive())
+
+	if (!parent_sdl_window_)
 	{
-		SIMILI::Frontend::IFrameScreenData panelData;
-		if (frame_datas_->getFrameData("panel_above_UI", panelData))
-		{
-			
-			int screenX = composite_test_renderer_->getScreenX();
-			int screenY = composite_test_renderer_->getScreenY();
-			int width = composite_test_renderer_->getWidth();
-			int height = composite_test_renderer_->getHeight();
-			
-		// Get window position to convert screen coords to window-relative coords
-		int windowX, windowY;
-		SDL_GetWindowPosition(parent_window_, &windowX, &windowY);
-		int topLeftX = screenX - windowX;
-		int topLeftY = screenY - windowY;
-		
-		// Get DPI scale using SDL3
-		float dpiScale = 1.0f;
-		SDL_DisplayID displayID = SDL_GetDisplayForWindow(parent_window_);
-		if (displayID != 0)
-		{
-			dpiScale = SDL_GetDisplayContentScale(displayID);
-		}
-		
-		// Convert physical pixels to CSS pixels for coordinates AND dimensions
-		int relativeX = static_cast<int>(topLeftX / dpiScale);
-		int relativeY = static_cast<int>(topLeftY / dpiScale);
-		int cssWidth = static_cast<int>(width / dpiScale);
-		int cssHeight = static_cast<int>(height / dpiScale);
-		
-		frame_datas_->updateFrameData("panel_above_UI", relativeX, relativeY, cssWidth, cssHeight, relativeX, relativeY, parent_window_);
-		
-		std::cout <<"\n [UIHandler] -------------- Test Panel Above UI Frame Data --------------" << std::endl;
-		std::cout << "[UIHandler] panel_above_UI updated - RelativeX: " << relativeX 
-				  << ", RelativeY: " << relativeY 
-				  << ", Width (CSS): " << cssWidth 
-				  << ", Height (CSS): " << cssHeight 
-				  << " (Physical: " << width << "x" << height << ", DPI: " << dpiScale << ")" << std::endl;
-		std::cout << "-------------------------------------------------------------\n" << std::endl;
-		}
+		std::cout << "[UIHandler] parent_sdl_window_ not available" << std::endl;
+		return;
 	}
-	
-	updateIFrameMouseDetectorFromFrameDatas();
-	
+
+	SDL_Window* sdlWindow = parent_sdl_window_->getHandle();
+	if (!sdlWindow)
+	{
+		std::cout << "[UIHandler] SDL window handle not available" << std::endl;
+		return;
+	}
+
+	if (mouse_controller_)
+	{
+		mouse_controller_->setWindowHandle(sdlWindow);
+		
+		bool isMaximized = parent_sdl_window_->isMaximized();
+		int left = 0, top = 0, right = 0, bottom = 0;
+		if (isMaximized)
+		{
+			parent_sdl_window_->getBorderOffsets(left, top, right, bottom);
+		}
+		mouse_controller_->setMaximizedState(isMaximized, left, top);
+	}
+
+	frame_datas_->catchFrameData(sdlWindow);
+
+	if (mouse_controller_)
+	{
+		const auto& frameDataMap = frame_datas_->getFrameData();
+		
+		if (frameDataMap.empty())
+		{
+			std::cout << "[UIHandler] WARNING: No frame data captured from FrameDatas" << std::endl;
+			return;
+		}
+
+		std::map<std::string, SIMILI::Input::MouseControlFrameData> mouseControlDataMap;
+		for (const auto& pair : frameDataMap)
+		{
+			const auto& data = pair.second;
+			SIMILI::Input::MouseControlFrameData convertedData;
+			convertedData.name = data.name;
+			convertedData.clientX = data.clientX;
+			convertedData.clientY = data.clientY;
+			convertedData.width = data.width;
+			convertedData.height = data.height;
+			mouseControlDataMap[pair.first] = convertedData;
+			
+			std::cout << "[UIHandler] Panel '" << data.name << "' bounds: "
+				<< "clientX=" << data.clientX << " clientY=" << data.clientY
+				<< " width=" << data.width << " height=" << data.height << std::endl;
+		}
+
+		mouse_controller_->updateMouseControlPanelBoundsFromFrameData(mouseControlDataMap);
+	}
+		
 	if (overlay_viewport_ && vk_scene_ && vk_scene_->getActiveCamera())
 	{
 		SIMILI::Frontend::IFrameScreenData ViewportPanelSize;
@@ -1102,7 +902,6 @@ void UIHandler::captureIFramePositions()
 			
 			overlay_viewport_->updateViewportDimensions(Width, Height);
 
-			// Handle panel repositioning if requested
 			if (composite_test_renderer_ && composite_test_renderer_->needs_repositioning())
 			{
 				composite_test_renderer_->UpdateParentData(
@@ -1113,7 +912,6 @@ void UIHandler::captureIFramePositions()
 					dpiScale
 				);
 
-				// Apply the requested anchor position
 				switch (composite_test_renderer_->anchor_position())
 				{
 					case PanelAnchorPosition::Centerize:
@@ -1140,138 +938,8 @@ void UIHandler::captureIFramePositions()
 				}
 
 				composite_test_renderer_->clearRepositioningFlag();
-
-				int newScreenX = composite_test_renderer_->getScreenX();
-				int newScreenY = composite_test_renderer_->getScreenY();
-				int newWidth = composite_test_renderer_->getWidth();
-				int newHeight = composite_test_renderer_->getHeight();
-				
-				// Get window position to convert screen coords to window-relative coords
-				int newWindowX, newWindowY;
-				SDL_GetWindowPosition(parent_window_, &newWindowX, &newWindowY);
-				int newTopLeftX = newScreenX - newWindowX;
-				int newTopLeftY = newScreenY - newWindowY;
-				
-				// Convert physical pixels to CSS pixels for coordinates AND dimensions
-				int newRelativeX = static_cast<int>(newTopLeftX / dpiScale);
-				int newRelativeY = static_cast<int>(newTopLeftY / dpiScale);
-				int newCssWidth = static_cast<int>(newWidth / dpiScale);
-				int newCssHeight = static_cast<int>(newHeight / dpiScale);
-				
-				frame_datas_->updateFrameData("panel_above_UI", newRelativeX, newRelativeY, newCssWidth, newCssHeight, newRelativeX, newRelativeY, parent_window_);
-								
-				// Update IFrameMouseDetector with new coordinates
-				updateIFrameMouseDetectorFromFrameDatas();
 			}
 
-		}
-	}
-}
-
-void UIHandler::updateIFrameMouseDetectorFromFrameDatas()
-{
-	if (!frame_datas_ || !iframe_mouse_detector_)
-	{
-		return;
-	}
-	
-	std::map<std::string, SIMILI::Input::IFrameScreenDataSimple> simpleFrameData;
-	
-	const auto& frameDataMap = frame_datas_->getFrameData();
-
-	for (const auto& pair : frameDataMap)
-	{
-		const SIMILI::Frontend::IFrameScreenData& data = pair.second;
-		SIMILI::Input::IFrameScreenDataSimple simple;
-		
-		simple.name = data.name;
-		
-		if (data.name == "panel_above_UI" && composite_test_renderer_ && composite_test_renderer_->isActive())
-		{
-			int screenX = composite_test_renderer_->getScreenX();
-			int screenY = composite_test_renderer_->getScreenY();
-			int width = composite_test_renderer_->getWidth();
-			int height = composite_test_renderer_->getHeight();
-			
-			// Get window position to convert screen coords to window-relative coords
-			int topLeftX = screenX;
-			int topLeftY = screenY;
-			if (parent_window_)
-			{
-				int windowX, windowY;
-				SDL_GetWindowPosition(parent_window_, &windowX, &windowY);
-				topLeftX = screenX - windowX;
-				topLeftY = screenY - windowY;
-			}
-			
-			// Get DPI scale using SDL3
-			float dpiScale = 1.0f;
-			if (parent_window_)
-			{
-				SDL_DisplayID displayID = SDL_GetDisplayForWindow(parent_window_);
-				if (displayID != 0)
-				{
-					dpiScale = SDL_GetDisplayContentScale(displayID);
-				}
-			}
-			
-			simple.clientX = static_cast<int>(topLeftX / dpiScale);
-			simple.clientY = static_cast<int>(topLeftY / dpiScale);
-			simple.width = static_cast<int>(width / dpiScale);
-			simple.height = static_cast<int>(height / dpiScale);
-		}
-		else
-		{
-			simple.clientX = data.clientX;
-			simple.clientY = data.clientY;
-			simple.width = data.width;
-			simple.height = data.height;
-		}
-		
-		simpleFrameData[data.name] = simple;
-	}
-	
-	iframe_mouse_detector_->updatePanelBoundsFromFrameData(simpleFrameData);
-	
-}
-
-void UIHandler::transitionMouseState(const std::string& regionName)
-{
-	
-	last_detected_region_name_ = regionName;
-	
-	SIMILI::Input::Mouse_State* newState = nullptr;
-	
-	if (regionName == "Viewport Panel")
-	{
-		newState = above_overlay_state_;
-	}
-	else if (regionName == "Panel Above UI")
-	{
-		newState = above_ui_panel_state_;
-	}
-	else
-	{
-		newState = outside_overlay_state_;
-	}
-	
-	if (newState != current_mouse_state_)
-	{
-		if (current_mouse_state_)
-		{
-			current_mouse_state_->onExit();
-		}
-		
-		current_mouse_state_ = newState;
-		
-		if (current_mouse_state_)
-		{
-			current_mouse_state_->onEnter();
-		}
-		
-		if (mouse_control_to_overlay_)
-		{
-			mouse_control_to_overlay_->setMouseState(current_mouse_state_);
 		}
 	}
 }
@@ -1281,7 +949,6 @@ void UIHandler::CallTestFromServer()
 	
 	if (!CefCurrentlyOn(TID_UI))
 	{
-		// the texture need to be rendered on the UI thread, so we post a task to enable it there
 		CefPostTask(TID_UI, base::BindOnce(&UIHandler::enableSlotTextureRendering, base::Unretained(this), true));
 		return;
 	}

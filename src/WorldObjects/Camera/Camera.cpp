@@ -111,12 +111,12 @@ void Camera::setResolution(int width, int height, float dpiScale)
     std::cout << "[Camera] Resolution updated: " << width << "x" << height << " (DPI Scale: " << dpiScale << ")" << std::endl;
 }
 
-void Camera::set_Vulkan_Scene(VKScene* scene)
+void Camera::setVKScene(VKScene* scene)
 {
     vulkanScene_ = scene;
 }
 
-void Camera::render_Vulkan_Scene()
+void Camera::renderAttachedVKScene()
 {
     if (vulkanScene_)
     {

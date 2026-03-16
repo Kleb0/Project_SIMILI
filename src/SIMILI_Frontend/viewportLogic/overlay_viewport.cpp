@@ -41,7 +41,7 @@
 #include "../../Engine/ThreeDInteractions/FaceTransform.hpp"
 #include "../../Engine/ThreeDInteractions/EdgeTransform.hpp"
 #include "Keymanagement/KeyManager.hpp"
-#include "Keymanagement/MouseControlToOverlay.hpp"
+#include "Keymanagement/MouseController.hpp"
 #include "FrameDatas/FrameDatas.hpp"
 #include "../ui_handler.hpp"
 // ============================================================================
@@ -55,6 +55,7 @@ OverlayViewport::OverlayViewport() : sdl_window_(nullptr)
 	, width_(800)
 	, height_(600)
 	, vk_scene_(nullptr)
+	, camera_(nullptr)
 	, rendering_enabled_(true)
 	, imgui_initialized_(false)
 	, selector_(nullptr)
@@ -262,8 +263,7 @@ void OverlayViewport::initializeOpenGL(SDL_GLContext shareContext)
 	
 	html_texture_renderer_ = new HtmlTextureRenderer();
 	html_texture_renderer_->initialize(html_texture_width_, html_texture_height_);
-	html_texture_renderer_->setRenderRect(html_texture_x_, html_texture_y_, 
-		html_texture_width_, html_texture_height_);
+	html_texture_renderer_->setRenderRect(html_texture_x_, html_texture_y_, html_texture_width_, html_texture_height_);
 	html_texture_renderer_->createBrowser("file:///ui/Mode_UI.html", html_texture_width_, html_texture_height_);
 }
 
@@ -317,8 +317,22 @@ void OverlayViewport::makeContextCurrent() {
 	}
 }
 
-void OverlayViewport::releaseContext() {
+void OverlayViewport::releaseContext() 
+{
 	SDL_GL_MakeCurrent(nullptr, nullptr);
+}
+
+// ============================================================================
+// CAMERA MANAGEMENT
+// ============================================================================
+
+void OverlayViewport::setCamera(Camera* cam)
+{
+	camera_ = cam;
+	if (camera_)
+	{
+		std::cout << "[OverlayViewport] Camera set: " << camera_->getName() << std::endl;
+	}
 }
 
 // ============================================================================
@@ -367,84 +381,6 @@ void OverlayViewport::update_Scene_Rendering()
 	}
 }
 
-// ============================================================================
-// RENDERING SYSTEM
-// ============================================================================
-
-void OverlayViewport::render() 
-{
-	if (!sdl_window_ || !rendering_enabled_) 
-	{
-		return;
-	}
-	
-	update_Scene_Rendering();
-	
-	CefDoMessageLoopWork();
-		
-	if (imgui_initialized_) 
-	{
-		if (has_injected_inputs_)
-		{
-			ImGuiIO& io = ImGui::GetIO();
-			io.MousePos = ImVec2(static_cast<float>(injected_mouse_x_), static_cast<float>(injected_mouse_y_));
-			io.MouseDown[0] = injected_left_down_;
-			io.MouseDown[1] = injected_right_down_;
-			io.MouseDown[2] = injected_middle_down_;
-			io.MouseWheel = injected_wheel_delta_;
-			
-			injected_wheel_delta_ = 0.0f;
-		}
-		
-		ImGui_ImplOpenGL3_NewFrame();
-		ImGui_ImplSDL3_NewFrame();
-		ImGui::NewFrame();
-		ImGuizmo::BeginFrame();
-		
-		ImGui::SetNextWindowPos(ImVec2(0, 0));
-		ImGui::SetNextWindowSize(ImVec2(static_cast<float>(width_), static_cast<float>(height_)));
-		ImGui::Begin("ViewportOverlay", nullptr, 
-			ImGuiWindowFlags_NoTitleBar | 
-			ImGuiWindowFlags_NoResize | 
-			ImGuiWindowFlags_NoMove | 
-			ImGuiWindowFlags_NoScrollbar | 
-			ImGuiWindowFlags_NoScrollWithMouse | 
-			ImGuiWindowFlags_NoCollapse | 
-			ImGuiWindowFlags_NoBackground | 
-			ImGuiWindowFlags_NoBringToFrontOnFocus |
-			ImGuiWindowFlags_NoFocusOnAppearing);
-	}
-	
-	renderScene();
-	
-	ThreeDWorldInteractions();
-	
-	if (imgui_initialized_)
-	{
-		is_gizmo_active_ = ImGuizmo::IsUsing();
-	}
-	else
-	{
-		is_gizmo_active_ = false;
-	}
-	
-	SIMILI::Input::KeyManager::getInstance().update();
-	
-	if (html_texture_renderer_) 
-	{
-		html_texture_renderer_->render();
-	}
-	
-	if (imgui_initialized_) 
-	{
-		ImGui::End();
-		ImGui::Render();
-		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-	}
-	
-	SDL_GL_SwapWindow(sdl_window_);
-}
-
 void OverlayViewport::updateViewportDimensions(int width, int height)
 {
 	if (width_ != width || height_ != height)
@@ -455,52 +391,6 @@ void OverlayViewport::updateViewportDimensions(int width, int height)
 		if (vk_scene_ && vk_scene_->getVKContext())
 		{
 			vk_scene_->getVKContext()->resize(width_, height_);
-		}
-	}
-}
-
-void OverlayViewport::renderScene() 
-{
-	static int render_debug_counter = 0;
-	bool should_debug = false; // Disabled to reduce console spam
-	
-	// CRITICAL: Ensure our OpenGL context is current before rendering
-	makeContextCurrent();
-	
-	if (vk_scene_) 
-	{
-		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glViewport(0, 0, width_, height_);
-		
-		if (should_debug) 
-		{
-			std::cout << "[OverlayViewport] Rendering 3D scene to " << width_ << "x" << height_ << " viewport" << std::endl;
-		}
-		
-		// Enable depth testing for 3D rendering
-		glEnable(GL_DEPTH_TEST);
-		glDepthFunc(GL_LESS);
-		
-		vk_scene_->render(width_, height_);
-		
-		if (should_debug) 
-		{
-			// Check if anything was rendered
-			unsigned char pixel[4];
-			glReadPixels(width_/2, height_/2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
-			std::cout << "[OverlayViewport] Center pixel after render: R=" << (int)pixel[0] << " G=" << (int)pixel[1] << " B=" << (int)pixel[2] << std::endl;
-		}
-	}
-	else 
-	{
-		// Red background indicates missing 3D scene
-		glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glViewport(0, 0, width_, height_);
-		
-		if (should_debug) {
-			std::cout << "[OverlayViewport] WARNING: No 3D scene to render!" << std::endl;
 		}
 	}
 }
@@ -517,18 +407,10 @@ void OverlayViewport::setPosition(int x, int y, int width, int height)
 		
 		glViewport(0, 0, width, height);
 		
-		if (vk_scene_ && vk_scene_->getActiveCamera() && ui_handler_ && ui_handler_->getFrameDatas())
+		if (vk_scene_ && vk_scene_->getActiveCamera())
 		{
-			SIMILI::Frontend::IFrameScreenData viewportData;
-			if (ui_handler_->getFrameDatas()->getFrameData("viewport_docking", viewportData))
-			{
-				vk_scene_->getActiveCamera()->setResolution(width, height, viewportData.dpiScale);
-			}
-			else
-			{
-				vk_scene_->getActiveCamera()->setResolution(width, height);
-			}
-		}	
+			vk_scene_->getActiveCamera()->setResolution(width, height);
+		}
 		
 	}
 }
@@ -668,11 +550,6 @@ void OverlayViewport::performRaycast(int mouseX, int mouseY)
 void OverlayViewport::setMultipleSelectedObjects(const std::list<ThreeDObject*>& objects) 
 { 
 	multiple_selected_objects_ = objects;
-	
-	if (ui_handler_) 
-	{
-		ui_handler_->notifySceneChanged();
-	}
 }
 
 // ============================================================================
@@ -820,7 +697,6 @@ void OverlayViewport::ProcessCameraOrbiting(int deltaX, int deltaY)
 	
 	cam->prepareOrbit();
 	cam->orbitAroundTarget(static_cast<float>(deltaX), static_cast<float>(deltaY));
-	// No need to manually invalidate with SDL3 - continuous render loop handles updates
 }
 
 // ---------- Raycast process ------------- //

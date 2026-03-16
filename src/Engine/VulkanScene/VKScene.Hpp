@@ -52,6 +52,7 @@ public:
 
     void setActiveCamera(Camera* cam);
     Camera* getActiveCamera() const { return activeCamera; }
+    void setCameraToUse(Camera* cam);
 
     bool containsObject(const ThreeDObject* obj) const;
 
