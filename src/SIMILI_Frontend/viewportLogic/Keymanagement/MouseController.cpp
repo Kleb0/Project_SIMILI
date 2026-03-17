@@ -160,7 +160,7 @@ namespace SIMILI
 					}
 					else
 					{
-						additionnal_right_margin_offset_ = 100;
+						additionnal_right_margin_offset_ += 60;
 						panel_bounds_.viewport.marginRight = data.marginRight + additionnal_right_margin_offset_;
 					}
 				}

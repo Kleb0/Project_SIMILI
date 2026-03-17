@@ -1,5 +1,6 @@
 #include "SDL_ApplicationWindow.hpp"
 #include "ui_handler.hpp"
+#include "viewportLogic/ThreeDScreen/ThreeDScreen.hpp"
 
 SDL_ApplicationWindow::SDL_ApplicationWindow()
 	: window_(nullptr)
@@ -9,6 +10,8 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, last_width_(800)
 	, last_height_(600)
 	, dpi_scale_(1.0f)
+	, threed_screen_(nullptr)
+	, frame_datas_(nullptr)
 {
 }
 
@@ -275,4 +278,30 @@ void SDL_ApplicationWindow::captureFrameData()
 		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
 		handler->captureIFramePositions();
 	}
+}
+
+void SDL_ApplicationWindow::setThreeDScreen(ThreeDScreen* screen)
+{
+	threed_screen_ = screen;
+}
+
+void SDL_ApplicationWindow::renderThreeDScreen(const std::map<std::string, IFrameData>&)
+{
+	if (threed_screen_)
+	{
+		threed_screen_->render(frame_datas_, window_);
+	}
+}
+
+void SDL_ApplicationWindow::drawThreeDScreen()
+{
+	if (threed_screen_)
+	{
+		threed_screen_->draw();
+	}
+}
+
+void SDL_ApplicationWindow::updateFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas)
+{
+	frame_datas_ = frameDatas;
 }

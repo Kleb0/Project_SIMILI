@@ -322,26 +322,58 @@
         });
         
         if (iframeData.length > 0) {
+            console.log('[Layout] Sending iframe data to server:', JSON.stringify(iframeData, null, 2));
             fetch('http://localhost:8080/api/iframes/update', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ iframes: iframeData })
-            }).catch(() => {});
+            })
+            .then(response => response.json())
+            .then(data => console.log('[Layout] Server response:', data))
+            .catch(err => console.error('[Layout] Failed to send iframe data:', err));
         }
     }
 
+    function syncIFrameSizesToServer()
+    {
+        notifyViewportResize();
+        sendIFrameSizesToServer();
+    }
+
+    function runStartupSync()
+    {
+        syncIFrameSizesToServer();
+
+        window.requestAnimationFrame(function() {
+            syncIFrameSizesToServer();
+        });
+
+        setTimeout(function() {
+            syncIFrameSizesToServer();
+        }, 100);
+
+        setTimeout(function() {
+            syncIFrameSizesToServer();
+        }, 300);
+    }
+
+    window.notifyViewportResize = notifyViewportResize;
+    window.sendIFrameSizesToServer = sendIFrameSizesToServer;
+    window.syncIFrameSizesToServer = runStartupSync;
+
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initSplitters);
+        document.addEventListener('DOMContentLoaded', function() {
+            initSplitters();
+            runStartupSync();
+        });
     } else {
         initSplitters();
+        runStartupSync();
     }
     
     window.addEventListener('load', function() {
-        setTimeout(function() {
-            notifyViewportResize();
-            sendIFrameSizesToServer();
-        }, 200);
+        runStartupSync();
     });
 })();

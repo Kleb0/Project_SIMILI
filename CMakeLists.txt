@@ -124,6 +124,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ProjectBuilder
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/SaveLoadSystem
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/Obj_Export_Import
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/SceneObjectContainer
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Layout_Theme
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/images
     ${CMAKE_CURRENT_SOURCE_DIR}/src/InternalLogic
@@ -132,11 +133,12 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Camera
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Entities
     ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/Mesh_DNA
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/DebugRay
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/WorldObjects/DebugRa
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Resources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic
+    $(Cmake_CURRENT_SOURCE_DIR)/src/SIMILI_Frontend/viewportLogic/ThreeDScreen
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/example
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glad
@@ -186,6 +188,7 @@ file(GLOB CEF_UI_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/ClickHandling/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/ContextualMenuLogic/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/FrameDatas/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/ThreeDScreen/*.cpp"
 )
 list(REMOVE_ITEM CEF_UI_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/main_ui.cpp")
 list(APPEND SOURCES ${CEF_UI_SOURCES})
@@ -356,6 +359,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/Obj_Export_Import
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/PrimitivesCreation
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ProjectBuilder
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/SceneObjectContainer
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Layout_Theme
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/images
     ${CMAKE_CURRENT_SOURCE_DIR}/src/InternalLogic
@@ -386,6 +390,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/ClickHandling
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/ContextualMenuLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/FrameDatas
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/ThreeDScreen
     ${SDL3_INCLUDE_DIR}
 	${Vulkan_INCLUDE_DIRS}
 	${Boost_INCLUDE_DIRS}

@@ -331,6 +331,25 @@ void UIHandler::OnAfterCreated(CefRefPtr<CefBrowser> browser)
 	browser_list_.push_back(browser);
 }
 
+void UIHandler::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, int)
+{
+	CEF_REQUIRE_UI_THREAD();
+
+	if (!frame || !frame->IsMain())
+	{
+		return;
+	}
+
+	CefString script = R"(
+		if (window.syncIFrameSizesToServer)
+		{
+			window.syncIFrameSizesToServer();
+		}
+	)";
+
+	frame->ExecuteJavaScript(script, frame->GetURL(), 0);
+}
+
 bool UIHandler::DoClose(CefRefPtr<CefBrowser> browser) 
 {
 	CEF_REQUIRE_UI_THREAD();
@@ -533,6 +552,12 @@ static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 i
 		if (handler->getCompositeTestRenderer() && handler->getCompositeTestRenderer()->isRenderingEnabled())
 		{
 			handler->getCompositeTestRenderer()->render();
+		}
+		
+		if (parentWindow)
+		{
+			auto frameDataMap = handler->getAllIFrames();
+			parentWindow->renderThreeDScreen(frameDataMap);
 		}
 	}
 	
@@ -852,6 +877,11 @@ void UIHandler::captureIFramePositions()
 	}
 
 	frame_datas_->catchFrameData(sdlWindow);
+	
+	if (parent_sdl_window_)
+	{
+		parent_sdl_window_->updateFrameDatas(frame_datas_);
+	}
 
 	if (mouse_controller_)
 	{
@@ -943,6 +973,7 @@ void UIHandler::captureIFramePositions()
 		}
 	}
 }
+
 
 void UIHandler::CallTestFromServer()
 {

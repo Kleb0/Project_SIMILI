@@ -8,6 +8,7 @@
 #include "SIMILI_Frontend/viewportLogic/Keymanagement/MouseController.hpp"
 #include "SIMILI_Frontend/viewportLogic/overlay_viewport.hpp"
 #include "SIMILI_Frontend/viewportLogic/FrameDatas/FrameDatas.hpp"
+#include "SIMILI_Frontend/viewportLogic/ThreeDScreen/ThreeDScreen.hpp"
 
 #include "SIMILI_Services/router/RouterSim.hpp"
 #include "SIMILI_Services/router/RoutesManager.hpp"
@@ -143,6 +144,11 @@ int main(int argc, char* argv[])
 	handler->setFrameDatas(frameDatas.get());
 	std::cout << "[Main] FrameDatas created and linked to UIHandler" << std::endl;
 	
+	ThreeDScreen myThreeDScreen;
+	myThreeDScreen.initialize();
+	mainWindow.setThreeDScreen(&myThreeDScreen);
+	std::cout << "[Main] ThreeDScreen initialized and linked to SDL_ApplicationWindow" << std::endl;
+	
 	SDL_StartTextInput(mainWindow.getHandle());
 	
 	std::cout << "[Main] Starting HTTP Server..." << std::endl;
@@ -216,7 +222,8 @@ int main(int argc, char* argv[])
 	SDL_GetWindowSizeInPixels(mainWindow.getHandle(), &windowPixelWidth, &windowPixelHeight);
 	std::cout << "[Main] Window pixel size: " << windowPixelWidth << "x" << windowPixelHeight << std::endl;
 
-	std::string url = "file:///ui/main_layout.html";
+	fs::path uiPath = fs::absolute(gExecutableDir / "ui" / "main_layout.html").lexically_normal();
+	std::string url = "file:///" + uiPath.generic_string();
 	if (!cefDrawer->createBrowser(handler, url, windowPixelWidth, windowPixelHeight))
 	{
 		std::cerr << "[Main] Failed to create CEF browser" << std::endl;
@@ -254,6 +261,7 @@ int main(int argc, char* argv[])
 		glClear(GL_COLOR_BUFFER_BIT);
 		
 		cefDrawer->draw();
+		mainWindow.drawThreeDScreen();
 		
 		SDL_GL_SwapWindow(mainWindow.getHandle());
 	}

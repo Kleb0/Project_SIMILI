@@ -4,7 +4,7 @@
         {
             "label": "Build SIMILI (UI + Main)",
             "type": "shell",
-            "command": "${workspaceFolder}\\build_simili.bat",
+            "command": "${workspaceFolder}\\build_simili_Vscode.bat",
             "options": {
                 "cwd": "${workspaceFolder}",
                 "shell": {

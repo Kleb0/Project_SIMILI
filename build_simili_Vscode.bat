@@ -1,9 +1,9 @@
 @echo off
 setlocal EnableExtensions
 
-echo ================================
-echo   BUILD SIMILI - CEF INTEGRATION
-echo ================================
+echo =============================================
+echo   BUILD SIMILI FOR VSCODE - CEF INTEGRATION 
+echo =============================================
 echo.
 
 call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
