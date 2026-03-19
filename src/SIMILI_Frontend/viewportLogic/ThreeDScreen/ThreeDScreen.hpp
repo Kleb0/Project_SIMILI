@@ -19,7 +19,7 @@ public:
 	~ThreeDScreen();
 	
 	void initialize();
-	void render(SIMILI::Frontend::FrameDatas* frameDatas, SDL_Window* window);
+	void render(SIMILI::Frontend::FrameDatas* frameDatas, SDL_Window* window, const SIMILI::Frontend::IFrameScreenData* viewportFrameData = nullptr);
 	void draw();
 	
 private:

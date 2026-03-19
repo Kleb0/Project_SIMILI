@@ -1,6 +1,11 @@
 #include "CEF_Drawer.hpp"
+#include <algorithm>
+#include <cmath>
+#include <cstring>
 #include <string>
 #include "include/cef_browser.h"
+
+CEF_Drawer* CEF_Drawer::active_instance_ = nullptr;
 
 // Vertex shader - simple pass-through with texture coordinates
 static const char* vertexShaderSource = R"(
@@ -40,9 +45,16 @@ CEF_Drawer::CEF_Drawer()
 	, shader_program_(0)
 	, width_(1920)
 	, height_(1080)
+	, logical_width_(0)
+	, logical_height_(0)
+	, drawable_width_(0)
+	, drawable_height_(0)
+	, dpi_scale_(1.0f)
 	, initialized_(false)
 	, browser_(nullptr)
 	, url_("")
+	, paint_buffer_width_(0)
+	, paint_buffer_height_(0)
 {
 }
 
@@ -66,13 +78,14 @@ bool CEF_Drawer::initialize(SDL_Window* window)
 	}
 	
 	window_ = window;
-	
-	SDL_GetWindowSize(window_, &width_, &height_);
+	updateWindowProperties();
+	width_ = logical_width_;
+	height_ = logical_height_;
 	
 	glGenTextures(1, &texture_id_);
 	glBindTexture(GL_TEXTURE_2D, texture_id_);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	
@@ -93,9 +106,47 @@ bool CEF_Drawer::initialize(SDL_Window* window)
 	}
 	
 	initialized_ = true;
+	active_instance_ = this;
 	std::cout << "[CEF_Drawer] Initialized (logical pixels): " << width_ << "x" << height_ << std::endl;
 	
 	return true;
+}
+
+void CEF_Drawer::syncWindowProperties()
+{
+	if (!initialized_ || !window_)
+	{
+		return;
+	}
+
+	updateWindowProperties();
+
+	int newWidth = logical_width_;
+	int newHeight = logical_height_;
+
+	if (newWidth <= 0 || newHeight <= 0 || (newWidth == width_ && newHeight == height_))
+	{
+		return;
+	}
+
+	{
+		std::lock_guard<std::mutex> lock(render_mutex_);
+		width_ = newWidth;
+		height_ = newHeight;
+		ensureTextureStorage(width_, height_);
+	}
+
+	if (browser_)
+	{
+		CefRefPtr<CefBrowserHost> host = browser_->GetHost();
+		if (host)
+		{
+			host->WasResized();
+			host->Invalidate(PET_VIEW);
+		}
+	}
+
+	std::cout << "[CEF_Drawer] Synced SDL window properties: " << width_ << "x" << height_ << std::endl;
 }
 
 bool CEF_Drawer::createBrowser(CefRefPtr<CefClient> client, const std::string& url, int width, int height)
@@ -121,9 +172,7 @@ bool CEF_Drawer::createBrowser(CefRefPtr<CefClient> client, const std::string& u
 	url_ = url;
 	width_ = width;
 	height_ = height;
-	
-	glBindTexture(GL_TEXTURE_2D, texture_id_);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width_, height_, 0, GL_BGRA, GL_UNSIGNED_BYTE, nullptr);
+	updateWindowProperties();
 	
 	CefBrowserSettings browser_settings;
 	browser_settings.windowless_frame_rate = 60;
@@ -146,6 +195,28 @@ bool CEF_Drawer::createBrowser(CefRefPtr<CefClient> client, const std::string& u
 
 void CEF_Drawer::shutdown()
 {
+	{
+		std::lock_guard<std::mutex> lock(render_mutex_);
+		ui_panel_frames_.clear();
+		ui_panel_display_frames_.clear();
+		paint_buffer_.clear();
+		paint_buffer_width_ = 0;
+		paint_buffer_height_ = 0;
+		for (auto& texturePair : ui_panel_textures_)
+		{
+			if (texturePair.second.texture_id != 0)
+			{
+				glDeleteTextures(1, &texturePair.second.texture_id);
+				texturePair.second.texture_id = 0;
+			}
+		}
+		ui_panel_textures_.clear();
+		if (active_instance_ == this)
+		{
+			active_instance_ = nullptr;
+		}
+	}
+
 	if (vao_)
 	{
 		glDeleteVertexArrays(1, &vao_);
@@ -176,49 +247,84 @@ void CEF_Drawer::shutdown()
 
 void CEF_Drawer::draw()
 {
-	if (!initialized_)
-		return;
-	
-	if (window_)
+	syncWindowProperties();
+}
+
+void CEF_Drawer::updateUIPanelFrames(const std::map<std::string, UIPanelFrameData>& panelFrames)
+{
+	std::lock_guard<std::mutex> lock(render_mutex_);
+	ui_panel_frames_ = panelFrames;
+
+	for (auto& texturePair : ui_panel_textures_)
 	{
-		int currentWidth, currentHeight;
-		SDL_GetWindowSize(window_, &currentWidth, &currentHeight);
-		
-		if (currentWidth > 0 && currentHeight > 0 && (currentWidth != width_ || currentHeight != height_))
+		texturePair.second.dirty = true;
+	}
+
+	for (auto it = ui_panel_display_frames_.begin(); it != ui_panel_display_frames_.end();)
+	{
+		if (ui_panel_frames_.find(it->first) == ui_panel_frames_.end())
 		{
-			std::cout << "[CEF_Drawer] Auto-resize detected (logical pixels): " << width_ << "x" << height_ 
-			          << " -> " << currentWidth << "x" << currentHeight << std::endl;
-			
-			width_ = currentWidth;
-			height_ = currentHeight;
-			
-			glBindTexture(GL_TEXTURE_2D, texture_id_);
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width_, height_, 0, GL_BGRA, GL_UNSIGNED_BYTE, nullptr);
-			
-			if (browser_)
-			{
-				CefRefPtr<CefBrowserHost> host = browser_->GetHost();
-				if (host)
-				{
-					host->WasResized();
-					host->Invalidate(PET_VIEW);
-				}
-			}
+			it = ui_panel_display_frames_.erase(it);
+		}
+		else
+		{
+			++it;
 		}
 	}
-	
+}
+
+void CEF_Drawer::updateUIPanelDisplayFrame(const std::string& panelName, const UIPanelFrameData& panelFrame)
+{
 	std::lock_guard<std::mutex> lock(render_mutex_);
-	
-	glUseProgram(shader_program_);
-	
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, texture_id_);
-	
-	glViewport(0, 0, width_, height_);
-	
-	glBindVertexArray(vao_);
-	glDrawArrays(GL_TRIANGLES, 0, 6);
-	glBindVertexArray(0);
+	ui_panel_display_frames_[panelName] = panelFrame;
+	ui_panel_textures_[panelName].dirty = true;
+}
+
+bool CEF_Drawer::getUIPanelTextureRegion(const std::string& panelName, GLuint& outTextureId, int& outTextureWidth, int& outTextureHeight, UIPanelFrameData& outFrame)
+{
+	std::lock_guard<std::mutex> lock(render_mutex_);
+
+	auto it = ui_panel_frames_.find(panelName);
+	if (it == ui_panel_frames_.end())
+	{
+		return false;
+	}
+
+	if (it->second.width <= 0 || it->second.height <= 0)
+	{
+		return false;
+	}
+
+	UIPanelTextureData& textureData = ui_panel_textures_[panelName];
+	if (!rebuildUIPanelTextureLocked(panelName, textureData, outFrame))
+	{
+		return false;
+	}
+
+	outTextureId = textureData.texture_id;
+	outTextureWidth = textureData.width;
+	outTextureHeight = textureData.height;
+	return true;
+}
+
+bool CEF_Drawer::getActiveUIPanelTextureRegion(const std::string& panelName, GLuint& outTextureId, int& outTextureWidth, int& outTextureHeight, UIPanelFrameData& outFrame)
+{
+	if (!active_instance_)
+	{
+		return false;
+	}
+
+	return active_instance_->getUIPanelTextureRegion(panelName, outTextureId, outTextureWidth, outTextureHeight, outFrame);
+}
+
+void CEF_Drawer::updateActiveUIPanelDisplayFrame(const std::string& panelName, const UIPanelFrameData& panelFrame)
+{
+	if (!active_instance_)
+	{
+		return;
+	}
+
+	active_instance_->updateUIPanelDisplayFrame(panelName, panelFrame);
 }
 
 void CEF_Drawer::handleEvent(const SDL_Event& event)
@@ -235,8 +341,7 @@ void CEF_Drawer::handleEvent(const SDL_Event& event)
 		case SDL_EVENT_MOUSE_MOTION:
 		{
 			CefMouseEvent mouse_event;
-			mouse_event.x = event.motion.x;
-			mouse_event.y = event.motion.y;
+			translateMousePosition(event.motion.x, event.motion.y, mouse_event.x, mouse_event.y);
 			mouse_event.modifiers = GetCefModifiers(event);
 			host->SendMouseMoveEvent(mouse_event, false);
 			break;
@@ -246,8 +351,7 @@ void CEF_Drawer::handleEvent(const SDL_Event& event)
 		case SDL_EVENT_MOUSE_BUTTON_UP:
 		{
 			CefMouseEvent mouse_event;
-			mouse_event.x = event.button.x;
-			mouse_event.y = event.button.y;
+			translateMousePosition(event.button.x, event.button.y, mouse_event.x, mouse_event.y);
 			mouse_event.modifiers = GetCefModifiers(event);
 			
 			CefBrowserHost::MouseButtonType button_type = MBT_LEFT;
@@ -275,8 +379,7 @@ void CEF_Drawer::handleEvent(const SDL_Event& event)
 			// Use current mouse position (SDL doesn't provide it in wheel event)
 			float mouseX, mouseY;
 			SDL_GetMouseState(&mouseX, &mouseY);
-			mouse_event.x = static_cast<int>(mouseX);
-			mouse_event.y = static_cast<int>(mouseY);
+			translateMousePosition(mouseX, mouseY, mouse_event.x, mouse_event.y);
 			mouse_event.modifiers = GetCefModifiers(event);
 			
 			// SDL3 wheel values are float, convert to pixels (multiply by ~100 for smooth scrolling)
@@ -355,29 +458,23 @@ void CEF_Drawer::handleEvent(const SDL_Event& event)
 		case SDL_EVENT_WINDOW_RESIZED:
 		case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
 		{
-			int newWidth, newHeight;
-			SDL_GetWindowSize(window_, &newWidth, &newHeight);
-			
-			std::cout << "[CEF_Drawer] Window event - current (logical pixels): " 
-			          << width_ << "x" << height_ << ", new: " << newWidth << "x" << newHeight << std::endl;
-			
-			if (newWidth > 0 && newHeight > 0 && (newWidth != width_ || newHeight != height_))
-			{
-				width_ = newWidth;
-				height_ = newHeight;
-				
-				glBindTexture(GL_TEXTURE_2D, texture_id_);
-				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width_, height_, 0, GL_BGRA, GL_UNSIGNED_BYTE, nullptr);
-				
-				host->WasResized();
-				host->Invalidate(PET_VIEW);
-				
-				std::cout << "[CEF_Drawer] Resized to " << width_ << "x" << height_ 
-				          << " logical pixels and CEF invalidated" << std::endl;
-			}
+			syncWindowProperties();
 			break;
 		}
 	}
+}
+
+CEF_Drawer::SDLWindowProperties CEF_Drawer::getSDLWindowProperties()
+{
+	std::lock_guard<std::mutex> lock(render_mutex_);
+
+	SDLWindowProperties properties;
+	properties.logical_width = logical_width_;
+	properties.logical_height = logical_height_;
+	properties.drawable_width = drawable_width_;
+	properties.drawable_height = drawable_height_;
+	properties.dpi_scale = dpi_scale_;
+	return properties;
 }
 
 uint32_t CEF_Drawer::GetCefModifiers(const SDL_Event& event)
@@ -507,23 +604,35 @@ void CEF_Drawer::OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type,
 		
 		width_ = width;
 		height_ = height;
-		
-		glBindTexture(GL_TEXTURE_2D, texture_id_);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width_, height_, 0, GL_BGRA, GL_UNSIGNED_BYTE, nullptr);
+		ensureTextureStorage(width_, height_);
 	}
-	
+
+	std::size_t bufferSize = static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4u;
+	paint_buffer_width_ = width;
+	paint_buffer_height_ = height;
+	paint_buffer_.resize(bufferSize);
+	if (buffer && bufferSize > 0)
+	{
+		std::memcpy(paint_buffer_.data(), buffer, bufferSize);
+	}
+
+	for (auto& texturePair : ui_panel_textures_)
+	{
+		texturePair.second.dirty = true;
+	}
+
 	updateTexture(buffer, width, height);
 }
 
 void CEF_Drawer::resize(int width, int height)
 {
-	std::lock_guard<std::mutex> lock(render_mutex_);
-	
-	width_ = width;
-	height_ = height;
-	
-	glBindTexture(GL_TEXTURE_2D, texture_id_);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width_, height_, 0, GL_BGRA, GL_UNSIGNED_BYTE, nullptr);
+	{
+		std::lock_guard<std::mutex> lock(render_mutex_);
+		width_ = width;
+		height_ = height;
+		updateWindowProperties();
+		ensureTextureStorage(width_, height_);
+	}
 	
 	if (browser_)
 	{
@@ -536,6 +645,195 @@ void CEF_Drawer::resize(int width, int height)
 	}
 	
 	std::cout << "[CEF_Drawer] Resized (logical pixels): " << width << "x" << height << std::endl;
+}
+
+void CEF_Drawer::ensureTextureStorage(int width, int height)
+{
+	if (!texture_id_ || width <= 0 || height <= 0)
+	{
+		return;
+	}
+
+	glBindTexture(GL_TEXTURE_2D, texture_id_);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, nullptr);
+}
+
+bool CEF_Drawer::rebuildUIPanelTextureLocked(const std::string& panelName, UIPanelTextureData& textureData, UIPanelFrameData& outFrame)
+{
+	auto sourceIt = ui_panel_frames_.find(panelName);
+	if (sourceIt == ui_panel_frames_.end())
+	{
+		return false;
+	}
+
+	UIPanelFrameData sourceFrame = sourceIt->second;
+	UIPanelFrameData displayFrame = sourceFrame;
+
+	auto displayIt = ui_panel_display_frames_.find(panelName);
+	if (displayIt != ui_panel_display_frames_.end())
+	{
+		displayFrame = displayIt->second;
+	}
+
+	if (sourceFrame.width <= 0 || sourceFrame.height <= 0 || displayFrame.width <= 0 || displayFrame.height <= 0)
+	{
+		return false;
+	}
+
+	if (paint_buffer_.empty() || paint_buffer_width_ <= 0 || paint_buffer_height_ <= 0)
+	{
+		return false;
+	}
+
+	int sourceMinX = std::clamp(sourceFrame.x, 0, paint_buffer_width_ - 1);
+	int sourceMinY = std::clamp(sourceFrame.y, 0, paint_buffer_height_ - 1);
+	int sourceMaxX = std::clamp(sourceFrame.x + sourceFrame.width, sourceMinX + 1, paint_buffer_width_);
+	int sourceMaxY = std::clamp(sourceFrame.y + sourceFrame.height, sourceMinY + 1, paint_buffer_height_);
+	int sourceWidth = sourceMaxX - sourceMinX;
+	int sourceHeight = sourceMaxY - sourceMinY;
+
+	if (sourceWidth <= 0 || sourceHeight <= 0)
+	{
+		return false;
+	}
+
+	int targetWidth = displayFrame.width > 0 ? displayFrame.width : 1;
+	int targetHeight = displayFrame.height > 0 ? displayFrame.height : 1;
+
+	bool needsRebuild = textureData.dirty || textureData.texture_id == 0 || textureData.width != targetWidth || textureData.height != targetHeight;
+	if (!needsRebuild)
+	{
+		outFrame.x = 0;
+		outFrame.y = 0;
+		outFrame.width = textureData.width;
+		outFrame.height = textureData.height;
+		return true;
+	}
+
+	std::vector<unsigned char> panelPixels(static_cast<std::size_t>(targetWidth) * static_cast<std::size_t>(targetHeight) * 4u);
+
+	for (int targetY = 0; targetY < targetHeight; ++targetY)
+	{
+		float normalizedY = (static_cast<float>(targetY) + 0.5f) / static_cast<float>(targetHeight);
+		int sampleY = sourceMinY + static_cast<int>(std::floor(normalizedY * static_cast<float>(sourceHeight)));
+		sampleY = std::clamp(sampleY, sourceMinY, sourceMaxY - 1);
+
+		for (int targetX = 0; targetX < targetWidth; ++targetX)
+		{
+			float normalizedX = (static_cast<float>(targetX) + 0.5f) / static_cast<float>(targetWidth);
+			int sampleX = sourceMinX + static_cast<int>(std::floor(normalizedX * static_cast<float>(sourceWidth)));
+			sampleX = std::clamp(sampleX, sourceMinX, sourceMaxX - 1);
+
+			std::size_t sourceIndex = (static_cast<std::size_t>(sampleY) * static_cast<std::size_t>(paint_buffer_width_) + static_cast<std::size_t>(sampleX)) * 4u;
+			std::size_t targetIndex = (static_cast<std::size_t>(targetY) * static_cast<std::size_t>(targetWidth) + static_cast<std::size_t>(targetX)) * 4u;
+
+			panelPixels[targetIndex + 0] = paint_buffer_[sourceIndex + 0];
+			panelPixels[targetIndex + 1] = paint_buffer_[sourceIndex + 1];
+			panelPixels[targetIndex + 2] = paint_buffer_[sourceIndex + 2];
+			panelPixels[targetIndex + 3] = paint_buffer_[sourceIndex + 3];
+		}
+	}
+
+	if (textureData.texture_id == 0)
+	{
+		glGenTextures(1, &textureData.texture_id);
+		glBindTexture(GL_TEXTURE_2D, textureData.texture_id);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	}
+	else
+	{
+		glBindTexture(GL_TEXTURE_2D, textureData.texture_id);
+	}
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, targetWidth, targetHeight, 0, GL_BGRA, GL_UNSIGNED_BYTE, panelPixels.data());
+
+	textureData.width = targetWidth;
+	textureData.height = targetHeight;
+	textureData.dirty = false;
+
+	outFrame.x = 0;
+	outFrame.y = 0;
+	outFrame.width = targetWidth;
+	outFrame.height = targetHeight;
+	return true;
+}
+
+bool CEF_Drawer::translateMousePosition(float inputX, float inputY, int& outputX, int& outputY)
+{
+	std::lock_guard<std::mutex> lock(render_mutex_);
+
+	outputX = static_cast<int>(std::lround(inputX));
+	outputY = static_cast<int>(std::lround(inputY));
+
+	for (const auto& displayPair : ui_panel_display_frames_)
+	{
+		auto sourceIt = ui_panel_frames_.find(displayPair.first);
+		if (sourceIt == ui_panel_frames_.end())
+		{
+			continue;
+		}
+
+		const UIPanelFrameData& displayFrame = displayPair.second;
+		const UIPanelFrameData& sourceFrame = sourceIt->second;
+
+		if (displayFrame.width <= 0 || displayFrame.height <= 0 || sourceFrame.width <= 0 || sourceFrame.height <= 0)
+		{
+			continue;
+		}
+
+		float minX = static_cast<float>(displayFrame.x);
+		float minY = static_cast<float>(displayFrame.y);
+		float maxX = minX + static_cast<float>(displayFrame.width);
+		float maxY = minY + static_cast<float>(displayFrame.height);
+
+		if (inputX < minX || inputX >= maxX || inputY < minY || inputY >= maxY)
+		{
+			continue;
+		}
+
+		float normalizedX = (inputX - minX) / static_cast<float>(displayFrame.width);
+		float normalizedY = (inputY - minY) / static_cast<float>(displayFrame.height);
+
+		normalizedX = std::clamp(normalizedX, 0.0f, 1.0f);
+		normalizedY = std::clamp(normalizedY, 0.0f, 1.0f);
+
+		float mappedX = static_cast<float>(sourceFrame.x) + normalizedX * static_cast<float>(sourceFrame.width);
+		float mappedY = static_cast<float>(sourceFrame.y) + normalizedY * static_cast<float>(sourceFrame.height);
+
+		outputX = static_cast<int>(std::lround(mappedX));
+		outputY = static_cast<int>(std::lround(mappedY));
+		return true;
+	}
+
+	return false;
+}
+
+void CEF_Drawer::updateWindowProperties()
+{
+	if (!window_)
+	{
+		logical_width_ = 0;
+		logical_height_ = 0;
+		drawable_width_ = 0;
+		drawable_height_ = 0;
+		dpi_scale_ = 1.0f;
+		return;
+	}
+
+	SDL_GetWindowSize(window_, &logical_width_, &logical_height_);
+	SDL_GetWindowSizeInPixels(window_, &drawable_width_, &drawable_height_);
+
+	if (logical_width_ > 0 && logical_height_ > 0 && drawable_width_ > 0 && drawable_height_ > 0)
+	{
+		dpi_scale_ = static_cast<float>(drawable_width_) / static_cast<float>(logical_width_);
+	}
+	else
+	{
+		dpi_scale_ = 1.0f;
+	}
 }
 
 bool CEF_Drawer::createShaders()

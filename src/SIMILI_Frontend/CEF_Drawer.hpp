@@ -4,7 +4,9 @@
 #include "include/cef_client.h"
 #include <SDL3/SDL.h>
 #include <glad/glad.h>
+#include <map>
 #include <mutex>
+#include <vector>
 #include <iostream>
 
 /**
@@ -17,12 +19,38 @@
 class CEF_Drawer : public CefRenderHandler
 {
 public:
+	struct SDLWindowProperties
+	{
+		int logical_width;
+		int logical_height;
+		int drawable_width;
+		int drawable_height;
+		float dpi_scale;
+	};
+
+	struct UIPanelFrameData
+	{
+		int x;
+		int y;
+		int width;
+		int height;
+	};
+
+	struct UIPanelTextureData
+	{
+		GLuint texture_id = 0;
+		int width = 0;
+		int height = 0;
+		bool dirty = true;
+	};
+
 	CEF_Drawer();
 	virtual ~CEF_Drawer();
 	
 	// Initialize OpenGL resources for drawing CEF content
 	bool initialize(SDL_Window* window);
 	void shutdown();
+	void syncWindowProperties();
 	
 	// Create CEF browser with specified URL
 	bool createBrowser(CefRefPtr<CefClient> client, const std::string& url, int width, int height);
@@ -41,11 +69,18 @@ public:
 	
 	// Resize handling
 	void resize(int width, int height);
+	void updateUIPanelFrames(const std::map<std::string, UIPanelFrameData>& panelFrames);
+	void updateUIPanelDisplayFrame(const std::string& panelName, const UIPanelFrameData& panelFrame);
+	bool getUIPanelTextureRegion(const std::string& panelName, GLuint& outTextureId, int& outTextureWidth, int& outTextureHeight, UIPanelFrameData& outFrame);
+	static bool getActiveUIPanelTextureRegion(const std::string& panelName, GLuint& outTextureId, int& outTextureWidth, int& outTextureHeight, UIPanelFrameData& outFrame);
+	static void updateActiveUIPanelDisplayFrame(const std::string& panelName, const UIPanelFrameData& panelFrame);
 	
 	// Accessors
 	int getWidth() const { return width_; }
 	int getHeight() const { return height_; }
 	bool isInitialized() const { return initialized_; }
+	SDL_Window* getWindowHandle() const { return window_; }
+	SDLWindowProperties getSDLWindowProperties();
 	
 private:
 	SDL_Window* window_;
@@ -56,16 +91,32 @@ private:
 	
 	int width_;
 	int height_;
+	int logical_width_;
+	int logical_height_;
+	int drawable_width_;
+	int drawable_height_;
+	float dpi_scale_;
 	bool initialized_;
 	
 	CefRefPtr<CefBrowser> browser_;
 	std::string url_;
+	std::map<std::string, UIPanelFrameData> ui_panel_frames_;
+	std::map<std::string, UIPanelFrameData> ui_panel_display_frames_;
+	std::map<std::string, UIPanelTextureData> ui_panel_textures_;
+	std::vector<unsigned char> paint_buffer_;
+	int paint_buffer_width_;
+	int paint_buffer_height_;
 	
 	std::mutex render_mutex_;
+	static CEF_Drawer* active_instance_;
 	
 	// OpenGL setup helpers
 	bool createShaders();
 	bool createQuad();
+	void ensureTextureStorage(int width, int height);
+	bool rebuildUIPanelTextureLocked(const std::string& panelName, UIPanelTextureData& textureData, UIPanelFrameData& outFrame);
+	bool translateMousePosition(float inputX, float inputY, int& outputX, int& outputY);
+	void updateWindowProperties();
 	void updateTexture(const void* buffer, int width, int height);
 	
 	// SDL to CEF event conversion helpers

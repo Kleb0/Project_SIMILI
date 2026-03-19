@@ -424,6 +424,88 @@ namespace SIMILI {
 				
 				return resp;
 			}, "Update iframe dimensions");
+
+			router.post("/api/uipanels/update", [&handler](const Message& msg) -> Response
+			{
+				Response resp;
+				resp.headers["Access-Control-Allow-Origin"] = "*";
+				resp.headers["Content-Type"] = "application/json";
+
+				try
+				{
+					json requestData = json::parse(msg.body);
+
+					if (!requestData.contains("iframes") || !requestData["iframes"].is_array())
+					{
+						resp.statusCode = 400;
+						resp.statusMessage = "Bad Request";
+						resp.body = "{\"success\": false, \"error\": \"Missing or invalid 'iframes' array\"}";
+						return resp;
+					}
+
+					if (!handler)
+					{
+						resp.statusCode = 500;
+						resp.statusMessage = "Internal Server Error";
+						resp.body = "{\"success\": false, \"error\": \"Handler not available\"}";
+						return resp;
+					}
+
+					std::map<std::string, IFrameData> uiPanelIFrames;
+					std::map<std::string, CEF_Drawer::UIPanelFrameData> uiPanelFramesForDrawer;
+
+					for (const auto& iframe : requestData["iframes"])
+					{
+						if (iframe.contains("name") && iframe.contains("x") && iframe.contains("y") &&
+							iframe.contains("width") && iframe.contains("height"))
+						{
+							std::string name = iframe["name"];
+							if (name == "viewport_panel")
+							{
+								continue;
+							}
+
+							IFrameData data;
+							data.name = name;
+							data.x = iframe["x"];
+							data.y = iframe["y"];
+							data.width = iframe["width"];
+							data.height = iframe["height"];
+							data.clientX = iframe.contains("clientX") ? iframe["clientX"].get<int>() : data.x;
+							data.clientY = iframe.contains("clientY") ? iframe["clientY"].get<int>() : data.y;
+							uiPanelIFrames[name] = data;
+
+							CEF_Drawer::UIPanelFrameData panelFrame;
+							panelFrame.x = data.x;
+							panelFrame.y = data.y;
+							panelFrame.width = data.width;
+							panelFrame.height = data.height;
+							uiPanelFramesForDrawer[name] = panelFrame;
+						}
+					}
+
+					CEF_Drawer* cefDrawer = handler->getCEFDrawer();
+					if (cefDrawer)
+					{
+						cefDrawer->updateUIPanelFrames(uiPanelFramesForDrawer);
+					}
+
+					handler->updateUIPanelIFrames(uiPanelIFrames);
+					handler->cacheUIPanelFrameDatas();
+
+					resp.statusCode = 200;
+					resp.statusMessage = "OK";
+					resp.body = "{\"success\": true, \"count\": " + std::to_string(uiPanelIFrames.size()) + "}";
+				}
+				catch (const std::exception& e)
+				{
+					resp.statusCode = 500;
+					resp.statusMessage = "Internal Server Error";
+					resp.body = "{\"success\": false, \"error\": \"" + std::string(e.what()) + "\"}";
+				}
+
+				return resp;
+			}, "Update UI panel iframes");
 			
 			router.get("/api/iframes/all", [&handler](const Message& msg) -> Response 
 			{
@@ -463,6 +545,43 @@ namespace SIMILI {
 				
 				return resp;
 			}, "Get all iframe dimensions");
+
+			router.get("/api/uipanels/all", [&handler](const Message& msg) -> Response
+			{
+				Response resp;
+				resp.headers["Access-Control-Allow-Origin"] = "*";
+				resp.headers["Content-Type"] = "application/json";
+
+				if (!handler)
+				{
+					resp.statusCode = 500;
+					resp.statusMessage = "Internal Server Error";
+					resp.body = "{\"success\": false, \"error\": \"Handler not available\"}";
+					return resp;
+				}
+
+				const auto& allUIPanels = handler->getUIPanelIFrames();
+				json responseData = json::array();
+
+				for (const auto& pair : allUIPanels)
+				{
+					json iframeJson;
+					iframeJson["name"] = pair.second.name;
+					iframeJson["x"] = pair.second.x;
+					iframeJson["y"] = pair.second.y;
+					iframeJson["width"] = pair.second.width;
+					iframeJson["height"] = pair.second.height;
+					iframeJson["clientX"] = pair.second.clientX;
+					iframeJson["clientY"] = pair.second.clientY;
+					responseData.push_back(iframeJson);
+				}
+
+				resp.statusCode = 200;
+				resp.statusMessage = "OK";
+				resp.body = responseData.dump();
+
+				return resp;
+			}, "Get all UI panel iframes");
 			
 			std::cout << "[RoutesManager] IFrame routes registered" << std::endl;
 		}

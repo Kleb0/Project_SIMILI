@@ -50,8 +50,11 @@ public:
 	void Set_UIHandler(void* handler);
 	
 	void setThreeDScreen(ThreeDScreen* screen);
+	void startSplitter();
+	bool handleSplitterEvent(const SDL_Event& event);
 	void renderThreeDScreen(const std::map<std::string, IFrameData>& frameDataMap);
 	void drawThreeDScreen();
+	void drawUIPanels();
 	void updateFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas);
 		
 	void processEvents();

@@ -140,13 +140,14 @@ int main(int argc, char* argv[])
 	handler->Set_DOM(cefDrawer.get());
 	mainWindow.Set_UIHandler(handler.get());
 	
-	auto frameDatas = std::make_unique<SIMILI::Frontend::FrameDatas>(handler.get());
-	handler->setFrameDatas(frameDatas.get());
+	auto* frameDatas = new SIMILI::Frontend::FrameDatas(handler.get());
+	handler->setFrameDatas(frameDatas);
 	std::cout << "[Main] FrameDatas created and linked to UIHandler" << std::endl;
 	
 	ThreeDScreen myThreeDScreen;
 	myThreeDScreen.initialize();
 	mainWindow.setThreeDScreen(&myThreeDScreen);
+	mainWindow.startSplitter();
 	std::cout << "[Main] ThreeDScreen initialized and linked to SDL_ApplicationWindow" << std::endl;
 	
 	SDL_StartTextInput(mainWindow.getHandle());
@@ -218,13 +219,17 @@ int main(int argc, char* argv[])
 	handler->startRenderTimer();
 	std::cout << "[Main] Render timer started" << std::endl;
 
-	int windowPixelWidth, windowPixelHeight;
+	int windowWidth = 0;
+	int windowHeight = 0;
+	int windowPixelWidth = 0;
+	int windowPixelHeight = 0;
+	SDL_GetWindowSize(mainWindow.getHandle(), &windowWidth, &windowHeight);
 	SDL_GetWindowSizeInPixels(mainWindow.getHandle(), &windowPixelWidth, &windowPixelHeight);
 	std::cout << "[Main] Window pixel size: " << windowPixelWidth << "x" << windowPixelHeight << std::endl;
 
 	fs::path uiPath = fs::absolute(gExecutableDir / "ui" / "main_layout.html").lexically_normal();
 	std::string url = "file:///" + uiPath.generic_string();
-	if (!cefDrawer->createBrowser(handler, url, windowPixelWidth, windowPixelHeight))
+	if (!cefDrawer->createBrowser(handler, url, windowWidth, windowHeight))
 	{
 		std::cerr << "[Main] Failed to create CEF browser" << std::endl;
 		CefShutdown();
@@ -250,23 +255,28 @@ int main(int argc, char* argv[])
 				running = false;
 			}
 			
-			cefDrawer->handleEvent(event);
+			if (!mainWindow.handleSplitterEvent(event))
+			{
+				cefDrawer->handleEvent(event);
+			}
 		}
 		
 		mainWindow.processEvents();
 		
 		CefDoMessageLoopWork();
+		cefDrawer->syncWindowProperties();
 		
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 		
-		cefDrawer->draw();
 		mainWindow.drawThreeDScreen();
+		mainWindow.drawUIPanels();
 		
 		SDL_GL_SwapWindow(mainWindow.getHandle());
 	}
 
 	std::cout << "[Main] Shutting down CEF..." << std::endl;
+	handler->clearUIPanels();
 	CefShutdown();
 
 	SDL_GL_DestroyContext(glContext);

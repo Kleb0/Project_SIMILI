@@ -138,7 +138,9 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/UIPanels
     $(Cmake_CURRENT_SOURCE_DIR)/src/SIMILI_Frontend/viewportLogic/ThreeDScreen
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_HomeFramework
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/example
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glad
@@ -189,6 +191,8 @@ file(GLOB CEF_UI_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/ContextualMenuLogic/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/FrameDatas/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/ThreeDScreen/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/UIPanels/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_HomeFramework/*.cpp"
 )
 list(REMOVE_ITEM CEF_UI_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/main_ui.cpp")
 list(APPEND SOURCES ${CEF_UI_SOURCES})
@@ -383,6 +387,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/UIPanels
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/CameraControl
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/HTMLTextureRenderer
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/Keymanagement
@@ -391,6 +396,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/ContextualMenuLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/FrameDatas
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/ThreeDScreen
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_HomeFramework
     ${SDL3_INCLUDE_DIR}
 	${Vulkan_INCLUDE_DIRS}
 	${Boost_INCLUDE_DIRS}

@@ -1,0 +1,28 @@
+CompileFlags:
+  CompilationDatabase: build-ninja
+  Add:
+    - -std=c++17
+
+    - -DUNICODE
+    - -D_UNICODE
+    - -DWIN32_LEAN_AND_MEAN
+    - -DNOMINMAX
+    - -D_WIN32_WINNT=0x0A00
+    - -DWINVER=0x0A00
+    - -DNTDDI_VERSION=NTDDI_WIN10_FE
+    - -D_HAS_EXCEPTIONS=0
+    - -DCEF_USE_ATL
+    - -Duse_cef
+    - -Dboost_use_windows_h
+
+    - -IE:/Project_SIMILI/Project/include
+    - -IE:/Project_SIMILI/Project/src
+    - -IE:/Project_SIMILI/Project/src/ThirdParty
+    - -IE:/Project_SIMILI/Project/src/ThirdParty/glad/include
+    - -IE:/Project_SIMILI/Project/src/ThirdParty/CEF/cef_binary
+    - -IE:/Project_SIMILI/Project/src/ThirdParty/CEF/cef_binary/include
+
+
+    - -IC:/SDL3/SDL3-devel-3.4.2-VC/include
+    - -IC:/VulkanSDK/1.3.290.0/include
+    - -IC:/vcpkg/installed/x64-windows-static/include

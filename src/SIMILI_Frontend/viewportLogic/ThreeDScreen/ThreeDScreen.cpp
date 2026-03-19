@@ -25,7 +25,7 @@ void ThreeDScreen::initialize()
 	initialized_ = true;
 }
 
-void ThreeDScreen::render(SIMILI::Frontend::FrameDatas* frameDatas, SDL_Window* window)
+void ThreeDScreen::render(SIMILI::Frontend::FrameDatas* frameDatas, SDL_Window* window, const SIMILI::Frontend::IFrameScreenData* viewportFrameData)
 {
 	std::lock_guard<std::mutex> lock(render_mutex_);
 
@@ -48,7 +48,11 @@ void ThreeDScreen::render(SIMILI::Frontend::FrameDatas* frameDatas, SDL_Window* 
 	}
 	
 	SIMILI::Frontend::IFrameScreenData frameData;
-	if (!frameDatas->getFrameData("viewport_panel", frameData))
+	if (viewportFrameData)
+	{
+		frameData = *viewportFrameData;
+	}
+	else if (!frameDatas->getFrameData("viewport_panel", frameData))
 	{
 		if (!waiting_for_frame_data_logged_)
 		{

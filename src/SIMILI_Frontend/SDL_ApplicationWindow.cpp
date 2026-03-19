@@ -10,6 +10,7 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, last_width_(800)
 	, last_height_(600)
 	, dpi_scale_(1.0f)
+	, ui_handler_(nullptr)
 	, threed_screen_(nullptr)
 	, frame_datas_(nullptr)
 {
@@ -240,6 +241,12 @@ void SDL_ApplicationWindow::processEvents()
 		std::cout << "[SDL_ApplicationWindow] Window " << (is_maximized_ ? "MAXIMIZED" : "RESTORED") << std::endl;
 		captureFrameData();
 	}
+
+	if (ui_handler_)
+	{
+		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+		handler->processPendingFrameUpdates();
+	}
 }
 
 void SDL_ApplicationWindow::updateDpiScale()
@@ -285,11 +292,43 @@ void SDL_ApplicationWindow::setThreeDScreen(ThreeDScreen* screen)
 	threed_screen_ = screen;
 }
 
+void SDL_ApplicationWindow::startSplitter()
+{
+	if (ui_handler_)
+	{
+		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+		handler->startSplitter();
+	}
+}
+
+bool SDL_ApplicationWindow::handleSplitterEvent(const SDL_Event& event)
+{
+	if (!ui_handler_)
+	{
+		return false;
+	}
+
+	UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+	return handler->handleSplitterEvent(event);
+}
+
 void SDL_ApplicationWindow::renderThreeDScreen(const std::map<std::string, IFrameData>&)
 {
 	if (threed_screen_)
 	{
-		threed_screen_->render(frame_datas_, window_);
+		SIMILI::Frontend::IFrameScreenData viewportPanelSize;
+		const SIMILI::Frontend::IFrameScreenData* viewportPanelSizePtr = nullptr;
+
+		if (ui_handler_)
+		{
+			UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+			if (handler->getResolvedViewportFrameData(viewportPanelSize))
+			{
+				viewportPanelSizePtr = &viewportPanelSize;
+			}
+		}
+
+		threed_screen_->render(frame_datas_, window_, viewportPanelSizePtr);
 	}
 }
 
@@ -298,6 +337,15 @@ void SDL_ApplicationWindow::drawThreeDScreen()
 	if (threed_screen_)
 	{
 		threed_screen_->draw();
+	}
+}
+
+void SDL_ApplicationWindow::drawUIPanels()
+{
+	if (ui_handler_)
+	{
+		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+		handler->drawUIPanels();
 	}
 }
 

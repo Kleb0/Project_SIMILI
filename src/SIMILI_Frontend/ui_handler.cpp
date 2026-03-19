@@ -16,6 +16,7 @@
 #include "include/base/cef_callback.h"
 #include "include/wrapper/cef_closure_task.h"
 #include <iostream>
+#include <set>
 #include <unordered_map>
 #include <commctrl.h>  
 #include <glm/glm.hpp>
@@ -46,7 +47,11 @@ UIHandler::UIHandler() : parent_sdl_window_(nullptr), parent_window_(nullptr), w
 	dxgi_device_(nullptr),
 	d2d_factory_(nullptr),
 	d2d_device_(nullptr),
-	overlay_viewport_(nullptr)
+	overlay_viewport_(nullptr),
+	splitter_(nullptr),
+	owner_thread_id_(std::this_thread::get_id()),
+	pending_iframe_capture_(false),
+	pending_ui_panel_cache_(false)
 {
 	mouse_controller_ = new SIMILI::Input::MouseController();
 
@@ -159,6 +164,9 @@ UIHandler::~UIHandler()
 		delete composite_test_renderer_;
 		composite_test_renderer_ = nullptr;
 	}
+	ui_panels_.clear();
+	ui_panel_frame_data_map_.clear();
+	ui_panel_iframe_map_.clear();
 	if (cef_drawer_)
 	{
 		cef_drawer_ = nullptr; // CEF will release it via reference counting
@@ -561,9 +569,7 @@ static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 i
 		}
 	}
 	
-	return interval; 
-
-	
+	return interval; 	
 }
 
 
@@ -841,9 +847,115 @@ void UIHandler::set_MouseControl(SIMILI::Input::MouseController* mouseControl)
 	}
 }
 
+bool UIHandler::isOwnerThread() const
+{
+	return std::this_thread::get_id() == owner_thread_id_;
+}
+
+void UIHandler::processPendingFrameUpdates()
+{
+	if (!isOwnerThread())
+	{
+		return;
+	}
+
+	if (pending_iframe_capture_.exchange(false))
+	{
+		captureIFramePositions();
+		pending_ui_panel_cache_.store(false);
+		return;
+	}
+
+	if (pending_ui_panel_cache_.exchange(false))
+	{
+		cacheUIPanelFrameDatas();
+	}
+}
+
+void UIHandler::startSplitter()
+{
+	if (!parent_window_)
+	{
+		return;
+	}
+
+	if (!splitter_)
+	{
+		splitter_ = std::make_unique<Splitter>();
+	}
+
+	if (!splitter_->initialize(parent_window_))
+	{
+		splitter_.reset();
+		return;
+	}
+
+	if (frame_datas_)
+	{
+		splitter_->syncFrameDatas(frame_datas_);
+		cacheUIPanelFrameDatas();
+	}
+}
+
+bool UIHandler::handleSplitterEvent(const SDL_Event& event)
+{
+	if (!splitter_)
+	{
+		return false;
+	}
+
+	const bool handled = splitter_->handleEvent(event);
+	if (handled)
+	{
+		cacheUIPanelFrameDatas();
+	}
+
+	return handled;
+}
+
+bool UIHandler::getResolvedViewportFrameData(SIMILI::Frontend::IFrameScreenData& outData) const
+{
+	if (splitter_ && splitter_->getViewportFrameData(outData))
+	{
+		return true;
+	}
+
+	if (!frame_datas_)
+	{
+		return false;
+	}
+
+	return frame_datas_->getFrameData("viewport_panel", outData);
+}
+
+std::map<std::string, SIMILI::Frontend::IFrameScreenData> UIHandler::getRuntimeFrameDataMap() const
+{
+	if (splitter_)
+	{
+		auto frameDataMap = splitter_->getAllFrameDatas();
+		if (!frameDataMap.empty())
+		{
+			return frameDataMap;
+		}
+	}
+
+	if (!frame_datas_)
+	{
+		return {};
+	}
+
+	return frame_datas_->getFrameData();
+}
+
 
 void UIHandler::captureIFramePositions()
 {
+	if (!isOwnerThread())
+	{
+		pending_iframe_capture_.store(true);
+		return;
+	}
+
 	if (!frame_datas_)
 	{
 		std::cout << "[UIHandler] Cannot capture iframe positions - frame_datas_ not available" << std::endl;
@@ -877,6 +989,11 @@ void UIHandler::captureIFramePositions()
 	}
 
 	frame_datas_->catchFrameData(sdlWindow);
+	if (splitter_)
+	{
+		splitter_->syncFrameDatas(frame_datas_);
+	}
+	cacheUIPanelFrameDatas();
 	
 	if (parent_sdl_window_)
 	{
@@ -885,7 +1002,7 @@ void UIHandler::captureIFramePositions()
 
 	if (mouse_controller_)
 	{
-		const auto& frameDataMap = frame_datas_->getFrameData();
+		auto frameDataMap = getRuntimeFrameDataMap();
 		
 		if (frameDataMap.empty())
 		{
@@ -917,7 +1034,7 @@ void UIHandler::captureIFramePositions()
 	{
 		SIMILI::Frontend::IFrameScreenData ViewportPanelSize;
 
-		if (frame_datas_->getFrameData("viewport_panel", ViewportPanelSize))
+		if (getResolvedViewportFrameData(ViewportPanelSize))
 		{
 			float dpiScale = ViewportPanelSize.dpiScale;
 			int Width = static_cast<int>(ViewportPanelSize.width * dpiScale);
@@ -972,6 +1089,167 @@ void UIHandler::captureIFramePositions()
 
 		}
 	}
+}
+
+void UIHandler::updateUIPanelIFrames(const std::map<std::string, IFrameData>& iframeDataMap)
+{
+	std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+	ui_panel_iframe_map_.clear();
+
+	for (const auto& pair : iframeDataMap)
+	{
+		if (pair.first == "viewport_panel")
+		{
+			continue;
+		}
+
+		ui_panel_iframe_map_[pair.first] = pair.second;
+	}
+
+	std::cout << "[UIHandler] UI panel iframe count received: " << ui_panel_iframe_map_.size() << std::endl;
+	pending_ui_panel_cache_.store(true);
+}
+
+void UIHandler::cacheUIPanelFrameDatas()
+{
+	if (!isOwnerThread())
+	{
+		pending_ui_panel_cache_.store(true);
+		return;
+	}
+
+	if (splitter_)
+	{
+		auto splitterFrameDataMap = splitter_->getUIPanelFrameDatas();
+		if (!splitterFrameDataMap.empty())
+		{
+			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+			ui_panel_frame_data_map_ = std::move(splitterFrameDataMap);
+			return;
+		}
+	}
+
+	if (!frame_datas_)
+	{
+		return;
+	}
+
+	const auto& frameDataMap = frame_datas_->getFrameData();
+	std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+	ui_panel_frame_data_map_.clear();
+
+	if (ui_panel_iframe_map_.empty())
+	{
+		return;
+	}
+
+	for (const auto& pair : ui_panel_iframe_map_)
+	{
+		auto frameIt = frameDataMap.find(pair.first);
+		if (frameIt != frameDataMap.end())
+		{
+			ui_panel_frame_data_map_[pair.first] = frameIt->second;
+		}
+	}
+}
+
+void UIHandler::drawUIPanels()
+{
+	if (!cef_drawer_)
+	{
+		return;
+	}
+
+	cef_drawer_->syncWindowProperties();
+
+	SDL_Window* sdlWindow = cef_drawer_->getWindowHandle();
+	if (!sdlWindow)
+	{
+		return;
+	}
+
+	std::map<std::string, SIMILI::Frontend::IFrameScreenData> panelFrameDataMap;
+	if (splitter_)
+	{
+		panelFrameDataMap = splitter_->getUIPanelFrameDatas();
+	}
+
+	if (panelFrameDataMap.empty())
+	{
+		std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+		panelFrameDataMap = ui_panel_frame_data_map_;
+	}
+
+	if (panelFrameDataMap.empty())
+	{
+		ui_panels_.clear();
+		return;
+	}
+
+	CEF_Drawer::SDLWindowProperties windowProperties = cef_drawer_->getSDLWindowProperties();
+	int drawableWidth = windowProperties.drawable_width;
+	int drawableHeight = windowProperties.drawable_height;
+	if (drawableWidth <= 0 || drawableHeight <= 0)
+	{
+		SDL_GetWindowSizeInPixels(sdlWindow, &drawableWidth, &drawableHeight);
+	}
+	if (drawableWidth <= 0 || drawableHeight <= 0)
+	{
+		return;
+	}
+
+	glViewport(0, 0, drawableWidth, drawableHeight);
+
+	std::set<std::string> activePanelNames;
+
+	for (const auto& pair : panelFrameDataMap)
+	{
+		auto panelIt = ui_panels_.find(pair.first);
+		if (panelIt == ui_panels_.end())
+		{
+			auto panel = std::make_unique<UIPanel>();
+			if (!panel->initialize(pair.first))
+			{
+				continue;
+			}
+
+			panelIt = ui_panels_.emplace(pair.first, std::move(panel)).first;
+		}
+
+		panelIt->second->updateFromFrameData(pair.second, sdlWindow);
+		panelIt->second->draw(drawableWidth, drawableHeight);
+		activePanelNames.insert(pair.first);
+	}
+
+	for (auto it = ui_panels_.begin(); it != ui_panels_.end();)
+	{
+		if (activePanelNames.find(it->first) == activePanelNames.end())
+		{
+			it = ui_panels_.erase(it);
+		}
+		else
+		{
+			++it;
+		}
+	}
+
+	if (splitter_)
+	{
+		splitter_->draw();
+	}
+}
+
+void UIHandler::clearUIPanels()
+{
+	ui_panels_.clear();
+	splitter_.reset();
+	iframe_data_map_.clear();
+	pending_iframe_capture_.store(false);
+	pending_ui_panel_cache_.store(false);
+
+	std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+	ui_panel_frame_data_map_.clear();
+	ui_panel_iframe_map_.clear();
 }
 
 

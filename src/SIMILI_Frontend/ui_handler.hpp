@@ -10,14 +10,20 @@
 #include "CEF_Drawer.hpp"
 #include "viewportLogic/overlay_viewport.hpp"
 #include "viewportLogic/FrameDatas/FrameDatas.hpp"
+#include "viewportLogic/UIPanels/UIPanel.hpp"
+#include "viewportLogic/UIPanels/Splitter.hpp"
 #include "viewportLogic/Keymanagement/MouseStates/Mouse_State.hpp"
 #include "viewportLogic/Keymanagement/MouseStates/Mouse_Above_Overlay_State.hpp"
 #include "viewportLogic/Keymanagement/MouseStates/Mouse_Outside_Overlay_State.hpp"
 #include "viewportLogic/Keymanagement/MouseStates/Mouse_Above_UI_Panel_State.hpp"
 #include "viewportLogic/HTMLTextureRenderer/Overlay_HTML_Texture_Renderer.hpp"
 #include <list>
+#include <map>
 #include <sstream>
 #include <memory>
+#include <mutex>
+#include <atomic>
+#include <thread>
 #include <SDL3/SDL.h>
 #include <d3d11.h>
 #include <d2d1.h>
@@ -36,6 +42,68 @@ struct IFrameData
 	int height;
 	int clientX;
 	int clientY;
+};
+
+class ThreadSafeIFrameMap
+{
+public:
+	class WriteProxy
+	{
+	public:
+		WriteProxy(ThreadSafeIFrameMap* owner, const std::string& key)
+			: owner_(owner)
+			, key_(key)
+		{
+		}
+
+		WriteProxy& operator=(const IFrameData& value)
+		{
+			if (owner_)
+			{
+				std::lock_guard<std::mutex> lock(owner_->mutex_);
+				owner_->data_[key_] = value;
+			}
+
+			return *this;
+		}
+
+	private:
+		ThreadSafeIFrameMap* owner_;
+		std::string key_;
+	};
+
+	WriteProxy operator[](const std::string& key)
+	{
+		return WriteProxy(this, key);
+	}
+
+	std::map<std::string, IFrameData> snapshot() const
+	{
+		std::lock_guard<std::mutex> lock(mutex_);
+		return data_;
+	}
+
+	void clear()
+	{
+		std::lock_guard<std::mutex> lock(mutex_);
+		data_.clear();
+	}
+
+	bool empty() const
+	{
+		std::lock_guard<std::mutex> lock(mutex_);
+		return data_.empty();
+	}
+
+	std::size_t size() const
+	{
+		std::lock_guard<std::mutex> lock(mutex_);
+		return data_.size();
+	}
+
+private:
+	mutable std::mutex mutex_;
+	std::map<std::string, IFrameData> data_;
 };
 
 namespace SIMILI 
@@ -131,6 +199,14 @@ public:
 	
 	
 	void captureIFramePositions();
+	void updateUIPanelIFrames(const std::map<std::string, IFrameData>& iframeDataMap);
+	void cacheUIPanelFrameDatas();
+	void drawUIPanels();
+	void clearUIPanels();
+	void startSplitter();
+	bool handleSplitterEvent(const SDL_Event& event);
+	bool getResolvedViewportFrameData(SIMILI::Frontend::IFrameScreenData& outData) const;
+	void processPendingFrameUpdates();
 	SIMILI::Frontend::FrameDatas* getFrameDatas() { return frame_datas_; }
 
 	void setFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas) { frame_datas_ = frameDatas; }
@@ -202,10 +278,25 @@ private:
 	ID2D1Device* d2d_device_;
 
 public:
-	std::map<std::string, IFrameData> iframe_data_map_;
-	const std::map<std::string, IFrameData>& getAllIFrames() const { return iframe_data_map_; }
+	ThreadSafeIFrameMap iframe_data_map_;
+	std::map<std::string, IFrameData> getUIPanelIFrames() const
+	{
+		std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+		return ui_panel_iframe_map_;
+	}
+	std::map<std::string, IFrameData> getAllIFrames() const { return iframe_data_map_.snapshot(); }
 	SDL_ApplicationWindow* getSDLParent() { return parent_sdl_window_; }
 
 private:
+	bool isOwnerThread() const;
+	std::map<std::string, IFrameData> ui_panel_iframe_map_;
+	std::map<std::string, SIMILI::Frontend::IFrameScreenData> ui_panel_frame_data_map_;
+	std::map<std::string, std::unique_ptr<UIPanel>> ui_panels_;
+	std::unique_ptr<Splitter> splitter_;
+	std::thread::id owner_thread_id_;
+	std::atomic_bool pending_iframe_capture_;
+	std::atomic_bool pending_ui_panel_cache_;
+	mutable std::mutex ui_panel_mutex_;
+	std::map<std::string, SIMILI::Frontend::IFrameScreenData> getRuntimeFrameDataMap() const;
 	IMPLEMENT_REFCOUNTING(UIHandler);
 };
