@@ -1,4 +1,5 @@
 #include "ui_handler.hpp"
+#include "CEF_Resizer.hpp"
 #include "viewportLogic/HTMLTextureRenderer/HtmlTextureRenderer.hpp"
 #include "viewportLogic/HTMLTextureRenderer/Overlay_HTML_Texture_Renderer.hpp"
 #include "viewportLogic/KeyManagement/KeyManager.hpp"
@@ -953,7 +954,7 @@ bool UIHandler::handleSplitterEvent(const SDL_Event& event)
 			const auto currentFrameDataMap = splitter_->getAllFrameDatas();		
 
 			cef_drawer_->requestRuntimeLayoutSync(buildRuntimeLayoutFrameMap(currentFrameDataMap));
-			cef_drawer_->forceLayoutSync();
+			cef_drawer_->getResizer().forceLayoutSync();
 			splitter_drag_start_frame_data_.clear();
 		}
 

@@ -4,10 +4,13 @@
 #include "include/cef_client.h"
 #include <SDL3/SDL.h>
 #include <glad/glad.h>
+#include <memory>
 #include <map>
 #include <mutex>
 #include <vector>
 #include <iostream>
+
+class CEF_Resizer;
 
 /**
  * @brief Handles CEF off-screen rendering and draws it into SDL window
@@ -68,7 +71,6 @@ public:
 	             int width, int height) override;
 	
 	// Resize handling
-	void resize(int width, int height);
 	void updateUIPanelFrames(const std::map<std::string, UIPanelFrameData>& panelFrames);
 	void updateUIPanelDisplayFrame(const std::string& panelName, const UIPanelFrameData& panelFrame);
 	void updateUIPanelSourceFrame(const std::string& panelName, const UIPanelFrameData& sourceFrame);
@@ -81,7 +83,7 @@ public:
 	static void requestActiveRuntimeLayoutSync(const std::map<std::string, UIPanelFrameData>& panelFrames);
 	static void forceActiveLayoutSync();
 	void requestRuntimeLayoutSync(const std::map<std::string, UIPanelFrameData>& panelFrames);
-	void forceLayoutSync();
+	CEF_Resizer& getResizer();
 	
 	// Accessors
 	int getWidth() const { return width_; }
@@ -121,22 +123,20 @@ private:
 	
 	std::mutex render_mutex_;
 	static CEF_Drawer* active_instance_;
+	std::unique_ptr<CEF_Resizer> resizer_;
 	
 	// OpenGL setup helpers
 	bool createShaders();
 	bool createQuad();
-	void ensureTextureStorage(int width, int height);
-	bool rebuildUIPanelTextureLocked(const std::string& panelName, UIPanelTextureData& textureData, UIPanelFrameData& outFrame);
-	bool translateMousePosition(float inputX, float inputY, int& outputX, int& outputY);
 	void updateWindowProperties();
 	void updateTexture(const void* buffer, int width, int height);
-	void flushRuntimeLayoutSync();
-	std::string buildRuntimeLayoutSyncScript(const std::map<std::string, UIPanelFrameData>& panelFrames) const;
 	
 	// SDL to CEF event conversion helpers
 	uint32_t GetCefModifiers(const SDL_Event& event);
 	uint32_t GetCefKeyboardModifiers(const SDL_Event& event);
 	int GetWindowsKeyCode(SDL_Scancode scancode, SDL_Keycode key);
+
+	friend class CEF_Resizer;
 	
 	IMPLEMENT_REFCOUNTING(CEF_Drawer);
 };
