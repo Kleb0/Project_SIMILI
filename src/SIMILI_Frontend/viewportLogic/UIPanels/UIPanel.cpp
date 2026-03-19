@@ -48,6 +48,10 @@ UIPanel::UIPanel()
 	, y_(0)
 	, width_(0)
 	, height_(0)
+	, last_frame_x_(0)
+	, last_frame_y_(0)
+	, last_frame_width_(0)
+	, last_frame_height_(0)
 	, texcoord_left_(0.0f)
 	, texcoord_top_(0.0f)
 	, texcoord_right_(1.0f)
@@ -133,13 +137,17 @@ void UIPanel::shutdown()
 	initialized_ = false;
 	has_valid_bounds_ = false;
 	external_texture_id_ = 0;
+	last_frame_x_ = 0;
+	last_frame_y_ = 0;
+	last_frame_width_ = 0;
+	last_frame_height_ = 0;
 	texcoord_left_ = 0.0f;
 	texcoord_top_ = 0.0f;
 	texcoord_right_ = 1.0f;
 	texcoord_bottom_ = 1.0f;
 }
 
-void UIPanel::updateFromFrameData(const SIMILI::Frontend::IFrameScreenData& frameData, SDL_Window* window)
+void UIPanel::updateFromFrameData(const SIMILI::Frontend::IFrameScreenData& frameData, SDL_Window* window, bool skipTextureRebuild)
 {
 	if (!window)
 	{
@@ -192,14 +200,38 @@ void UIPanel::updateFromFrameData(const SIMILI::Frontend::IFrameScreenData& fram
 
 	has_valid_bounds_ = width_ > 0 && height_ > 0;
 
+	// Update display frame with SDL drawable coordinates (with DPI scaling)
 	CEF_Drawer::UIPanelFrameData displayFrame;
-	displayFrame.x = frameData.relativeX;
-	displayFrame.y = frameData.relativeY;
-	displayFrame.width = frameData.width;
-	displayFrame.height = frameData.height;
+	displayFrame.x = x_;
+	displayFrame.y = y_;
+	displayFrame.width = width_;
+	displayFrame.height = height_;
 	CEF_Drawer::updateActiveUIPanelDisplayFrame(name_, displayFrame);
 
-	updateTextureRegion();
+	// Update source frame with CEF logical coordinates (without DPI scaling)
+	CEF_Drawer::UIPanelFrameData sourceFrame;
+	sourceFrame.x = frameData.relativeX;
+	sourceFrame.y = frameData.relativeY;
+	sourceFrame.width = frameData.width;
+	sourceFrame.height = frameData.height;
+	CEF_Drawer::updateActiveUIPanelSourceFrame(name_, sourceFrame);
+
+	const bool frameGeometryChanged =
+		frameData.relativeX != last_frame_x_ || frameData.relativeY != last_frame_y_ ||
+		frameData.width != last_frame_width_ || frameData.height != last_frame_height_;
+
+	if (frameGeometryChanged)
+	{
+		last_frame_x_ = frameData.relativeX;
+		last_frame_y_ = frameData.relativeY;
+		last_frame_width_ = frameData.width;
+		last_frame_height_ = frameData.height;
+	}
+
+	if (!skipTextureRebuild && (frameGeometryChanged || CEF_Drawer::isActiveUIPanelTextureDirty(name_)))
+	{
+		updateTextureRegion();
+	}
 }
 
 void UIPanel::draw(int drawableWidth, int drawableHeight)
@@ -359,4 +391,13 @@ void UIPanel::updateGeometry(int drawableWidth, int drawableHeight)
 	glBindBuffer(GL_ARRAY_BUFFER, vbo_);
 	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+void UIPanel::forceTextureRebuild()
+{
+	// Reset last frame dimensions to force a rebuild on next update
+	last_frame_x_ = -1;
+	last_frame_y_ = -1;
+	last_frame_width_ = -1;
+	last_frame_height_ = -1;
 }

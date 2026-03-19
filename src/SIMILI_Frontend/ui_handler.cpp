@@ -428,16 +428,6 @@ static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 i
 	UIHandler* handler = it->second;
 	if (handler && handler->getOverlay()) 
 	{
-		SDL_Event event;
-		while (SDL_PollEvent(&event))
-		{
-			if (event.type == SDL_EVENT_QUIT)
-			{
-				CefQuitMessageLoop();
-				return 0;
-			}
-		}
-	
 		if (handler->getMouseController())
 		{
 			handler->getMouseController()->updateMousePosition();
@@ -852,6 +842,51 @@ bool UIHandler::isOwnerThread() const
 	return std::this_thread::get_id() == owner_thread_id_;
 }
 
+bool UIHandler::hasRuntimeLayoutChanged(const std::map<std::string, SIMILI::Frontend::IFrameScreenData>& beforeMap, const std::map<std::string, SIMILI::Frontend::IFrameScreenData>& afterMap) const
+{
+	if (beforeMap.size() != afterMap.size())
+	{
+		return true;
+	}
+
+	for (const auto& pair : afterMap)
+	{
+		auto beforeIt = beforeMap.find(pair.first);
+		if (beforeIt == beforeMap.end())
+		{
+			return true;
+		}
+
+		const SIMILI::Frontend::IFrameScreenData& beforeFrame = beforeIt->second;
+		const SIMILI::Frontend::IFrameScreenData& afterFrame = pair.second;
+		
+		if (beforeFrame.relativeX != afterFrame.relativeX || beforeFrame.relativeY != afterFrame.relativeY || 
+		    beforeFrame.width != afterFrame.width || beforeFrame.height != afterFrame.height)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+std::map<std::string, CEF_Drawer::UIPanelFrameData> UIHandler::buildRuntimeLayoutFrameMap(const std::map<std::string, SIMILI::Frontend::IFrameScreenData>& frameDataMap) const
+{
+	std::map<std::string, CEF_Drawer::UIPanelFrameData> layoutFrameMap;
+
+	for (const auto& pair : frameDataMap)
+	{
+		CEF_Drawer::UIPanelFrameData panelFrame;
+		panelFrame.x = pair.second.relativeX;
+		panelFrame.y = pair.second.relativeY;
+		panelFrame.width = pair.second.width;
+		panelFrame.height = pair.second.height;
+		layoutFrameMap[pair.first] = panelFrame;
+	}
+
+	return layoutFrameMap;
+}
+
 void UIHandler::processPendingFrameUpdates()
 {
 	if (!isOwnerThread())
@@ -905,8 +940,23 @@ bool UIHandler::handleSplitterEvent(const SDL_Event& event)
 	}
 
 	const bool handled = splitter_->handleEvent(event);
+	
 	if (handled)
 	{
+
+		if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
+		{
+			splitter_drag_start_frame_data_ = splitter_->getAllFrameDatas();
+		}
+		else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP)
+		{
+			const auto currentFrameDataMap = splitter_->getAllFrameDatas();		
+
+			cef_drawer_->requestRuntimeLayoutSync(buildRuntimeLayoutFrameMap(currentFrameDataMap));
+			cef_drawer_->forceLayoutSync();
+			splitter_drag_start_frame_data_.clear();
+		}
+
 		cacheUIPanelFrameDatas();
 	}
 
@@ -1200,6 +1250,9 @@ void UIHandler::drawUIPanels()
 
 	glViewport(0, 0, drawableWidth, drawableHeight);
 
+	// Skip texture rebuilds during splitter drag for better responsiveness
+	bool skipTextureRebuild = splitter_ && splitter_->isDragging();
+
 	std::set<std::string> activePanelNames;
 
 	for (const auto& pair : panelFrameDataMap)
@@ -1216,7 +1269,7 @@ void UIHandler::drawUIPanels()
 			panelIt = ui_panels_.emplace(pair.first, std::move(panel)).first;
 		}
 
-		panelIt->second->updateFromFrameData(pair.second, sdlWindow);
+		panelIt->second->updateFromFrameData(pair.second, sdlWindow, skipTextureRebuild);
 		panelIt->second->draw(drawableWidth, drawableHeight);
 		activePanelNames.insert(pair.first);
 	}

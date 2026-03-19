@@ -289,10 +289,13 @@ public:
 
 private:
 	bool isOwnerThread() const;
+	bool hasRuntimeLayoutChanged(const std::map<std::string, SIMILI::Frontend::IFrameScreenData>& beforeMap, const std::map<std::string, SIMILI::Frontend::IFrameScreenData>& afterMap) const;
+	std::map<std::string, CEF_Drawer::UIPanelFrameData> buildRuntimeLayoutFrameMap(const std::map<std::string, SIMILI::Frontend::IFrameScreenData>& frameDataMap) const;
 	std::map<std::string, IFrameData> ui_panel_iframe_map_;
 	std::map<std::string, SIMILI::Frontend::IFrameScreenData> ui_panel_frame_data_map_;
 	std::map<std::string, std::unique_ptr<UIPanel>> ui_panels_;
 	std::unique_ptr<Splitter> splitter_;
+	std::map<std::string, SIMILI::Frontend::IFrameScreenData> splitter_drag_start_frame_data_;
 	std::thread::id owner_thread_id_;
 	std::atomic_bool pending_iframe_capture_;
 	std::atomic_bool pending_ui_panel_cache_;

@@ -13,8 +13,9 @@ public:
 
 	bool initialize(const std::string& panelName);
 	void shutdown();
-	void updateFromFrameData(const SIMILI::Frontend::IFrameScreenData& frameData, SDL_Window* window);
+	void updateFromFrameData(const SIMILI::Frontend::IFrameScreenData& frameData, SDL_Window* window, bool skipTextureRebuild = false);
 	void draw(int drawableWidth, int drawableHeight);
+	void forceTextureRebuild();
 
 	const std::string& getName() const { return name_; }
 
@@ -37,6 +38,10 @@ private:
 	int y_;
 	int width_;
 	int height_;
+	int last_frame_x_;
+	int last_frame_y_;
+	int last_frame_width_;
+	int last_frame_height_;
 	float texcoord_left_;
 	float texcoord_top_;
 	float texcoord_right_;

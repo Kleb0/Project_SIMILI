@@ -71,9 +71,17 @@ public:
 	void resize(int width, int height);
 	void updateUIPanelFrames(const std::map<std::string, UIPanelFrameData>& panelFrames);
 	void updateUIPanelDisplayFrame(const std::string& panelName, const UIPanelFrameData& panelFrame);
+	void updateUIPanelSourceFrame(const std::string& panelName, const UIPanelFrameData& sourceFrame);
 	bool getUIPanelTextureRegion(const std::string& panelName, GLuint& outTextureId, int& outTextureWidth, int& outTextureHeight, UIPanelFrameData& outFrame);
+	bool isUIPanelTextureDirty(const std::string& panelName);
 	static bool getActiveUIPanelTextureRegion(const std::string& panelName, GLuint& outTextureId, int& outTextureWidth, int& outTextureHeight, UIPanelFrameData& outFrame);
+	static bool isActiveUIPanelTextureDirty(const std::string& panelName);
 	static void updateActiveUIPanelDisplayFrame(const std::string& panelName, const UIPanelFrameData& panelFrame);
+	static void updateActiveUIPanelSourceFrame(const std::string& panelName, const UIPanelFrameData& sourceFrame);
+	static void requestActiveRuntimeLayoutSync(const std::map<std::string, UIPanelFrameData>& panelFrames);
+	static void forceActiveLayoutSync();
+	void requestRuntimeLayoutSync(const std::map<std::string, UIPanelFrameData>& panelFrames);
+	void forceLayoutSync();
 	
 	// Accessors
 	int getWidth() const { return width_; }
@@ -102,10 +110,14 @@ private:
 	std::string url_;
 	std::map<std::string, UIPanelFrameData> ui_panel_frames_;
 	std::map<std::string, UIPanelFrameData> ui_panel_display_frames_;
+	std::map<std::string, UIPanelFrameData> runtime_layout_frames_;
 	std::map<std::string, UIPanelTextureData> ui_panel_textures_;
 	std::vector<unsigned char> paint_buffer_;
 	int paint_buffer_width_;
 	int paint_buffer_height_;
+	bool runtime_layout_sync_pending_;
+	bool runtime_layout_waiting_for_paint_;
+	bool runtime_layout_needs_second_invalidate_;
 	
 	std::mutex render_mutex_;
 	static CEF_Drawer* active_instance_;
@@ -118,6 +130,8 @@ private:
 	bool translateMousePosition(float inputX, float inputY, int& outputX, int& outputY);
 	void updateWindowProperties();
 	void updateTexture(const void* buffer, int width, int height);
+	void flushRuntimeLayoutSync();
+	std::string buildRuntimeLayoutSyncScript(const std::map<std::string, UIPanelFrameData>& panelFrames) const;
 	
 	// SDL to CEF event conversion helpers
 	uint32_t GetCefModifiers(const SDL_Event& event);

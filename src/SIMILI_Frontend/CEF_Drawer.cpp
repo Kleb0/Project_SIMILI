@@ -2,8 +2,12 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <sstream>
 #include <string>
+#include "include/base/cef_callback.h"
 #include "include/cef_browser.h"
+#include "include/wrapper/cef_closure_task.h"
+#include "include/wrapper/cef_helpers.h"
 
 CEF_Drawer* CEF_Drawer::active_instance_ = nullptr;
 
@@ -55,6 +59,9 @@ CEF_Drawer::CEF_Drawer()
 	, url_("")
 	, paint_buffer_width_(0)
 	, paint_buffer_height_(0)
+	, runtime_layout_sync_pending_(false)
+	, runtime_layout_waiting_for_paint_(false)
+	, runtime_layout_needs_second_invalidate_(false)
 {
 }
 
@@ -199,9 +206,12 @@ void CEF_Drawer::shutdown()
 		std::lock_guard<std::mutex> lock(render_mutex_);
 		ui_panel_frames_.clear();
 		ui_panel_display_frames_.clear();
+		runtime_layout_frames_.clear();
 		paint_buffer_.clear();
 		paint_buffer_width_ = 0;
 		paint_buffer_height_ = 0;
+		runtime_layout_sync_pending_ = false;
+		runtime_layout_waiting_for_paint_ = false;
 		for (auto& texturePair : ui_panel_textures_)
 		{
 			if (texturePair.second.texture_id != 0)
@@ -277,7 +287,13 @@ void CEF_Drawer::updateUIPanelDisplayFrame(const std::string& panelName, const U
 {
 	std::lock_guard<std::mutex> lock(render_mutex_);
 	ui_panel_display_frames_[panelName] = panelFrame;
-	ui_panel_textures_[panelName].dirty = true;
+	// Do NOT sync to ui_panel_frames_ - display uses SDL drawable coords, frames use CEF logical coords
+}
+
+void CEF_Drawer::updateUIPanelSourceFrame(const std::string& panelName, const UIPanelFrameData& sourceFrame)
+{
+	std::lock_guard<std::mutex> lock(render_mutex_);
+	ui_panel_frames_[panelName] = sourceFrame;
 }
 
 bool CEF_Drawer::getUIPanelTextureRegion(const std::string& panelName, GLuint& outTextureId, int& outTextureWidth, int& outTextureHeight, UIPanelFrameData& outFrame)
@@ -317,6 +333,29 @@ bool CEF_Drawer::getActiveUIPanelTextureRegion(const std::string& panelName, GLu
 	return active_instance_->getUIPanelTextureRegion(panelName, outTextureId, outTextureWidth, outTextureHeight, outFrame);
 }
 
+bool CEF_Drawer::isUIPanelTextureDirty(const std::string& panelName)
+{
+	std::lock_guard<std::mutex> lock(render_mutex_);
+
+	auto it = ui_panel_textures_.find(panelName);
+	if (it == ui_panel_textures_.end())
+	{
+		return true;
+	}
+
+	return it->second.dirty;
+}
+
+bool CEF_Drawer::isActiveUIPanelTextureDirty(const std::string& panelName)
+{
+	if (!active_instance_)
+	{
+		return false;
+	}
+
+	return active_instance_->isUIPanelTextureDirty(panelName);
+}
+
 void CEF_Drawer::updateActiveUIPanelDisplayFrame(const std::string& panelName, const UIPanelFrameData& panelFrame)
 {
 	if (!active_instance_)
@@ -325,6 +364,71 @@ void CEF_Drawer::updateActiveUIPanelDisplayFrame(const std::string& panelName, c
 	}
 
 	active_instance_->updateUIPanelDisplayFrame(panelName, panelFrame);
+}
+
+void CEF_Drawer::updateActiveUIPanelSourceFrame(const std::string& panelName, const UIPanelFrameData& sourceFrame)
+{
+	if (!active_instance_)
+	{
+		return;
+	}
+
+	active_instance_->updateUIPanelSourceFrame(panelName, sourceFrame);
+}
+
+void CEF_Drawer::requestActiveRuntimeLayoutSync(const std::map<std::string, UIPanelFrameData>& panelFrames)
+{
+	if (!active_instance_)
+	{
+		return;
+	}
+
+	active_instance_->requestRuntimeLayoutSync(panelFrames);
+}
+
+void CEF_Drawer::forceActiveLayoutSync()
+{
+	if (!active_instance_)
+	{
+		return;
+	}
+
+	active_instance_->forceLayoutSync();
+}
+
+void CEF_Drawer::requestRuntimeLayoutSync(const std::map<std::string, UIPanelFrameData>& panelFrames)
+{
+	if (panelFrames.empty())
+	{
+		return;
+	}
+
+	bool shouldSchedule = false;
+	{
+		std::lock_guard<std::mutex> lock(render_mutex_);
+		runtime_layout_frames_ = panelFrames;
+		runtime_layout_waiting_for_paint_ = true;
+		runtime_layout_needs_second_invalidate_ = true;
+
+		if (!runtime_layout_sync_pending_)
+		{
+			runtime_layout_sync_pending_ = true;
+			shouldSchedule = true;
+		}
+	}
+
+	if (!shouldSchedule)
+	{
+		return;
+	}
+
+	if (CefCurrentlyOn(TID_UI))
+	{
+		flushRuntimeLayoutSync();
+		return;
+	}
+
+	CefPostTask(TID_UI, base::BindOnce(&CEF_Drawer::flushRuntimeLayoutSync, base::Unretained(this)));
 }
 
 void CEF_Drawer::handleEvent(const SDL_Event& event)
@@ -589,39 +693,119 @@ void CEF_Drawer::GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect)
 }
 
 void CEF_Drawer::OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type,
-                         const RectList& dirtyRects, const void* buffer,
-                         int width, int height)
+const RectList& dirtyRects, const void* buffer, int width, int height)
 {
 	if (type != PET_VIEW)
 		return;
 	
-	std::lock_guard<std::mutex> lock(render_mutex_);
+	bool needsSecondInvalidate = false;
+	CefRefPtr<CefBrowser> browserRef;
 	
-	if (width != width_ || height != height_)
 	{
-		std::cout << "[CEF_Drawer] OnPaint size mismatch: expected " << width_ << "x" << height_ 
-		          << ", got " << width << "x" << height << std::endl;
+		std::lock_guard<std::mutex> lock(render_mutex_);
 		
-		width_ = width;
-		height_ = height;
-		ensureTextureStorage(width_, height_);
-	}
+		if (width != width_ || height != height_)
+		{
+			
+			width_ = width;
+			height_ = height;
+			ensureTextureStorage(width_, height_);
+		}
 
-	std::size_t bufferSize = static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4u;
-	paint_buffer_width_ = width;
-	paint_buffer_height_ = height;
-	paint_buffer_.resize(bufferSize);
-	if (buffer && bufferSize > 0)
+		std::size_t bufferSize = static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4u;
+		paint_buffer_width_ = width;
+		paint_buffer_height_ = height;
+		paint_buffer_.resize(bufferSize);
+		if (buffer && bufferSize > 0)
+		{
+			std::memcpy(paint_buffer_.data(), buffer, bufferSize);
+		}
+
+		if (runtime_layout_waiting_for_paint_ && !runtime_layout_frames_.empty())
+		{
+			for (const auto& pair : runtime_layout_frames_)
+			{
+				if (pair.first != "viewport_panel")
+				{
+					std::cout << "  " << pair.first << ": " << pair.second.width << "x" << pair.second.height 
+					          << " at (" << pair.second.x << "," << pair.second.y << ")" << std::endl;
+					ui_panel_frames_[pair.first] = pair.second;
+					// Synchronize display frames immediately to ensure mouse events work
+					ui_panel_display_frames_[pair.first] = pair.second;
+				}
+			}
+			needsSecondInvalidate = runtime_layout_needs_second_invalidate_;
+			runtime_layout_needs_second_invalidate_ = false;
+		}
+
+		runtime_layout_waiting_for_paint_ = false;
+
+		for (auto& texturePair : ui_panel_textures_)
+		{
+			texturePair.second.dirty = false;
+		}
+
+		bool markedDirtyPanel = false;
+		for (auto& texturePair : ui_panel_textures_)
+		{
+			auto sourceIt = ui_panel_frames_.find(texturePair.first);
+			if (sourceIt == ui_panel_frames_.end())
+			{
+				continue;
+			}
+
+			const UIPanelFrameData& sourceFrame = sourceIt->second;
+			if (sourceFrame.width <= 0 || sourceFrame.height <= 0)
+			{
+				continue;
+			}
+
+			for (const CefRect& dirtyRect : dirtyRects)
+			{
+				const int dirtyMinX = (std::max)(dirtyRect.x, sourceFrame.x);
+				const int dirtyMinY = (std::max)(dirtyRect.y, sourceFrame.y);
+				const int dirtyMaxX = (std::min)(dirtyRect.x + dirtyRect.width, sourceFrame.x + sourceFrame.width);
+				const int dirtyMaxY = (std::min)(dirtyRect.y + dirtyRect.height, sourceFrame.y + sourceFrame.height);
+
+				if (dirtyMinX < dirtyMaxX && dirtyMinY < dirtyMaxY)
+				{
+					texturePair.second.dirty = true;
+					markedDirtyPanel = true;
+					break;
+				}
+			}
+		}
+
+		if (!markedDirtyPanel && dirtyRects.empty())
+		{
+			for (auto& texturePair : ui_panel_textures_)
+			{
+				texturePair.second.dirty = true;
+			}
+		}
+
+		updateTexture(buffer, width, height);
+		
+		// Capture browser reference before releasing mutex
+		browserRef = browser_;
+	} // Mutex released here
+
+
+	if (needsSecondInvalidate && browserRef)
 	{
-		std::memcpy(paint_buffer_.data(), buffer, bufferSize);
+		std::cout << "[CEF_Drawer::OnPaint] Scheduling second invalidation to refresh interactive zones" << std::endl;
+		CefPostTask(TID_UI, base::BindOnce([](CefRefPtr<CefBrowser> browser) {
+			if (browser)
+			{
+				CefRefPtr<CefBrowserHost> host = browser->GetHost();
+				if (host)
+				{
+					host->WasResized();
+					host->Invalidate(PET_VIEW);
+				}
+			}
+		}, browserRef));
 	}
-
-	for (auto& texturePair : ui_panel_textures_)
-	{
-		texturePair.second.dirty = true;
-	}
-
-	updateTexture(buffer, width, height);
 }
 
 void CEF_Drawer::resize(int width, int height)
@@ -697,8 +881,8 @@ bool CEF_Drawer::rebuildUIPanelTextureLocked(const std::string& panelName, UIPan
 		return false;
 	}
 
-	int targetWidth = displayFrame.width > 0 ? displayFrame.width : 1;
-	int targetHeight = displayFrame.height > 0 ? displayFrame.height : 1;
+	int targetWidth = sourceWidth > 0 ? sourceWidth : 1;
+	int targetHeight = sourceHeight > 0 ? sourceHeight : 1;
 
 	bool needsRebuild = textureData.dirty || textureData.texture_id == 0 || textureData.width != targetWidth || textureData.height != targetHeight;
 	if (!needsRebuild)
@@ -709,6 +893,7 @@ bool CEF_Drawer::rebuildUIPanelTextureLocked(const std::string& panelName, UIPan
 		outFrame.height = textureData.height;
 		return true;
 	}
+
 
 	std::vector<unsigned char> panelPixels(static_cast<std::size_t>(targetWidth) * static_cast<std::size_t>(targetHeight) * 4u);
 
@@ -838,7 +1023,6 @@ void CEF_Drawer::updateWindowProperties()
 
 bool CEF_Drawer::createShaders()
 {
-	// Compile vertex shader
 	GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
 	glShaderSource(vertexShader, 1, &vertexShaderSource, nullptr);
 	glCompileShader(vertexShader);
@@ -854,7 +1038,6 @@ bool CEF_Drawer::createShaders()
 		return false;
 	}
 	
-	// Compile fragment shader
 	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
 	glShaderSource(fragmentShader, 1, &fragmentShaderSource, nullptr);
 	glCompileShader(fragmentShader);
@@ -870,7 +1053,6 @@ bool CEF_Drawer::createShaders()
 		return false;
 	}
 	
-	// Link shader program
 	shader_program_ = glCreateProgram();
 	glAttachShader(shader_program_, vertexShader);
 	glAttachShader(shader_program_, fragmentShader);
@@ -892,7 +1074,6 @@ bool CEF_Drawer::createShaders()
 	glDeleteShader(vertexShader);
 	glDeleteShader(fragmentShader);
 	
-	// Set texture uniform
 	glUseProgram(shader_program_);
 	glUniform1i(glGetUniformLocation(shader_program_, "cefTexture"), 0);
 	
@@ -940,4 +1121,160 @@ void CEF_Drawer::updateTexture(const void* buffer, int width, int height)
 	
 	glBindTexture(GL_TEXTURE_2D, texture_id_);
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_BGRA, GL_UNSIGNED_BYTE, buffer);
+}
+
+void CEF_Drawer::flushRuntimeLayoutSync()
+{
+	std::map<std::string, UIPanelFrameData> panelFrames;
+	CefRefPtr<CefBrowser> browser;
+	{
+		std::lock_guard<std::mutex> lock(render_mutex_);
+		runtime_layout_sync_pending_ = false;
+		panelFrames = runtime_layout_frames_;
+		browser = browser_;
+	}
+
+	if (!browser || panelFrames.empty())
+	{
+		return;
+	}
+
+	CefRefPtr<CefFrame> mainFrame = browser->GetMainFrame();
+	if (!mainFrame || !mainFrame->IsValid())
+	{
+		return;
+	}
+
+	const std::string script = buildRuntimeLayoutSyncScript(panelFrames);
+	if (script.empty())
+	{
+		return;
+	}
+
+	mainFrame->ExecuteJavaScript(script, mainFrame->GetURL(), 0);
+
+	CefRefPtr<CefBrowserHost> host = browser->GetHost();
+	if (host)
+	{
+		host->Invalidate(PET_VIEW);
+	}
+}
+
+std::string CEF_Drawer::buildRuntimeLayoutSyncScript(const std::map<std::string, UIPanelFrameData>& panelFrames) const
+{
+	if (panelFrames.empty())
+	{
+		return std::string();
+	}
+
+	std::ostringstream script;
+	script << "(function(){";
+	script << "const frameMap={";
+	bool firstFrame = true;
+	for (const auto& pair : panelFrames)
+	{
+		if (!firstFrame)
+		{
+			script << ",";
+		}
+
+		firstFrame = false;
+		script << "'" << pair.first << "':{";
+		script << "x:" << pair.second.x << ",";
+		script << "y:" << pair.second.y << ",";
+		script << "width:" << pair.second.width << ",";
+		script << "height:" << pair.second.height;
+		script << "}";
+	}
+	script << "};";
+	script
+		<< "const container=document.querySelector('.main-container');"
+		<< "const leftSection=document.querySelector('.left-section');"
+		<< "const centerSection=document.querySelector('.center-section');"
+		<< "const rightSection=document.querySelector('.right-section');"
+		<< "const topRow=document.querySelector('.top-row');"
+		<< "const projectViewerPanel=document.querySelector('.project-viewer-panel');"
+		<< "if(!container||!leftSection||!centerSection||!rightSection||!topRow||!projectViewerPanel){return;}"
+		<< "const sectionWidths={};"
+		<< "let topRowTop=null;"
+		<< "let topRowBottom=null;"
+		<< "const getPanelName=function(iframe){"
+		<< "if(!iframe||!iframe.parentElement){return null;}"
+		<< "const panelClasses=iframe.parentElement.classList;"
+		<< "for(let index=0;index<panelClasses.length;++index){"
+		<< "const className=panelClasses[index];"
+		<< "if(!className||className==='panel'){continue;}"
+		<< "return className.replace(/-/g,'_');"
+		<< "}"
+		<< "return null;"
+		<< "};"
+		<< "container.querySelectorAll('iframe').forEach(function(iframe){"
+		<< "const panelName=getPanelName(iframe);"
+		<< "if(!panelName){return;}"
+		<< "const frame=frameMap[panelName];"
+		<< "if(!frame||frame.width<=0||frame.height<=0){return;}"
+		<< "const panelElement=iframe.parentElement;"
+		<< "const sectionElement=panelElement?panelElement.parentElement:null;"
+		<< "if(!panelElement){return;}"
+		<< "if(panelElement.classList.contains('project-viewer-panel')){"
+		<< "panelElement.style.flex='0 0 auto';"
+		<< "panelElement.style.height=frame.height+'px';"
+		<< "return;"
+		<< "}"
+		<< "if(!sectionElement||!sectionElement.classList){return;}"
+		<< "let sectionKey='';"
+		<< "if(sectionElement.classList.contains('left-section')){sectionKey='left-section';}"
+		<< "else if(sectionElement.classList.contains('center-section')){sectionKey='center-section';}"
+		<< "else if(sectionElement.classList.contains('right-section')){sectionKey='right-section';}"
+		<< "if(!sectionKey){return;}"
+		<< "topRowTop=topRowTop===null?frame.y:Math.min(topRowTop,frame.y);"
+		<< "topRowBottom=topRowBottom===null?(frame.y+frame.height):Math.max(topRowBottom,frame.y+frame.height);"
+		<< "sectionElement.style.flex='0 0 auto';"
+		<< "sectionWidths[sectionKey]=sectionWidths[sectionKey]?Math.max(sectionWidths[sectionKey],frame.width):frame.width;"
+		<< "if(sectionKey==='right-section'){"
+		<< "panelElement.style.flex='0 0 auto';"
+		<< "panelElement.style.height=frame.height+'px';"
+		<< "}else{"
+		<< "panelElement.style.height='';"
+		<< "panelElement.style.flex='';"
+		<< "}"
+		<< "});"
+		<< "leftSection.style.flex='0 0 auto';"
+		<< "centerSection.style.flex='0 0 auto';"
+		<< "rightSection.style.flex='0 0 auto';"
+		<< "projectViewerPanel.style.flex='0 0 auto';"
+		<< "if(sectionWidths['left-section']){leftSection.style.width=sectionWidths['left-section']+'px';}"
+		<< "if(sectionWidths['center-section']){centerSection.style.width=sectionWidths['center-section']+'px';}"
+		<< "if(sectionWidths['right-section']){rightSection.style.width=sectionWidths['right-section']+'px';}"
+		<< "if(topRowTop!==null&&topRowBottom!==null){topRow.style.flex='0 0 auto';topRow.style.height=(topRowBottom-topRowTop)+'px';}"
+		<< "if(leftSection.firstElementChild){leftSection.firstElementChild.style.height='';leftSection.firstElementChild.style.flex='';}"
+		<< "if(centerSection.firstElementChild){centerSection.firstElementChild.style.height='';centerSection.firstElementChild.style.flex='';}"
+		<< "document.body.offsetHeight;"
+		<< "})();";
+
+	return script.str();
+}
+
+void CEF_Drawer::forceLayoutSync()
+{
+	if (!browser_)
+	{
+		return;
+	}
+
+	{
+		std::lock_guard<std::mutex> lock(render_mutex_);
+		runtime_layout_waiting_for_paint_ = true;
+		for (auto& texturePair : ui_panel_textures_)
+		{
+			texturePair.second.dirty = true;
+		}
+	}
+
+	CefRefPtr<CefBrowserHost> host = browser_->GetHost();
+	if (host)
+	{
+		host->WasResized();
+		host->Invalidate(PET_VIEW);
+	}
 }

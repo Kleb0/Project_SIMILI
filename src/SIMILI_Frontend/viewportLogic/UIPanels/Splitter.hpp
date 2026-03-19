@@ -24,6 +24,7 @@ public:
 	std::map<std::string, SIMILI::Frontend::IFrameScreenData> getUIPanelFrameDatas() const;
 	std::map<std::string, SIMILI::Frontend::IFrameScreenData> getAllFrameDatas() const;
 	bool isReady() const;
+	bool isDragging() const { return dragging_; }
 
 private:
 	enum class Axis
