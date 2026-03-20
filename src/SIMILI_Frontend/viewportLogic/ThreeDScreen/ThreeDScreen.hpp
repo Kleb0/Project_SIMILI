@@ -12,6 +12,8 @@ namespace SIMILI
 	}
 }
 
+class Camera;
+
 class ThreeDScreen
 {
 public:
@@ -19,8 +21,16 @@ public:
 	~ThreeDScreen();
 	
 	void initialize();
-	void render(SIMILI::Frontend::FrameDatas* frameDatas, SDL_Window* window, const SIMILI::Frontend::IFrameScreenData* viewportFrameData = nullptr);
+	void render(SIMILI::Frontend::FrameDatas* frameDatas, SDL_Window* window);
 	void draw();
+	void setCamera(Camera* camera) { camera_ = camera; }
+	Camera* getCamera() const { return camera_; }
+	
+	int getX() const { return x_; }
+	int getY() const { return y_; }
+	int getWidth() const { return width_; }
+	int getHeight() const { return height_; }
+	bool hasValidViewport() const { return has_valid_viewport_; }
 	
 private:
 	int x_;
@@ -31,5 +41,6 @@ private:
 	bool has_valid_viewport_;
 	bool waiting_for_frame_data_logged_;
 	bool first_render_logged_;
+	Camera* camera_;
 	std::mutex render_mutex_;
 };

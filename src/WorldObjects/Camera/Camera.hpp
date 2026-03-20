@@ -4,6 +4,7 @@
 #include "WorldObjects/Entities/ThreedObject.hpp"
 
 class VKScene;
+class ThreeDScreen;
 
 class Camera : public ThreeDObject
 {
@@ -46,6 +47,7 @@ public:
     void setVKScene(VKScene* scene);
     void renderAttachedVKScene();
     VKScene* getVulkanScene() const { return vulkanScene_; }
+    void ProjectScene(ThreeDScreen* screen);
 
     float fov = 45.0f;
     float nearClip = 0.1f;

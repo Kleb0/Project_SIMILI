@@ -5,6 +5,8 @@
 #include <list>
 
 class ThreeDObject;
+class ThreeDScreen;
+class Camera;
 
 class VKContext
 {
@@ -29,6 +31,12 @@ public:
     VkInstance getInstance() const { return instance; }
     VkPhysicalDevice getPhysicalDevice() const { return physicalDevice; }
     VkDevice getDevice() const { return device; }
+    void setThreeDScreen(ThreeDScreen* screen) { three_d_screen_ = screen; }
+    ThreeDScreen* getThreeDScreen() const { return three_d_screen_; }
+
+    void setCamera(Camera* cam);
+    Camera* getCamera() const { return camera_; }
+    void ProjectOnThreeDScreen();
 
 private:
     int width = 800;
@@ -48,4 +56,6 @@ private:
     
     uint32_t graphicsQueueFamily;
     uint32_t presentQueueFamily;
+    ThreeDScreen* three_d_screen_ = nullptr;
+    Camera* camera_ = nullptr;
 };

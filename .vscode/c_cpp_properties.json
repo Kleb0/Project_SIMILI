@@ -14,6 +14,7 @@
         "${workspaceFolder}/src/Engine/ThreeDScene_DNA",
         "${workspaceFolder}/src/Engine/SaveLoadSystem",
         "${workspaceFolder}/src/Engine/MeshEdit",
+        "${workspaceFolder}/src/SIMILI_Frontend/CEFDrawing",
         "${workspaceFolder}/src/SIMILI_Frontend/viewportLogic",
         "${workspaceFolder}/src/SIMILI_Frontend/viewportLogic/FrameDatas",
         "${workspaceFolder}/src/SIMILI_Frontend/viewportLogic/UIPanels",

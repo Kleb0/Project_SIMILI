@@ -143,6 +143,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_HomeFramework
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/example
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/CEFDrawing
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glad
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/glm
     ${SDL3_INCLUDE_DIR}
@@ -185,6 +186,7 @@ file(GLOB CEF_UI_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/CameraControl/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/HTMLTextureRenderer/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/CEFDrawing/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/Keymanagement/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/Raycasting/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/ClickHandling/*.cpp"
@@ -386,6 +388,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/types
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/CEFDrawing
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/UIPanels
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/CameraControl

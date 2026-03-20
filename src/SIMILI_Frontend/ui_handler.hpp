@@ -7,8 +7,7 @@
 #include "include/views/cef_browser_view.h"
 #include "include/views/cef_window.h"
 #include "SDL_ApplicationWindow.hpp"
-#include "CEF_Drawer.hpp"
-#include "viewportLogic/overlay_viewport.hpp"
+#include "CEFDrawing/CEF_Drawer.hpp"
 #include "viewportLogic/FrameDatas/FrameDatas.hpp"
 #include "viewportLogic/UIPanels/UIPanel.hpp"
 #include "viewportLogic/UIPanels/Splitter.hpp"
@@ -118,6 +117,7 @@ class VKScene;
 class VKContext;
 class Camera;
 class Mesh;
+class ThreeDObject;
 
 class UIHandler : public CefApp,
 				  public CefClient, 
@@ -173,14 +173,11 @@ public:
 	CefEventHandle os_event) override;
 
 	void CloseAllBrowsers(bool force_close);
-	bool isOverlayRenderingEnabled() const;
 	void enableSlotTextureRendering(bool enable);
 	void enableCompositeTestRenderer(bool enable);
-	OverlayViewport* getOverlay() { return overlay_viewport_; }
 	SDL_Window* getParentWindow() const { return parent_window_; }
 
 	void setParentWindow(SDL_Window* window) { parent_window_ = window; }
-	void set_Overlay_Viewport(OverlayViewport* viewport);
 	void Set_SDLParent(SDL_ApplicationWindow* parentWindow);
 	void Set_DOM(CEF_Drawer* drawer);
 	
@@ -237,7 +234,6 @@ private:
 
 	typedef std::list<CefRefPtr<CefBrowser>> BrowserList;
 	BrowserList browser_list_;
-	OverlayViewport* overlay_viewport_;
 	SDL_ApplicationWindow* parent_sdl_window_;
 	SDL_Window* parent_window_;
 	SDL_Window* window_handle_;

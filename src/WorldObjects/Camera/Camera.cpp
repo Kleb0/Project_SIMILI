@@ -1,5 +1,6 @@
 #include "WorldObjects/Camera/Camera.hpp"
 #include "Engine/VulkanScene/VKScene.Hpp"
+#include "SIMILI_Frontend/viewportLogic/ThreeDScreen/ThreeDScreen.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
 
@@ -122,4 +123,38 @@ void Camera::renderAttachedVKScene()
     {
         vulkanScene_->render(resolutionWidth_, resolutionHeight_);
     }
+}
+
+void Camera::ProjectScene(ThreeDScreen* screen)
+{
+    if (!screen || !vulkanScene_)
+    {
+        std::cout << "[Camera] ProjectScene: screen=" << screen << " vulkanScene_=" << vulkanScene_ << std::endl;
+        return;
+    }
+    
+    if (!screen->hasValidViewport())
+    {
+        std::cout << "[Camera] ProjectScene: Invalid viewport" << std::endl;
+        return;
+    }
+    
+    int screenX = screen->getX();
+    int screenY = screen->getY();
+    int screenWidth = screen->getWidth();
+    int screenHeight = screen->getHeight();
+    
+    std::cout << "[Camera] ProjectScene: x=" << screenX << " y=" << screenY 
+              << " w=" << screenWidth << " h=" << screenHeight << std::endl;
+    
+    glViewport(screenX, screenY, screenWidth, screenHeight);
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(screenX, screenY, screenWidth, screenHeight);
+    
+    glClearColor(0.2f, 0.3f, 0.5f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
+    glDisable(GL_SCISSOR_TEST);
+    
+    vulkanScene_->render(screenWidth, screenHeight);
 }

@@ -4,7 +4,7 @@
 #include "include/cef_sandbox_win.h"
 #include "SIMILI_Frontend/ui_handler.hpp"
 #include "SIMILI_Frontend/SDL_ApplicationWindow.hpp"
-#include "SIMILI_Frontend/CEF_Drawer.hpp"
+#include "SIMILI_Frontend/CEFDrawing/CEF_Drawer.hpp"
 #include "SIMILI_Frontend/viewportLogic/Keymanagement/MouseController.hpp"
 #include "SIMILI_Frontend/viewportLogic/overlay_viewport.hpp"
 #include "SIMILI_Frontend/viewportLogic/FrameDatas/FrameDatas.hpp"
@@ -59,8 +59,6 @@ int main(int argc, char* argv[])
 	handler->set_MouseControl(MouseControl);
 
 	OverlayViewport ThreeDViewport;
-
-	handler->set_Overlay_Viewport(&ThreeDViewport);
 
 	const char* basePath = SDL_GetBasePath();
 	if (basePath)
@@ -148,6 +146,7 @@ int main(int argc, char* argv[])
 	myThreeDScreen.initialize();
 	mainWindow.setThreeDScreen(&myThreeDScreen);
 	mainWindow.startSplitter();
+
 	std::cout << "[Main] ThreeDScreen initialized and linked to SDL_ApplicationWindow" << std::endl;
 	
 	SDL_StartTextInput(mainWindow.getHandle());
@@ -166,6 +165,7 @@ int main(int argc, char* argv[])
 
 	VKContext vkRenderer;
 	vkRenderer.initialize();
+	vkRenderer.setThreeDScreen(&myThreeDScreen);
 
 	SceneObjectContainer VKSceneObjectContainer;
 
@@ -192,7 +192,12 @@ int main(int argc, char* argv[])
 	if (sceneCamera)
 	{
 		myVKScene.setCameraToUse(sceneCamera);
+		myThreeDScreen.setCamera(myVKScene.getActiveCamera());
 		ThreeDViewport.setCamera(myVKScene.getActiveCamera());
+		vkRenderer.setCamera(sceneCamera);
+		vkRenderer.setThreeDScreen(&myThreeDScreen);
+		sceneCamera->setVKScene(&myVKScene);
+		std::cout << "[Main] Camera linked to VKContext" << std::endl;
 	}
 
 	std::cout << "[Main] VKScene initialized with ID: " << myVKScene.getSceneID() << std::endl;

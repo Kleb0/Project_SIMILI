@@ -246,23 +246,6 @@ namespace SIMILI {
 				if (!isCamera) 
 				{
 					selectedObject->setSelected(true);
-					
-					if (handler && handler->getOverlay()) 
-					{
-						std::list<ThreeDObject*> selectedList;
-						for (auto* obj : objects) 
-						{
-							if (obj && obj->getSelected()) 
-							{
-								selectedList.push_back(obj);
-							}
-						}
-						
-						handler->getOverlay()->setMultipleSelectedObjects(selectedList);
-						
-						
-						std::cout << "[RoutesManager] " << selectedList.size() << " object(s) selected, gizmo render forced" << std::endl;
-					}
 				} 
 				else 
 				{

@@ -13,6 +13,7 @@ ThreeDScreen::ThreeDScreen()
 	, has_valid_viewport_(false)
 	, waiting_for_frame_data_logged_(false)
 	, first_render_logged_(false)
+	, camera_(nullptr)
 {
 }
 
@@ -25,7 +26,7 @@ void ThreeDScreen::initialize()
 	initialized_ = true;
 }
 
-void ThreeDScreen::render(SIMILI::Frontend::FrameDatas* frameDatas, SDL_Window* window, const SIMILI::Frontend::IFrameScreenData* viewportFrameData)
+void ThreeDScreen::render(SIMILI::Frontend::FrameDatas* frameDatas, SDL_Window* window)
 {
 	std::lock_guard<std::mutex> lock(render_mutex_);
 
@@ -48,11 +49,7 @@ void ThreeDScreen::render(SIMILI::Frontend::FrameDatas* frameDatas, SDL_Window* 
 	}
 	
 	SIMILI::Frontend::IFrameScreenData frameData;
-	if (viewportFrameData)
-	{
-		frameData = *viewportFrameData;
-	}
-	else if (!frameDatas->getFrameData("viewport_panel", frameData))
+	if (!frameDatas->getFrameData("viewport_panel", frameData))
 	{
 		if (!waiting_for_frame_data_logged_)
 		{
@@ -143,10 +140,4 @@ void ThreeDScreen::draw()
 		{
 			return;
 		}
-	
-		glEnable(GL_SCISSOR_TEST);
-		glScissor(x_, y_, width_, height_);
-		glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
-		glDisable(GL_SCISSOR_TEST);
 	}

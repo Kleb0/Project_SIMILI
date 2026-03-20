@@ -316,19 +316,7 @@ void SDL_ApplicationWindow::renderThreeDScreen(const std::map<std::string, IFram
 {
 	if (threed_screen_)
 	{
-		SIMILI::Frontend::IFrameScreenData viewportPanelSize;
-		const SIMILI::Frontend::IFrameScreenData* viewportPanelSizePtr = nullptr;
-
-		if (ui_handler_)
-		{
-			UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-			if (handler->getResolvedViewportFrameData(viewportPanelSize))
-			{
-				viewportPanelSizePtr = &viewportPanelSize;
-			}
-		}
-
-		threed_screen_->render(frame_datas_, window_, viewportPanelSizePtr);
+		threed_screen_->render(frame_datas_, window_);
 	}
 }
 

@@ -1,5 +1,7 @@
 #include "VKcontext.hpp"
 #include "WorldObjects/Entities/ThreeDObject.hpp"
+#include "WorldObjects/Camera/Camera.hpp"
+#include "SIMILI_Frontend/viewportLogic/ThreeDScreen/ThreeDScreen.hpp"
 #include <iostream>
 #include <sstream>
 #include <iomanip>
@@ -165,4 +167,31 @@ void VKContext::pushInGraveyard(ThreeDObject* obj)
 bool VKContext::containsObject(const ThreeDObject* obj) const
 {
 	return std::find(objects.begin(), objects.end(), obj) != objects.end();
+}
+
+void VKContext::setCamera(Camera* cam)
+{
+	camera_ = cam;
+}
+
+void VKContext::ProjectOnThreeDScreen()
+{
+	if (!camera_)
+	{
+		std::cout << "[VKContext] ProjectOnThreeDScreen: No camera set" << std::endl;
+		return;
+	}
+	
+	if (!three_d_screen_)
+	{
+		std::cout << "[VKContext] ProjectOnThreeDScreen: No ThreeDScreen set" << std::endl;
+		return;
+	}
+	
+	if (!three_d_screen_->hasValidViewport())
+	{
+		return;
+	}
+	
+	camera_->ProjectScene(three_d_screen_);
 }

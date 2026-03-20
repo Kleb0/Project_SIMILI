@@ -48,7 +48,6 @@ UIHandler::UIHandler() : parent_sdl_window_(nullptr), parent_window_(nullptr), w
 	dxgi_device_(nullptr),
 	d2d_factory_(nullptr),
 	d2d_device_(nullptr),
-	overlay_viewport_(nullptr),
 	splitter_(nullptr),
 	owner_thread_id_(std::this_thread::get_id()),
 	pending_iframe_capture_(false),
@@ -250,11 +249,6 @@ void UIHandler::OnContextInitialized()
 {
 }
 
-void UIHandler::set_Overlay_Viewport(OverlayViewport* viewport)
-{
-	overlay_viewport_ = viewport;
-}
-
 void UIHandler::Set_SDLParent(SDL_ApplicationWindow* parentWindow)
 {
 	parent_sdl_window_ = parentWindow;
@@ -427,7 +421,7 @@ static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 i
 	}
 	
 	UIHandler* handler = it->second;
-	if (handler && handler->getOverlay()) 
+	if (handler)
 	{
 		if (handler->getMouseController())
 		{
@@ -443,15 +437,7 @@ static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 i
 		// Camera lateral movement (panning)
 		if (handler->getMouseController()->isShiftLeftClickActive() && handler->getMouseController()->getCurrentMouseState() == handler->getMouseController()->getAboveOverlayState())
 		{
-			// Lock state transitions during camera panning
 			handler->setCameraOperationLocked(true);
-			
-			if (handler->getOverlay())
-			{
-				int deltaX = handler->getMouseController()->getMouseDeltaX();
-				int deltaY = handler->getMouseController()->getMouseDeltaY();
-				handler->getOverlay()->MoveCameraLaterally(deltaX, deltaY);
-			}
 		}
 		else
 		{
@@ -466,12 +452,12 @@ static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 i
 		{
 			if (handler->getMouseController()->hasClickEvent())
 			{
-				if (handler->getOverlay())
-				{
-					int mouseX = handler->getMouseController()->getCurrentMouseX();
-					int mouseY = handler->getMouseController()->getCurrentMouseY();
-					handler->getOverlay()->shootRaycastFromUIHandler(mouseX, mouseY);
-				}
+				// if (handler->getOverlay())
+				// {
+				// 	int mouseX = handler->getMouseController()->getCurrentMouseX();
+				// 	int mouseY = handler->getMouseController()->getCurrentMouseY();
+				// 	handler->getOverlay()->shootRaycastFromUIHandler(mouseX, mouseY);
+				// }
 			}
 		}
 		
@@ -482,12 +468,12 @@ static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 i
 		{
 			if (handler->getMouseController()->isClickHeldForDuration(200))
 			{
-				if (handler->getOverlay() && !handler->getOverlay()->isGizmoActive())
-				{
-					int deltaX = handler->getMouseController()->getMouseDeltaX();
-					int deltaY = handler->getMouseController()->getMouseDeltaY();
-					handler->getOverlay()->ProcessCameraOrbiting(deltaX, deltaY);
-				}
+				// if (handler->getOverlay() && !handler->getOverlay()->isGizmoActive())
+				// {
+				// 	int deltaX = handler->getMouseController()->getMouseDeltaX();
+				// 	int deltaY = handler->getMouseController()->getMouseDeltaY();
+				// 	handler->getOverlay()->ProcessCameraOrbiting(deltaX, deltaY);
+				// }
 			}
 		}
 		
@@ -497,7 +483,7 @@ static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 i
 			if (handler->getMouseController()->hasWheelInput())
 			{
 				int wheelDirection = handler->getMouseController()->getMouseWheelDirection();
-				handler->getOverlay()->ProcessZoom(wheelDirection);
+				// handler->getOverlay()->ProcessZoom(wheelDirection);
 			}
 		}
 		else
@@ -509,39 +495,39 @@ static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 i
 			}
 		}
 		
-		if (handler->getOverlay() && handler->getMouseController())
-		{
-			SDL_Window* overlayWindow = handler->getOverlay()->getHandle();
+		// if (handler->getOverlay() && handler->getMouseController())
+		// {
+		// 	SDL_Window* overlayWindow = handler->getOverlay()->getHandle();
 
-			if (overlayWindow)
-			{
-				// Get mouse position relative to the overlay window
-				float mouseX, mouseY;
-				Uint32 mouseState = SDL_GetMouseState(&mouseX, &mouseY);
+		// 	if (overlayWindow)
+		// 	{
+		// 		// Get mouse position relative to the overlay window
+		// 		float mouseX, mouseY;
+		// 		Uint32 mouseState = SDL_GetMouseState(&mouseX, &mouseY);
 				
-				bool leftDown = handler->getMouseController()->isLeftButtonClicking();
-				bool rightDown = (mouseState & SDL_BUTTON_RMASK) != 0;
-				bool middleDown = (mouseState & SDL_BUTTON_MMASK) != 0;
+		// 		bool leftDown = handler->getMouseController()->isLeftButtonClicking();
+		// 		bool rightDown = (mouseState & SDL_BUTTON_RMASK) != 0;
+		// 		bool middleDown = (mouseState & SDL_BUTTON_MMASK) != 0;
 					
-				float wheelDelta = 0.0f;
+		// 		float wheelDelta = 0.0f;
 
-				// if (handler->getMouseController()->hasWheelInput())
-				// {
-				// 	wheelDelta = static_cast<float>(handler->getMouseController()->getMouseWheelDirection());
-				// }
+		// 		// if (handler->getMouseController()->hasWheelInput())
+		// 		// {
+		// 		// 	wheelDelta = static_cast<float>(handler->getMouseController()->getMouseWheelDirection());
+		// 		// }
 					
-				handler->getOverlay()->injectMouseInputs(
-					static_cast<int>(mouseX),
-					static_cast<int>(mouseY),
-					leftDown,
-					rightDown,
-					middleDown,
-					wheelDelta
-				);
+		// 		handler->getOverlay()->injectMouseInputs(
+		// 			static_cast<int>(mouseX),
+		// 			static_cast<int>(mouseY),
+		// 			leftDown,
+		// 			rightDown,
+		// 			middleDown,
+		// 			wheelDelta
+		// 		);
 				
-				// handler->getOverlay()->render();
-			}
-		}
+		// 		// handler->getOverlay()->render();
+		// 	}
+		// }
 		
 		if (handler->getSlotTextureRenderer() && handler->getSlotTextureRenderer()->isRenderingEnabled())
 		{
@@ -551,6 +537,11 @@ static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 i
 		if (handler->getCompositeTestRenderer() && handler->getCompositeTestRenderer()->isRenderingEnabled())
 		{
 			handler->getCompositeTestRenderer()->render();
+		}
+		
+		if (handler->getVKScene() && handler->getVKScene()->getVKContext())
+		{
+			handler->getVKScene()->getVKContext()->ProjectOnThreeDScreen();
 		}
 		
 		if (parentWindow)
@@ -566,14 +557,14 @@ static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 i
 
 // -------------------- End of Render Timer Callback --------------------
 
-bool UIHandler::isOverlayRenderingEnabled() const 
-{
-	if (overlay_viewport_) 
-	{
-		return overlay_viewport_->isRenderingEnabled();
-	}
-	return false;
-}
+// bool UIHandler::isOverlayRenderingEnabled() const 
+// {
+// 	if (overlay_viewport_) 
+// 	{
+// 		return overlay_viewport_->isRenderingEnabled();
+// 	}
+// 	return false;
+// }
 
 void UIHandler::enableSlotTextureRendering(bool enable)
 {
@@ -584,11 +575,11 @@ void UIHandler::enableSlotTextureRendering(bool enable)
 		if (!slot_texture_renderer_) 
 		{
 			SDL_GLContext shareContext = nullptr;
-			if (overlay_viewport_)
-			{
-				overlay_viewport_->makeContextCurrent();
-				shareContext = overlay_viewport_->getGLContext();
-			}
+			// if (overlay_viewport_)
+			// {
+			// 	overlay_viewport_->makeContextCurrent();
+			// 	shareContext = overlay_viewport_->getGLContext();
+			// }
 			
 			slot_texture_renderer_ = new Overlay_HTML_Texture_Renderer("file:///ui/hello_cef.html");
 			slot_texture_renderer_->create(parent_window_, 0, 50, 1920, 150, shareContext);
@@ -673,15 +664,15 @@ void UIHandler::initializeSceneObjects()
 		return;
 	}
 	
-	if (!overlay_viewport_) 
-	{
-		std::cerr << "[UIHandler] ERROR: Overlay viewport not created yet!" << std::endl;
-		return;
-	}
+	// if (!overlay_viewport_) 
+	// {
+	// 	std::cerr << "[UIHandler] ERROR: Overlay viewport not created yet!" << std::endl;
+	// 	return;
+	// }
 	
 	std::cout << "[UIHandler] Initializing scene objects with Vulkan context..." << std::endl;
 	
-	overlay_viewport_->makeContextCurrent();
+	// overlay_viewport_->makeContextCurrent();
 	
 	if (vk_scene_) 
 	{
@@ -702,7 +693,7 @@ void UIHandler::initializeSceneObjects()
 	
 	if (vk_scene_ && main_camera_) 
 	{
-		overlay_viewport_->setVKScene(vk_scene_);
+		// overlay_viewport_->setVKScene(vk_scene_);
 		std::cout << "[UIHandler] VKScene set to overlay viewport - Objects count: " << vk_scene_->getObjectsRef().size() << std::endl;
 		std::cout << "[UIHandler] VKScene camera: " << (vk_scene_->getActiveCamera() ? vk_scene_->getActiveCamera()->getName() : "NULL") << std::endl;
 	}
@@ -729,18 +720,10 @@ void UIHandler::reinitializeSingleObject(ThreeDObject* obj)
 		return;
 	}
 	
-	if (!overlay_viewport_)
-	{
-		return;
-	}
-	
-	
 	if (obj->getIsMesh())
 	{
 		Mesh* mesh = static_cast<Mesh*>(obj);
-		overlay_viewport_->reinitializeMeshComponents(mesh);
 	}
-
 }
 
 void UIHandler::notifySceneChanged()
@@ -773,8 +756,8 @@ void UIHandler::notifySceneChanged()
 bool UIHandler::OnPreKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& event,
 	CefEventHandle os_event, bool* is_keyboard_shortcut)
 {
-	if (!overlay_viewport_ || !overlay_viewport_->getHandle())
-		return false;
+	// if (!overlay_viewport_ || !overlay_viewport_->getHandle())
+	// 	return false;
 	
 	auto& keyManager = SIMILI::Input::KeyManager::getInstance();
 	
@@ -787,12 +770,12 @@ bool UIHandler::OnPreKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& 
 		// Additionally send mode keys (1-4) to HTML renderer for UI visual feedback
 		if (event.windows_key_code >= '1' && event.windows_key_code <= '4')
 		{
-			HtmlTextureRenderer* html_renderer = overlay_viewport_->getHtmlTextureRenderer();
-			if (html_renderer) 
-			{
-				html_renderer->sendKeyEvent(event);
+			// HtmlTextureRenderer* html_renderer = overlay_viewport_->getHtmlTextureRenderer();
+			// if (html_renderer) 
+			// {
+			// 	html_renderer->sendKeyEvent(event);
 
-			}
+			// }
 		}
 		
 		return true; 
@@ -1081,65 +1064,65 @@ void UIHandler::captureIFramePositions()
 		mouse_controller_->updateMouseControlPanelBoundsFromFrameData(mouseControlDataMap);
 	}
 		
-	if (overlay_viewport_ && vk_scene_ && vk_scene_->getActiveCamera())
-	{
-		SIMILI::Frontend::IFrameScreenData ViewportPanelSize;
+	// if (overlay_viewport_ && vk_scene_ && vk_scene_->getActiveCamera())
+	// {
+	// 	SIMILI::Frontend::IFrameScreenData ViewportPanelSize;
 
-		if (getResolvedViewportFrameData(ViewportPanelSize))
-		{
-			float dpiScale = ViewportPanelSize.dpiScale;
-			int Width = static_cast<int>(ViewportPanelSize.width * dpiScale);
-			int Height = static_cast<int>(ViewportPanelSize.height * dpiScale);
+	// 	if (getResolvedViewportFrameData(ViewportPanelSize))
+	// 	{
+	// 		float dpiScale = ViewportPanelSize.dpiScale;
+	// 		int Width = static_cast<int>(ViewportPanelSize.width * dpiScale);
+	// 		int Height = static_cast<int>(ViewportPanelSize.height * dpiScale);
 			
-			Camera* cam = vk_scene_->getActiveCamera();
+	// 		Camera* cam = vk_scene_->getActiveCamera();
 
-			cam->setResolution(Width, Height, dpiScale);
+	// 		cam->setResolution(Width, Height, dpiScale);
 
-			std::cout << "[UIHandler] Camera resolution updated: " << "x : " << ViewportPanelSize.height << " y : " << ViewportPanelSize.width
-			<< " DPI scale: " << dpiScale  << std::endl;
+	// 		std::cout << "[UIHandler] Camera resolution updated: " << "x : " << ViewportPanelSize.height << " y : " << ViewportPanelSize.width
+	// 		<< " DPI scale: " << dpiScale  << std::endl;
 			
-			overlay_viewport_->updateViewportDimensions(Width, Height);
+	// 		overlay_viewport_->updateViewportDimensions(Width, Height);
 
-			if (composite_test_renderer_ && composite_test_renderer_->needs_repositioning())
-			{
-				composite_test_renderer_->UpdateParentData(
-					ViewportPanelSize.clientX,
-					ViewportPanelSize.clientY,
-					ViewportPanelSize.width,
-					ViewportPanelSize.height,
-					dpiScale
-				);
+	// 		if (composite_test_renderer_ && composite_test_renderer_->needs_repositioning())
+	// 		{
+	// 			composite_test_renderer_->UpdateParentData(
+	// 				ViewportPanelSize.clientX,
+	// 				ViewportPanelSize.clientY,
+	// 				ViewportPanelSize.width,
+	// 				ViewportPanelSize.height,
+	// 				dpiScale
+	// 			);
 
-				switch (composite_test_renderer_->anchor_position())
-				{
-					case PanelAnchorPosition::Centerize:
-						composite_test_renderer_->setCenterize();
-						break;
-					case PanelAnchorPosition::TopLeft:
-						composite_test_renderer_->setTopLeft();
-						break;
-					case PanelAnchorPosition::TopRight:
-						composite_test_renderer_->setTopRight();
-						break;
-					case PanelAnchorPosition::BottomLeft:
-						composite_test_renderer_->setBottomLeft();
-						break;
-					case PanelAnchorPosition::BottomRight:
-						composite_test_renderer_->setBottomRight();
-						break;
-					case PanelAnchorPosition::MiddleLeft:
-						composite_test_renderer_->setMiddleLeft();
-						break;
-					case PanelAnchorPosition::MiddleRight:
-						composite_test_renderer_->setMiddleRight();
-						break;
-				}
+	// 			switch (composite_test_renderer_->anchor_position())
+	// 			{
+	// 				case PanelAnchorPosition::Centerize:
+	// 					composite_test_renderer_->setCenterize();
+	// 					break;
+	// 				case PanelAnchorPosition::TopLeft:
+	// 					composite_test_renderer_->setTopLeft();
+	// 					break;
+	// 				case PanelAnchorPosition::TopRight:
+	// 					composite_test_renderer_->setTopRight();
+	// 					break;
+	// 				case PanelAnchorPosition::BottomLeft:
+	// 					composite_test_renderer_->setBottomLeft();
+	// 					break;
+	// 				case PanelAnchorPosition::BottomRight:
+	// 					composite_test_renderer_->setBottomRight();
+	// 					break;
+	// 				case PanelAnchorPosition::MiddleLeft:
+	// 					composite_test_renderer_->setMiddleLeft();
+	// 					break;
+	// 				case PanelAnchorPosition::MiddleRight:
+	// 					composite_test_renderer_->setMiddleRight();
+	// 					break;
+	// 			}
 
-				composite_test_renderer_->clearRepositioningFlag();
-			}
+	// 			composite_test_renderer_->clearRepositioningFlag();
+	// 		}
 
-		}
-	}
+	// 	}
+	// }
 }
 
 void UIHandler::updateUIPanelIFrames(const std::map<std::string, IFrameData>& iframeDataMap)
