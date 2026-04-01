@@ -6,14 +6,26 @@ namespace Primitives
 {
     Mesh* CreateCubeMesh(float size, const glm::vec3& center, const std::string& name, bool attachDNA)
     {
+        std::cout << "[CreatePrimitive] Creating mesh object..." << std::endl;
         auto* mesh = new Mesh();
+        std::cout << "[CreatePrimitive] Mesh object created" << std::endl;
+        
         mesh->setName(name);
+        std::cout << "[CreatePrimitive] Mesh name set: " << name << std::endl;
+        
         mesh->setPosition(center);
-        mesh->setScale(glm::vec3(size)); 
+        std::cout << "[CreatePrimitive] Mesh position set" << std::endl;
+        
+        mesh->setScale(glm::vec3(size));
+        std::cout << "[CreatePrimitive] Mesh scale set" << std::endl;
 
+        std::cout << "[CreatePrimitive] Creating MeshDNA..." << std::endl;
         auto* dna = new MeshDNA();
+        std::cout << "[CreatePrimitive] MeshDNA created" << std::endl;
+        
         dna->name = name;
-        mesh->setMeshDNA(dna); 
+        mesh->setMeshDNA(dna);
+        std::cout << "[CreatePrimitive] MeshDNA attached" << std::endl;
 
         const glm::vec3 localPositions[8] = 
         {
@@ -27,6 +39,7 @@ namespace Primitives
             {-0.5f,  0.5f,  0.5f}
         };
 
+        std::cout << "[CreatePrimitive] Adding vertices..." << std::endl;
         std::vector<Vertice*> vs;
         vs.reserve(8);
         for (int i = 0; i < 8; ++i)
@@ -35,6 +48,7 @@ namespace Primitives
             if (attachDNA && mesh->getMeshDNA())
                 mesh->getMeshDNA()->setVerticeCount(mesh->getMeshDNA()->getVerticeCount() + 1);
         }
+        std::cout << "[CreatePrimitive] Vertices added: " << vs.size() << std::endl;
 
         const int edgeIndices[12][2] = 
         {
@@ -43,6 +57,7 @@ namespace Primitives
             {0, 4}, {1, 5}, {2, 6}, {3, 7}
         };
 
+        std::cout << "[CreatePrimitive] Adding edges..." << std::endl;
         std::vector<Edge*> es;
         es.reserve(12);
         for (int i = 0; i < 12; ++i)
@@ -54,6 +69,7 @@ namespace Primitives
             if (attachDNA && mesh->getMeshDNA())
                 mesh->getMeshDNA()->setEdgeCount(mesh->getMeshDNA()->getEdgeCount() + 1);
         }
+        std::cout << "[CreatePrimitive] Edges added: " << es.size() << std::endl;
 
         const int faceVertIndices[6][4] = 
         {
@@ -75,6 +91,7 @@ namespace Primitives
             {1, 9, 5,10}
         };
 
+        std::cout << "[CreatePrimitive] Adding quads..." << std::endl;
         std::vector<Quad*> quads;
         quads.reserve(6);
         for (int i = 0; i < 6; ++i)
@@ -98,7 +115,9 @@ namespace Primitives
             if (attachDNA && mesh->getMeshDNA())
                 mesh->getMeshDNA()->setQuadCount(mesh->getMeshDNA()->getQuadCount() + 1);
         }
+        std::cout << "[CreatePrimitive] Quads added: " << quads.size() << std::endl;
 
+        std::cout << "[CreatePrimitive] Setting shared faces for edges..." << std::endl;
         for (Edge* edge : es)
         {
             std::vector<Face*> sharedFaces;
@@ -134,13 +153,11 @@ namespace Primitives
                 {
                     Vertice* otherVertB = (edgeB->getStart() == vertB) ? edgeB->getEnd() : edgeB->getStart();
                     
-
                     for (Edge* connectingEdge : es)
                     {
                         if ((connectingEdge->getStart() == otherVertA && connectingEdge->getEnd() == otherVertB) ||
                             (connectingEdge->getStart() == otherVertB && connectingEdge->getEnd() == otherVertA))
                         {
-
                             for (Quad* quad : quads)
                             {
                                 const auto& quadEdges = quad->getEdgesArray();
@@ -178,12 +195,15 @@ namespace Primitives
             }
             
             edge->setSharedFaces(sharedFaces);
-        
         }
+        std::cout << "[CreatePrimitive] Shared faces set for all edges" << std::endl;
 
+        std::cout << "[CreatePrimitive] Finalizing mesh..." << std::endl;
         mesh->finalize();
+        std::cout << "[CreatePrimitive] Mesh finalized" << std::endl;
 
+        std::cout << "[CreatePrimitive] Cube mesh created successfully: " << name << std::endl;
         return mesh;
-        std::cout << "[CreatePrimitive.cpp] Create Primitive with name " << name << std::endl;
     }
 }
+

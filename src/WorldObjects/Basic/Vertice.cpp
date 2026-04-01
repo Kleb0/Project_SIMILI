@@ -80,21 +80,27 @@ void Vertice::compileShaders()
 
 void Vertice::initialize()
 {
-    compileShaders();
-
-    float vertex[] = { 0.0f, 0.0f, 0.0f };
-
-    glGenVertexArrays(1, &vao);
-    glGenBuffers(1, &vbo);
-
-    glBindVertexArray(vao);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertex), vertex, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
-    glEnableVertexAttribArray(0);
-
-    glBindVertexArray(0);
+    // TEMPORAIRE: Désactivation OpenGL pour éviter crash avec moteur Vulkan
+    // TODO: Implémenter rendu Vulkan pour les vertices
+    std::cout << "[Vertice] Initialize called for vertex ID: " << id << std::endl;
+    
+    // compileShaders();  // <- Commenté temporairement (appels OpenGL)
+    
+    // float vertex[] = { 0.0f, 0.0f, 0.0f };
+    
+    // glGenVertexArrays(1, &vao);      // <- Commenté (OpenGL)
+    // glGenBuffers(1, &vbo);           // <- Commenté (OpenGL)
+    
+    // glBindVertexArray(vao);
+    // glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    // glBufferData(GL_ARRAY_BUFFER, sizeof(vertex), vertex, GL_STATIC_DRAW);
+    
+    // glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+    // glEnableVertexAttribArray(0);
+    
+    // glBindVertexArray(0);
+    
+    std::cout << "[Vertice] Vertex initialized (OpenGL disabled)" << std::endl;
 }
 
 void Vertice::render(const glm::mat4& viewProj, const glm::mat4& modelMatrix)

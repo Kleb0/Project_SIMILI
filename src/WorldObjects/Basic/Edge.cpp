@@ -75,10 +75,14 @@ void Edge::compileShaders()
 
 void Edge::initialize()
 {
-    compileShaders();
-
-    glGenVertexArrays(1, &vao);
-    glGenBuffers(1, &vbo);
+    // TEMPORAIRE: Désactivation OpenGL pour éviter crash avec moteur Vulkan
+    std::cout << "[Edge] Initialize called for edge ID: " << id << std::endl;
+    
+    // compileShaders();           // <- Commenté temporairement (appels OpenGL)
+    // glGenVertexArrays(1, &vao); // <- Commenté (OpenGL)
+    // glGenBuffers(1, &vbo);      // <- Commenté (OpenGL)
+    
+    std::cout << "[Edge] Edge initialized (OpenGL disabled)" << std::endl;
 }
 
 void Edge::render(const glm::mat4& viewProj, const glm::mat4& modelMatrix)

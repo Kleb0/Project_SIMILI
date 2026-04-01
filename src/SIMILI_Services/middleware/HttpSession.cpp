@@ -204,6 +204,9 @@ namespace SIMILI
 			std::ostringstream logMsg;
 			logMsg << "[HttpSession] " << req_.method_string() << " " << req_.target();
 			
+			// Log ALL requests temporarily for debugging
+			std::cout << logMsg.str() << std::endl;
+			
 			std::string target = std::string(req_.target());
 			static std::unordered_map<std::string, bool> loggedRoutes;
 			static std::mutex logMutex;
@@ -248,6 +251,7 @@ namespace SIMILI
 			
 			Router::Response routerRes = router.handleMessage(routerMsg);
 			
+			
 			auto response = std::make_shared<http::response<http::string_body>>(
 			static_cast<http::status>(routerRes.statusCode), req_.version());
 			
@@ -255,7 +259,9 @@ namespace SIMILI
 			response->set(http::field::content_type, "application/json");
 			response->set(http::field::access_control_allow_origin, "*");
 			response->keep_alive(req_.keep_alive());
+			
 			response->body() = routerRes.body;
+			
 			response->prepare_payload();
 
 			if (shouldLog) 

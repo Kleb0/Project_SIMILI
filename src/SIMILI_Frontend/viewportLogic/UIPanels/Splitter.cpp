@@ -1,8 +1,11 @@
 #include "Splitter.hpp"
+#include "../../../Engine/VulkanScene/VKcontext.hpp"
+#include "../../../Engine/GLSL_Compiler/GLSLCompiler.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <cstring>
 
 #ifndef GLM_ENABLE_EXPERIMENTAL
 #define GLM_ENABLE_EXPERIMENTAL
@@ -14,32 +17,13 @@ namespace
 	constexpr int kDefaultSplitterThickness = 8;
 	constexpr int kMinPanelWidth = 120;
 	constexpr int kMinPanelHeight = 80;
-
-	const char* splitterVertexShaderSource = R"(
-#version 330 core
-layout (location = 0) in vec2 aPos;
-
-void main()
-{
-	gl_Position = vec4(aPos.x, aPos.y, 0.0, 1.0);
-}
-)";
-
-	const char* splitterFragmentShaderSource = R"(
-#version 330 core
-out vec4 FragColor;
-
-uniform vec4 splitterColor;
-
-void main()
-{
-	FragColor = splitterColor;
-}
-)";
 }
 
 Splitter::Splitter()
 	: window_(nullptr)
+	, vk_context_(nullptr)
+	, vulkan_pipelines_(nullptr)
+	, vk_render_pass_(VK_NULL_HANDLE)
 	, initialized_(false)
 	, layout_ready_(false)
 	, dragging_(false)
@@ -48,9 +32,16 @@ Splitter::Splitter()
 	, drag_anchor_(0)
 	, last_window_width_(0)
 	, last_window_height_(0)
-	, vao_(0)
-	, vbo_(0)
-	, shader_program_(0)
+	, vk_vertex_buffer_(VK_NULL_HANDLE)
+	, vk_vertex_buffer_memory_(VK_NULL_HANDLE)
+	, vk_descriptor_set_layout_(VK_NULL_HANDLE)
+	, vk_descriptor_pool_(VK_NULL_HANDLE)
+	, vk_descriptor_set_(VK_NULL_HANDLE)
+	, dummy_texture_image_(VK_NULL_HANDLE)
+	, dummy_texture_memory_(VK_NULL_HANDLE)
+	, dummy_texture_view_(VK_NULL_HANDLE)
+	, dummy_texture_sampler_(VK_NULL_HANDLE)
+	, shared_pipeline_(nullptr)
 {
 }
 
@@ -59,29 +50,47 @@ Splitter::~Splitter()
 	shutdown();
 }
 
-bool Splitter::initialize(SDL_Window* window)
+bool Splitter::initialize(SDL_Window* window, VKContext* vkContext, VkRenderPass renderPass)
 {
 	if (initialized_)
 	{
 		window_ = window;
+		vk_context_ = vkContext;
+		vk_render_pass_ = renderPass;
 		return true;
 	}
 
-	if (!window)
+	if (!window || !vkContext || renderPass == VK_NULL_HANDLE)
 	{
 		return false;
 	}
 
 	window_ = window;
+	vk_context_ = vkContext;
+	vk_render_pass_ = renderPass;
+
+	SDL_GetWindowSize(window_, &last_window_width_, &last_window_height_);
+	initialized_ = true;
+	return true;
+}
+
+bool Splitter::finalizeInitialization()
+{
+	if (!initialized_)
+	{
+		std::cerr << "[Splitter] Cannot finalize: not initialized" << std::endl;
+		return false;
+	}
 
 	if (!createGraphicsResources())
 	{
+		std::cerr << "[Splitter] Failed to create graphics resources" << std::endl;
+		std::cout << "--------------- [Splitter] Finalize initialization failed------------ \n " << std::endl;
 		shutdown();
 		return false;
 	}
 
-	SDL_GetWindowSize(window_, &last_window_width_, &last_window_height_);
-	initialized_ = true;
+	std::cout << "[Splitter] Graphics resources created successfully" << std::endl;
 	return true;
 }
 
@@ -110,17 +119,47 @@ bool Splitter::isReady() const
 	return initialized_ && layout_ready_;
 }
 
+void Splitter::setVulkanPipelines(VulkanPipeline* pipelines)
+{
+	vulkan_pipelines_ = pipelines;
+	std::cout << "[Splitter::setVulkanPipelines] VulkanPipeline instance set" << std::endl;
+}
+
 void Splitter::syncFrameDatas(const SIMILI::Frontend::FrameDatas* frameDatas)
 {
-	if (!initialized_ || !frameDatas)
+	std::cout << "\n---------------- [Splitter] syncFrameDatas START ----------------" << std::endl;
+
+	if (!initialized_)
 	{
+		std::cout << "[Splitter] ERROR: Not initialized, returning early" << std::endl;
+		std::cout << "---------------- [Splitter] syncFrameDatas END ----------------\n" << std::endl;
+		return;
+	}
+
+	if (!frameDatas)
+	{
+		std::cout << "[Splitter] ERROR: frameDatas is null, returning early" << std::endl;
+		std::cout << "---------------- [Splitter] syncFrameDatas END ----------------\n" << std::endl;
 		return;
 	}
 
 	const auto& frameDataMap = frameDatas->getFrameData();
+	std::cout << "[Splitter] FrameDataMap size: " << frameDataMap.size() << std::endl;
+	
 	if (frameDataMap.empty())
 	{
+		std::cout << "[Splitter] ERROR: frameDataMap is empty, returning early" << std::endl;
+		std::cout << "---------------- [Splitter] syncFrameDatas END ----------------\n" << std::endl;
 		return;
+	}
+
+	for (const auto& pair : frameDataMap)
+	{
+		std::cout << "[Splitter] Frame data: " << pair.first 
+				  << " - X:" << pair.second.relativeX 
+				  << " Y:" << pair.second.relativeY 
+				  << " W:" << pair.second.width 
+				  << " H:" << pair.second.height << std::endl;
 	}
 
 	std::lock_guard<std::mutex> lock(splitter_mutex_);
@@ -129,22 +168,53 @@ void Splitter::syncFrameDatas(const SIMILI::Frontend::FrameDatas* frameDatas)
 	if (window_)
 	{
 		SDL_GetWindowSize(window_, &windowWidth, &windowHeight);
-	}
-
-	if (hasSourceGeometryChanged(frameDataMap) || shouldRefreshFromSource(frameDataMap))
-	{
-		source_frame_data_map_ = frameDataMap;
-		rebuildFromSource(frameDataMap);
-	}
-	else if (windowWidth > 0 && windowHeight > 0 && (windowWidth != last_window_width_ || windowHeight != last_window_height_))
-	{
-		scaleLayoutToWindow(windowWidth, windowHeight);
-		refreshDerivedData();
+		std::cout << "[Splitter] Window size: " << windowWidth << "x" << windowHeight << std::endl;
 	}
 	else
 	{
-		refreshDerivedData();
+		std::cout << "[Splitter] WARNING: window_ is null" << std::endl;
 	}
+
+	bool hasGeometryChanged = hasSourceGeometryChanged(frameDataMap);
+	bool shouldRefresh = shouldRefreshFromSource(frameDataMap);
+	
+	std::cout << "[Splitter] hasSourceGeometryChanged: " << (hasGeometryChanged ? "true" : "false") << std::endl;
+	std::cout << "[Splitter] shouldRefreshFromSource: " << (shouldRefresh ? "true" : "false") << std::endl;
+
+	if (hasGeometryChanged || shouldRefresh)
+	{
+		std::cout << "[Splitter] Calling rebuildFromSource..." << std::endl;
+		source_frame_data_map_ = frameDataMap;
+		rebuildFromSource(frameDataMap);
+		std::cout << "[Splitter] rebuildFromSource completed" << std::endl;
+	}
+	else if (windowWidth > 0 && windowHeight > 0 && (windowWidth != last_window_width_ || windowHeight != last_window_height_))
+	{
+		std::cout << "[Splitter] Window size changed, calling scaleLayoutToWindow..." << std::endl;
+		scaleLayoutToWindow(windowWidth, windowHeight);
+		refreshDerivedData();
+		std::cout << "[Splitter] Window scaling completed" << std::endl;
+	}
+	else
+	{
+		std::cout << "[Splitter] No major changes, calling refreshDerivedData..." << std::endl;
+		refreshDerivedData();
+		std::cout << "[Splitter] refreshDerivedData completed" << std::endl;
+	}
+
+	std::cout << "[Splitter] Final state - layout_ready_: " << (layout_ready_ ? "true" : "false") << std::endl;
+	std::cout << "[Splitter] Final state - panel_state_map_ size: " << panel_state_map_.size() << std::endl;
+	
+	for (const auto& pair : panel_state_map_)
+	{
+		std::cout << "[Splitter] Panel state: " << pair.first 
+				  << " - X:" << pair.second.frame.relativeX 
+				  << " Y:" << pair.second.frame.relativeY 
+				  << " W:" << pair.second.frame.width 
+				  << " H:" << pair.second.frame.height << std::endl;
+	}
+
+	std::cout << "---------------- [Splitter] syncFrameDatas END ----------------\n" << std::endl;
 }
 
 bool Splitter::handleEvent(const SDL_Event& event)
@@ -277,15 +347,13 @@ bool Splitter::hasSourceGeometryChanged(const std::map<std::string, SIMILI::Fron
 	return false;
 }
 
-void Splitter::draw()
+void Splitter::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight)
 {
-	if (!initialized_)
+	if (!initialized_ || !vk_context_ || !shared_pipeline_ || shared_pipeline_->pipeline == VK_NULL_HANDLE)
 	{
 		return;
 	}
 
-	int drawableWidth = 0;
-	int drawableHeight = 0;
 	std::vector<SplitterGeometry> splitters;
 	int hoveredSplitterIndex = -1;
 	int activeSplitterIndex = -1;
@@ -304,17 +372,21 @@ void Splitter::draw()
 		dragging = dragging_;
 	}
 
-	SDL_GetWindowSizeInPixels(window_, &drawableWidth, &drawableHeight);
 	if (drawableWidth <= 0 || drawableHeight <= 0)
 	{
 		return;
 	}
 
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shared_pipeline_->pipeline);
+	
+	// Bind descriptor set (required even if shader doesn't use it - driver validation)
+	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shared_pipeline_->layout, 0, 1, &vk_descriptor_set_, 0, nullptr);
+
 	for (std::size_t index = 0; index < splitters.size(); ++index)
 	{
 		const bool highlighted = static_cast<int>(index) == hoveredSplitterIndex || (dragging && static_cast<int>(index) == activeSplitterIndex);
 		const glm::vec4 color = highlighted ? glm::vec4(0.12f, 0.78f, 0.24f, 1.0f) : glm::vec4(0.22f, 0.24f, 0.26f, 1.0f);
-		drawGeometry(splitters[index], drawableWidth, drawableHeight, color.r, color.g, color.b, color.a);
+		drawGeometry(commandBuffer, splitters[index], drawableWidth, drawableHeight, color.r, color.g, color.b, color.a);
 	}
 }
 
@@ -343,6 +415,12 @@ std::map<std::string, SIMILI::Frontend::IFrameScreenData> Splitter::getUIPanelFr
 			continue;
 		}
 
+		if (pair.second.frame.width <= 0 || pair.second.frame.height <= 0)
+		{
+			std::cout << "[Splitter::getUIPanelFrameDatas] Skipping panel '" << pair.first << "' with invalid dimensions: " << pair.second.frame.width << "x" << pair.second.frame.height << std::endl;
+			continue;
+		}
+
 		frameDataMap[pair.first] = pair.second.frame;
 	}
 
@@ -364,77 +442,387 @@ std::map<std::string, SIMILI::Frontend::IFrameScreenData> Splitter::getAllFrameD
 
 bool Splitter::createGraphicsResources()
 {
-	GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertexShader, 1, &splitterVertexShaderSource, nullptr);
-	glCompileShader(vertexShader);
-
-	GLint success = 0;
-	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-	if (!success)
+	if (!vk_context_ || !vulkan_pipelines_ || !vulkan_pipelines_->isInitialized())
 	{
-		glDeleteShader(vertexShader);
+		std::cerr << "[Splitter::createGraphicsResources] Missing VulkanPipeline or VKContext" << std::endl;
 		return false;
 	}
 
-	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fragmentShader, 1, &splitterFragmentShaderSource, nullptr);
-	glCompileShader(fragmentShader);
-	glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-	if (!success)
+	if (vk_render_pass_ == VK_NULL_HANDLE)
 	{
-		glDeleteShader(vertexShader);
-		glDeleteShader(fragmentShader);
+		std::cerr << "[Splitter::createGraphicsResources] RenderPass is VK_NULL_HANDLE" << std::endl;
 		return false;
 	}
 
-	shader_program_ = glCreateProgram();
-	glAttachShader(shader_program_, vertexShader);
-	glAttachShader(shader_program_, fragmentShader);
-	glLinkProgram(shader_program_);
-	glGetProgramiv(shader_program_, GL_LINK_STATUS, &success);
+	VkDevice device = vk_context_->getDevice();
 
-	glDeleteShader(vertexShader);
-	glDeleteShader(fragmentShader);
+	// GLSL Vertex Shader - Runtime compiled
+	const std::string vertexShaderGLSL = R"(
+	#version 450
 
-	if (!success)
+	layout(location = 0) in vec2 inPosition;
+
+	void main() {
+		gl_Position = vec4(inPosition, 0.0, 1.0);
+	}
+	)";
+
+	// GLSL Fragment Shader - Runtime compiled  
+	const std::string fragmentShaderGLSL = R"(
+	#version 450
+
+	layout(location = 0) out vec4 outColor;
+
+	void main() {
+		outColor = vec4(0.22, 0.24, 0.26, 1.0);
+	}
+	)";
+
+	// Compile vertex shader
+	std::cout << "[Splitter] Compiling vertex shader..." << std::endl;
+	std::vector<uint32_t> vertexSPIRV = GLSLCompiler::compileGLSL(vertexShaderGLSL, GLSLCompiler::ShaderType::Vertex);
+	if (vertexSPIRV.empty())
 	{
-		glDeleteProgram(shader_program_);
-		shader_program_ = 0;
+		std::cerr << "[Splitter] Failed to compile vertex shader: " << GLSLCompiler::getLastError() << std::endl;
 		return false;
 	}
 
-	glGenVertexArrays(1, &vao_);
-	glGenBuffers(1, &vbo_);
+	// Compile fragment shader
+	std::cout << "[Splitter] Compiling fragment shader..." << std::endl;
+	std::vector<uint32_t> fragmentSPIRV = GLSLCompiler::compileGLSL(fragmentShaderGLSL, GLSLCompiler::ShaderType::Fragment);
+	if (fragmentSPIRV.empty())
+	{
+		std::cerr << "[Splitter] Failed to compile fragment shader: " << GLSLCompiler::getLastError() << std::endl;
+		return false;
+	}
 
-	glBindVertexArray(vao_);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo_);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 12, nullptr, GL_DYNAMIC_DRAW);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), reinterpret_cast<void*>(0));
-	glEnableVertexAttribArray(0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindVertexArray(0);
+	// Convert SPIR-V to byte vectors
+	std::vector<char> vertShaderBytes = GLSLCompiler::spirvToBytes(vertexSPIRV);
+	std::vector<char> fragShaderBytes = GLSLCompiler::spirvToBytes(fragmentSPIRV);
 
-	return vao_ != 0 && vbo_ != 0;
+	VkBufferCreateInfo bufferInfo{};
+	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferInfo.size = sizeof(float) * 12;  
+	bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	if (vkCreateBuffer(device, &bufferInfo, nullptr, &vk_vertex_buffer_) != VK_SUCCESS)
+	{
+		std::cerr << "[Splitter::createGraphicsResources] Failed to create vertex buffer" << std::endl;
+		return false;
+	}
+
+	// Allocate vertex buffer memory
+	VkMemoryRequirements memRequirements;
+	vkGetBufferMemoryRequirements(device, vk_vertex_buffer_, &memRequirements);
+
+	VkMemoryAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.allocationSize = memRequirements.size;
+	allocInfo.memoryTypeIndex = findMemoryType(
+		memRequirements.memoryTypeBits,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+	);
+
+	if (vkAllocateMemory(device, &allocInfo, nullptr, &vk_vertex_buffer_memory_) != VK_SUCCESS)
+	{
+		vkDestroyBuffer(device, vk_vertex_buffer_, nullptr);
+		vk_vertex_buffer_ = VK_NULL_HANDLE;
+		std::cerr << "[Splitter::createGraphicsResources] Failed to allocate vertex buffer memory" << std::endl;
+		return false;
+	}
+
+	vkBindBufferMemory(device, vk_vertex_buffer_, vk_vertex_buffer_memory_, 0);
+
+	// Configure vertex attributes - SIMPLIFIED: only vec2 position (no texcoord)
+	VkVertexInputAttributeDescription attr0{};
+	attr0.binding = 0;
+	attr0.location = 0;
+	attr0.format = VK_FORMAT_R32G32_SFLOAT;
+	attr0.offset = 0;
+
+	std::vector<VkVertexInputAttributeDescription> vertexAttributes = { attr0 };
+
+	// NVIDIA driver bug: Use SAME descriptor type as CEF_Drawer (texture sampler)
+	// Even though shaders don't use it - driver validation requires exact match
+	VkDescriptorSetLayoutBinding dummyBinding{};
+	dummyBinding.binding = 0;
+	dummyBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	dummyBinding.descriptorCount = 1;
+	dummyBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	dummyBinding.pImmutableSamplers = nullptr;
+	
+	VkDescriptorSetLayoutCreateInfo layoutInfo{};
+	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	layoutInfo.bindingCount = 1;
+	layoutInfo.pBindings = &dummyBinding;
+	
+	if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &vk_descriptor_set_layout_) != VK_SUCCESS)
+	{
+		std::cerr << "[Splitter::createGraphicsResources] Failed to create descriptor set layout" << std::endl;
+		vkFreeMemory(device, vk_vertex_buffer_memory_, nullptr);
+		vkDestroyBuffer(device, vk_vertex_buffer_, nullptr);
+		vk_vertex_buffer_memory_ = VK_NULL_HANDLE;
+		vk_vertex_buffer_ = VK_NULL_HANDLE;
+		return false;
+	}
+	std::cout << "[Splitter::createGraphicsResources] Created descriptor set layout (texture sampler): " << vk_descriptor_set_layout_ << std::endl;
+
+	// Create dummy 1x1 white texture for descriptor binding
+	VkImageCreateInfo imageInfo{};
+	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageInfo.extent.width = 1;
+	imageInfo.extent.height = 1;
+	imageInfo.extent.depth = 1;
+	imageInfo.mipLevels = 1;
+	imageInfo.arrayLayers = 1;
+	imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+	imageInfo.tiling = VK_IMAGE_TILING_LINEAR;
+	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	imageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+
+	if (vkCreateImage(device, &imageInfo, nullptr, &dummy_texture_image_) != VK_SUCCESS)
+	{
+		std::cerr << "[Splitter] Failed to create dummy texture image" << std::endl;
+		vkDestroyDescriptorSetLayout(device, vk_descriptor_set_layout_, nullptr);
+		vkFreeMemory(device, vk_vertex_buffer_memory_, nullptr);
+		vkDestroyBuffer(device, vk_vertex_buffer_, nullptr);
+		return false;
+	}
+
+	VkMemoryRequirements memReqs;
+	vkGetImageMemoryRequirements(device, dummy_texture_image_, &memReqs);
+
+	VkMemoryAllocateInfo allocInfo2{};
+	allocInfo2.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo2.allocationSize = memReqs.size;
+	allocInfo2.memoryTypeIndex = findMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+	if (vkAllocateMemory(device, &allocInfo2, nullptr, &dummy_texture_memory_) != VK_SUCCESS)
+	{
+		std::cerr << "[Splitter] Failed to allocate dummy texture memory" << std::endl;
+		vkDestroyImage(device, dummy_texture_image_, nullptr);
+		vkDestroyDescriptorSetLayout(device, vk_descriptor_set_layout_, nullptr);
+		vkFreeMemory(device, vk_vertex_buffer_memory_, nullptr);
+		vkDestroyBuffer(device, vk_vertex_buffer_, nullptr);
+		return false;
+	}
+
+	vkBindImageMemory(device, dummy_texture_image_, dummy_texture_memory_, 0);
+
+	// Create image view
+	VkImageViewCreateInfo viewInfo{};
+	viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	viewInfo.image = dummy_texture_image_;
+	viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	viewInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+	viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	viewInfo.subresourceRange.baseMipLevel = 0;
+	viewInfo.subresourceRange.levelCount = 1;
+	viewInfo.subresourceRange.baseArrayLayer = 0;
+	viewInfo.subresourceRange.layerCount = 1;
+
+	if (vkCreateImageView(device, &viewInfo, nullptr, &dummy_texture_view_) != VK_SUCCESS)
+	{
+		std::cerr << "[Splitter] Failed to create dummy image view" << std::endl;
+		vkFreeMemory(device, dummy_texture_memory_, nullptr);
+		vkDestroyImage(device, dummy_texture_image_, nullptr);
+		vkDestroyDescriptorSetLayout(device, vk_descriptor_set_layout_, nullptr);
+		vkFreeMemory(device, vk_vertex_buffer_memory_, nullptr);
+		vkDestroyBuffer(device, vk_vertex_buffer_, nullptr);
+		return false;
+	}
+
+	// Create sampler
+	VkSamplerCreateInfo samplerInfo{};
+	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	samplerInfo.magFilter = VK_FILTER_LINEAR;
+	samplerInfo.minFilter = VK_FILTER_LINEAR;
+	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerInfo.anisotropyEnable = VK_FALSE;
+	samplerInfo.maxAnisotropy = 1.0f;
+	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	samplerInfo.unnormalizedCoordinates = VK_FALSE;
+	samplerInfo.compareEnable = VK_FALSE;
+	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+
+	if (vkCreateSampler(device, &samplerInfo, nullptr, &dummy_texture_sampler_) != VK_SUCCESS)
+	{
+		std::cerr << "[Splitter] Failed to create dummy sampler" << std::endl;
+		vkDestroyImageView(device, dummy_texture_view_, nullptr);
+		vkFreeMemory(device, dummy_texture_memory_, nullptr);
+		vkDestroyImage(device, dummy_texture_image_, nullptr);
+		vkDestroyDescriptorSetLayout(device, vk_descriptor_set_layout_, nullptr);
+		vkFreeMemory(device, vk_vertex_buffer_memory_, nullptr);
+		vkDestroyBuffer(device, vk_vertex_buffer_, nullptr);
+		return false;
+	}
+
+	std::cout << "[Splitter] Dummy texture created (1x1 for descriptor binding)" << std::endl;
+
+	// Create descriptor pool
+	VkDescriptorPoolSize poolSize{};
+	poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSize.descriptorCount = 1;
+
+	VkDescriptorPoolCreateInfo poolInfo{};
+	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	poolInfo.poolSizeCount = 1;
+	poolInfo.pPoolSizes = &poolSize;
+	poolInfo.maxSets = 1;
+
+	if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &vk_descriptor_pool_) != VK_SUCCESS)
+	{
+		std::cerr << "[Splitter] Failed to create descriptor pool" << std::endl;
+		vkDestroySampler(device, dummy_texture_sampler_, nullptr);
+		vkDestroyImageView(device, dummy_texture_view_, nullptr);
+		vkFreeMemory(device, dummy_texture_memory_, nullptr);
+		vkDestroyImage(device, dummy_texture_image_, nullptr);
+		vkDestroyDescriptorSetLayout(device, vk_descriptor_set_layout_, nullptr);
+		vkFreeMemory(device, vk_vertex_buffer_memory_, nullptr);
+		vkDestroyBuffer(device, vk_vertex_buffer_, nullptr);
+		return false;
+	}
+
+	std::cout << "[Splitter] Descriptor pool created: " << vk_descriptor_pool_ << std::endl;
+
+	// Allocate descriptor set
+	VkDescriptorSetAllocateInfo allocInfoDesc{};
+	allocInfoDesc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfoDesc.descriptorPool = vk_descriptor_pool_;
+	allocInfoDesc.descriptorSetCount = 1;
+	allocInfoDesc.pSetLayouts = &vk_descriptor_set_layout_;
+
+	if (vkAllocateDescriptorSets(device, &allocInfoDesc, &vk_descriptor_set_) != VK_SUCCESS)
+	{
+		std::cerr << "[Splitter] Failed to allocate descriptor set" << std::endl;
+		vkDestroyDescriptorPool(device, vk_descriptor_pool_, nullptr);
+		vkDestroySampler(device, dummy_texture_sampler_, nullptr);
+		vkDestroyImageView(device, dummy_texture_view_, nullptr);
+		vkFreeMemory(device, dummy_texture_memory_, nullptr);
+		vkDestroyImage(device, dummy_texture_image_, nullptr);
+		vkDestroyDescriptorSetLayout(device, vk_descriptor_set_layout_, nullptr);
+		vkFreeMemory(device, vk_vertex_buffer_memory_, nullptr);
+		vkDestroyBuffer(device, vk_vertex_buffer_, nullptr);
+		return false;
+	}
+
+	std::cout << "[Splitter] Descriptor set allocated: " << vk_descriptor_set_ << std::endl;
+
+	VkDescriptorImageInfo imageDescInfo{};
+	imageDescInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+	imageDescInfo.imageView = dummy_texture_view_;
+	imageDescInfo.sampler = dummy_texture_sampler_;
+
+	VkWriteDescriptorSet descriptorWrite{};
+	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrite.dstSet = vk_descriptor_set_;
+	descriptorWrite.dstBinding = 0;
+	descriptorWrite.dstArrayElement = 0;
+	descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptorWrite.descriptorCount = 1;
+	descriptorWrite.pImageInfo = &imageDescInfo;
+
+	vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
+	std::cout << "[Splitter] Descriptor set updated with dummy texture" << std::endl;
+
+	// Build pipeline configuration
+	VulkanPipeline::PipelineConfig config;
+	config.name = "splitter_lines";
+	config.vertexShaderCode = vertShaderBytes;
+	config.fragmentShaderCode = fragShaderBytes;
+	config.renderPass = vk_render_pass_;
+	config.descriptorSetLayout = vk_descriptor_set_layout_;
+	config.enableBlending = true;
+	config.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	config.vertexBindingStride = 2 * sizeof(float);  // Changed from 4 to 2 (vec2 only)
+	config.vertexAttributes = vertexAttributes;
+
+	// Get or create pipeline from factory
+	shared_pipeline_ = vulkan_pipelines_->getOrCreatePipeline(config);
+	
+	if (!shared_pipeline_)
+	{
+		vkFreeMemory(device, vk_vertex_buffer_memory_, nullptr);
+		vkDestroyBuffer(device, vk_vertex_buffer_, nullptr);
+		vk_vertex_buffer_memory_ = VK_NULL_HANDLE;
+		vk_vertex_buffer_ = VK_NULL_HANDLE;
+		std::cerr << "[Splitter::createGraphicsResources] Failed to get/create pipeline" << std::endl;
+		return false;
+	}
+
+	std::cout << "[Splitter::createGraphicsResources] Pipeline acquired successfully (handle=" 
+	          << shared_pipeline_->pipeline << ")" << std::endl;
+
+	return true;
 }
 
 void Splitter::destroyGraphicsResources()
 {
-	if (vbo_)
+	if (!vk_context_)
 	{
-		glDeleteBuffers(1, &vbo_);
-		vbo_ = 0;
+		return;
 	}
 
-	if (vao_)
+	VkDevice device = vk_context_->getDevice();
+
+	// Release shared pipeline - VulkanPipeline will destroy when no longer referenced
+	shared_pipeline_.reset();
+
+	// Destroy descriptor resources
+	if (vk_descriptor_pool_ != VK_NULL_HANDLE)
 	{
-		glDeleteVertexArrays(1, &vao_);
-		vao_ = 0;
+		vkDestroyDescriptorPool(device, vk_descriptor_pool_, nullptr);
+		vk_descriptor_pool_ = VK_NULL_HANDLE;
+		vk_descriptor_set_ = VK_NULL_HANDLE;
 	}
 
-	if (shader_program_)
+	if (dummy_texture_sampler_ != VK_NULL_HANDLE)
 	{
-		glDeleteProgram(shader_program_);
-		shader_program_ = 0;
+		vkDestroySampler(device, dummy_texture_sampler_, nullptr);
+		dummy_texture_sampler_ = VK_NULL_HANDLE;
+	}
+
+	if (dummy_texture_view_ != VK_NULL_HANDLE)
+	{
+		vkDestroyImageView(device, dummy_texture_view_, nullptr);
+		dummy_texture_view_ = VK_NULL_HANDLE;
+	}
+
+	if (dummy_texture_memory_ != VK_NULL_HANDLE)
+	{
+		vkFreeMemory(device, dummy_texture_memory_, nullptr);
+		dummy_texture_memory_ = VK_NULL_HANDLE;
+	}
+
+	if (dummy_texture_image_ != VK_NULL_HANDLE)
+	{
+		vkDestroyImage(device, dummy_texture_image_, nullptr);
+		dummy_texture_image_ = VK_NULL_HANDLE;
+	}
+
+	if (vk_descriptor_set_layout_ != VK_NULL_HANDLE)
+	{
+		vkDestroyDescriptorSetLayout(device, vk_descriptor_set_layout_, nullptr);
+		vk_descriptor_set_layout_ = VK_NULL_HANDLE;
+	}
+
+	if (vk_vertex_buffer_memory_ != VK_NULL_HANDLE)
+	{
+		vkFreeMemory(device, vk_vertex_buffer_memory_, nullptr);
+		vk_vertex_buffer_memory_ = VK_NULL_HANDLE;
+	}
+
+	if (vk_vertex_buffer_ != VK_NULL_HANDLE)
+	{
+		vkDestroyBuffer(device, vk_vertex_buffer_, nullptr);
+		vk_vertex_buffer_ = VK_NULL_HANDLE;
 	}
 }
 
@@ -891,9 +1279,9 @@ int Splitter::applyTopRowDelta(int delta)
 	return clampedDelta;
 }
 
-void Splitter::drawGeometry(const SplitterGeometry& splitter, int drawableWidth, int drawableHeight, float red, float green, float blue, float alpha)
+void Splitter::drawGeometry(VkCommandBuffer commandBuffer, const SplitterGeometry& splitter, int drawableWidth, int drawableHeight, float red, float green, float blue, float alpha)
 {
-	if (!window_ || !shader_program_ || !vao_ || !vbo_)
+	if (!window_ || !vk_context_ || !shared_pipeline_ || shared_pipeline_->pipeline == VK_NULL_HANDLE || vk_vertex_buffer_ == VK_NULL_HANDLE)
 	{
 		return;
 	}
@@ -918,6 +1306,7 @@ void Splitter::drawGeometry(const SplitterGeometry& splitter, int drawableWidth,
 	const float top = 1.0f - (static_cast<float>(y) / static_cast<float>(drawableHeight)) * 2.0f;
 	const float bottom = 1.0f - (static_cast<float>(y + height) / static_cast<float>(drawableHeight)) * 2.0f;
 
+	// Simplified vertex format: only vec2 position (no texcoord)
 	const float vertices[] = {
 		left, top,
 		left, bottom,
@@ -927,12 +1316,41 @@ void Splitter::drawGeometry(const SplitterGeometry& splitter, int drawableWidth,
 		right, top
 	};
 
-	glUseProgram(shader_program_);
-	glUniform4f(glGetUniformLocation(shader_program_, "splitterColor"), red, green, blue, alpha);
-	glBindVertexArray(vao_);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo_);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
-	glDrawArrays(GL_TRIANGLES, 0, 6);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindVertexArray(0);
+	// Update vertex buffer with new geometry
+	VkDevice device = vk_context_->getDevice();
+	void* data = nullptr;
+	if (vkMapMemory(device, vk_vertex_buffer_memory_, 0, sizeof(vertices), 0, &data) == VK_SUCCESS)
+	{
+		std::memcpy(data, vertices, sizeof(vertices));
+		vkUnmapMemory(device, vk_vertex_buffer_memory_);
+	}
+
+	// Bind vertex buffer
+	VkBuffer vertexBuffers[] = {vk_vertex_buffer_};
+	VkDeviceSize offsets[] = {0};
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
+	// Draw the splitter geometry
+	vkCmdDraw(commandBuffer, 6, 1, 0, 0);
+}
+
+uint32_t Splitter::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
+{
+	if (!vk_context_)
+	{
+		return 0;
+	}
+
+	VkPhysicalDeviceMemoryProperties memProperties;
+	vkGetPhysicalDeviceMemoryProperties(vk_context_->getPhysicalDevice(), &memProperties);
+
+	for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
+	{
+		if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+		{
+			return i;
+		}
+	}
+
+	return 0;
 }

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <SDL3/SDL.h>
-#include <glad/glad.h>
+#include <vulkan/vulkan.h>
 #include <mutex>
 
 namespace SIMILI
@@ -13,6 +13,7 @@ namespace SIMILI
 }
 
 class Camera;
+class VKContext;
 
 class ThreeDScreen
 {
@@ -22,9 +23,10 @@ public:
 	
 	void initialize();
 	void render(SIMILI::Frontend::FrameDatas* frameDatas, SDL_Window* window);
-	void draw();
+	void draw(VkCommandBuffer commandBuffer, VkRenderPass renderPass, VkFramebuffer framebuffer);
 	void setCamera(Camera* camera) { camera_ = camera; }
 	Camera* getCamera() const { return camera_; }
+	void setVKContext(VKContext* context);
 	
 	int getX() const { return x_; }
 	int getY() const { return y_; }
@@ -42,5 +44,6 @@ private:
 	bool waiting_for_frame_data_logged_;
 	bool first_render_logged_;
 	Camera* camera_;
+	VKContext* vk_context_;
 	std::mutex render_mutex_;
 };

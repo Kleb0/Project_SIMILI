@@ -57,7 +57,11 @@ namespace SIMILI {
 					screenData.screenY = wy + frameData.clientY;
 					
 					frameDataMap_[frameData.name] = screenData;
+
+					printAllFrameData();
 				}
+
+				
 
 			}
 

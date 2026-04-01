@@ -23,11 +23,14 @@ namespace net = boost::asio;
 namespace ssl = boost::asio::ssl;
 using tcp = boost::asio::ip::tcp;
 
+class HttpListener;
+
 class SimpleHttpServer 
 {
 	net::io_context ioc_;
 	std::unique_ptr<ssl::context> ssl_ctx_;
-	std::thread server_thread_;
+	std::vector<std::thread> server_threads_;
+	std::shared_ptr<HttpListener> http_listener_;
 	bool running_;
 	
 	std::unique_ptr<ContextRegistry> contextRegistry_;

@@ -14,9 +14,11 @@
 #include "../../Engine/ThreeDModes/Vertice_Mode.hpp"
 #include "../../Engine/ThreeDModes/Face_Mode.hpp"
 #include "../../Engine/ThreeDModes/Edge_Mode.hpp"
+#include "ResourcesLoader.hpp"
 #include "include/base/cef_callback.h"
 #include "include/wrapper/cef_closure_task.h"
 #include <iostream>
+#include <algorithm>
 #include <set>
 #include <unordered_map>
 #include <commctrl.h>  
@@ -34,7 +36,7 @@ UIHandler* UIHandler::s_instance_ = nullptr;
 UIHandler::UIHandler() : parent_sdl_window_(nullptr), parent_window_(nullptr), window_handle_(nullptr), timer_id_(0),
 	last_viewport_update_time_(0), last_viewport_x_(0), last_viewport_y_(0), 
 	last_viewport_width_(0), last_viewport_height_(0), vk_scene_(nullptr),
-	vk_renderer_(nullptr), main_camera_(nullptr), cube_mesh_ptr_(nullptr), scene_initialized_(false),
+	vk_renderer_(nullptr), vulkan_pipelines_(nullptr), main_camera_(nullptr), cube_mesh_ptr_(nullptr), scene_initialized_(false),
 	render_message_router_(nullptr), 
 	frame_datas_(nullptr),
 	window_delegate_(nullptr),
@@ -243,6 +245,19 @@ void UIHandler::OnBeforeCommandLineProcessing(const CefString& process_type, Cef
 	// Disable animations that can cause lag during resize
 	command_line->AppendSwitch("disable-renderer-backgrounding");
 	command_line->AppendSwitch("disable-backgrounding-occluded-windows");
+	
+	// Allow localhost requests and disable security for development
+	command_line->AppendSwitch("allow-running-insecure-content");
+	command_line->AppendSwitch("disable-web-security");
+	command_line->AppendSwitch("allow-file-access-from-files");
+	command_line->AppendSwitch("allow-file-access");
+	command_line->AppendSwitch("disable-site-isolation-trials");
+	command_line->AppendSwitch("disable-same-origin-policy");
+	command_line->AppendSwitch("allow-insecure-localhost");
+	command_line->AppendSwitch("ignore-certificate-errors-spki-list");
+	command_line->AppendSwitch("ignore-ssl-errors");
+	
+	std::cout << "[UIHandler] CEF command line flags configured for localhost access" << std::endl;
 }
 
 void UIHandler::OnContextInitialized() 
@@ -318,9 +333,16 @@ CefRefPtr<CefKeyboardHandler> UIHandler::GetKeyboardHandler()
 {
 	return this;
 }
+
 CefRefPtr<CefRenderHandler> UIHandler::GetRenderHandler()
 {
 	return cef_drawer_;
+}
+
+CefRefPtr<CefRequestHandler> UIHandler::GetRequestHandler()
+{
+	std::cout << "[UIHandler] GetRequestHandler() called" << std::endl;
+	return this;
 }
 
 
@@ -334,24 +356,7 @@ void UIHandler::OnAfterCreated(CefRefPtr<CefBrowser> browser)
 	browser_list_.push_back(browser);
 }
 
-void UIHandler::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, int)
-{
-	CEF_REQUIRE_UI_THREAD();
 
-	if (!frame || !frame->IsMain())
-	{
-		return;
-	}
-
-	CefString script = R"(
-		if (window.syncIFrameSizesToServer)
-		{
-			window.syncIFrameSizesToServer();
-		}
-	)";
-
-	frame->ExecuteJavaScript(script, frame->GetURL(), 0);
-}
 
 bool UIHandler::DoClose(CefRefPtr<CefBrowser> browser) 
 {
@@ -378,23 +383,51 @@ void UIHandler::OnBeforeClose(CefRefPtr<CefBrowser> browser)
 	}
 }
 
-void UIHandler::OnLoadError(CefRefPtr<CefBrowser> browser,
-CefRefPtr<CefFrame> frame, ErrorCode errorCode, const CefString& errorText, const CefString& failedUrl) 
+void UIHandler::initializeDefaultUIPanels()
 {
-	CEF_REQUIRE_UI_THREAD();
-
-	if (errorCode == ERR_ABORTED)
-		return;
-
-	std::stringstream ss;
-
-	ss << "<html><body bgcolor=\"white\">"
-		"<h2>Failed to load URL "
-	   << std::string(failedUrl) << " with error " << std::string(errorText)
-	   << " (" << errorCode << ").</h2></body></html>";
-
-	frame->LoadURL(CefString("data:text/html," + ss.str()));
+	std::cout << "[UIHandler] Initializing default UI panels..." << std::endl;
+	
+	std::map<std::string, IFrameData> defaultPanels;
+	
+	for (int i = 0; i < 1; i++)
+	{
+		std::string panelName = "temp_panel_" + std::to_string(i);
+		
+		IFrameData panelData;
+		panelData.name = panelName;
+		panelData.x = 0;
+		panelData.y = 0;
+		panelData.width = 100;
+		panelData.height = 100;
+		panelData.clientX = 0;
+		panelData.clientY = 0;
+		
+		defaultPanels[panelName] = panelData;
+		iframe_data_map_[panelName] = panelData;
+	}
+	
+	std::map<std::string, CEF_Drawer::UIPanelFrameData> uiPanelFramesForDrawer;
+	for (const auto& pair : defaultPanels)
+	{
+		CEF_Drawer::UIPanelFrameData panelFrame;
+		panelFrame.x = pair.second.x;
+		panelFrame.y = pair.second.y;
+		panelFrame.width = pair.second.width;
+		panelFrame.height = pair.second.height;
+		uiPanelFramesForDrawer[pair.first] = panelFrame;
+	}
+	
+	if (cef_drawer_)
+	{
+		cef_drawer_->updateUIPanelFrames(uiPanelFramesForDrawer);
+	}
+	
+	updateUIPanelIFrames(defaultPanels);
+	cacheUIPanelFrameDatas();
+	
+	std::cout << "[UIHandler] Default UI panels initialized: " << defaultPanels.size() << " panels" << std::endl;
 }
+
 
 void UIHandler::CloseAllBrowsers(bool force_close) 
 {
@@ -528,21 +561,6 @@ static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 i
 		// 		// handler->getOverlay()->render();
 		// 	}
 		// }
-		
-		if (handler->getSlotTextureRenderer() && handler->getSlotTextureRenderer()->isRenderingEnabled())
-		{
-			handler->getSlotTextureRenderer()->render();
-		}
-		
-		if (handler->getCompositeTestRenderer() && handler->getCompositeTestRenderer()->isRenderingEnabled())
-		{
-			handler->getCompositeTestRenderer()->render();
-		}
-		
-		if (handler->getVKScene() && handler->getVKScene()->getVKContext())
-		{
-			handler->getVKScene()->getVKContext()->ProjectOnThreeDScreen();
-		}
 		
 		if (parentWindow)
 		{
@@ -797,6 +815,31 @@ CefEventHandle os_event)
 	return false;
 }
 
+bool UIHandler::OnBeforeBrowse(CefRefPtr<CefBrowser> browser,
+	CefRefPtr<CefFrame> frame,
+	CefRefPtr<CefRequest> request,
+	bool user_gesture,
+	bool is_redirect)
+{
+	std::string url = request->GetURL().ToString();
+	std::cout << "[UIHandler] OnBeforeBrowse: " << url << std::endl;
+	return false;
+}
+
+CefRefPtr<CefResourceRequestHandler> UIHandler::GetResourceRequestHandler(
+	CefRefPtr<CefBrowser> browser,
+	CefRefPtr<CefFrame> frame,
+	CefRefPtr<CefRequest> request,
+	bool is_navigation,
+	bool is_download,
+	const CefString& request_initiator,
+	bool& disable_default_handling)
+{
+	std::string url = request->GetURL().ToString();
+	std::cout << "[UIHandler] GetResourceRequestHandler for: " << url << std::endl;
+	return new LocalResourceRequestHandler();
+}
+
 void UIHandler::set_MouseControl(SIMILI::Input::MouseController* mouseControl)
 {
 	if (mouse_controller_ == mouseControl)
@@ -891,10 +934,11 @@ void UIHandler::processPendingFrameUpdates()
 	}
 }
 
-void UIHandler::startSplitter()
+void UIHandler::startSplitter(VKContext* vkContext, VkRenderPass renderPass)
 {
-	if (!parent_window_)
+	if (!parent_window_ || !vkContext || renderPass == VK_NULL_HANDLE)
 	{
+		std::cerr << "[UIHandler] Cannot start splitter: missing resources" << std::endl;
 		return;
 	}
 
@@ -903,11 +947,33 @@ void UIHandler::startSplitter()
 		splitter_ = std::make_unique<Splitter>();
 	}
 
-	if (!splitter_->initialize(parent_window_))
+	if (!splitter_->initialize(parent_window_, vkContext, renderPass))
 	{
+		std::cerr << "[UIHandler] Failed to initialize splitter" << std::endl;
 		splitter_.reset();
 		return;
 	}
+
+	if (vulkan_pipelines_)
+	{
+		splitter_->setVulkanPipelines(vulkan_pipelines_);
+		std::cout << "[UIHandler] VulkanPipelines set for splitter" << std::endl;
+	}
+	else
+	{
+		std::cerr << "[UIHandler] ERROR: No VulkanPipelines available for splitter" << std::endl;
+		splitter_.reset();
+		return;
+	}
+
+	if (!splitter_->finalizeInitialization())
+	{
+		std::cerr << "[UIHandler] Failed to finalize splitter initialization" << std::endl;
+		splitter_.reset();
+		return;
+	}
+
+	std::cout << "[UIHandler] Splitter initialized" << std::endl;
 
 	if (frame_datas_)
 	{
@@ -1023,6 +1089,18 @@ void UIHandler::captureIFramePositions()
 	}
 
 	frame_datas_->catchFrameData(sdlWindow);
+	
+	if (!splitter_ && !iframe_data_map_.empty() && parent_sdl_window_)
+	{
+		VkRenderPass renderPass = parent_sdl_window_->getRenderPass();
+		if (vk_renderer_ && renderPass != VK_NULL_HANDLE)
+		{
+			std::cout << "\n  [UIHANDLER] --------------------------------- SPLITTER CREATION TRIGGERED ---------------------------------" << std::endl;
+			std::cout << "[UIHandler] Frame data available - initializing splitter now" << std::endl;
+			startSplitter(vk_renderer_, renderPass);
+		}
+	}
+	
 	if (splitter_)
 	{
 		splitter_->syncFrameDatas(frame_datas_);
@@ -1056,7 +1134,7 @@ void UIHandler::captureIFramePositions()
 			convertedData.height = data.height;
 			mouseControlDataMap[pair.first] = convertedData;
 			
-			std::cout << "[UIHandler] Panel '" << data.name << "' bounds: "
+			std::cout << "\n [UIHandler] Panel '" << data.name << "' bounds: "
 				<< "clientX=" << data.clientX << " clientY=" << data.clientY
 				<< " width=" << data.width << " height=" << data.height << std::endl;
 		}
@@ -1187,7 +1265,7 @@ void UIHandler::cacheUIPanelFrameDatas()
 	}
 }
 
-void UIHandler::drawUIPanels()
+void UIHandler::drawUIPanels(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight)
 {
 	if (!cef_drawer_)
 	{
@@ -1206,23 +1284,37 @@ void UIHandler::drawUIPanels()
 	if (splitter_)
 	{
 		panelFrameDataMap = splitter_->getUIPanelFrameDatas();
+		std::cout << "[UIHandler] drawUIPanels: Got " << panelFrameDataMap.size() << " panels from splitter" << std::endl;
+		for (const auto& p : panelFrameDataMap)
+		{
+			std::cout << "[UIHandler]   - Panel in map: " << p.first << " (X:" << p.second.relativeX << " Y:" << p.second.relativeY << " W:" << p.second.width << " H:" << p.second.height << ")" << std::endl;
+		}
+	}
+	else
+	{
+		std::cout << "[UIHandler] drawUIPanels: No splitter available" << std::endl;
 	}
 
 	if (panelFrameDataMap.empty())
 	{
 		std::lock_guard<std::mutex> lock(ui_panel_mutex_);
 		panelFrameDataMap = ui_panel_frame_data_map_;
+		std::cout << "[UIHandler] drawUIPanels: Got " << panelFrameDataMap.size() << " panels from cached frame data" << std::endl;
 	}
 
 	if (panelFrameDataMap.empty())
 	{
+		std::cout << "[UIHandler] drawUIPanels: No panel data available - clearing panels" << std::endl;
 		ui_panels_.clear();
 		return;
 	}
 
 	CEF_Drawer::SDLWindowProperties windowProperties = cef_drawer_->getSDLWindowProperties();
-	int drawableWidth = windowProperties.drawable_width;
-	int drawableHeight = windowProperties.drawable_height;
+	if (drawableWidth <= 0 || drawableHeight <= 0)
+	{
+		drawableWidth = windowProperties.drawable_width;
+		drawableHeight = windowProperties.drawable_height;
+	}
 	if (drawableWidth <= 0 || drawableHeight <= 0)
 	{
 		SDL_GetWindowSizeInPixels(sdlWindow, &drawableWidth, &drawableHeight);
@@ -1232,29 +1324,81 @@ void UIHandler::drawUIPanels()
 		return;
 	}
 
-	glViewport(0, 0, drawableWidth, drawableHeight);
-
-	// Skip texture rebuilds during splitter drag for better responsiveness
 	bool skipTextureRebuild = splitter_ && splitter_->isDragging();
 
 	std::set<std::string> activePanelNames;
 
 	for (const auto& pair : panelFrameDataMap)
 	{
+		if (pair.first == "viewport_panel")
+		{
+			std::cout << "[UIHandler] Skipping viewport_panel from UI rendering" << std::endl;
+			continue;
+		}
+
+		if (pair.second.width <= 0 || pair.second.height <= 0)
+		{
+			std::cout << "[UIHandler] Skipping panel '" << pair.first << "' with invalid dimensions: " << pair.second.width << "x" << pair.second.height << std::endl;
+			continue;
+		}
+		
 		auto panelIt = ui_panels_.find(pair.first);
 		if (panelIt == ui_panels_.end())
 		{
+			std::cout << "[UIHandler] Creating new UIPanel: " << pair.first << std::endl;
 			auto panel = std::make_unique<UIPanel>();
 			if (!panel->initialize(pair.first))
 			{
+				std::cout << "[UIHandler] Failed to initialize panel: " << pair.first << std::endl;
 				continue;
 			}
 
+			if (vk_renderer_)
+			{
+				panel->setVKContext(vk_renderer_);
+				std::cout << "[UIHandler] VKContext set for panel: " << pair.first << std::endl;
+			}
+			else
+			{
+				std::cout << "[UIHandler] No VKContext available for panel: " << pair.first << std::endl;
+			}
+
+			if (vulkan_pipelines_)
+			{
+				panel->setVulkanPipelines(vulkan_pipelines_);
+				std::cout << "[UIHandler] VulkanPipelines set for panel: " << pair.first << std::endl;
+			}
+			else
+			{
+				std::cout << "[UIHandler] No VulkanPipelines available for panel: " << pair.first << std::endl;
+			}
+
+			if (parent_sdl_window_)
+			{
+				VkRenderPass renderPass = parent_sdl_window_->getRenderPass();
+				if (renderPass != VK_NULL_HANDLE)
+				{
+					panel->setRenderPass(renderPass);
+					std::cout << "[UIHandler] RenderPass set for panel: " << pair.first << std::endl;
+				}
+				else
+				{
+					std::cout << "[UIHandler] RenderPass is NULL for panel: " << pair.first << std::endl;
+				}
+			}
+			else
+			{
+				std::cout << "[UIHandler] No SDL window available for panel: " << pair.first << std::endl;
+			}
+
 			panelIt = ui_panels_.emplace(pair.first, std::move(panel)).first;
+			std::cout << "[UIHandler] Panel created and stored: " << pair.first << std::endl;
 		}
 
 		panelIt->second->updateFromFrameData(pair.second, sdlWindow, skipTextureRebuild);
-		panelIt->second->draw(drawableWidth, drawableHeight);
+		std::cout << "[UIHandler] About to draw panel: " << pair.first << std::endl;
+		panelIt->second->draw(commandBuffer, drawableWidth, drawableHeight);
+		std::cout << "[UIHandler] Panel updated and drawn: " << pair.first << " at (" << pair.second.relativeX << "," << pair.second.relativeY << ") " << pair.second.width << "x" << pair.second.height << std::endl;
 		activePanelNames.insert(pair.first);
 	}
 
@@ -1268,11 +1412,6 @@ void UIHandler::drawUIPanels()
 		{
 			++it;
 		}
-	}
-
-	if (splitter_)
-	{
-		splitter_->draw();
 	}
 }
 

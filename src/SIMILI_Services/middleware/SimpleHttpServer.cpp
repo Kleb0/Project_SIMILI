@@ -46,7 +46,6 @@ void SimpleHttpServer::start(unsigned short http_port, unsigned short https_port
 
     std::cout << "[SimpleHttpServer] Starting HTTP server on port " << http_port << "..." << std::endl;
     
-    // Initialize ConsoleLogger session once at server startup
     if (ConsoleLogger::getInstance().initializeSession()) {
         std::string appSessionId = ConsoleLogger::getInstance().getApplicationSessionId();
         std::ostringstream initMsg;
@@ -57,24 +56,24 @@ void SimpleHttpServer::start(unsigned short http_port, unsigned short https_port
         std::cout << "[SimpleHttpServer] ConsoleLogger initialized with session ID: " << appSessionId << std::endl;
     }
 
-    // Start HTTP listener
     auto http_address = net::ip::make_address("127.0.0.1");
-    std::make_shared<HttpListener>(ioc_, tcp::endpoint{http_address, http_port})->run();
+    http_listener_ = std::make_shared<HttpListener>(ioc_, tcp::endpoint{http_address, http_port});
+    http_listener_->run();
+    std::cout << "[SimpleHttpServer] HttpListener created and started" << std::endl;
 
     // Setup SSL context for HTTPS (self-signed certificate for POC)
     ssl_ctx_ = std::make_unique<ssl::context>(ssl::context::tlsv12_server);
     running_ = true;
 
-    // Run the I/O context in multiple high-priority threads for faster request processing
     const int thread_count = 2;
+    server_threads_.reserve(thread_count);
     for (int i = 0; i < thread_count; ++i) {
-        server_thread_ = std::thread([this, i]() {
+        server_threads_.emplace_back([this, i]() {
             SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
             std::cout << "[SimpleHttpServer] Worker thread " << i << " started with HIGHEST priority" << std::endl;
             ioc_.run();
             std::cout << "[SimpleHttpServer] Worker thread " << i << " stopped" << std::endl;
         });
-        server_thread_.detach(); // Allow multiple threads to run concurrently
     }
 
     std::cout << "[SimpleHttpServer] HTTP server started on port " << http_port << " with " << thread_count << " worker threads" << std::endl;
@@ -87,12 +86,19 @@ void SimpleHttpServer::stop()
     
     std::cout << "[SimpleHttpServer] Stopping server..." << std::endl;
     running_ = false;
+    
+    http_listener_.reset();
+    
     ioc_.stop();
     
-    if (server_thread_.joinable()) 
+    for (auto& thread : server_threads_)
     {
-        server_thread_.join();
+        if (thread.joinable())
+        {
+            thread.join();
+        }
     }
+    server_threads_.clear();
     
     std::cout << "[SimpleHttpServer] Server stopped" << std::endl;
 }

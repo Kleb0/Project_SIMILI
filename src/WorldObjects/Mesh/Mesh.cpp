@@ -239,27 +239,58 @@ std::vector<Ngon*> Mesh::getNgons() const
 
 void Mesh::finalize()
 {
+    std::cout << "[Mesh] Starting finalize..." << std::endl;
 
-    for (Vertice* v : vertices)
+    std::cout << "[Mesh] Finalizing " << vertices.size() << " vertices..." << std::endl;
+    for (size_t i = 0; i < vertices.size(); ++i)
     {
-
+        Vertice* v = vertices[i];
+        if (!v)
+        {
+            std::cerr << "[Mesh] WARNING: Null vertex at index " << i << std::endl;
+            continue;
+        }
+        
         v->setMeshParent(this);
-        v->setName("Vertice_" + std::to_string(&v - &vertices[0]));
+        v->setName("Vertice_" + std::to_string(i));
         v->initialize();
     }
+    std::cout << "[Mesh] Vertices finalized" << std::endl;
 
-    for (Edge* e : edges) e->initialize();
+    std::cout << "[Mesh] Finalizing " << edges.size() << " edges..." << std::endl;
+    for (Edge* e : edges) 
+    {
+        if (e) 
+            e->initialize();
+    }
+    std::cout << "[Mesh] Edges finalized" << std::endl;
 
+    std::cout << "[Mesh] Finalizing " << faces.size() << " faces..." << std::endl;
     for (Face* f : faces) 
     {
-
+        if (!f)
+        {
+            std::cerr << "[Mesh] WARNING: Null face found" << std::endl;
+            continue;
+        }
         f->setParentMesh(this);      
         f->initialize();
-    } 
+    }
+    std::cout << "[Mesh] Faces finalized" << std::endl;
 
+    std::cout << "[Mesh] Checking meshDNA..." << std::endl;
+    if (!meshDNA)
+    {
+        std::cerr << "[Mesh] ERROR: meshDNA is null!" << std::endl;
+        return;
+    }
+    std::cout << "[Mesh] meshDNA is valid, calling ensureInit..." << std::endl;
     
     meshDNA->ensureInit(getModelMatrix());
+    std::cout << "[Mesh] ensureInit completed, calling freezeFromMesh..." << std::endl;
+    
     meshDNA->freezeFromMesh(this);
+    std::cout << "[Mesh] Mesh finalized successfully" << std::endl;
 }
 
 void Mesh::clearGeometry()

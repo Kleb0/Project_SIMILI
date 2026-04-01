@@ -1,0 +1,293 @@
+#include "ResourcesLoader.hpp"
+#include "ui_handler.hpp"
+#include "CEFDrawing/CEF_Drawer.hpp"
+#include "../ThirdParty/json.hpp"
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <vector>
+#include <algorithm>
+
+#define NOMINMAX
+#include <Windows.h>
+
+using json = nlohmann::json;
+
+// ==================== SimpleResourceHandler ====================
+
+SimpleResourceHandler::SimpleResourceHandler(const std::string& mimeType, const std::string& content)
+	: mime_type_(mimeType)
+	, content_(content)
+	, offset_(0)
+{
+}
+
+bool SimpleResourceHandler::Open(CefRefPtr<CefRequest> request, bool& handle_request, CefRefPtr<CefCallback> callback)
+{
+	handle_request = true;
+	return true;
+}
+
+void SimpleResourceHandler::GetResponseHeaders(CefRefPtr<CefResponse> response, int64_t& response_length, CefString& redirectUrl)
+{
+	response->SetMimeType(mime_type_);
+	response->SetStatus(200);
+	response_length = content_.size();
+}
+
+bool SimpleResourceHandler::Read(void* data_out, int bytes_to_read, int& bytes_read, CefRefPtr<CefResourceReadCallback> callback)
+{
+	bytes_read = 0;
+	
+	if (offset_ < content_.size())
+	{
+		int transfer_size = (std::min)(bytes_to_read, static_cast<int>(content_.size() - offset_));
+		memcpy(data_out, content_.data() + offset_, transfer_size);
+		offset_ += transfer_size;
+		bytes_read = transfer_size;
+		return true;
+	}
+	
+	return false;
+}
+
+void SimpleResourceHandler::Cancel()
+{
+	// Nothing to cancel
+}
+
+// ==================== LocalResourceRequestHandler ====================
+
+LocalResourceRequestHandler::LocalResourceRequestHandler()
+{
+	// Get executable directory to resolve ui/ path
+	char buffer[MAX_PATH];
+	GetModuleFileNameA(nullptr, buffer, MAX_PATH);
+	std::string exePath(buffer);
+	size_t lastSlash = exePath.find_last_of("\\/");
+	if (lastSlash != std::string::npos)
+	{
+		base_dir_ = exePath.substr(0, lastSlash + 1);
+	}
+	else
+	{
+		base_dir_ = "";
+	}
+	std::cout << "[LocalResourceRequestHandler] Constructor: base_dir_=\"" << base_dir_ << "\"" << std::endl;
+}
+
+CefRefPtr<CefResourceHandler> LocalResourceRequestHandler::GetResourceHandler(
+	CefRefPtr<CefBrowser> browser,
+	CefRefPtr<CefFrame> frame,
+	CefRefPtr<CefRequest> request)
+{
+	std::string url = request->GetURL().ToString();
+
+	std::cout << "\n --------------- [LocalResourceRequestHandler] GetResourceHandler called --------------- " << std::endl;
+	std::cout << "[LocalResourceRequestHandler] GetResourceHandler for URL: " << url << std::endl;
+
+	// Intercept /api/uipanels/update and /api/iframes/update (both use same JSON format)
+	if (url == "http://localhost:8080/api/uipanels/update" || url == "http://localhost:8080/api/iframes/update")
+	{
+		return handleUIPanelUpdate(request);
+	}
+
+	// Let other API requests through (though they won't work in CEF OSR)
+	if (url.find("http://localhost:8080/api/") == 0)
+	{
+		std::cout << "[LocalResourceRequestHandler] API request - letting it through to HTTP server" << std::endl;
+		return nullptr;  // Let CEF make a real HTTP request (won't work in OSR mode)
+	}
+
+	// Serve local files from ui/ directory
+	if (url.find("http://localhost:8080/ui/") == 0)
+	{
+		std::string filePath = url.substr(std::string("http://localhost:8080/ui/").length());
+		return serveLocalFile(filePath);
+	}
+	
+	std::cout << "[LocalResourceRequestHandler] URL not handled: " << url << std::endl;
+	return nullptr;
+}
+
+CefRefPtr<CefResourceHandler> LocalResourceRequestHandler::handleUIPanelUpdate(CefRefPtr<CefRequest> request)
+{
+	std::string url = request->GetURL().ToString();
+	std::cout << "[LocalResourceRequestHandler] Intercepting " << url << std::endl;
+	
+	// Get POST data
+	CefRefPtr<CefPostData> postData = request->GetPostData();
+	if (!postData)
+	{
+		std::cout << "[LocalResourceRequestHandler] ERROR: No POST data" << std::endl;
+		return new SimpleResourceHandler("application/json", "{\"success\": false, \"error\": \"No POST data\"}");
+	}
+	
+	// Extract POST body
+	CefPostData::ElementVector elements;
+	postData->GetElements(elements);
+	
+	std::string body;
+	for (size_t i = 0; i < elements.size(); ++i)
+	{
+		CefRefPtr<CefPostDataElement> element = elements[i];
+		if (element->GetType() == PDE_TYPE_BYTES)
+		{
+			size_t size = element->GetBytesCount();
+			if (size > 0)
+			{
+				std::vector<char> buffer(size);
+				element->GetBytes(size, buffer.data());
+				body.append(buffer.data(), size);
+			}
+		}
+	}
+	
+	std::cout << "[LocalResourceRequestHandler] POST body: " << body << std::endl;
+	
+	try
+	{
+		json requestData = json::parse(body);
+		
+		if (!requestData.contains("iframes") || !requestData["iframes"].is_array())
+		{
+			return new SimpleResourceHandler("application/json", "{\"success\": false, \"error\": \"Missing iframes array\"}");
+		}
+		
+		UIHandler* handler = UIHandler::getInstance();
+		if (!handler)
+		{
+			return new SimpleResourceHandler("application/json", "{\"success\": false, \"error\": \"Handler not available\"}");
+		}
+		
+		std::map<std::string, IFrameData> uiPanelIFrames;
+		std::map<std::string, CEF_Drawer::UIPanelFrameData> uiPanelFramesForDrawer;
+		
+		for (const auto& iframe : requestData["iframes"])
+		{
+			if (iframe.contains("name") && iframe.contains("x") && iframe.contains("y") &&
+				iframe.contains("width") && iframe.contains("height"))
+			{
+				std::string name = iframe["name"];
+				if (name == "viewport_panel")
+				{
+					continue;  // Skip viewport panel (handled separately)
+				}
+				
+				IFrameData data;
+				data.name = name;
+				data.x = iframe["x"];
+				data.y = iframe["y"];
+				data.width = iframe["width"];
+				data.height = iframe["height"];
+				data.clientX = iframe.contains("clientX") ? iframe["clientX"].get<int>() : data.x;
+				data.clientY = iframe.contains("clientY") ? iframe["clientY"].get<int>() : data.y;
+				uiPanelIFrames[name] = data;
+				
+				handler->iframe_data_map_[name] = data;
+				
+				CEF_Drawer::UIPanelFrameData panelFrame;
+				panelFrame.x = data.x;
+				panelFrame.y = data.y;
+				panelFrame.width = data.width;
+				panelFrame.height = data.height;
+				uiPanelFramesForDrawer[name] = panelFrame;
+			}
+		}
+		
+		std::cout << "[LocalResourceRequestHandler] Created " << uiPanelIFrames.size() << " UI panels" << std::endl;
+		
+		CEF_Drawer* cefDrawer = handler->getCEFDrawer();
+		if (cefDrawer)
+		{
+			cefDrawer->updateUIPanelFrames(uiPanelFramesForDrawer);
+		}
+		
+		handler->updateUIPanelIFrames(uiPanelIFrames);
+		handler->cacheUIPanelFrameDatas();
+		handler->captureIFramePositions();
+		
+		std::string response = "{\"success\": true, \"count\": " + std::to_string(uiPanelIFrames.size()) + "}";
+		return new SimpleResourceHandler("application/json", response);
+	}
+	catch (const std::exception& e)
+	{
+		std::cout << "[LocalResourceRequestHandler] JSON parse error: " << e.what() << std::endl;
+		std::string error = "{\"success\": false, \"error\": \"" + std::string(e.what()) + "\"}";
+		return new SimpleResourceHandler("application/json", error);
+	}
+}
+
+CefRefPtr<CefResourceHandler> LocalResourceRequestHandler::serveLocalFile(const std::string& filePath)
+{
+	std::cout << "[LocalResourceRequestHandler] Mapping to file: ui/" << filePath << std::endl;
+	
+	// Try base_dir_ + "ui/" + filePath first
+	std::string fullPath = base_dir_ + "ui/" + filePath;
+	std::cout << "[LocalResourceRequestHandler] Trying absolute path: " << fullPath << std::endl;
+	
+	std::ifstream file(fullPath, std::ios::binary);
+	
+	// If not found, try relative path as fallback
+	if (!file.is_open())
+	{
+		std::cout << "[LocalResourceRequestHandler] Absolute path failed, trying relative: ui/" << filePath << std::endl;
+		fullPath = "ui/" + filePath;
+		file.open(fullPath, std::ios::binary);
+	}
+	
+	if (!file.is_open())
+	{
+		std::cout << "[LocalResourceRequestHandler] ERROR: File not found: " << fullPath << std::endl;
+		return nullptr;
+	}
+	
+	std::stringstream buffer;
+	buffer << file.rdbuf();
+	file.close();
+	
+	std::string content = buffer.str();
+	std::cout << "[LocalResourceRequestHandler] Loaded file: " << fullPath << " (" << content.size() << " bytes)" << std::endl;
+	
+	std::string mimeType = getMimeType(filePath);
+	std::cout << "[LocalResourceRequestHandler] Created handler for " << mimeType << std::endl;
+	
+	return new SimpleResourceHandler(mimeType, content);
+}
+
+std::string LocalResourceRequestHandler::getMimeType(const std::string& filePath) const
+{
+	if (filePath.find(".css") != std::string::npos)
+	{
+		return "text/css";
+	}
+	else if (filePath.find(".js") != std::string::npos)
+	{
+		return "application/javascript";
+	}
+	else if (filePath.find(".png") != std::string::npos)
+	{
+		return "image/png";
+	}
+	else if (filePath.find(".jpg") != std::string::npos || filePath.find(".jpeg") != std::string::npos)
+	{
+		return "image/jpeg";
+	}
+	else if (filePath.find(".svg") != std::string::npos)
+	{
+		return "image/svg+xml";
+	}
+	else if (filePath.find(".json") != std::string::npos)
+	{
+		return "application/json";
+	}
+	
+	return "text/html";  // Default MIME type
+}
+
+// ==================== ResourcesLoader ====================
+
+CefRefPtr<CefResourceRequestHandler> ResourcesLoader::createRequestHandler()
+{
+	return new LocalResourceRequestHandler();
+}

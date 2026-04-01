@@ -3,8 +3,10 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <cstring>
 
 #include "include/cef_browser.h"
+#include "../../Engine/VulkanScene/VKcontext.hpp"
 
 CEF_Resizer::CEF_Resizer(CEF_Drawer& owner)
 	: owner_(owner)
@@ -36,13 +38,79 @@ void CEF_Resizer::resize(int width, int height)
 
 void CEF_Resizer::ensureTextureStorage(int width, int height)
 {
-	if (!owner_.texture_id_ || width <= 0 || height <= 0)
+	if (owner_.texture_image_ == VK_NULL_HANDLE || width <= 0 || height <= 0)
 	{
 		return;
 	}
 
-	glBindTexture(GL_TEXTURE_2D, owner_.texture_id_);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, nullptr);
+	VkDevice device = owner_.vk_context_->getDevice();
+
+	if (owner_.texture_view_ != VK_NULL_HANDLE)
+	{
+		vkDestroyImageView(device, owner_.texture_view_, nullptr);
+		owner_.texture_view_ = VK_NULL_HANDLE;
+	}
+
+	if (owner_.texture_image_ != VK_NULL_HANDLE)
+	{
+		vkDestroyImage(device, owner_.texture_image_, nullptr);
+		owner_.texture_image_ = VK_NULL_HANDLE;
+	}
+
+	if (owner_.texture_memory_ != VK_NULL_HANDLE)
+	{
+		vkFreeMemory(device, owner_.texture_memory_, nullptr);
+		owner_.texture_memory_ = VK_NULL_HANDLE;
+	}
+
+	VkImageCreateInfo imageInfo{};
+	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageInfo.extent.width = width;
+	imageInfo.extent.height = height;
+	imageInfo.extent.depth = 1;
+	imageInfo.mipLevels = 1;
+	imageInfo.arrayLayers = 1;
+	imageInfo.format = VK_FORMAT_B8G8R8A8_UNORM;
+	imageInfo.tiling = VK_IMAGE_TILING_LINEAR;
+	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	if (vkCreateImage(device, &imageInfo, nullptr, &owner_.texture_image_) != VK_SUCCESS)
+	{
+		return;
+	}
+
+	VkMemoryRequirements memRequirements;
+	vkGetImageMemoryRequirements(device, owner_.texture_image_, &memRequirements);
+
+	VkMemoryAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.allocationSize = memRequirements.size;
+	allocInfo.memoryTypeIndex = owner_.findMemoryType(memRequirements.memoryTypeBits,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+	if (vkAllocateMemory(device, &allocInfo, nullptr, &owner_.texture_memory_) != VK_SUCCESS)
+	{
+		return;
+	}
+
+	vkBindImageMemory(device, owner_.texture_image_, owner_.texture_memory_, 0);
+
+	VkImageViewCreateInfo viewInfo{};
+	viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	viewInfo.image = owner_.texture_image_;
+	viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	viewInfo.format = VK_FORMAT_B8G8R8A8_UNORM;
+	viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	viewInfo.subresourceRange.baseMipLevel = 0;
+	viewInfo.subresourceRange.levelCount = 1;
+	viewInfo.subresourceRange.baseArrayLayer = 0;
+	viewInfo.subresourceRange.layerCount = 1;
+
+	vkCreateImageView(device, &viewInfo, nullptr, &owner_.texture_view_);
 }
 
 bool CEF_Resizer::rebuildUIPanelTextureLocked(const std::string& panelName, CEF_Drawer::UIPanelTextureData& textureData, CEF_Drawer::UIPanelFrameData& outFrame)
@@ -50,6 +118,7 @@ bool CEF_Resizer::rebuildUIPanelTextureLocked(const std::string& panelName, CEF_
 	auto sourceIt = owner_.ui_panel_frames_.find(panelName);
 	if (sourceIt == owner_.ui_panel_frames_.end())
 	{
+		std::cout << "[CEF_Resizer::rebuildUIPanelTextureLocked] " << panelName << " - Not found in ui_panel_frames_" << std::endl;
 		return false;
 	}
 
@@ -64,11 +133,23 @@ bool CEF_Resizer::rebuildUIPanelTextureLocked(const std::string& panelName, CEF_
 
 	if (sourceFrame.width <= 0 || sourceFrame.height <= 0 || displayFrame.width <= 0 || displayFrame.height <= 0)
 	{
+		std::cout << "[CEF_Resizer::rebuildUIPanelTextureLocked] " << panelName << " - Invalid dimensions: source " << sourceFrame.width << "x" << sourceFrame.height << ", display " << displayFrame.width << "x" << displayFrame.height << std::endl;
 		return false;
 	}
 
 	if (owner_.paint_buffer_.empty() || owner_.paint_buffer_width_ <= 0 || owner_.paint_buffer_height_ <= 0)
 	{
+		std::cout << "[CEF_Resizer::rebuildUIPanelTextureLocked] " << panelName << " - Paint buffer not ready: " << owner_.paint_buffer_.size() << " bytes, " << owner_.paint_buffer_width_ << "x" << owner_.paint_buffer_height_ << std::endl;
+		return false;
+	}
+	
+	std::size_t expectedBufferSize = static_cast<std::size_t>(owner_.paint_buffer_width_) * static_cast<std::size_t>(owner_.paint_buffer_height_) * 4u;
+	if (owner_.paint_buffer_.size() != expectedBufferSize)
+	{
+		std::cout << "[CEF_Resizer::rebuildUIPanelTextureLocked] " << panelName 
+		          << " - Buffer size mismatch: got " << owner_.paint_buffer_.size() 
+		          << " bytes, expected " << expectedBufferSize 
+		          << " (" << owner_.paint_buffer_width_ << "x" << owner_.paint_buffer_height_ << "x4)" << std::endl;
 		return false;
 	}
 
@@ -87,7 +168,7 @@ bool CEF_Resizer::rebuildUIPanelTextureLocked(const std::string& panelName, CEF_
 	int targetWidth = sourceWidth > 0 ? sourceWidth : 1;
 	int targetHeight = sourceHeight > 0 ? sourceHeight : 1;
 
-	bool needsRebuild = textureData.dirty || textureData.texture_id == 0 || textureData.width != targetWidth || textureData.height != targetHeight;
+	bool needsRebuild = textureData.dirty || textureData.texture_image == VK_NULL_HANDLE || textureData.width != targetWidth || textureData.height != targetHeight;
 	if (!needsRebuild)
 	{
 		outFrame.x = 0;
@@ -97,7 +178,40 @@ bool CEF_Resizer::rebuildUIPanelTextureLocked(const std::string& panelName, CEF_
 		return true;
 	}
 
+	if (textureData.texture_image != VK_NULL_HANDLE && (textureData.width != targetWidth || textureData.height != targetHeight))
+	{
+		VkDevice device = owner_.vk_context_->getDevice();
+
+		if (textureData.texture_view != VK_NULL_HANDLE)
+		{
+			vkDestroyImageView(device, textureData.texture_view, nullptr);
+			textureData.texture_view = VK_NULL_HANDLE;
+		}
+
+		if (textureData.texture_memory != VK_NULL_HANDLE)
+		{
+			vkFreeMemory(device, textureData.texture_memory, nullptr);
+			textureData.texture_memory = VK_NULL_HANDLE;
+		}
+
+		if (textureData.texture_image != VK_NULL_HANDLE)
+		{
+			vkDestroyImage(device, textureData.texture_image, nullptr);
+			textureData.texture_image = VK_NULL_HANDLE;
+		}
+
+		textureData.width = 0;
+		textureData.height = 0;
+		textureData.texture_layout_initialized = false;
+	}
+
+	std::cout << "[CEF_Resizer::rebuildUIPanelTextureLocked] " << panelName 
+	          << " - Sampling from paint buffer: sourceRegion[" << sourceMinX << "," << sourceMinY 
+	          << " " << sourceWidth << "x" << sourceHeight << "] -> target " << targetWidth << "x" << targetHeight << std::endl;
+
 	std::vector<unsigned char> panelPixels(static_cast<std::size_t>(targetWidth) * static_cast<std::size_t>(targetHeight) * 4u);
+	
+	std::size_t paintBufferSize = owner_.paint_buffer_.size();
 
 	for (int targetY = 0; targetY < targetHeight; ++targetY)
 	{
@@ -114,6 +228,20 @@ bool CEF_Resizer::rebuildUIPanelTextureLocked(const std::string& panelName, CEF_
 			std::size_t sourceIndex = (static_cast<std::size_t>(sampleY) * static_cast<std::size_t>(owner_.paint_buffer_width_) + static_cast<std::size_t>(sampleX)) * 4u;
 			std::size_t targetIndex = (static_cast<std::size_t>(targetY) * static_cast<std::size_t>(targetWidth) + static_cast<std::size_t>(targetX)) * 4u;
 
+			if (sourceIndex + 3 >= paintBufferSize)
+			{
+				std::cout << "[CEF_Resizer::rebuildUIPanelTextureLocked] " << panelName 
+				          << " - OUT OF BOUNDS: sourceIndex=" << sourceIndex 
+				          << " paintBufferSize=" << paintBufferSize
+				          << " sampleX=" << sampleX << " sampleY=" << sampleY
+				          << " paint_buffer_width=" << owner_.paint_buffer_width_ << std::endl;
+				panelPixels[targetIndex + 0] = 0;
+				panelPixels[targetIndex + 1] = 0;
+				panelPixels[targetIndex + 2] = 0;
+				panelPixels[targetIndex + 3] = 255;
+				continue;
+			}
+
 			panelPixels[targetIndex + 0] = owner_.paint_buffer_[sourceIndex + 0];
 			panelPixels[targetIndex + 1] = owner_.paint_buffer_[sourceIndex + 1];
 			panelPixels[targetIndex + 2] = owner_.paint_buffer_[sourceIndex + 2];
@@ -121,21 +249,157 @@ bool CEF_Resizer::rebuildUIPanelTextureLocked(const std::string& panelName, CEF_
 		}
 	}
 
-	if (textureData.texture_id == 0)
+	if (textureData.texture_image == VK_NULL_HANDLE)
 	{
-		glGenTextures(1, &textureData.texture_id);
-		glBindTexture(GL_TEXTURE_2D, textureData.texture_id);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		VkDevice device = owner_.vk_context_->getDevice();
+
+		VkImageCreateInfo imageInfo{};
+		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		imageInfo.imageType = VK_IMAGE_TYPE_2D;
+		imageInfo.extent.width = targetWidth;
+		imageInfo.extent.height = targetHeight;
+		imageInfo.extent.depth = 1;
+		imageInfo.mipLevels = 1;
+		imageInfo.arrayLayers = 1;
+		imageInfo.format = VK_FORMAT_B8G8R8A8_UNORM;
+		imageInfo.tiling = VK_IMAGE_TILING_LINEAR;
+		imageInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+		imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		if (vkCreateImage(device, &imageInfo, nullptr, &textureData.texture_image) != VK_SUCCESS)
+		{
+			return false;
+		}
+
+		VkMemoryRequirements memRequirements;
+		vkGetImageMemoryRequirements(device, textureData.texture_image, &memRequirements);
+
+		VkMemoryAllocateInfo allocInfo{};
+		allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		allocInfo.allocationSize = memRequirements.size;
+		allocInfo.memoryTypeIndex = owner_.findMemoryType(memRequirements.memoryTypeBits,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+		if (vkAllocateMemory(device, &allocInfo, nullptr, &textureData.texture_memory) != VK_SUCCESS)
+		{
+			return false;
+		}
+
+		vkBindImageMemory(device, textureData.texture_image, textureData.texture_memory, 0);
+
+		VkImageViewCreateInfo viewInfo{};
+		viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		viewInfo.image = textureData.texture_image;
+		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		viewInfo.format = VK_FORMAT_B8G8R8A8_UNORM;
+		viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		viewInfo.subresourceRange.baseMipLevel = 0;
+		viewInfo.subresourceRange.levelCount = 1;
+		viewInfo.subresourceRange.baseArrayLayer = 0;
+		viewInfo.subresourceRange.layerCount = 1;
+
+		if (vkCreateImageView(device, &viewInfo, nullptr, &textureData.texture_view) != VK_SUCCESS)
+		{
+			return false;
+		}
+
+		textureData.texture_layout_initialized = false;
+	}
+
+	VkDevice device = owner_.vk_context_->getDevice();
+
+	VkImageSubresource subresource{};
+	subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	subresource.mipLevel = 0;
+	subresource.arrayLayer = 0;
+
+	VkSubresourceLayout layout;
+	vkGetImageSubresourceLayout(device, textureData.texture_image, &subresource, &layout);
+
+	void* data;
+	vkMapMemory(device, textureData.texture_memory, 0, VK_WHOLE_SIZE, 0, &data);
+
+	if (layout.rowPitch == targetWidth * 4)
+	{
+		memcpy(data, panelPixels.data(), targetWidth * targetHeight * 4);
 	}
 	else
 	{
-		glBindTexture(GL_TEXTURE_2D, textureData.texture_id);
+		uint8_t* dataBytes = reinterpret_cast<uint8_t*>(data);
+		const uint8_t* srcBytes = panelPixels.data();
+		for (int y = 0; y < targetHeight; y++)
+		{
+			memcpy(dataBytes + (y * layout.rowPitch), srcBytes + (y * targetWidth * 4), targetWidth * 4);
+		}
 	}
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, targetWidth, targetHeight, 0, GL_BGRA, GL_UNSIGNED_BYTE, panelPixels.data());
+	vkUnmapMemory(device, textureData.texture_memory);
+
+	if (!textureData.texture_layout_initialized)
+	{
+		VkCommandPool commandPool = VK_NULL_HANDLE;
+		VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+
+		VkCommandPoolCreateInfo poolInfo{};
+		poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		poolInfo.queueFamilyIndex = 0;
+		poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+
+		if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) == VK_SUCCESS)
+		{
+			VkCommandBufferAllocateInfo allocInfo{};
+			allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+			allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+			allocInfo.commandPool = commandPool;
+			allocInfo.commandBufferCount = 1;
+
+			if (vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer) == VK_SUCCESS)
+			{
+				VkCommandBufferBeginInfo beginInfo{};
+				beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+				beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+				vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+				VkImageMemoryBarrier barrier{};
+				barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+				barrier.oldLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+				barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+				barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.image = textureData.texture_image;
+				barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				barrier.subresourceRange.baseMipLevel = 0;
+				barrier.subresourceRange.levelCount = 1;
+				barrier.subresourceRange.baseArrayLayer = 0;
+				barrier.subresourceRange.layerCount = 1;
+				barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+				barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+				vkCmdPipelineBarrier(commandBuffer,
+					VK_PIPELINE_STAGE_HOST_BIT,
+					VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+					0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+				vkEndCommandBuffer(commandBuffer);
+
+				VkSubmitInfo submitInfo{};
+				submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+				submitInfo.commandBufferCount = 1;
+				submitInfo.pCommandBuffers = &commandBuffer;
+
+				vkQueueSubmit(owner_.vk_context_->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+				vkQueueWaitIdle(owner_.vk_context_->getGraphicsQueue());
+
+				vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+				textureData.texture_layout_initialized = true;
+			}
+
+			vkDestroyCommandPool(device, commandPool, nullptr);
+		}
+	}
 
 	textureData.width = targetWidth;
 	textureData.height = targetHeight;

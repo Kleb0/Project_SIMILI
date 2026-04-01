@@ -4,6 +4,8 @@
 #include <vector>
 #include <list>
 
+struct SDL_Window;
+
 class ThreeDObject;
 class ThreeDScreen;
 class Camera;
@@ -14,7 +16,7 @@ public:
     VKContext();
     ~VKContext();
 
-    void initialize();
+    void initialize(SDL_Window* window = nullptr);
     void resize(int w, int h);
 
     int getWidth() const { return width; }
@@ -31,6 +33,11 @@ public:
     VkInstance getInstance() const { return instance; }
     VkPhysicalDevice getPhysicalDevice() const { return physicalDevice; }
     VkDevice getDevice() const { return device; }
+    VkQueue getGraphicsQueue() const { return graphicsQueue; }
+    VkQueue getPresentQueue() const { return presentQueue; }
+    uint32_t getGraphicsQueueFamily() const { return graphicsQueueFamily; }
+    uint32_t getPresentQueueFamily() const { return presentQueueFamily; }
+    VkSurfaceKHR getSurface() const { return surface_; }
     void setThreeDScreen(ThreeDScreen* screen) { three_d_screen_ = screen; }
     ThreeDScreen* getThreeDScreen() const { return three_d_screen_; }
 
@@ -53,6 +60,8 @@ private:
     VkDevice device;
     VkQueue graphicsQueue;
     VkQueue presentQueue;
+    VkSurfaceKHR surface_;
+    VkDebugUtilsMessengerEXT debugMessenger_;
     
     uint32_t graphicsQueueFamily;
     uint32_t presentQueueFamily;

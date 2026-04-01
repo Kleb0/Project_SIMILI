@@ -1,10 +1,14 @@
 #include "CEF_Drawer.hpp"
 #include "CEF_Resizer.hpp"
+#include "../../Engine/VulkanScene/VKcontext.hpp"
+#include "../../Engine/VulkanPipeline/VulkanPipeline.hpp"
+#include "../../Engine/GLSL_Compiler/GLSLCompiler.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <sstream>
 #include <string>
+#include <array>
 #include "include/base/cef_callback.h"
 #include "include/cef_browser.h"
 #include "include/wrapper/cef_closure_task.h"
@@ -12,42 +16,24 @@
 
 CEF_Drawer* CEF_Drawer::active_instance_ = nullptr;
 
-// Vertex shader - simple pass-through with texture coordinates
-static const char* vertexShaderSource = R"(
-#version 330 core
-layout (location = 0) in vec2 aPos;
-layout (location = 1) in vec2 aTexCoord;
-
-out vec2 TexCoord;
-
-void main()
-{
-    gl_Position = vec4(aPos.x, aPos.y, 0.0, 1.0);
-    TexCoord = aTexCoord;
-}
-)";
-
-// Fragment shader - sample from CEF texture
-static const char* fragmentShaderSource = R"(
-#version 330 core
-out vec4 FragColor;
-
-in vec2 TexCoord;
-
-uniform sampler2D cefTexture;
-
-void main()
-{
-    FragColor = texture(cefTexture, TexCoord);
-}
-)";
-
 CEF_Drawer::CEF_Drawer()
 	: window_(nullptr)
-	, texture_id_(0)
-	, vao_(0)
-	, vbo_(0)
-	, shader_program_(0)
+	, vk_context_(nullptr)
+	, vulkan_pipelines_(nullptr)
+	, vk_render_pass_(VK_NULL_HANDLE)
+	, texture_image_(VK_NULL_HANDLE)
+	, texture_memory_(VK_NULL_HANDLE)
+	, texture_view_(VK_NULL_HANDLE)
+	, texture_sampler_(VK_NULL_HANDLE)
+	, vertex_buffer_(VK_NULL_HANDLE)
+	, vertex_buffer_memory_(VK_NULL_HANDLE)
+	, vertex_shader_(VK_NULL_HANDLE)
+	, fragment_shader_(VK_NULL_HANDLE)
+	, pipeline_(VK_NULL_HANDLE)
+	, pipeline_layout_(VK_NULL_HANDLE)
+	, descriptor_pool_(VK_NULL_HANDLE)
+	, descriptor_set_layout_(VK_NULL_HANDLE)
+	, descriptor_set_(VK_NULL_HANDLE)
 	, width_(1920)
 	, height_(1080)
 	, logical_width_(0)
@@ -56,6 +42,7 @@ CEF_Drawer::CEF_Drawer()
 	, drawable_height_(0)
 	, dpi_scale_(1.0f)
 	, initialized_(false)
+	, texture_layout_initialized_(false)
 	, browser_(nullptr)
 	, url_("")
 	, paint_buffer_width_(0)
@@ -63,6 +50,7 @@ CEF_Drawer::CEF_Drawer()
 	, runtime_layout_sync_pending_(false)
 	, runtime_layout_waiting_for_paint_(false)
 	, runtime_layout_needs_second_invalidate_(false)
+	, has_received_first_paint_(false)
 	, resizer_(std::make_unique<CEF_Resizer>(*this))
 {
 }
@@ -77,7 +65,7 @@ CEF_Resizer& CEF_Drawer::getResizer()
 	return *resizer_;
 }
 
-bool CEF_Drawer::initialize(SDL_Window* window)
+bool CEF_Drawer::initialize(SDL_Window* window, VKContext* vkContext, VulkanPipeline* vulkanPipelines)
 {
 	if (initialized_)
 	{
@@ -85,36 +73,25 @@ bool CEF_Drawer::initialize(SDL_Window* window)
 		return false;
 	}
 	
-	if (!window)
+	if (!window || !vkContext || !vulkanPipelines)
 	{
-		std::cerr << "[CEF_Drawer] Invalid SDL window" << std::endl;
+		std::cerr << "[CEF_Drawer] Invalid SDL window, VKContext, or VulkanPipeline" << std::endl;
 		return false;
 	}
 	
+	std::cout << "[CEF_Drawer] Starting initialization..." << std::endl;
+	
 	window_ = window;
+	vk_context_ = vkContext;
+	vulkan_pipelines_ = vulkanPipelines;
 	updateWindowProperties();
 	width_ = logical_width_;
 	height_ = logical_height_;
 	
-	glGenTextures(1, &texture_id_);
-	glBindTexture(GL_TEXTURE_2D, texture_id_);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width_, height_, 0, GL_BGRA, GL_UNSIGNED_BYTE, nullptr);
-	
-	if (!createShaders())
+	std::cout << "[CEF_Drawer] Creating Vulkan resources..." << std::endl;
+	if (!createVulkanResources())
 	{
-		std::cerr << "[CEF_Drawer] Failed to create shaders" << std::endl;
-		shutdown();
-		return false;
-	}
-	
-	if (!createQuad())
-	{
-		std::cerr << "[CEF_Drawer] Failed to create quad" << std::endl;
+		std::cerr << "[CEF_Drawer] Failed to create Vulkan resources" << std::endl;
 		shutdown();
 		return false;
 	}
@@ -122,6 +99,7 @@ bool CEF_Drawer::initialize(SDL_Window* window)
 	initialized_ = true;
 	active_instance_ = this;
 	std::cout << "[CEF_Drawer] Initialized (logical pixels): " << width_ << "x" << height_ << std::endl;
+	std::cout << "[CEF_Drawer] Pipeline status: " << (pipeline_ != VK_NULL_HANDLE ? "CREATED" : "NOT CREATED (waiting for render pass)") << std::endl;
 	
 	return true;
 }
@@ -163,6 +141,58 @@ void CEF_Drawer::syncWindowProperties()
 	std::cout << "[CEF_Drawer] Synced SDL window properties: " << width_ << "x" << height_ << std::endl;
 }
 
+void CEF_Drawer::setRenderPass(VkRenderPass renderPass)
+{
+	std::lock_guard<std::mutex> lock(render_mutex_);
+	
+	std::cout << "[CEF_Drawer] setRenderPass called with renderPass=" << renderPass << std::endl;
+	
+	if (renderPass == VK_NULL_HANDLE)
+	{
+		std::cerr << "[CEF_Drawer] ERROR: Render pass is VK_NULL_HANDLE!" << std::endl;
+		return;
+	}
+	
+	vk_render_pass_ = renderPass;
+	std::cout << "[CEF_Drawer] Render pass set: " << renderPass << std::endl;
+	
+	// Release shared pipeline (will be recreated with new render pass)
+	if (shared_pipeline_)
+	{
+		std::cout << "[CEF_Drawer] Releasing old pipeline (shared_ptr)" << std::endl;
+		shared_pipeline_.reset();
+		pipeline_ = VK_NULL_HANDLE;  // Clear deprecated handle for consistency
+	}
+	
+	std::cout << "[CEF_Drawer] About to create pipeline with render pass: " << vk_render_pass_ << std::endl;
+	std::cout << "[CEF_Drawer] Checking prerequisites:" << std::endl;
+	std::cout << "  - texture_view_: " << texture_view_ << std::endl;
+	std::cout << "  - texture_sampler_: " << texture_sampler_ << std::endl;
+	std::cout << "  - vertex_buffer_: " << vertex_buffer_ << std::endl;
+	std::cout << "  - vulkan_pipelines_: " << vulkan_pipelines_ << std::endl;
+	
+	if (texture_view_ == VK_NULL_HANDLE || texture_sampler_ == VK_NULL_HANDLE)
+	{
+		std::cerr << "[CEF_Drawer] ERROR: Texture resources not created!" << std::endl;
+		return;
+	}
+
+	if (!vulkan_pipelines_ || !vulkan_pipelines_->isInitialized())
+	{
+		std::cerr << "[CEF_Drawer] ERROR: VulkanPipeline system is not initialized" << std::endl;
+		return;
+	}
+	
+	if (!createVulkanPipeline())
+	{
+		std::cerr << "[CEF_Drawer] Failed to create Vulkan pipeline with render pass" << std::endl;
+	}
+	else
+	{
+		std::cout << "[CEF_Drawer] Pipeline created successfully with render pass, pipeline_=" << pipeline_ << " (address: " << &pipeline_ << ")" << std::endl;
+	}
+}
+
 bool CEF_Drawer::createBrowser(CefRefPtr<CefClient> client, const std::string& url, int width, int height)
 {
 	if (browser_)
@@ -190,6 +220,10 @@ bool CEF_Drawer::createBrowser(CefRefPtr<CefClient> client, const std::string& u
 	
 	CefBrowserSettings browser_settings;
 	browser_settings.windowless_frame_rate = 60;
+	browser_settings.javascript = STATE_ENABLED;
+	browser_settings.javascript_close_windows = STATE_ENABLED;
+	browser_settings.javascript_access_clipboard = STATE_ENABLED;
+	browser_settings.javascript_dom_paste = STATE_ENABLED;
 	
 	CefWindowInfo window_info;
 	window_info.SetAsWindowless(0);
@@ -203,6 +237,14 @@ bool CEF_Drawer::createBrowser(CefRefPtr<CefClient> client, const std::string& u
 	}
 	
 	std::cout << "[CEF_Drawer] Browser created with URL: " << url_ << " (logical pixels): " << width_ << "x" << height_ << std::endl;
+	
+	CefRefPtr<CefBrowserHost> host = browser_->GetHost();
+	if (host)
+	{
+		host->WasResized();
+		host->Invalidate(PET_VIEW);
+		std::cout << "[CEF_Drawer] Browser invalidated to trigger initial render" << std::endl;
+	}
 	
 	return true;
 }
@@ -219,12 +261,23 @@ void CEF_Drawer::shutdown()
 		paint_buffer_height_ = 0;
 		runtime_layout_sync_pending_ = false;
 		runtime_layout_waiting_for_paint_ = false;
+		has_received_first_paint_ = false;
 		for (auto& texturePair : ui_panel_textures_)
 		{
-			if (texturePair.second.texture_id != 0)
+			if (texturePair.second.texture_view != VK_NULL_HANDLE)
 			{
-				glDeleteTextures(1, &texturePair.second.texture_id);
-				texturePair.second.texture_id = 0;
+				vkDestroyImageView(vk_context_->getDevice(), texturePair.second.texture_view, nullptr);
+				texturePair.second.texture_view = VK_NULL_HANDLE;
+			}
+			if (texturePair.second.texture_image != VK_NULL_HANDLE)
+			{
+				vkDestroyImage(vk_context_->getDevice(), texturePair.second.texture_image, nullptr);
+				texturePair.second.texture_image = VK_NULL_HANDLE;
+			}
+			if (texturePair.second.texture_memory != VK_NULL_HANDLE)
+			{
+				vkFreeMemory(vk_context_->getDevice(), texturePair.second.texture_memory, nullptr);
+				texturePair.second.texture_memory = VK_NULL_HANDLE;
 			}
 		}
 		ui_panel_textures_.clear();
@@ -234,37 +287,83 @@ void CEF_Drawer::shutdown()
 		}
 	}
 
-	if (vao_)
-	{
-		glDeleteVertexArrays(1, &vao_);
-		vao_ = 0;
-	}
-	
-	if (vbo_)
-	{
-		glDeleteBuffers(1, &vbo_);
-		vbo_ = 0;
-	}
-	
-	if (texture_id_)
-	{
-		glDeleteTextures(1, &texture_id_);
-		texture_id_ = 0;
-	}
-	
-	if (shader_program_)
-	{
-		glDeleteProgram(shader_program_);
-		shader_program_ = 0;
-	}
+	cleanupVulkanResources();
 	
 	initialized_ = false;
 	std::cout << "[CEF_Drawer] Shutdown complete" << std::endl;
 }
 
-void CEF_Drawer::draw()
+void CEF_Drawer::draw(VkCommandBuffer commandBuffer)
 {
 	syncWindowProperties();
+	
+	if (!initialized_ || !vk_context_)
+	{
+		std::cout << "[CEF_Drawer] draw() early return: initialized=" << initialized_ 
+		          << " vk_context=" << (vk_context_ != nullptr) << std::endl;
+		return;
+	}
+	
+	if (!has_received_first_paint_)
+	{
+		std::cout << "[CEF_Drawer] draw() waiting for first OnPaint from CEF" << std::endl;
+		return;
+	}
+	
+	if (paint_buffer_.empty())
+	{
+		std::cout << "[CEF_Drawer] draw() paint buffer is empty" << std::endl;
+		return;
+	}
+	
+	std::lock_guard<std::mutex> lock(render_mutex_);
+	
+	if (pipeline_ == VK_NULL_HANDLE)
+	{
+		std::cout << "[CEF_Drawer] draw() pipeline is NULL (address: " << &pipeline_ << ")" << std::endl;
+		return;
+	}
+	
+	std::cout << "[CEF_Drawer] draw() executing with pipeline_=" << pipeline_ << " (address: " << &pipeline_ << ")" << std::endl;
+	
+	if (texture_view_ == VK_NULL_HANDLE || vertex_buffer_ == VK_NULL_HANDLE)
+	{
+		std::cout << "[CEF_Drawer] draw() texture_view or vertex_buffer is NULL" << std::endl;
+		return;
+	}
+	
+	std::cout << "[CEF_Drawer] draw() executing draw call with " << paint_buffer_.size() << " bytes" << std::endl;
+	
+	int width, height;
+	SDL_GetWindowSizeInPixels(window_, &width, &height);
+	
+	VkViewport viewport{};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = static_cast<float>(width);
+	viewport.height = static_cast<float>(height);
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+	
+	VkRect2D scissor{};
+	scissor.offset = {0, 0};
+	scissor.extent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
+	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+	
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
+	
+	if (descriptor_set_ != VK_NULL_HANDLE)
+	{
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			pipeline_layout_, 0, 1, &descriptor_set_, 0, nullptr);
+	}
+	
+	VkBuffer vertexBuffers[] = {vertex_buffer_};
+	VkDeviceSize offsets[] = {0};
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+	
+	vkCmdDraw(commandBuffer, 6, 1, 0, 0);
 }
 
 void CEF_Drawer::updateUIPanelFrames(const std::map<std::string, UIPanelFrameData>& panelFrames)
@@ -303,41 +402,59 @@ void CEF_Drawer::updateUIPanelSourceFrame(const std::string& panelName, const UI
 	ui_panel_frames_[panelName] = sourceFrame;
 }
 
-bool CEF_Drawer::getUIPanelTextureRegion(const std::string& panelName, GLuint& outTextureId, int& outTextureWidth, int& outTextureHeight, UIPanelFrameData& outFrame)
+bool CEF_Drawer::getUIPanelTextureRegion(const std::string& panelName, VkImageView& outTextureView, VkSampler& outSampler, int& outTextureWidth, int& outTextureHeight, UIPanelFrameData& outFrame)
 {
 	std::lock_guard<std::mutex> lock(render_mutex_);
 
 	auto it = ui_panel_frames_.find(panelName);
 	if (it == ui_panel_frames_.end())
 	{
+		std::cout << "[CEF_Drawer::getUIPanelTextureRegion] " << panelName << " - Not found in ui_panel_frames_" << std::endl;
 		return false;
 	}
 
 	if (it->second.width <= 0 || it->second.height <= 0)
 	{
+		std::cout << "[CEF_Drawer::getUIPanelTextureRegion] " << panelName << " - Invalid dimensions: " << it->second.width << "x" << it->second.height << std::endl;
+		return false;
+	}
+
+	if (texture_sampler_ == VK_NULL_HANDLE)
+	{
+		std::cout << "[CEF_Drawer::getUIPanelTextureRegion] " << panelName << " - texture_sampler_ is NULL, CEF resources not ready" << std::endl;
 		return false;
 	}
 
 	UIPanelTextureData& textureData = ui_panel_textures_[panelName];
 	if (!resizer_->rebuildUIPanelTextureLocked(panelName, textureData, outFrame))
 	{
+		std::cout << "[CEF_Drawer::getUIPanelTextureRegion] " << panelName << " - rebuildUIPanelTextureLocked failed" << std::endl;
 		return false;
 	}
 
-	outTextureId = textureData.texture_id;
+	if (textureData.texture_view == VK_NULL_HANDLE)
+	{
+		std::cout << "[CEF_Drawer::getUIPanelTextureRegion] " << panelName << " - textureData.texture_view is NULL after rebuild" << std::endl;
+		return false;
+	}
+
+	outTextureView = textureData.texture_view;
+	outSampler = texture_sampler_;
 	outTextureWidth = textureData.width;
 	outTextureHeight = textureData.height;
+	
+	std::cout << "[CEF_Drawer::getUIPanelTextureRegion] " << panelName << " - SUCCESS: returning texture " << outTextureWidth << "x" << outTextureHeight << std::endl;
 	return true;
 }
 
-bool CEF_Drawer::getActiveUIPanelTextureRegion(const std::string& panelName, GLuint& outTextureId, int& outTextureWidth, int& outTextureHeight, UIPanelFrameData& outFrame)
+bool CEF_Drawer::getActiveUIPanelTextureRegion(const std::string& panelName, VkImageView& outTextureView, VkSampler& outSampler, int& outTextureWidth, int& outTextureHeight, UIPanelFrameData& outFrame)
 {
 	if (!active_instance_)
 	{
 		return false;
 	}
 
-	return active_instance_->getUIPanelTextureRegion(panelName, outTextureId, outTextureWidth, outTextureHeight, outFrame);
+	return active_instance_->getUIPanelTextureRegion(panelName, outTextureView, outSampler, outTextureWidth, outTextureHeight, outFrame);
 }
 
 bool CEF_Drawer::isUIPanelTextureDirty(const std::string& panelName)
@@ -705,11 +822,21 @@ const RectList& dirtyRects, const void* buffer, int width, int height)
 	if (type != PET_VIEW)
 		return;
 	
+	std::cout << "[CEF_Drawer] OnPaint called: " << width << "x" << height 
+	          << " buffer=" << (buffer ? "valid" : "null") 
+	          << " dirtyRects=" << dirtyRects.size() << std::endl;
+	
 	bool needsSecondInvalidate = false;
 	CefRefPtr<CefBrowser> browserRef;
 	
 	{
 		std::lock_guard<std::mutex> lock(render_mutex_);
+		
+		if (!has_received_first_paint_)
+		{
+			has_received_first_paint_ = true;
+			std::cout << "[CEF_Drawer] First OnPaint received - rendering enabled" << std::endl;
+		}
 		
 		if (width != width_ || height != height_)
 		{
@@ -839,105 +966,607 @@ void CEF_Drawer::updateWindowProperties()
 	}
 }
 
-bool CEF_Drawer::createShaders()
+bool CEF_Drawer::createVulkanShaders()
 {
-	GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertexShader, 1, &vertexShaderSource, nullptr);
-	glCompileShader(vertexShader);
-	
-	GLint success;
-	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-	if (!success)
+	// GLSL Vertex Shader - Runtime compiled
+	const std::string vertexShaderGLSL = R"(
+	#version 450
+
+	layout(location = 0) in vec2 aPosition;
+	layout(location = 1) in vec2 aTexCoord;
+
+	layout(location = 0) out vec2 vTexCoord;
+
+	void main() {
+		gl_Position = vec4(aPosition, 0.0, 1.0);
+		vTexCoord = aTexCoord;
+	}
+	)";
+
+	// GLSL Fragment Shader - Runtime compiled
+	const std::string fragmentShaderGLSL = R"(
+	#version 450
+
+	layout(location = 0) in vec2 vTexCoord;
+	layout(location = 0) out vec4 outColor;
+
+	layout(binding = 0) uniform sampler2D texSampler;
+
+	void main() {
+		outColor = texture(texSampler, vTexCoord);
+	}
+	)";
+
+	// Compile vertex shader
+	std::cout << "[CEF_Drawer::createVulkanShaders] Compiling vertex shader..." << std::endl;
+	std::vector<uint32_t> vertexSPIRV = GLSLCompiler::compileGLSL(vertexShaderGLSL, GLSLCompiler::ShaderType::Vertex);
+	if (vertexSPIRV.empty())
 	{
-		char infoLog[512];
-		glGetShaderInfoLog(vertexShader, 512, nullptr, infoLog);
-		std::cerr << "[CEF_Drawer] Vertex shader compilation failed: " << infoLog << std::endl;
-		glDeleteShader(vertexShader);
+		std::cerr << "[CEF_Drawer::createVulkanShaders] Failed to compile vertex shader: " << GLSLCompiler::getLastError() << std::endl;
+		return false;
+	}
+
+	// Compile fragment shader
+	std::cout << "[CEF_Drawer::createVulkanShaders] Compiling fragment shader..." << std::endl;
+	std::vector<uint32_t> fragmentSPIRV = GLSLCompiler::compileGLSL(fragmentShaderGLSL, GLSLCompiler::ShaderType::Fragment);
+	if (fragmentSPIRV.empty())
+	{
+		std::cerr << "[CEF_Drawer::createVulkanShaders] Failed to compile fragment shader: " << GLSLCompiler::getLastError() << std::endl;
+		return false;
+	}
+
+	// Create vertex shader module
+	VkShaderModuleCreateInfo createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	createInfo.codeSize = vertexSPIRV.size() * sizeof(uint32_t);
+	createInfo.pCode = vertexSPIRV.data();
+	
+	if (vkCreateShaderModule(vk_context_->getDevice(), &createInfo, nullptr, &vertex_shader_) != VK_SUCCESS)
+	{
+		std::cerr << "[CEF_Drawer::createVulkanShaders] Failed to create vertex shader module" << std::endl;
 		return false;
 	}
 	
-	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fragmentShader, 1, &fragmentShaderSource, nullptr);
-	glCompileShader(fragmentShader);
+	// Create fragment shader module
+	createInfo.codeSize = fragmentSPIRV.size() * sizeof(uint32_t);
+	createInfo.pCode = fragmentSPIRV.data();
 	
-	glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-	if (!success)
+	if (vkCreateShaderModule(vk_context_->getDevice(), &createInfo, nullptr, &fragment_shader_) != VK_SUCCESS)
 	{
-		char infoLog[512];
-		glGetShaderInfoLog(fragmentShader, 512, nullptr, infoLog);
-		std::cerr << "[CEF_Drawer] Fragment shader compilation failed: " << infoLog << std::endl;
-		glDeleteShader(vertexShader);
-		glDeleteShader(fragmentShader);
+		std::cerr << "[CEF_Drawer::createVulkanShaders] Failed to create fragment shader module" << std::endl;
 		return false;
 	}
 	
-	shader_program_ = glCreateProgram();
-	glAttachShader(shader_program_, vertexShader);
-	glAttachShader(shader_program_, fragmentShader);
-	glLinkProgram(shader_program_);
-	
-	glGetProgramiv(shader_program_, GL_LINK_STATUS, &success);
-	if (!success)
-	{
-		char infoLog[512];
-		glGetProgramInfoLog(shader_program_, 512, nullptr, infoLog);
-		std::cerr << "[CEF_Drawer] Shader program linking failed: " << infoLog << std::endl;
-		glDeleteShader(vertexShader);
-		glDeleteShader(fragmentShader);
-		glDeleteProgram(shader_program_);
-		shader_program_ = 0;
-		return false;
-	}
-	
-	glDeleteShader(vertexShader);
-	glDeleteShader(fragmentShader);
-	
-	glUseProgram(shader_program_);
-	glUniform1i(glGetUniformLocation(shader_program_, "cefTexture"), 0);
-	
+	std::cout << "[CEF_Drawer::createVulkanShaders] Vulkan shaders created successfully" << std::endl;
 	return true;
 }
 
-bool CEF_Drawer::createQuad()
+bool CEF_Drawer::createVertexBuffer()
 {
-	// Fullscreen quad vertices (position + texcoord)
-	float vertices[] = {
-		// Positions   // TexCoords
-		-1.0f,  1.0f,  0.0f, 0.0f,  // Top-left
-		-1.0f, -1.0f,  0.0f, 1.0f,  // Bottom-left
-		 1.0f, -1.0f,  1.0f, 1.0f,  // Bottom-right
-		
-		-1.0f,  1.0f,  0.0f, 0.0f,  // Top-left
-		 1.0f, -1.0f,  1.0f, 1.0f,  // Bottom-right
-		 1.0f,  1.0f,  1.0f, 0.0f   // Top-right
+	struct Vertex
+	{
+		float pos[2];
+		float texCoord[2];
 	};
-	
-	glGenVertexArrays(1, &vao_);
-	glGenBuffers(1, &vbo_);
-	
-	glBindVertexArray(vao_);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo_);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-	
-	// Position attribute
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);
-	
-	// TexCoord attribute
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-	glEnableVertexAttribArray(1);
-	
-	glBindVertexArray(0);
-	
+
+	std::array<Vertex, 6> vertices = {{
+		{{-1.0f,  1.0f}, {0.0f, 0.0f}},
+		{{-1.0f, -1.0f}, {0.0f, 1.0f}},
+		{{ 1.0f, -1.0f}, {1.0f, 1.0f}},
+		{{-1.0f,  1.0f}, {0.0f, 0.0f}},
+		{{ 1.0f, -1.0f}, {1.0f, 1.0f}},
+		{{ 1.0f,  1.0f}, {1.0f, 0.0f}}
+	}};
+
+	VkBufferCreateInfo bufferInfo{};
+	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferInfo.size = sizeof(vertices);
+	bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	if (vkCreateBuffer(vk_context_->getDevice(), &bufferInfo, nullptr, &vertex_buffer_) != VK_SUCCESS)
+	{
+		std::cerr << "[CEF_Drawer] Failed to create vertex buffer" << std::endl;
+		return false;
+	}
+
+	VkMemoryRequirements memRequirements;
+	vkGetBufferMemoryRequirements(vk_context_->getDevice(), vertex_buffer_, &memRequirements);
+
+	VkMemoryAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.allocationSize = memRequirements.size;
+	allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, 
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+	if (vkAllocateMemory(vk_context_->getDevice(), &allocInfo, nullptr, &vertex_buffer_memory_) != VK_SUCCESS)
+	{
+		std::cerr << "[CEF_Drawer] Failed to allocate vertex buffer memory" << std::endl;
+		return false;
+	}
+
+	vkBindBufferMemory(vk_context_->getDevice(), vertex_buffer_, vertex_buffer_memory_, 0);
+
+	void* data;
+	vkMapMemory(vk_context_->getDevice(), vertex_buffer_memory_, 0, bufferInfo.size, 0, &data);
+	memcpy(data, vertices.data(), bufferInfo.size);
+	vkUnmapMemory(vk_context_->getDevice(), vertex_buffer_memory_);
+
 	return true;
+}
+
+bool CEF_Drawer::createVulkanPipeline()
+{
+	// GLSL Vertex Shader - Runtime compiled
+	const std::string vertexShaderGLSL = R"(
+#version 450
+
+layout(location = 0) in vec2 aPosition;
+layout(location = 1) in vec2 aTexCoord;
+
+layout(location = 0) out vec2 vTexCoord;
+
+void main() {
+    gl_Position = vec4(aPosition, 0.0, 1.0);
+    vTexCoord = aTexCoord;
+}
+)";
+
+	// GLSL Fragment Shader - Runtime compiled
+	const std::string fragmentShaderGLSL = R"(
+#version 450
+
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 0) out vec4 outColor;
+
+layout(binding = 0) uniform sampler2D texSampler;
+
+void main() {
+    outColor = texture(texSampler, vTexCoord);
+}
+)";
+
+	// Compile vertex shader
+	std::cout << "[CEF_Drawer] Compiling vertex shader..." << std::endl;
+	std::vector<uint32_t> vertexSPIRV = GLSLCompiler::compileGLSL(vertexShaderGLSL, GLSLCompiler::ShaderType::Vertex);
+	if (vertexSPIRV.empty())
+	{
+		std::cerr << "[CEF_Drawer] Failed to compile vertex shader: " << GLSLCompiler::getLastError() << std::endl;
+		return false;
+	}
+
+	// Compile fragment shader
+	std::cout << "[CEF_Drawer] Compiling fragment shader..." << std::endl;
+	std::vector<uint32_t> fragmentSPIRV = GLSLCompiler::compileGLSL(fragmentShaderGLSL, GLSLCompiler::ShaderType::Fragment);
+	if (fragmentSPIRV.empty())
+	{
+		std::cerr << "[CEF_Drawer] Failed to compile fragment shader: " << GLSLCompiler::getLastError() << std::endl;
+		return false;
+	}
+
+	// Convert SPIR-V to byte vectors
+	std::vector<char> vertShaderBytes = GLSLCompiler::spirvToBytes(vertexSPIRV);
+	std::vector<char> fragShaderBytes = GLSLCompiler::spirvToBytes(fragmentSPIRV);
+
+	VkDevice device = vk_context_->getDevice();
+
+	// Create descriptor set layout for texture sampler
+	VkDescriptorSetLayoutBinding layoutBinding{};
+	layoutBinding.binding = 0;
+	layoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	layoutBinding.descriptorCount = 1;
+	layoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	layoutBinding.pImmutableSamplers = nullptr;
+	
+	VkDescriptorSetLayoutCreateInfo layoutInfo{};
+	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	layoutInfo.bindingCount = 1;
+	layoutInfo.pBindings = &layoutBinding;
+	
+	if (vkCreateDescriptorSetLayout(vk_context_->getDevice(), &layoutInfo, nullptr, &descriptor_set_layout_) != VK_SUCCESS)
+	{
+		std::cerr << "[CEF_Drawer] Failed to create descriptor set layout" << std::endl;
+		return false;
+	}
+	
+	VkDescriptorPoolSize poolSize{};
+	poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSize.descriptorCount = 1;
+	
+	VkDescriptorPoolCreateInfo poolInfo{};
+	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	poolInfo.poolSizeCount = 1;
+	poolInfo.pPoolSizes = &poolSize;
+	poolInfo.maxSets = 1;
+	
+	if (vkCreateDescriptorPool(vk_context_->getDevice(), &poolInfo, nullptr, &descriptor_pool_) != VK_SUCCESS)
+	{
+		std::cerr << "[CEF_Drawer] Failed to create descriptor pool" << std::endl;
+		return false;
+	}
+	
+	VkDescriptorSetAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = descriptor_pool_;
+	allocInfo.descriptorSetCount = 1;
+	allocInfo.pSetLayouts = &descriptor_set_layout_;
+	
+	if (vkAllocateDescriptorSets(vk_context_->getDevice(), &allocInfo, &descriptor_set_) != VK_SUCCESS)
+	{
+		std::cerr << "[CEF_Drawer] Failed to allocate descriptor set" << std::endl;
+		return false;
+	}
+	
+	VkDescriptorImageInfo imageInfo{};
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+	imageInfo.imageView = texture_view_;
+	imageInfo.sampler = texture_sampler_;
+	
+	VkWriteDescriptorSet descriptorWrite{};
+	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrite.dstSet = descriptor_set_;
+	descriptorWrite.dstBinding = 0;
+	descriptorWrite.dstArrayElement = 0;
+	descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptorWrite.descriptorCount = 1;
+	descriptorWrite.pImageInfo = &imageInfo;
+	
+	vkUpdateDescriptorSets(vk_context_->getDevice(), 1, &descriptorWrite, 0, nullptr);
+
+	// Configure vertex attributes
+	VkVertexInputAttributeDescription attr0{};
+	attr0.binding = 0;
+	attr0.location = 0;
+	attr0.format = VK_FORMAT_R32G32_SFLOAT;  // vec2 position
+	attr0.offset = 0;
+
+	VkVertexInputAttributeDescription attr1{};
+	attr1.binding = 0;
+	attr1.location = 1;
+	attr1.format = VK_FORMAT_R32G32_SFLOAT;  // vec2 texCoord
+	attr1.offset = 2 * sizeof(float);
+
+	std::vector<VkVertexInputAttributeDescription> vertexAttributes = { attr0, attr1 };
+
+	// Build pipeline configuration for VulkanPipeline factory
+	VulkanPipeline::PipelineConfig config;
+	config.name = "cef_drawer_texture";
+	config.vertexShaderCode = vertShaderBytes;
+	config.fragmentShaderCode = fragShaderBytes;
+	config.renderPass = vk_render_pass_;
+	config.descriptorSetLayout = descriptor_set_layout_;
+	config.enableBlending = true;
+	config.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	config.vertexBindingStride = 4 * sizeof(float);  // vec2 pos + vec2 texCoord = 16 bytes
+	config.vertexAttributes = vertexAttributes;
+
+	std::cout << "[CEF_Drawer] ========== Requesting pipeline from VulkanPipeline factory..." << std::endl;
+	std::cout << "[CEF_Drawer] Pipeline name: " << config.name << std::endl;
+	std::cout << "[CEF_Drawer] Vertex shader size: " << config.vertexShaderCode.size() << " bytes" << std::endl;
+	std::cout << "[CEF_Drawer] Fragment shader size: " << config.fragmentShaderCode.size() << " bytes" << std::endl;
+	std::cout << "[CEF_Drawer] RenderPass: " << config.renderPass << std::endl;
+	std::cout << "[CEF_Drawer] DescriptorSetLayout: " << config.descriptorSetLayout << std::endl;
+	std::cout << "[CEF_Drawer] Topology: " << config.topology << std::endl;
+	std::cout << "[CEF_Drawer] Vertex stride: " << config.vertexBindingStride << " bytes" << std::endl;
+	std::cout << "[CEF_Drawer] Vertex attributes: " << config.vertexAttributes.size() << std::endl;
+
+	// Get or create pipeline from factory
+	shared_pipeline_ = vulkan_pipelines_->getOrCreatePipeline(config);
+
+	if (!shared_pipeline_)
+	{
+		std::cerr << "[CEF_Drawer] Failed to get/create pipeline from VulkanPipeline factory" << std::endl;
+		return false;
+	}
+
+	if (shared_pipeline_->pipeline == VK_NULL_HANDLE)
+	{
+		std::cerr << "[CEF_Drawer] ERROR: Pipeline created but handle is NULL!" << std::endl;
+		return false;
+	}
+
+	// Store handles for compatibility (deprecated, but kept for now)
+	pipeline_ = shared_pipeline_->pipeline;
+	pipeline_layout_ = shared_pipeline_->layout;
+	vertex_shader_ = shared_pipeline_->vertexShader;
+	fragment_shader_ = shared_pipeline_->fragmentShader;
+
+	std::cout << "[CEF_Drawer] Vulkan pipeline acquired successfully from factory!" << std::endl;
+	std::cout << "[CEF_Drawer] Pipeline handle: " << shared_pipeline_->pipeline << std::endl;
+	std::cout << "[CEF_Drawer] Pipeline layout: " << shared_pipeline_->layout << std::endl;
+	std::cout << "[CEF_Drawer] Vertex shader: " << shared_pipeline_->vertexShader << std::endl;
+	std::cout << "[CEF_Drawer] Fragment shader: " << shared_pipeline_->fragmentShader << std::endl;
+	std::cout << "========================================" << std::endl;
+
+	return true;
+}
+
+bool CEF_Drawer::createVulkanResources()
+{
+	std::cout << "[CEF_Drawer::createVulkanResources] Starting..." << std::endl;
+	
+	// Shader creation now handled by VulkanPipeline factory in createVulkanPipeline()
+	// No need to call createVulkanShaders() anymore
+	std::cout << "[CEF_Drawer::createVulkanResources] Shaders will be created by VulkanPipeline factory" << std::endl;
+
+	if (!createVertexBuffer())
+	{
+		std::cerr << "[CEF_Drawer::createVulkanResources] Failed to create vertex buffer" << std::endl;
+		return false;
+	}
+	std::cout << "[CEF_Drawer::createVulkanResources] Vertex buffer created" << std::endl;
+
+	VkImageCreateInfo imageInfo{};
+	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageInfo.extent.width = width_;
+	imageInfo.extent.height = height_;
+	imageInfo.extent.depth = 1;
+	imageInfo.mipLevels = 1;
+	imageInfo.arrayLayers = 1;
+	imageInfo.format = VK_FORMAT_B8G8R8A8_UNORM;
+	imageInfo.tiling = VK_IMAGE_TILING_LINEAR;
+	imageInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+	imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	if (vkCreateImage(vk_context_->getDevice(), &imageInfo, nullptr, &texture_image_) != VK_SUCCESS)
+	{
+		std::cerr << "[CEF_Drawer] Failed to create texture image" << std::endl;
+		return false;
+	}
+	std::cout << "[CEF_Drawer::createVulkanResources] Texture image created" << std::endl;
+
+	VkMemoryRequirements memRequirements;
+	vkGetImageMemoryRequirements(vk_context_->getDevice(), texture_image_, &memRequirements);
+
+	VkMemoryAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.allocationSize = memRequirements.size;
+	allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, 
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+	if (vkAllocateMemory(vk_context_->getDevice(), &allocInfo, nullptr, &texture_memory_) != VK_SUCCESS)
+	{
+		std::cerr << "[CEF_Drawer] Failed to allocate texture memory" << std::endl;
+		return false;
+	}
+	std::cout << "[CEF_Drawer::createVulkanResources] Texture memory allocated" << std::endl;
+
+	vkBindImageMemory(vk_context_->getDevice(), texture_image_, texture_memory_, 0);
+	std::cout << "[CEF_Drawer::createVulkanResources] Texture image bound to memory" << std::endl;
+
+	VkImageViewCreateInfo viewInfo{};
+	viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	viewInfo.image = texture_image_;
+	viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	viewInfo.format = VK_FORMAT_B8G8R8A8_UNORM;
+	viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	viewInfo.subresourceRange.baseMipLevel = 0;
+	viewInfo.subresourceRange.levelCount = 1;
+	viewInfo.subresourceRange.baseArrayLayer = 0;
+	viewInfo.subresourceRange.layerCount = 1;
+
+	if (vkCreateImageView(vk_context_->getDevice(), &viewInfo, nullptr, &texture_view_) != VK_SUCCESS)
+	{
+		std::cerr << "[CEF_Drawer] Failed to create texture image view" << std::endl;
+		return false;
+	}
+	std::cout << "[CEF_Drawer::createVulkanResources] Texture image view created" << std::endl;
+
+	VkSamplerCreateInfo samplerInfo{};
+	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	samplerInfo.magFilter = VK_FILTER_LINEAR;
+	samplerInfo.minFilter = VK_FILTER_LINEAR;
+	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerInfo.anisotropyEnable = VK_FALSE;
+	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	samplerInfo.unnormalizedCoordinates = VK_FALSE;
+	samplerInfo.compareEnable = VK_FALSE;
+	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+
+	if (vkCreateSampler(vk_context_->getDevice(), &samplerInfo, nullptr, &texture_sampler_) != VK_SUCCESS)
+	{
+		std::cerr << "[CEF_Drawer] Failed to create texture sampler" << std::endl;
+		return false;
+	}
+	std::cout << "[CEF_Drawer::createVulkanResources] Texture sampler created" << std::endl;
+
+	std::cout << "[CEF_Drawer] Vulkan resources created (pipeline will be created after render pass is set)" << std::endl;
+	return true;
+}
+
+void CEF_Drawer::cleanupVulkanResources()
+{
+	if (!vk_context_)
+	{
+		return;
+	}
+
+	VkDevice device = vk_context_->getDevice();
+
+	if (texture_sampler_ != VK_NULL_HANDLE)
+	{
+		vkDestroySampler(device, texture_sampler_, nullptr);
+		texture_sampler_ = VK_NULL_HANDLE;
+	}
+
+	if (texture_view_ != VK_NULL_HANDLE)
+	{
+		vkDestroyImageView(device, texture_view_, nullptr);
+		texture_view_ = VK_NULL_HANDLE;
+	}
+
+	if (texture_image_ != VK_NULL_HANDLE)
+	{
+		vkDestroyImage(device, texture_image_, nullptr);
+		texture_image_ = VK_NULL_HANDLE;
+	}
+
+	if (texture_memory_ != VK_NULL_HANDLE)
+	{
+		vkFreeMemory(device, texture_memory_, nullptr);
+		texture_memory_ = VK_NULL_HANDLE;
+	}
+
+	if (vertex_buffer_ != VK_NULL_HANDLE)
+	{
+		vkDestroyBuffer(device, vertex_buffer_, nullptr);
+		vertex_buffer_ = VK_NULL_HANDLE;
+	}
+
+	if (vertex_buffer_memory_ != VK_NULL_HANDLE)
+	{
+		vkFreeMemory(device, vertex_buffer_memory_, nullptr);
+		vertex_buffer_memory_ = VK_NULL_HANDLE;
+	}
+
+	if (descriptor_pool_ != VK_NULL_HANDLE)
+	{
+		vkDestroyDescriptorPool(device, descriptor_pool_, nullptr);
+		descriptor_pool_ = VK_NULL_HANDLE;
+	}
+
+	if (descriptor_set_layout_ != VK_NULL_HANDLE)
+	{
+		vkDestroyDescriptorSetLayout(device, descriptor_set_layout_, nullptr);
+		descriptor_set_layout_ = VK_NULL_HANDLE;
+	}
+
+	// Pipeline resources now managed by VulkanPipeline factory via shared_pipeline_
+	// Release the shared_ptr to decrement reference count
+	if (shared_pipeline_)
+	{
+		std::cout << "[CEF_Drawer] Releasing shared pipeline reference" << std::endl;
+		shared_pipeline_.reset();
+	}
+	
+	// Clear deprecated handles (no manual destruction needed)
+	pipeline_ = VK_NULL_HANDLE;
+	pipeline_layout_ = VK_NULL_HANDLE;
+	vertex_shader_ = VK_NULL_HANDLE;
+	fragment_shader_ = VK_NULL_HANDLE;
+	
+	texture_layout_initialized_ = false;
+}
+
+uint32_t CEF_Drawer::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
+{
+	VkPhysicalDeviceMemoryProperties memProperties;
+	vkGetPhysicalDeviceMemoryProperties(vk_context_->getPhysicalDevice(), &memProperties);
+
+	for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
+	{
+		if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+		{
+			return i;
+		}
+	}
+
+	std::cerr << "[CEF_Drawer] Failed to find suitable memory type" << std::endl;
+	return 0;
 }
 
 void CEF_Drawer::updateTexture(const void* buffer, int width, int height)
 {
-	if (!buffer || !texture_id_)
+	if (!buffer || texture_image_ == VK_NULL_HANDLE)
 		return;
-	
-	glBindTexture(GL_TEXTURE_2D, texture_id_);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_BGRA, GL_UNSIGNED_BYTE, buffer);
-}
 
+	// Transition image layout from PREINITIALIZED to GENERAL on first use
+	if (!texture_layout_initialized_)
+	{
+		VkCommandPool commandPool = VK_NULL_HANDLE;
+		VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+		
+		VkCommandPoolCreateInfo poolInfo{};
+		poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		poolInfo.queueFamilyIndex = 0;
+		poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+		
+		if (vkCreateCommandPool(vk_context_->getDevice(), &poolInfo, nullptr, &commandPool) == VK_SUCCESS)
+		{
+			VkCommandBufferAllocateInfo allocInfo{};
+			allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+			allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+			allocInfo.commandPool = commandPool;
+			allocInfo.commandBufferCount = 1;
+			
+			if (vkAllocateCommandBuffers(vk_context_->getDevice(), &allocInfo, &commandBuffer) == VK_SUCCESS)
+			{
+				VkCommandBufferBeginInfo beginInfo{};
+				beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+				beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+				
+				vkBeginCommandBuffer(commandBuffer, &beginInfo);
+				
+				VkImageMemoryBarrier barrier{};
+				barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+				barrier.oldLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+				barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+				barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.image = texture_image_;
+				barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				barrier.subresourceRange.baseMipLevel = 0;
+				barrier.subresourceRange.levelCount = 1;
+				barrier.subresourceRange.baseArrayLayer = 0;
+				barrier.subresourceRange.layerCount = 1;
+				barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+				barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+				
+				vkCmdPipelineBarrier(commandBuffer, 
+					VK_PIPELINE_STAGE_HOST_BIT, 
+					VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+					0, 0, nullptr, 0, nullptr, 1, &barrier);
+				
+				vkEndCommandBuffer(commandBuffer);
+				
+				VkSubmitInfo submitInfo{};
+				submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+				submitInfo.commandBufferCount = 1;
+				submitInfo.pCommandBuffers = &commandBuffer;
+				
+				vkQueueSubmit(vk_context_->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+				vkQueueWaitIdle(vk_context_->getGraphicsQueue());
+				
+				vkFreeCommandBuffers(vk_context_->getDevice(), commandPool, 1, &commandBuffer);
+			}
+			
+			vkDestroyCommandPool(vk_context_->getDevice(), commandPool, nullptr);
+		}
+		
+		texture_layout_initialized_ = true;
+		std::cout << "[CEF_Drawer] Texture layout transitioned to GENERAL" << std::endl;
+	}
+
+	VkImageSubresource subresource{};
+	subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	subresource.mipLevel = 0;
+	subresource.arrayLayer = 0;
+
+	VkSubresourceLayout layout;
+	vkGetImageSubresourceLayout(vk_context_->getDevice(), texture_image_, &subresource, &layout);
+
+	void* data;
+	vkMapMemory(vk_context_->getDevice(), texture_memory_, 0, VK_WHOLE_SIZE, 0, &data);
+
+	if (layout.rowPitch == width * 4)
+	{
+		memcpy(data, buffer, width * height * 4);
+	}
+	else
+	{
+		uint8_t* dataBytes = reinterpret_cast<uint8_t*>(data);
+		const uint8_t* bufferBytes = reinterpret_cast<const uint8_t*>(buffer);
+		for (int y = 0; y < height; y++)
+		{
+			memcpy(dataBytes + (y * layout.rowPitch), bufferBytes + (y * width * 4), width * 4);
+		}
+	}
+
+	vkUnmapMemory(vk_context_->getDevice(), texture_memory_);
+}

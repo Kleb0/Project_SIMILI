@@ -113,20 +113,22 @@ void Face::compileShaders()
 
 void Face::initialize()
 {
-    compileShaders();
-
-    glGenVertexArrays(1, &vao);
-    glGenBuffers(1, &vbo);
-
-    glBindVertexArray(vao);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-
-    glBufferData(GL_ARRAY_BUFFER, 4 * 3 * sizeof(float), nullptr, GL_DYNAMIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    glBindVertexArray(0);
+    // TEMPORAIRE: Désactivation OpenGL pour éviter crash avec moteur Vulkan
+    std::cout << "[Face] Initialize called for face ID: " << id << std::endl;
+    
+    // compileShaders();           // <- Commenté temporairement (appels OpenGL)
+    
+    // glGenVertexArrays(1, &vao); // <- Commenté (OpenGL)
+    // glGenBuffers(1, &vbo);      // <- Commenté (OpenGL)
+    
+    // glBindVertexArray(vao);
+    // glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    // glBufferData(GL_ARRAY_BUFFER, 4 * 3 * sizeof(float), nullptr, GL_DYNAMIC_DRAW);
+    // glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    // glEnableVertexAttribArray(0);
+    // glBindVertexArray(0);
+    
+    std::cout << "[Face] Face initialized (OpenGL disabled)" << std::endl;
 }
 
 void Face::uploadFromVertices()

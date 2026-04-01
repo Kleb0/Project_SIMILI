@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "ThreeDScreen.hpp"
 #include "../FrameDatas/FrameDatas.hpp"
+#include "../../../Engine/VulkanScene/VKcontext.hpp"
 #include <cmath>
 #include <iostream>
 
@@ -14,6 +15,7 @@ ThreeDScreen::ThreeDScreen()
 	, waiting_for_frame_data_logged_(false)
 	, first_render_logged_(false)
 	, camera_(nullptr)
+	, vk_context_(nullptr)
 {
 }
 
@@ -132,12 +134,36 @@ void ThreeDScreen::render(SIMILI::Frontend::FrameDatas* frameDatas, SDL_Window* 
 	}
 	}
 
-void ThreeDScreen::draw()
-	{
-		std::lock_guard<std::mutex> lock(render_mutex_);
+void ThreeDScreen::draw(VkCommandBuffer commandBuffer, VkRenderPass renderPass, VkFramebuffer framebuffer)
+{
+	std::lock_guard<std::mutex> lock(render_mutex_);
 
-		if (!initialized_ || !has_valid_viewport_)
-		{
-			return;
-		}
+	if (!initialized_ || !has_valid_viewport_)
+	{
+		return;
 	}
+
+	if (!vk_context_)
+	{
+		return;
+	}
+
+	VkViewport viewport{};
+	viewport.x = static_cast<float>(x_);
+	viewport.y = static_cast<float>(y_);
+	viewport.width = static_cast<float>(width_);
+	viewport.height = static_cast<float>(height_);
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+	VkRect2D scissor{};
+	scissor.offset = {x_, y_};
+	scissor.extent = {static_cast<uint32_t>(width_), static_cast<uint32_t>(height_)};
+	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+}
+
+void ThreeDScreen::setVKContext(VKContext* context)
+{
+	vk_context_ = context;
+}

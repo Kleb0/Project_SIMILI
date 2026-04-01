@@ -106,6 +106,11 @@ function collectUIPanelIFrames() {
     const iframes = document.querySelectorAll('.main-container iframe');
     const iframeData = [];
 
+    fetch('http://localhost:8080/api/debug/iframe-count', { 
+        method: 'POST', 
+        body: 'Found ' + iframes.length + ' iframes in DOM' 
+    }).catch(() => {});
+
     iframes.forEach(iframe => {
         const panelName = getUIPanelName(iframe);
         if (!panelName) {
@@ -131,7 +136,13 @@ function collectUIPanelIFrames() {
 function sendUIPanelIFramesToServer() {
     const iframeData = collectUIPanelIFrames();
 
+    fetch('http://localhost:8080/api/debug/panels-found', { 
+        method: 'POST', 
+        body: 'Collected ' + iframeData.length + ' panels' 
+    }).catch(() => {});
+
     if (iframeData.length === 0) {
+        fetch('http://localhost:8080/api/debug/no-panels', { method: 'POST', body: 'No panels to send' }).catch(() => {});
         return;
     }
 
@@ -141,7 +152,17 @@ function sendUIPanelIFramesToServer() {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({ iframes: iframeData })
-    }).catch(() => {});
+    }).then(response => {
+        fetch('http://localhost:8080/api/debug/send-success', { 
+            method: 'POST', 
+            body: 'Panels sent successfully: ' + response.status 
+        }).catch(() => {});
+    }).catch(error => {
+        fetch('http://localhost:8080/api/debug/send-error', { 
+            method: 'POST', 
+            body: 'Send failed: ' + error.toString() 
+        }).catch(() => {});
+    });
 }
 
 function scheduleUIPanelIFramesSync() {
@@ -154,14 +175,19 @@ function scheduleUIPanelIFramesSync() {
     }, 120);
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-    initializeServerConnection();
-    sendUIPanelIFramesToServer();
-    setTimeout(sendUIPanelIFramesToServer, 250);
-    setInterval(pollServerLogs, 500);
-});
+// Execute immediately instead of waiting for DOMContentLoaded (CEF issue)
+fetch('http://localhost:8080/api/debug/init-start', { method: 'POST', body: 'Init start from main_layout_manager' }).catch(() => {});
+initializeServerConnection();
+sendUIPanelIFramesToServer();
+setTimeout(sendUIPanelIFramesToServer, 100);
+setTimeout(sendUIPanelIFramesToServer, 250);
+setTimeout(sendUIPanelIFramesToServer, 500);
+setTimeout(sendUIPanelIFramesToServer, 1000);
+setTimeout(sendUIPanelIFramesToServer, 2000);
+setInterval(pollServerLogs, 500);
 
 window.addEventListener('load', () => {
+    sendUIPanelIFramesToServer();
     scheduleUIPanelIFramesSync();
 });
 

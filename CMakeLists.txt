@@ -105,17 +105,33 @@ endif()
 message(STATUS "Vulkan found: ${Vulkan_INCLUDE_DIRS}")
 message(STATUS "Vulkan library: ${Vulkan_LIBRARIES}")
 
-#then save save this file to create the build folder.
-#This project has been made and tested with VS code. So please use CTRL + Shift + P and choose : C/C++: Select Configuration
-#and then choose : MSVC configuration
-#Use CTRL + Shift + B to build the project thanks to file .vscode/tasks.json
-#The C_Cpp_properties.json file, indeed, configure the intellisense for this project and the path to the compiler.
+# Shaderc (GLSL to SPIR-V compiler - included in Vulkan SDK)
+if(VULKAN_SDK_DIR)
+	# Try DLL version first (avoids /MT vs /MD conflicts)
+	set(SHADERC_DLL "${VULKAN_SDK_DIR}/Bin/shaderc_shared.dll")
+	set(SHADERC_LIB_IMPORT "${VULKAN_SDK_DIR}/Lib/shaderc_shared.lib")
+	
+	if(EXISTS ${SHADERC_LIB_IMPORT})
+		set(SHADERC_LIB ${SHADERC_LIB_IMPORT})
+		message(STATUS "Shaderc library found (DLL import): ${SHADERC_LIB}")
+		message(STATUS "Shaderc DLL: ${SHADERC_DLL}")
+	else()
+		# Fallback to static library
+		set(SHADERC_LIB "${VULKAN_SDK_DIR}/Lib/shaderc_combined.lib")
+		if(EXISTS ${SHADERC_LIB})
+			message(STATUS "Shaderc library found (static): ${SHADERC_LIB}")
+		else()
+			message(WARNING "Shaderc library not found in ${VULKAN_SDK_DIR}")
+		endif()
+	endif()
+endif()
 
 # Include dirs
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/GLSL_Compiler
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/OpenGLScene
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDInteractions
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDModes
@@ -125,6 +141,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/SaveLoadSystem
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/Obj_Export_Import
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/SceneObjectContainer
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/VulkanPipeline
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Layout_Theme
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/images
     ${CMAKE_CURRENT_SOURCE_DIR}/src/InternalLogic
@@ -139,7 +156,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/UIPanels
-    $(Cmake_CURRENT_SOURCE_DIR)/src/SIMILI_Frontend/viewportLogic/ThreeDScreen
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/ThreeDScreen
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_HomeFramework
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/example
@@ -357,6 +374,7 @@ target_precompile_headers(${PROJECT_NAME} PRIVATE
 target_include_directories(${PROJECT_NAME} PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}/src
 	${CMAKE_CURRENT_SOURCE_DIR}/src/Engine
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/GLSL_Compiler
 	${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/OpenGLScene    
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDInteractions
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ThreeDSceneDNA
@@ -366,6 +384,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/PrimitivesCreation
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/ProjectBuilder
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/SceneObjectContainer
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/VulkanPipeline
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Layout_Theme
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/images
     ${CMAKE_CURRENT_SOURCE_DIR}/src/InternalLogic
@@ -430,6 +449,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     tinyfiledialogs
     ${SDL3_LIBRARY}
 	${Vulkan_LIBRARIES}
+	${SHADERC_LIB}
 	Boost::system
 	OpenSSL::SSL
 	OpenSSL::Crypto
@@ -448,4 +468,14 @@ if(USE_CEF)
     target_link_libraries(${PROJECT_NAME} PRIVATE 
         "${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/CEF/cef_binary/Release/libcef.lib"
     )
+endif()
+
+# Copy shaderc DLL to build directory if using DLL version
+if(EXISTS ${SHADERC_DLL})
+	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different
+			"${SHADERC_DLL}"
+			"$<TARGET_FILE_DIR:${PROJECT_NAME}>"
+		COMMENT "Copying shaderc DLL to build directory"
+	)
 endif()

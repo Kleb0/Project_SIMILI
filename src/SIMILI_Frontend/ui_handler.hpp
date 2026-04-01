@@ -126,7 +126,8 @@ class UIHandler : public CefApp,
 				  public CefDisplayHandler,
 				  public CefLifeSpanHandler, 
 				  public CefLoadHandler, 
-				  public CefKeyboardHandler
+				  public CefKeyboardHandler,
+				  public CefRequestHandler
 {
 public:
 	explicit UIHandler();
@@ -154,6 +155,7 @@ public:
 	virtual CefRefPtr<CefLoadHandler> GetLoadHandler() override;
 	virtual CefRefPtr<CefKeyboardHandler> GetKeyboardHandler() override;
 	virtual CefRefPtr<CefRenderHandler> GetRenderHandler() override;
+	virtual CefRefPtr<CefRequestHandler> GetRequestHandler() override;
 
 	virtual void OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) override;
 
@@ -161,9 +163,6 @@ public:
 	virtual bool DoClose(CefRefPtr<CefBrowser> browser) override;
 	virtual void OnBeforeClose(CefRefPtr<CefBrowser> browser) override;
 
-	virtual void OnLoadError(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, ErrorCode errorCode, 
-	const CefString& errorText, const CefString& failedUrl) override;
-	virtual void OnLoadEnd(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, int httpStatusCode) override;
 
 	// keyboard events
 	virtual bool OnPreKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& event,
@@ -171,6 +170,21 @@ public:
 	
 	virtual bool OnKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& event,
 	CefEventHandle os_event) override;
+
+	virtual bool OnBeforeBrowse(CefRefPtr<CefBrowser> browser,
+		CefRefPtr<CefFrame> frame,
+		CefRefPtr<CefRequest> request,
+		bool user_gesture,
+		bool is_redirect) override;
+
+	virtual CefRefPtr<CefResourceRequestHandler> GetResourceRequestHandler(
+		CefRefPtr<CefBrowser> browser,
+		CefRefPtr<CefFrame> frame,
+		CefRefPtr<CefRequest> request,
+		bool is_navigation,
+		bool is_download,
+		const CefString& request_initiator,
+		bool& disable_default_handling) override;
 
 	void CloseAllBrowsers(bool force_close);
 	void enableSlotTextureRendering(bool enable);
@@ -184,6 +198,12 @@ public:
 	void setVKScene(VKScene* scene) { vk_scene_ = scene; }
 	VKScene* getVKScene() const { return vk_scene_; }
 	
+	void setVKRenderer(VKContext* renderer) { vk_renderer_ = renderer; }
+	VKContext* getVKRenderer() const { return vk_renderer_; }
+	
+	void setVulkanPipelines(VulkanPipeline* pipelines) { vulkan_pipelines_ = pipelines; }
+	VulkanPipeline* getVulkanPipelines() const { return vulkan_pipelines_; }
+	
 	void startRenderTimer();
 	
 	void initializeSceneObjects();
@@ -196,11 +216,12 @@ public:
 	
 	
 	void captureIFramePositions();
+	void initializeDefaultUIPanels();
 	void updateUIPanelIFrames(const std::map<std::string, IFrameData>& iframeDataMap);
 	void cacheUIPanelFrameDatas();
-	void drawUIPanels();
+	void drawUIPanels(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight);
 	void clearUIPanels();
-	void startSplitter();
+	void startSplitter(VKContext* vkContext, VkRenderPass renderPass);
 	bool handleSplitterEvent(const SDL_Event& event);
 	bool getResolvedViewportFrameData(SIMILI::Frontend::IFrameScreenData& outData) const;
 	void processPendingFrameUpdates();
@@ -242,6 +263,7 @@ private:
 	
 
 	VKContext* vk_renderer_;
+	VulkanPipeline* vulkan_pipelines_;
 	Camera* main_camera_;
 	Mesh** cube_mesh_ptr_;
 	bool scene_initialized_;

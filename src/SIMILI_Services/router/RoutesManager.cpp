@@ -6,6 +6,7 @@
 #include "../../SIMILI_Frontend/viewportLogic/HTMLTextureRenderer/TextureEnabler.hpp"
 #include <iostream>
 #include <sstream>
+#include <fstream>
 #include <GLFW/glfw3.h>
 
 #ifdef _WIN32
@@ -340,9 +341,142 @@ namespace SIMILI {
 
 		void RoutesManager::registerIFrameRoutes(RouterSim& router, CefRefPtr<UIHandler>& handler)
 		{
-			// Update iframe dimensions route
+			// Serve static UI files
+			std::cout << "[RoutesManager] Registering static file serving for UI..." << std::endl;
+			router.get("/ui/*", [](const Message& msg) -> Response 
+			{
+				Response resp;
+				resp.headers["Access-Control-Allow-Origin"] = "*";
+				
+				std::string target = std::string(msg.route);
+				std::cout << "[RoutesManager] Received request for: " << target << std::endl;
+				
+				std::string filePath = target.substr(4);
+				
+				std::string fullPath = "ui/" + filePath;
+				std::cout << "[RoutesManager] Attempting to serve: " << fullPath << std::endl;
+				
+				std::ifstream file(fullPath, std::ios::binary);
+				if (!file.is_open())
+				{
+					std::cout << "[RoutesManager] ERROR: File not found: " << fullPath << std::endl;
+					resp.statusCode = 404;
+					resp.statusMessage = "Not Found";
+					resp.body = "File not found: " + filePath;
+					return resp;
+				}
+				
+				std::stringstream buffer;
+				buffer << file.rdbuf();
+				file.close();
+				
+				resp.statusCode = 200;
+				resp.statusMessage = "OK";
+				resp.body = buffer.str();
+				
+				if (filePath.length() >= 5 && filePath.substr(filePath.length() - 5) == ".html")
+				{
+					resp.headers["Content-Type"] = "text/html; charset=utf-8";
+					resp.headers["Cache-Control"] = "no-cache";
+				}
+				else if (filePath.length() >= 4 && filePath.substr(filePath.length() - 4) == ".css")
+				{
+					resp.headers["Content-Type"] = "text/css";
+					resp.headers["Cache-Control"] = "no-cache";
+				}
+				else if (filePath.length() >= 3 && filePath.substr(filePath.length() - 3) == ".js")
+				{
+					resp.headers["Content-Type"] = "application/javascript";
+					resp.headers["Cache-Control"] = "no-cache";
+				}
+				
+				std::cout << "[RoutesManager] Served UI file: " << filePath << " (" << resp.body.size() << " bytes)" << std::endl;
+				
+				return resp;
+			}, "Serve static UI files");
+			
+			router.post("/api/debug/js-start", [](const Message& msg) -> Response 
+			{
+				Response resp;
+				resp.headers["Access-Control-Allow-Origin"] = "*";
+				resp.headers["Content-Type"] = "application/json";
+				resp.statusCode = 200;
+				resp.statusMessage = "OK";
+				resp.body = "{\"success\": true}";
+				return resp;
+			}, "Debug endpoint for JavaScript startup");
+
+			router.post("/api/debug/iframe-count", [](const Message& msg) -> Response 
+			{
+				Response resp;
+				resp.headers["Access-Control-Allow-Origin"] = "*";
+				resp.headers["Content-Type"] = "application/json";
+				resp.statusCode = 200;
+				resp.statusMessage = "OK";
+				resp.body = "{\"success\": true}";
+				return resp;
+			}, "Debug endpoint for iframe count");
+
+			router.post("/api/debug/panels-found", [](const Message& msg) -> Response 
+			{
+				Response resp;
+				resp.headers["Access-Control-Allow-Origin"] = "*";
+				resp.headers["Content-Type"] = "application/json";
+				resp.statusCode = 200;
+				resp.statusMessage = "OK";
+				resp.body = "{\"success\": true}";
+				return resp;
+			}, "Debug endpoint for panels found");
+
+			router.post("/api/debug/no-panels", [](const Message& msg) -> Response 
+			{
+				Response resp;
+				resp.headers["Access-Control-Allow-Origin"] = "*";
+				resp.headers["Content-Type"] = "application/json";
+				resp.statusCode = 200;
+				resp.statusMessage = "OK";
+				resp.body = "{\"success\": true}";
+				return resp;
+			}, "Debug endpoint for no panels");
+
+			router.post("/api/debug/send-success", [](const Message& msg) -> Response 
+			{
+				Response resp;
+				resp.headers["Access-Control-Allow-Origin"] = "*";
+				resp.headers["Content-Type"] = "application/json";
+				resp.statusCode = 200;
+				resp.statusMessage = "OK";
+				resp.body = "{\"success\": true}";
+				return resp;
+			}, "Debug endpoint for send success");
+
+			router.post("/api/debug/send-error", [](const Message& msg) -> Response 
+			{
+				Response resp;
+				resp.headers["Access-Control-Allow-Origin"] = "*";
+				resp.headers["Content-Type"] = "application/json";
+				resp.statusCode = 200;
+				resp.statusMessage = "OK";
+				resp.body = "{\"success\": true}";
+				return resp;
+			}, "Debug endpoint for send error");
+
+			router.post("/api/debug/init-start", [](const Message& msg) -> Response 
+			{
+				Response resp;
+				resp.headers["Access-Control-Allow-Origin"] = "*";
+				resp.headers["Content-Type"] = "application/json";
+				resp.statusCode = 200;
+				resp.statusMessage = "OK";
+				resp.body = "{\"success\": true}";
+				return resp;
+			}, "Debug endpoint for init start");
+
 			router.post("/api/iframes/update", [&handler](const Message& msg) -> Response 
 			{
+				std::cout << "[RoutesManager] /api/iframes/update endpoint called" << std::endl;
+				std::cout << "[RoutesManager] Request body size: " << msg.body.size() << " bytes" << std::endl;
+				
 				Response resp;
 				resp.headers["Access-Control-Allow-Origin"] = "*";
 				resp.headers["Content-Type"] = "application/json";
@@ -350,17 +484,22 @@ namespace SIMILI {
 				try
 				{
 					json requestData = json::parse(msg.body);
+					std::cout << "[RoutesManager] JSON parsed successfully" << std::endl;
 					
 					if (!requestData.contains("iframes") || !requestData["iframes"].is_array())
 					{
+						std::cout << "[RoutesManager] ERROR: Missing or invalid 'iframes' array" << std::endl;
 						resp.statusCode = 400;
 						resp.statusMessage = "Bad Request";
 						resp.body = "{\"success\": false, \"error\": \"Missing or invalid 'iframes' array\"}";
 						return resp;
 					}
 					
+					std::cout << "[RoutesManager] Found " << requestData["iframes"].size() << " iframes in request" << std::endl;
+					
 					if (!handler)
 					{
+						std::cout << "[RoutesManager] ERROR: Handler not available" << std::endl;
 						resp.statusCode = 500;
 						resp.statusMessage = "Internal Server Error";
 						resp.body = "{\"success\": false, \"error\": \"Handler not available\"}";
@@ -380,6 +519,9 @@ namespace SIMILI {
 							int clientX = iframe.contains("clientX") ? iframe["clientX"].get<int>() : x;
 							int clientY = iframe.contains("clientY") ? iframe["clientY"].get<int>() : y;
 							
+							std::cout << "[RoutesManager] Processing iframe: " << name 
+								<< " (x=" << x << ", y=" << y << ", w=" << width << ", h=" << height << ")" << std::endl;
+							
 							IFrameData data;
 							data.name = name;
 							data.x = x;
@@ -392,7 +534,9 @@ namespace SIMILI {
 						}
 					}
 					
+					std::cout << "[RoutesManager] Calling handler->captureIFramePositions()" << std::endl;
 					handler->captureIFramePositions();
+					std::cout << "[RoutesManager] captureIFramePositions() completed" << std::endl;
 					
 					resp.statusCode = 200;
 					resp.statusMessage = "OK";
@@ -400,6 +544,7 @@ namespace SIMILI {
 				}
 				catch (const std::exception& e)
 				{
+					std::cout << "[RoutesManager] EXCEPTION: " << e.what() << std::endl;
 					resp.statusCode = 500;
 					resp.statusMessage = "Internal Server Error";
 					resp.body = "{\"success\": false, \"error\": \"" + std::string(e.what()) + "\"}";
@@ -408,23 +553,31 @@ namespace SIMILI {
 				return resp;
 			}, "Update iframe dimensions");
 
+			std::cout << "[RoutesManager] Registering /api/uipanels/update endpoint..." << std::endl;
+
 			router.post("/api/uipanels/update", [&handler](const Message& msg) -> Response
 			{
 				Response resp;
 				resp.headers["Access-Control-Allow-Origin"] = "*";
 				resp.headers["Content-Type"] = "application/json";
 
+				std::cout << "[RoutesManager] /api/uipanels/update endpoint called with " << msg.body.size() << " bytes" << std::endl;
+
 				try
 				{
 					json requestData = json::parse(msg.body);
+					std::cout << "[RoutesManager] JSON parsed successfully" << std::endl;
 
 					if (!requestData.contains("iframes") || !requestData["iframes"].is_array())
 					{
+						std::cout << "[RoutesManager] Invalid or missing 'iframes' array in request" << std::endl;
 						resp.statusCode = 400;
 						resp.statusMessage = "Bad Request";
 						resp.body = "{\"success\": false, \"error\": \"Missing or invalid 'iframes' array\"}";
 						return resp;
 					}
+
+					std::cout << "[RoutesManager] Found iframes array with " << requestData["iframes"].size() << " elements" << std::endl;
 
 					if (!handler)
 					{
@@ -457,6 +610,8 @@ namespace SIMILI {
 							data.clientX = iframe.contains("clientX") ? iframe["clientX"].get<int>() : data.x;
 							data.clientY = iframe.contains("clientY") ? iframe["clientY"].get<int>() : data.y;
 							uiPanelIFrames[name] = data;
+							
+							handler->iframe_data_map_[name] = data;
 
 							CEF_Drawer::UIPanelFrameData panelFrame;
 							panelFrame.x = data.x;
@@ -467,6 +622,8 @@ namespace SIMILI {
 						}
 					}
 
+					std::cout << "[RoutesManager] Created " << uiPanelIFrames.size() << " UI panels" << std::endl;
+
 					CEF_Drawer* cefDrawer = handler->getCEFDrawer();
 					if (cefDrawer)
 					{
@@ -475,6 +632,7 @@ namespace SIMILI {
 
 					handler->updateUIPanelIFrames(uiPanelIFrames);
 					handler->cacheUIPanelFrameDatas();
+					handler->captureIFramePositions();
 
 					resp.statusCode = 200;
 					resp.statusMessage = "OK";
