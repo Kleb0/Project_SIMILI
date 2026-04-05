@@ -6,7 +6,25 @@ echo   BUILD SIMILI FOR VSCODE - CEF INTEGRATION
 echo =============================================
 echo.
 
-call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+REM Auto-detect Visual Studio installation
+set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+if not exist "%VSWHERE%" (
+    echo ERROR: vswhere.exe not found. Please install Visual Studio 2017 or later.
+    exit /b 1
+)
+
+for /f "usebackq tokens=*" %%i in (`"%VSWHERE%" -latest -property installationPath`) do set "VS_PATH=%%i"
+if not defined VS_PATH (
+    echo ERROR: Visual Studio installation not found
+    exit /b 1
+)
+
+for /f "usebackq tokens=*" %%i in (`"%VSWHERE%" -latest -property installationVersion`) do set "VS_VERSION=%%i"
+for /f "tokens=1 delims=." %%a in ("%VS_VERSION%") do set "VS_MAJOR=%%a"
+
+echo Detected Visual Studio %VS_VERSION% at: %VS_PATH%
+
+call "%VS_PATH%\VC\Auxiliary\Build\vcvars64.bat"
 echo === Visual Studio Environment initialized ===
 
 for /f %%A in ('powershell -NoProfile -Command "(Get-Date).ToString('o')"') do set "START_ISO=%%A"
@@ -24,7 +42,8 @@ if exist "CMakeCache.txt" (
 
 if not exist "CMakeCache.txt" (
     echo Generating CMake configuration...
-    cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static ..
+    echo Using CMake generator: Visual Studio %VS_MAJOR%
+    cmake -G "Visual Studio %VS_MAJOR%" -A x64 -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static ..
     if %errorlevel% neq 0 (
         echo ERROR: CMake generation failed
         exit /b 1

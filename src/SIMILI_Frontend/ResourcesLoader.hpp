@@ -51,38 +51,16 @@ public:
 		CefRefPtr<CefFrame> frame,
 		CefRefPtr<CefRequest> request) override;
 
+	void preloadResources();
+
 private:
-	/**
-	 * @brief Handles /api/uipanels/update POST requests by parsing JSON and calling C++ directly
-	 * 
-	 * CEF OSR mode cannot make real HTTP requests, so we intercept the POST body,
-	 * parse the iframe data, and call UIHandler functions directly.
-	 * 
-	 * @param request The CEF request containing POST data with {iframes: [...]}
-	 * @return JSON response handler with {success: bool, count: int}
-	 */
 	CefRefPtr<CefResourceHandler> handleUIPanelUpdate(CefRefPtr<CefRequest> request);
-
-	/**
-	 * @brief Serves a file from the ui/ directory
-	 * 
-	 * Tries absolute path first (base_dir_ + "ui/" + filePath), 
-	 * then relative path as fallback.
-	 * 
-	 * @param filePath Relative path within ui/ directory (e.g., "main_layout.html")
-	 * @return Resource handler with file content, or nullptr if file not found
-	 */
 	CefRefPtr<CefResourceHandler> serveLocalFile(const std::string& filePath);
-
-	/**
-	 * @brief Determines MIME type from file extension
-	 * 
-	 * @param filePath File path with extension
-	 * @return MIME type string (e.g., "text/html", "application/javascript")
-	 */
 	std::string getMimeType(const std::string& filePath) const;
+	std::string loadFileContent(const std::string& filePath);
 
-	std::string base_dir_;  ///< Executable directory path (e.g., "C:\Projet_Simili\local\build\Release\")
+	std::string base_dir_;
+	std::map<std::string, std::string> resource_cache_;
 	
 	IMPLEMENT_REFCOUNTING(LocalResourceRequestHandler);
 };

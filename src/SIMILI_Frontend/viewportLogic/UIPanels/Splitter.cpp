@@ -417,7 +417,6 @@ std::map<std::string, SIMILI::Frontend::IFrameScreenData> Splitter::getUIPanelFr
 
 		if (pair.second.frame.width <= 0 || pair.second.frame.height <= 0)
 		{
-			std::cout << "[Splitter::getUIPanelFrameDatas] Skipping panel '" << pair.first << "' with invalid dimensions: " << pair.second.frame.width << "x" << pair.second.frame.height << std::endl;
 			continue;
 		}
 
@@ -771,6 +770,8 @@ void Splitter::destroyGraphicsResources()
 	}
 
 	VkDevice device = vk_context_->getDevice();
+	
+	vkDeviceWaitIdle(device);
 
 	// Release shared pipeline - VulkanPipeline will destroy when no longer referenced
 	shared_pipeline_.reset();

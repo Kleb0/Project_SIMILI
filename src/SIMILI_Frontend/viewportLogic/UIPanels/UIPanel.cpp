@@ -171,9 +171,6 @@ void UIPanel::updateFromFrameData(const SIMILI::Frontend::IFrameScreenData& fram
 
 	if (frameGeometryChanged)
 	{
-		std::cout << "[UIPanel::updateFromFrameData] " << name_ << " - Geometry changed: (" 
-		          << last_frame_x_ << "," << last_frame_y_ << " " << last_frame_width_ << "x" << last_frame_height_ << ") -> ("
-		          << frameData.relativeX << "," << frameData.relativeY << " " << frameData.width << "x" << frameData.height << ")" << std::endl;
 		last_frame_x_ = frameData.relativeX;
 		last_frame_y_ = frameData.relativeY;
 		last_frame_width_ = frameData.width;
@@ -182,25 +179,21 @@ void UIPanel::updateFromFrameData(const SIMILI::Frontend::IFrameScreenData& fram
 	}
 
 	const bool hasNoTexture = (external_texture_view_ == VK_NULL_HANDLE);
-	
-	std::cout << "[UIPanel::updateFromFrameData] " << name_ << " - skipRebuild=" << skipTextureRebuild 
-	          << " geomChanged=" << frameGeometryChanged << " dirty=" << CEF_Drawer::isActiveUIPanelTextureDirty(name_)
-	          << " hasNoTexture=" << hasNoTexture << " validBounds=" << has_valid_bounds_ << std::endl;
 
 	if (!has_valid_bounds_)
 	{
-		std::cout << "[UIPanel::updateFromFrameData] " << name_ << " - Skipping texture update due to invalid bounds (" << frameData.width << "x" << frameData.height << ")" << std::endl;
 		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
 		return;
 	}
 
-	if (!skipTextureRebuild && (frameGeometryChanged || CEF_Drawer::isActiveUIPanelTextureDirty(name_) || hasNoTexture))
+	if (!skipTextureRebuild)
 	{
-		std::cout << "[UIPanel::updateFromFrameData] " << name_ << " - Texture needs update (frameGeometry=" 
-		          << frameGeometryChanged << " dirty=" << CEF_Drawer::isActiveUIPanelTextureDirty(name_) 
-		          << " noTexture=" << hasNoTexture << ")" << std::endl;
-		needs_redraw_ = true;
-		updateTextureRegion();
+		const bool isTextureDirty = CEF_Drawer::isActiveUIPanelTextureDirty(name_);
+		if (frameGeometryChanged || isTextureDirty || hasNoTexture)
+		{
+			needs_redraw_ = true;
+			updateTextureRegion();
+		}
 	}
 }
 
@@ -208,55 +201,42 @@ void UIPanel::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawabl
 {
 	if (commandBuffer == VK_NULL_HANDLE)
 	{
-		std::cout << "[UIPanel::draw] " << name_ << " - Command buffer is NULL" << std::endl;
 		return;
 	}
 	
 	if (drawing_state_ == DrawingState::IsNotReadyToBeDrawn)
 	{
-		std::cout << "[UIPanel::draw] " << name_ << " - DrawingState: IsNotReadyToBeDrawn - Skipping draw" << std::endl;
 		return;
 	}
 	
-	// Optimisation: ne dessiner que si nécessaire (premier dessin ou changement)
 	if (drawing_state_ == DrawingState::HasBeenDrawn && !needs_redraw_)
 	{
-		return; // Déjà dessiné et pas de changement
+		return;
 	}
 	
 	if (!initialized_ || !has_valid_bounds_ || drawableWidth <= 0 || drawableHeight <= 0)
 	{
-		std::cout << "[UIPanel::draw] " << name_ << " - Early return: initialized=" << initialized_ 
-		          << " has_valid_bounds=" << has_valid_bounds_ << " drawableWidth=" << drawableWidth 
-		          << " drawableHeight=" << drawableHeight << std::endl;
 		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
 		return;
 	}
 
 	if (!vk_context_ || !shared_pipeline_ || shared_pipeline_->pipeline == VK_NULL_HANDLE)
 	{
-		std::cout << "[UIPanel::draw] " << name_ << " - Early return: vk_context_=" << (vk_context_ ? "OK" : "NULL") 
-		          << " shared_pipeline_=" << (shared_pipeline_ ? "OK" : "NULL")
-		          << " pipeline_handle=" << (shared_pipeline_ ? shared_pipeline_->pipeline : VK_NULL_HANDLE) << std::endl;
 		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
 		return;
 	}
 
 	if (external_texture_view_ == VK_NULL_HANDLE || external_sampler_ == VK_NULL_HANDLE)
 	{
-		std::cout << "[UIPanel::draw] " << name_ << " - No texture available yet (CEF not painted), skipping draw" << std::endl;
 		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
 		return;
 	}
 
 	if (!updateDescriptorTextureBinding())
 	{
-		std::cout << "[UIPanel::draw] " << name_ << " - Failed to update descriptor binding, skipping draw" << std::endl;
 		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
 		return;
 	}
-
-	std::cout << "[UIPanel::draw] " << name_ << " - Drawing at [" << x_ << "," << y_ << "] size " << width_ << "x" << height_ << " (DrawingState: " << (drawing_state_ == DrawingState::IsReadyToBeDrawn ? "IsReadyToBeDrawn" : "HasBeenDrawn") << ")" << std::endl;
 	
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shared_pipeline_->pipeline);
 
@@ -277,18 +257,14 @@ void UIPanel::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawabl
 		if (drawing_state_ == DrawingState::IsReadyToBeDrawn)
 		{
 			drawing_state_ = DrawingState::HasBeenDrawn;
-			std::cout << "[UIPanel::draw] " << name_ << " - First successful draw completed -> DrawingState: HasBeenDrawn" << std::endl;
 		}
 		
-		// Marquer comme dessiné
 		needs_redraw_ = false;
 	}
 }
 
 void UIPanel::updateTextureRegion()
 {
-	std::cout << "[UIPanel::updateTextureRegion] " << name_ << " - START" << std::endl;
-	
 	external_texture_view_ = VK_NULL_HANDLE;
 	external_sampler_ = VK_NULL_HANDLE;
 	texcoord_left_ = 0.0f;
@@ -304,21 +280,18 @@ void UIPanel::updateTextureRegion()
 
 	if (!CEF_Drawer::getActiveUIPanelTextureRegion(name_, textureView, sampler, textureWidth, textureHeight, panelFrame))
 	{
-		std::cout << "[UIPanel::updateTextureRegion] " << name_ << " - CEF_Drawer returned false, no texture available" << std::endl;
 		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
 		return;
 	}
 
 	if (textureWidth <= 0 || textureHeight <= 0)
 	{
-		std::cout << "[UIPanel::updateTextureRegion] " << name_ << " - Invalid texture size: " << textureWidth << "x" << textureHeight << std::endl;
 		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
 		return;
 	}
 	
 	if (textureView == VK_NULL_HANDLE || sampler == VK_NULL_HANDLE)
 	{
-		std::cout << "[UIPanel::updateTextureRegion] " << name_ << " - Null texture handles returned" << std::endl;
 		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
 		return;
 	}
@@ -335,7 +308,6 @@ void UIPanel::updateTextureRegion()
 
 	if (right <= left || bottom <= top)
 	{
-		std::cout << "[UIPanel::updateTextureRegion] " << name_ << " - Invalid texcoords: [" << left << "," << top << "] to [" << right << "," << bottom << "]" << std::endl;
 		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
 		return;
 	}
@@ -351,19 +323,13 @@ void UIPanel::updateTextureRegion()
 	{
 		drawing_state_ = DrawingState::IsReadyToBeDrawn;
 		needs_redraw_ = true;
-		std::cout << "[UIPanel::updateTextureRegion] " << name_ << " - Texture received -> DrawingState: IsReadyToBeDrawn" << std::endl;
 	}
-	
-	std::cout << "[UIPanel::updateTextureRegion] " << name_ << " - SUCCESS: texture " << textureWidth << "x" << textureHeight 
-	          << " region [" << panelFrame.x << "," << panelFrame.y << "] size " << panelFrame.width << "x" << panelFrame.height
-	          << " texcoords [" << left << "," << bottom << "] to [" << right << "," << top << "] (Y inverted for Vulkan)" << std::endl;
 }
 
 bool UIPanel::updateDescriptorTextureBinding()
 {
 	if (!vk_context_ || vk_descriptor_set_ == VK_NULL_HANDLE)
 	{
-		std::cout << "[UIPanel::updateDescriptorTextureBinding] " << name_ << " - Missing vk_context or descriptor_set" << std::endl;
 		return false;
 	}
 
@@ -372,7 +338,6 @@ bool UIPanel::updateDescriptorTextureBinding()
 
 	if (textureView == VK_NULL_HANDLE || sampler == VK_NULL_HANDLE)
 	{
-		std::cout << "[UIPanel::updateDescriptorTextureBinding] " << name_ << " - Both texture sources are null" << std::endl;
 		return false;
 	}
 
@@ -524,8 +489,8 @@ void UIPanel::updateGeometry(int drawableWidth, int drawableHeight)
 
 	float left = (static_cast<float>(x_) / static_cast<float>(drawableWidth)) * 2.0f - 1.0f;
 	float right = (static_cast<float>(x_ + width_) / static_cast<float>(drawableWidth)) * 2.0f - 1.0f;
-	float top = 1.0f - (static_cast<float>(y_) / static_cast<float>(drawableHeight)) * 2.0f;
-	float bottom = 1.0f - (static_cast<float>(y_ + height_) / static_cast<float>(drawableHeight)) * 2.0f;
+	float top = -1.0f + (static_cast<float>(y_) / static_cast<float>(drawableHeight)) * 2.0f;
+	float bottom = -1.0f + (static_cast<float>(y_ + height_) / static_cast<float>(drawableHeight)) * 2.0f;
 
 	float vertices[] = {
 		left, top, texcoord_left_, texcoord_top_,
@@ -637,6 +602,8 @@ void UIPanel::cleanupVulkanResources()
 	}
 
 	VkDevice device = vk_context_->getDevice();
+	
+	vkDeviceWaitIdle(device);
 
 	if (vk_descriptor_pool_ != VK_NULL_HANDLE)
 	{

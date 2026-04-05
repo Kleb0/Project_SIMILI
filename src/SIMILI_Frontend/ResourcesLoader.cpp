@@ -60,7 +60,6 @@ void SimpleResourceHandler::Cancel()
 
 LocalResourceRequestHandler::LocalResourceRequestHandler()
 {
-	// Get executable directory to resolve ui/ path
 	char buffer[MAX_PATH];
 	GetModuleFileNameA(nullptr, buffer, MAX_PATH);
 	std::string exePath(buffer);
@@ -74,6 +73,7 @@ LocalResourceRequestHandler::LocalResourceRequestHandler()
 		base_dir_ = "";
 	}
 	std::cout << "[LocalResourceRequestHandler] Constructor: base_dir_=\"" << base_dir_ << "\"" << std::endl;
+	preloadResources();
 }
 
 CefRefPtr<CefResourceHandler> LocalResourceRequestHandler::GetResourceHandler(
@@ -83,39 +83,29 @@ CefRefPtr<CefResourceHandler> LocalResourceRequestHandler::GetResourceHandler(
 {
 	std::string url = request->GetURL().ToString();
 
-	std::cout << "\n --------------- [LocalResourceRequestHandler] GetResourceHandler called --------------- " << std::endl;
-	std::cout << "[LocalResourceRequestHandler] GetResourceHandler for URL: " << url << std::endl;
-
-	// Intercept /api/uipanels/update and /api/iframes/update (both use same JSON format)
 	if (url == "http://localhost:8080/api/uipanels/update" || url == "http://localhost:8080/api/iframes/update")
 	{
 		return handleUIPanelUpdate(request);
 	}
 
-	// Let other API requests through (though they won't work in CEF OSR)
 	if (url.find("http://localhost:8080/api/") == 0)
 	{
-		std::cout << "[LocalResourceRequestHandler] API request - letting it through to HTTP server" << std::endl;
-		return nullptr;  // Let CEF make a real HTTP request (won't work in OSR mode)
+		return nullptr;
 	}
 
-	// Serve local files from ui/ directory
 	if (url.find("http://localhost:8080/ui/") == 0)
 	{
 		std::string filePath = url.substr(std::string("http://localhost:8080/ui/").length());
 		return serveLocalFile(filePath);
 	}
 	
-	std::cout << "[LocalResourceRequestHandler] URL not handled: " << url << std::endl;
 	return nullptr;
 }
 
 CefRefPtr<CefResourceHandler> LocalResourceRequestHandler::handleUIPanelUpdate(CefRefPtr<CefRequest> request)
 {
 	std::string url = request->GetURL().ToString();
-	std::cout << "[LocalResourceRequestHandler] Intercepting " << url << std::endl;
 	
-	// Get POST data
 	CefRefPtr<CefPostData> postData = request->GetPostData();
 	if (!postData)
 	{
@@ -123,7 +113,6 @@ CefRefPtr<CefResourceHandler> LocalResourceRequestHandler::handleUIPanelUpdate(C
 		return new SimpleResourceHandler("application/json", "{\"success\": false, \"error\": \"No POST data\"}");
 	}
 	
-	// Extract POST body
 	CefPostData::ElementVector elements;
 	postData->GetElements(elements);
 	
@@ -142,8 +131,6 @@ CefRefPtr<CefResourceHandler> LocalResourceRequestHandler::handleUIPanelUpdate(C
 			}
 		}
 	}
-	
-	std::cout << "[LocalResourceRequestHandler] POST body: " << body << std::endl;
 	
 	try
 	{
@@ -171,7 +158,7 @@ CefRefPtr<CefResourceHandler> LocalResourceRequestHandler::handleUIPanelUpdate(C
 				std::string name = iframe["name"];
 				if (name == "viewport_panel")
 				{
-					continue;  // Skip viewport panel (handled separately)
+					continue;
 				}
 				
 				IFrameData data;
@@ -195,8 +182,6 @@ CefRefPtr<CefResourceHandler> LocalResourceRequestHandler::handleUIPanelUpdate(C
 			}
 		}
 		
-		std::cout << "[LocalResourceRequestHandler] Created " << uiPanelIFrames.size() << " UI panels" << std::endl;
-		
 		CEF_Drawer* cefDrawer = handler->getCEFDrawer();
 		if (cefDrawer)
 		{
@@ -212,46 +197,89 @@ CefRefPtr<CefResourceHandler> LocalResourceRequestHandler::handleUIPanelUpdate(C
 	}
 	catch (const std::exception& e)
 	{
-		std::cout << "[LocalResourceRequestHandler] JSON parse error: " << e.what() << std::endl;
+		std::cout << "[LocalResourceRequestHandler] ERROR: JSON parse - " << e.what() << std::endl;
 		std::string error = "{\"success\": false, \"error\": \"" + std::string(e.what()) + "\"}";
 		return new SimpleResourceHandler("application/json", error);
 	}
 }
 
-CefRefPtr<CefResourceHandler> LocalResourceRequestHandler::serveLocalFile(const std::string& filePath)
+std::string LocalResourceRequestHandler::loadFileContent(const std::string& filePath)
 {
-	std::cout << "[LocalResourceRequestHandler] Mapping to file: ui/" << filePath << std::endl;
-	
-	// Try base_dir_ + "ui/" + filePath first
 	std::string fullPath = base_dir_ + "ui/" + filePath;
-	std::cout << "[LocalResourceRequestHandler] Trying absolute path: " << fullPath << std::endl;
-	
 	std::ifstream file(fullPath, std::ios::binary);
 	
-	// If not found, try relative path as fallback
 	if (!file.is_open())
 	{
-		std::cout << "[LocalResourceRequestHandler] Absolute path failed, trying relative: ui/" << filePath << std::endl;
 		fullPath = "ui/" + filePath;
 		file.open(fullPath, std::ios::binary);
 	}
 	
 	if (!file.is_open())
 	{
-		std::cout << "[LocalResourceRequestHandler] ERROR: File not found: " << fullPath << std::endl;
-		return nullptr;
+		return "";
 	}
 	
 	std::stringstream buffer;
 	buffer << file.rdbuf();
 	file.close();
 	
-	std::string content = buffer.str();
-	std::cout << "[LocalResourceRequestHandler] Loaded file: " << fullPath << " (" << content.size() << " bytes)" << std::endl;
+	return buffer.str();
+}
+
+void LocalResourceRequestHandler::preloadResources()
+{
+	std::vector<std::string> resources = {
+		"main_layout.html",
+		"main_layout.css",
+		"layout_resizer.js",
+		"main_layout_manager.js",
+		"hierarchy_inspector.html",
+		"hierarchy_inspector.css",
+		"hierarchy_inspector.js",
+		"Viewport_docking.html",
+		"object_inspector.html",
+		"history_logger.html",
+		"project_viewer.html",
+		"project_viewer.css",
+		"ribbon_menu.css",
+		"console_server.html",
+		"console_server.css",
+		"console_server.js"
+	};
 	
+	std::cout << "[LocalResourceRequestHandler] Preload START: " << resources.size() << " resources" << std::endl;
+	
+	for (const auto& resource : resources)
+	{
+		std::string content = loadFileContent(resource);
+		if (!content.empty())
+		{
+			resource_cache_[resource] = content;
+			std::cout << "[LocalResourceRequestHandler] CACHED: " << resource << " (" << content.size() << " bytes)" << std::endl;
+		}
+	}
+	
+	std::cout << "[LocalResourceRequestHandler] Preload COMPLETE: " << resource_cache_.size() << " files" << std::endl;
+}
+
+CefRefPtr<CefResourceHandler> LocalResourceRequestHandler::serveLocalFile(const std::string& filePath)
+{
+	auto it = resource_cache_.find(filePath);
+	if (it != resource_cache_.end())
+	{
+		std::string mimeType = getMimeType(filePath);
+		return new SimpleResourceHandler(mimeType, it->second);
+	}
+	
+	std::string content = loadFileContent(filePath);
+	if (content.empty())
+	{
+		std::cout << "[LocalResourceRequestHandler] ERROR: File not found: " << filePath << std::endl;
+		return nullptr;
+	}
+	
+	resource_cache_[filePath] = content;
 	std::string mimeType = getMimeType(filePath);
-	std::cout << "[LocalResourceRequestHandler] Created handler for " << mimeType << std::endl;
-	
 	return new SimpleResourceHandler(mimeType, content);
 }
 

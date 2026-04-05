@@ -29,6 +29,8 @@ class HttpSession : public std::enable_shared_from_this<HttpSession>
 	http::request<http::string_body> req_;
 	std::string sessionId_;
 
+	static std::mutex logMutex;
+	static std::map<std::string, bool> loggedRoutes;
 	static std::string generateSessionId();
 
 public:

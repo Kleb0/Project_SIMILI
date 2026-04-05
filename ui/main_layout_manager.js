@@ -179,12 +179,9 @@ function scheduleUIPanelIFramesSync() {
 fetch('http://localhost:8080/api/debug/init-start', { method: 'POST', body: 'Init start from main_layout_manager' }).catch(() => {});
 initializeServerConnection();
 sendUIPanelIFramesToServer();
-setTimeout(sendUIPanelIFramesToServer, 100);
-setTimeout(sendUIPanelIFramesToServer, 250);
 setTimeout(sendUIPanelIFramesToServer, 500);
-setTimeout(sendUIPanelIFramesToServer, 1000);
-setTimeout(sendUIPanelIFramesToServer, 2000);
-setInterval(pollServerLogs, 500);
+setTimeout(sendUIPanelIFramesToServer, 1500);
+setInterval(pollServerLogs, 1000);
 
 window.addEventListener('load', () => {
     sendUIPanelIFramesToServer();

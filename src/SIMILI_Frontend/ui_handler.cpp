@@ -53,7 +53,9 @@ UIHandler::UIHandler() : parent_sdl_window_(nullptr), parent_window_(nullptr), w
 	splitter_(nullptr),
 	owner_thread_id_(std::this_thread::get_id()),
 	pending_iframe_capture_(false),
-	pending_ui_panel_cache_(false)
+	pending_ui_panel_cache_(false),
+	ui_panels_initialized_(false),
+	resource_request_handler_(nullptr)
 {
 	mouse_controller_ = new SIMILI::Input::MouseController();
 
@@ -262,6 +264,11 @@ void UIHandler::OnBeforeCommandLineProcessing(const CefString& process_type, Cef
 
 void UIHandler::OnContextInitialized() 
 {
+	if (!resource_request_handler_)
+	{
+		resource_request_handler_ = ResourcesLoader::createRequestHandler();
+		std::cout << "[UIHandler] Resource handler preloaded at initialization" << std::endl;
+	}
 }
 
 void UIHandler::Set_SDLParent(SDL_ApplicationWindow* parentWindow)
@@ -341,7 +348,6 @@ CefRefPtr<CefRenderHandler> UIHandler::GetRenderHandler()
 
 CefRefPtr<CefRequestHandler> UIHandler::GetRequestHandler()
 {
-	std::cout << "[UIHandler] GetRequestHandler() called" << std::endl;
 	return this;
 }
 
@@ -835,9 +841,13 @@ CefRefPtr<CefResourceRequestHandler> UIHandler::GetResourceRequestHandler(
 	const CefString& request_initiator,
 	bool& disable_default_handling)
 {
-	std::string url = request->GetURL().ToString();
-	std::cout << "[UIHandler] GetResourceRequestHandler for: " << url << std::endl;
-	return new LocalResourceRequestHandler();
+	if (!resource_request_handler_)
+	{
+		resource_request_handler_ = ResourcesLoader::createRequestHandler();
+		std::cout << "[UIHandler] Resource handler created and cached" << std::endl;
+	}
+	
+	return resource_request_handler_;
 }
 
 void UIHandler::set_MouseControl(SIMILI::Input::MouseController* mouseControl)
@@ -1284,27 +1294,39 @@ void UIHandler::drawUIPanels(VkCommandBuffer commandBuffer, int drawableWidth, i
 	if (splitter_)
 	{
 		panelFrameDataMap = splitter_->getUIPanelFrameDatas();
-		std::cout << "[UIHandler] drawUIPanels: Got " << panelFrameDataMap.size() << " panels from splitter" << std::endl;
-		for (const auto& p : panelFrameDataMap)
+		if (!ui_panels_initialized_)
 		{
-			std::cout << "[UIHandler]   - Panel in map: " << p.first << " (X:" << p.second.relativeX << " Y:" << p.second.relativeY << " W:" << p.second.width << " H:" << p.second.height << ")" << std::endl;
+			std::cout << "[UIHandler] drawUIPanels: Got " << panelFrameDataMap.size() << " panels from splitter" << std::endl;
+			for (const auto& p : panelFrameDataMap)
+			{
+				std::cout << "[UIHandler]   - Panel in map: " << p.first << " (X:" << p.second.relativeX << " Y:" << p.second.relativeY << " W:" << p.second.width << " H:" << p.second.height << ")" << std::endl;
+			}
 		}
 	}
 	else
 	{
-		std::cout << "[UIHandler] drawUIPanels: No splitter available" << std::endl;
+		if (!ui_panels_initialized_)
+		{
+			std::cout << "[UIHandler] drawUIPanels: No splitter available" << std::endl;
+		}
 	}
 
 	if (panelFrameDataMap.empty())
 	{
 		std::lock_guard<std::mutex> lock(ui_panel_mutex_);
 		panelFrameDataMap = ui_panel_frame_data_map_;
-		std::cout << "[UIHandler] drawUIPanels: Got " << panelFrameDataMap.size() << " panels from cached frame data" << std::endl;
+		if (!ui_panels_initialized_)
+		{
+			std::cout << "[UIHandler] drawUIPanels: Got " << panelFrameDataMap.size() << " panels from cached frame data" << std::endl;
+		}
 	}
 
 	if (panelFrameDataMap.empty())
 	{
-		std::cout << "[UIHandler] drawUIPanels: No panel data available - clearing panels" << std::endl;
+		if (!ui_panels_initialized_)
+		{
+			std::cout << "[UIHandler] drawUIPanels: No panel data available - clearing panels" << std::endl;
+		}
 		ui_panels_.clear();
 		return;
 	}
@@ -1332,13 +1354,19 @@ void UIHandler::drawUIPanels(VkCommandBuffer commandBuffer, int drawableWidth, i
 	{
 		if (pair.first == "viewport_panel")
 		{
-			std::cout << "[UIHandler] Skipping viewport_panel from UI rendering" << std::endl;
+			if (!ui_panels_initialized_)
+			{
+				std::cout << "[UIHandler] Skipping viewport_panel from UI rendering" << std::endl;
+			}
 			continue;
 		}
 
 		if (pair.second.width <= 0 || pair.second.height <= 0)
 		{
-			std::cout << "[UIHandler] Skipping panel '" << pair.first << "' with invalid dimensions: " << pair.second.width << "x" << pair.second.height << std::endl;
+			if (!ui_panels_initialized_)
+			{
+				std::cout << "[UIHandler] Skipping panel '" << pair.first << "' with invalid dimensions: " << pair.second.width << "x" << pair.second.height << std::endl;
+			}
 			continue;
 		}
 		
@@ -1396,9 +1424,7 @@ void UIHandler::drawUIPanels(VkCommandBuffer commandBuffer, int drawableWidth, i
 		}
 
 		panelIt->second->updateFromFrameData(pair.second, sdlWindow, skipTextureRebuild);
-		std::cout << "[UIHandler] About to draw panel: " << pair.first << std::endl;
 		panelIt->second->draw(commandBuffer, drawableWidth, drawableHeight);
-		std::cout << "[UIHandler] Panel updated and drawn: " << pair.first << " at (" << pair.second.relativeX << "," << pair.second.relativeY << ") " << pair.second.width << "x" << pair.second.height << std::endl;
 		activePanelNames.insert(pair.first);
 	}
 
@@ -1413,6 +1439,12 @@ void UIHandler::drawUIPanels(VkCommandBuffer commandBuffer, int drawableWidth, i
 			++it;
 		}
 	}
+
+	if (!ui_panels_initialized_ && !ui_panels_.empty())
+	{
+		ui_panels_initialized_ = true;
+		std::cout << "[UIHandler] UI Panels initialization completed with " << ui_panels_.size() << " panels" << std::endl;
+	}
 }
 
 void UIHandler::clearUIPanels()
@@ -1422,6 +1454,7 @@ void UIHandler::clearUIPanels()
 	iframe_data_map_.clear();
 	pending_iframe_capture_.store(false);
 	pending_ui_panel_cache_.store(false);
+	ui_panels_initialized_ = false;
 
 	std::lock_guard<std::mutex> lock(ui_panel_mutex_);
 	ui_panel_frame_data_map_.clear();

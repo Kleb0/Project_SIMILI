@@ -252,6 +252,7 @@ public:
 
 private:
 	static UIHandler* s_instance_;
+	CefRefPtr<CefResourceRequestHandler> resource_request_handler_;
 
 	typedef std::list<CefRefPtr<CefBrowser>> BrowserList;
 	BrowserList browser_list_;
@@ -317,6 +318,7 @@ private:
 	std::thread::id owner_thread_id_;
 	std::atomic_bool pending_iframe_capture_;
 	std::atomic_bool pending_ui_panel_cache_;
+	bool ui_panels_initialized_;
 	mutable std::mutex ui_panel_mutex_;
 	std::map<std::string, SIMILI::Frontend::IFrameScreenData> getRuntimeFrameDataMap() const;
 	IMPLEMENT_REFCOUNTING(UIHandler);

@@ -51,6 +51,9 @@ CEF_Drawer::CEF_Drawer()
 	, runtime_layout_waiting_for_paint_(false)
 	, runtime_layout_needs_second_invalidate_(false)
 	, has_received_first_paint_(false)
+	, is_initialized_render_complete_(false)
+	, suppress_cef_repaints_(false)
+	, initial_paint_count_(0)
 	, resizer_(std::make_unique<CEF_Resizer>(*this))
 {
 }
@@ -295,24 +298,36 @@ void CEF_Drawer::shutdown()
 
 void CEF_Drawer::draw(VkCommandBuffer commandBuffer)
 {
+	static int draw_call_count = 0;
+	static bool initialization_logged = false;
+	
 	syncWindowProperties();
 	
 	if (!initialized_ || !vk_context_)
 	{
-		std::cout << "[CEF_Drawer] draw() early return: initialized=" << initialized_ 
-		          << " vk_context=" << (vk_context_ != nullptr) << std::endl;
+		if (!initialization_logged)
+		{
+			std::cout << "[CEF_Drawer] draw() early return: initialized=" << initialized_ 
+					  << " vk_context=" << (vk_context_ != nullptr) << std::endl;
+		}
 		return;
 	}
 	
 	if (!has_received_first_paint_)
 	{
-		std::cout << "[CEF_Drawer] draw() waiting for first OnPaint from CEF" << std::endl;
+		if (!initialization_logged)
+		{
+			std::cout << "[CEF_Drawer] draw() waiting for first OnPaint from CEF" << std::endl;
+		}
 		return;
 	}
 	
 	if (paint_buffer_.empty())
 	{
-		std::cout << "[CEF_Drawer] draw() paint buffer is empty" << std::endl;
+		if (!initialization_logged)
+		{
+			std::cout << "[CEF_Drawer] draw() paint buffer is empty" << std::endl;
+		}
 		return;
 	}
 	
@@ -320,19 +335,27 @@ void CEF_Drawer::draw(VkCommandBuffer commandBuffer)
 	
 	if (pipeline_ == VK_NULL_HANDLE)
 	{
-		std::cout << "[CEF_Drawer] draw() pipeline is NULL (address: " << &pipeline_ << ")" << std::endl;
+		if (!initialization_logged)
+		{
+			std::cout << "[CEF_Drawer] draw() pipeline is NULL (address: " << &pipeline_ << ")" << std::endl;
+		}
 		return;
 	}
-	
-	std::cout << "[CEF_Drawer] draw() executing with pipeline_=" << pipeline_ << " (address: " << &pipeline_ << ")" << std::endl;
 	
 	if (texture_view_ == VK_NULL_HANDLE || vertex_buffer_ == VK_NULL_HANDLE)
 	{
-		std::cout << "[CEF_Drawer] draw() texture_view or vertex_buffer is NULL" << std::endl;
+		if (!initialization_logged)
+		{
+			std::cout << "[CEF_Drawer] draw() texture_view or vertex_buffer is NULL" << std::endl;
+		}
 		return;
 	}
 	
-	std::cout << "[CEF_Drawer] draw() executing draw call with " << paint_buffer_.size() << " bytes" << std::endl;
+	if (!initialization_logged)
+	{
+		std::cout << "[CEF_Drawer] First successful draw() with pipeline_=" << pipeline_ << std::endl;
+		initialization_logged = true;
+	}
 	
 	int width, height;
 	SDL_GetWindowSizeInPixels(window_, &width, &height);
@@ -364,6 +387,7 @@ void CEF_Drawer::draw(VkCommandBuffer commandBuffer)
 	vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 	
 	vkCmdDraw(commandBuffer, 6, 1, 0, 0);
+	draw_call_count++;
 }
 
 void CEF_Drawer::updateUIPanelFrames(const std::map<std::string, UIPanelFrameData>& panelFrames)
@@ -426,10 +450,17 @@ bool CEF_Drawer::getUIPanelTextureRegion(const std::string& panelName, VkImageVi
 	}
 
 	UIPanelTextureData& textureData = ui_panel_textures_[panelName];
-	if (!resizer_->rebuildUIPanelTextureLocked(panelName, textureData, outFrame))
+	
+	bool needsRebuild = textureData.texture_view == VK_NULL_HANDLE || textureData.dirty;
+	
+	if (needsRebuild && !resizer_->rebuildUIPanelTextureLocked(panelName, textureData, outFrame))
 	{
 		std::cout << "[CEF_Drawer::getUIPanelTextureRegion] " << panelName << " - rebuildUIPanelTextureLocked failed" << std::endl;
 		return false;
+	}
+	else if (!needsRebuild)
+	{
+		outFrame = it->second;
 	}
 
 	if (textureData.texture_view == VK_NULL_HANDLE)
@@ -443,7 +474,11 @@ bool CEF_Drawer::getUIPanelTextureRegion(const std::string& panelName, VkImageVi
 	outTextureWidth = textureData.width;
 	outTextureHeight = textureData.height;
 	
-	std::cout << "[CEF_Drawer::getUIPanelTextureRegion] " << panelName << " - SUCCESS: returning texture " << outTextureWidth << "x" << outTextureHeight << std::endl;
+	if (needsRebuild)
+	{
+		std::cout << "[CEF_Drawer::getUIPanelTextureRegion] " << panelName << " - SUCCESS: rebuilt texture " << outTextureWidth << "x" << outTextureHeight << std::endl;
+	}
+	
 	return true;
 }
 
@@ -553,6 +588,31 @@ void CEF_Drawer::requestRuntimeLayoutSync(const std::map<std::string, UIPanelFra
 	}
 
 	CefPostTask(TID_UI, base::BindOnce(&CEF_Resizer::flushRuntimeLayoutSync, base::Unretained(resizer_.get())));
+}
+
+void CEF_Drawer::forceRepaint()
+{
+	std::lock_guard<std::mutex> lock(render_mutex_);
+	suppress_cef_repaints_ = false;
+	
+	if (browser_)
+	{
+		CefRefPtr<CefBrowserHost> host = browser_->GetHost();
+		if (host)
+		{
+			CefPostTask(TID_UI, base::BindOnce([](CefRefPtr<CefBrowser> browser) {
+				if (browser)
+				{
+					CefRefPtr<CefBrowserHost> host = browser->GetHost();
+					if (host)
+					{
+						host->WasResized();
+						host->Invalidate(PET_VIEW);
+					}
+				}
+			}, browser_));
+		}
+	}
 }
 
 void CEF_Drawer::handleEvent(const SDL_Event& event)
@@ -822,9 +882,27 @@ const RectList& dirtyRects, const void* buffer, int width, int height)
 	if (type != PET_VIEW)
 		return;
 	
-	std::cout << "[CEF_Drawer] OnPaint called: " << width << "x" << height 
-	          << " buffer=" << (buffer ? "valid" : "null") 
-	          << " dirtyRects=" << dirtyRects.size() << std::endl;
+	initial_paint_count_++;
+	
+	if (is_initialized_render_complete_ && suppress_cef_repaints_)
+	{
+		return;
+	}
+	
+	bool isInitialRendering = initial_paint_count_ <= 3;
+	
+	if (initial_paint_count_ == 1)
+	{
+		std::cout << "[CEF_Drawer] First OnPaint - Initial rendering started" << std::endl;
+	}
+	
+	if (!isInitialRendering && initial_paint_count_ % 120 == 0)
+	{
+		std::cout << "[CEF_Drawer] OnPaint called: " << width << "x" << height 
+		          << " buffer=" << (buffer ? "valid" : "null") 
+		          << " dirtyRects=" << dirtyRects.size() 
+		          << " (count=" << initial_paint_count_ << ")" << std::endl;
+	}
 	
 	bool needsSecondInvalidate = false;
 	CefRefPtr<CefBrowser> browserRef;
@@ -864,7 +942,6 @@ const RectList& dirtyRects, const void* buffer, int width, int height)
 					std::cout << "  " << pair.first << ": " << pair.second.width << "x" << pair.second.height 
 					          << " at (" << pair.second.x << "," << pair.second.y << ")" << std::endl;
 					ui_panel_frames_[pair.first] = pair.second;
-					// Synchronize display frames immediately to ensure mouse events work
 					ui_panel_display_frames_[pair.first] = pair.second;
 				}
 			}
@@ -874,55 +951,64 @@ const RectList& dirtyRects, const void* buffer, int width, int height)
 
 		runtime_layout_waiting_for_paint_ = false;
 
-		for (auto& texturePair : ui_panel_textures_)
-		{
-			texturePair.second.dirty = false;
-		}
-
-		bool markedDirtyPanel = false;
-		for (auto& texturePair : ui_panel_textures_)
-		{
-			auto sourceIt = ui_panel_frames_.find(texturePair.first);
-			if (sourceIt == ui_panel_frames_.end())
-			{
-				continue;
-			}
-
-			const UIPanelFrameData& sourceFrame = sourceIt->second;
-			if (sourceFrame.width <= 0 || sourceFrame.height <= 0)
-			{
-				continue;
-			}
-
-			for (const CefRect& dirtyRect : dirtyRects)
-			{
-				const int dirtyMinX = (std::max)(dirtyRect.x, sourceFrame.x);
-				const int dirtyMinY = (std::max)(dirtyRect.y, sourceFrame.y);
-				const int dirtyMaxX = (std::min)(dirtyRect.x + dirtyRect.width, sourceFrame.x + sourceFrame.width);
-				const int dirtyMaxY = (std::min)(dirtyRect.y + dirtyRect.height, sourceFrame.y + sourceFrame.height);
-
-				if (dirtyMinX < dirtyMaxX && dirtyMinY < dirtyMaxY)
-				{
-					texturePair.second.dirty = true;
-					markedDirtyPanel = true;
-					break;
-				}
-			}
-		}
-
-		if (!markedDirtyPanel && dirtyRects.empty())
+		if (isInitialRendering)
 		{
 			for (auto& texturePair : ui_panel_textures_)
 			{
-				texturePair.second.dirty = true;
+				texturePair.second.dirty = false;
 			}
-		}
 
-		updateTexture(buffer, width, height);
+			bool markedDirtyPanel = false;
+			for (auto& texturePair : ui_panel_textures_)
+			{
+				auto sourceIt = ui_panel_frames_.find(texturePair.first);
+				if (sourceIt == ui_panel_frames_.end())
+				{
+					continue;
+				}
+
+				const UIPanelFrameData& sourceFrame = sourceIt->second;
+				if (sourceFrame.width <= 0 || sourceFrame.height <= 0)
+				{
+					continue;
+				}
+
+				for (const CefRect& dirtyRect : dirtyRects)
+				{
+					const int dirtyMinX = (std::max)(dirtyRect.x, sourceFrame.x);
+					const int dirtyMinY = (std::max)(dirtyRect.y, sourceFrame.y);
+					const int dirtyMaxX = (std::min)(dirtyRect.x + dirtyRect.width, sourceFrame.x + sourceFrame.width);
+					const int dirtyMaxY = (std::min)(dirtyRect.y + dirtyRect.height, sourceFrame.y + sourceFrame.height);
+
+					if (dirtyMinX < dirtyMaxX && dirtyMinY < dirtyMaxY)
+					{
+						texturePair.second.dirty = true;
+						markedDirtyPanel = true;
+						break;
+					}
+				}
+			}
+
+			if (!markedDirtyPanel && dirtyRects.empty())
+			{
+				for (auto& texturePair : ui_panel_textures_)
+				{
+					texturePair.second.dirty = true;
+				}
+			}
+
+			updateTexture(buffer, width, height);
+		}
 		
-		// Capture browser reference before releasing mutex
+		if (initial_paint_count_ == 3)
+		{
+			is_initialized_render_complete_ = true;
+			suppress_cef_repaints_ = true;
+			std::cout << "[CEF_Drawer] Initial rendering complete after 3 paints - suppressing further repaints" << std::endl;
+		}
+		
 		browserRef = browser_;
-	} // Mutex released here
+	}
 
 
 	if (needsSecondInvalidate && browserRef)
@@ -1050,12 +1136,12 @@ bool CEF_Drawer::createVertexBuffer()
 	};
 
 	std::array<Vertex, 6> vertices = {{
-		{{-1.0f,  1.0f}, {0.0f, 0.0f}},
-		{{-1.0f, -1.0f}, {0.0f, 1.0f}},
-		{{ 1.0f, -1.0f}, {1.0f, 1.0f}},
-		{{-1.0f,  1.0f}, {0.0f, 0.0f}},
-		{{ 1.0f, -1.0f}, {1.0f, 1.0f}},
-		{{ 1.0f,  1.0f}, {1.0f, 0.0f}}
+		{{-1.0f, -1.0f}, {0.0f, 0.0f}},  // top-left (Vulkan NDC: Y=-1 is top)
+		{{-1.0f,  1.0f}, {0.0f, 1.0f}},  // bottom-left
+		{{ 1.0f,  1.0f}, {1.0f, 1.0f}},  // bottom-right
+		{{-1.0f, -1.0f}, {0.0f, 0.0f}},  // top-left
+		{{ 1.0f,  1.0f}, {1.0f, 1.0f}},  // bottom-right
+		{{ 1.0f, -1.0f}, {1.0f, 0.0f}}   // top-right
 	}};
 
 	VkBufferCreateInfo bufferInfo{};
@@ -1388,6 +1474,8 @@ void CEF_Drawer::cleanupVulkanResources()
 	}
 
 	VkDevice device = vk_context_->getDevice();
+	
+	vkDeviceWaitIdle(device);
 
 	if (texture_sampler_ != VK_NULL_HANDLE)
 	{

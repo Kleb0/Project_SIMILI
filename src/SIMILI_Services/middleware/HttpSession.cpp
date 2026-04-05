@@ -5,6 +5,8 @@
 #include <sstream>
 #include <random>
 #include <iomanip>
+#include <mutex>
+#include <map>
 
 namespace SIMILI 
 {
@@ -13,6 +15,9 @@ namespace SIMILI
 
 	namespace beast = boost::beast;
 	namespace http = beast::http;
+
+	std::mutex HttpSession::logMutex;
+	std::map<std::string, bool> HttpSession::loggedRoutes;
 
 		std::string HttpSession::generateSessionId() 
 		{
@@ -204,12 +209,7 @@ namespace SIMILI
 			std::ostringstream logMsg;
 			logMsg << "[HttpSession] " << req_.method_string() << " " << req_.target();
 			
-			// Log ALL requests temporarily for debugging
-			std::cout << logMsg.str() << std::endl;
-			
 			std::string target = std::string(req_.target());
-			static std::unordered_map<std::string, bool> loggedRoutes;
-			static std::mutex logMutex;
 			
 			bool shouldLog = true;
 			{

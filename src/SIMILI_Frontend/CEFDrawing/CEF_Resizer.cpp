@@ -23,13 +23,14 @@ void CEF_Resizer::resize(int width, int height)
 		ensureTextureStorage(owner_.width_, owner_.height_);
 	}
 	
+	owner_.forceRepaint();
+	
 	if (owner_.browser_)
 	{
 		CefRefPtr<CefBrowserHost> host = owner_.browser_->GetHost();
 		if (host)
 		{
 			host->WasResized();
-			host->Invalidate(PET_VIEW);
 		}
 	}
 	
@@ -44,6 +45,8 @@ void CEF_Resizer::ensureTextureStorage(int width, int height)
 	}
 
 	VkDevice device = owner_.vk_context_->getDevice();
+	
+	vkDeviceWaitIdle(device);
 
 	if (owner_.texture_view_ != VK_NULL_HANDLE)
 	{
@@ -73,7 +76,7 @@ void CEF_Resizer::ensureTextureStorage(int width, int height)
 	imageInfo.arrayLayers = 1;
 	imageInfo.format = VK_FORMAT_B8G8R8A8_UNORM;
 	imageInfo.tiling = VK_IMAGE_TILING_LINEAR;
-	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	imageInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
 	imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -111,6 +114,9 @@ void CEF_Resizer::ensureTextureStorage(int width, int height)
 	viewInfo.subresourceRange.layerCount = 1;
 
 	vkCreateImageView(device, &viewInfo, nullptr, &owner_.texture_view_);
+	
+	// Reset layout flag since we just created a new texture
+	owner_.texture_layout_initialized_ = false;
 }
 
 bool CEF_Resizer::rebuildUIPanelTextureLocked(const std::string& panelName, CEF_Drawer::UIPanelTextureData& textureData, CEF_Drawer::UIPanelFrameData& outFrame)
@@ -181,6 +187,8 @@ bool CEF_Resizer::rebuildUIPanelTextureLocked(const std::string& panelName, CEF_
 	if (textureData.texture_image != VK_NULL_HANDLE && (textureData.width != targetWidth || textureData.height != targetHeight))
 	{
 		VkDevice device = owner_.vk_context_->getDevice();
+		
+		vkDeviceWaitIdle(device);
 
 		if (textureData.texture_view != VK_NULL_HANDLE)
 		{
@@ -492,10 +500,12 @@ void CEF_Resizer::flushRuntimeLayoutSync()
 
 	mainFrame->ExecuteJavaScript(script, mainFrame->GetURL(), 0);
 
+	owner_.forceRepaint();
+
 	CefRefPtr<CefBrowserHost> host = browser->GetHost();
 	if (host)
 	{
-		host->Invalidate(PET_VIEW);
+		host->WasResized();
 	}
 }
 
@@ -610,10 +620,11 @@ void CEF_Resizer::forceLayoutSync()
 		}
 	}
 
+	owner_.forceRepaint();
+
 	CefRefPtr<CefBrowserHost> host = owner_.browser_->GetHost();
 	if (host)
 	{
 		host->WasResized();
-		host->Invalidate(PET_VIEW);
 	}
 }

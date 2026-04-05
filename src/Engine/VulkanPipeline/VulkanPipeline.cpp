@@ -366,11 +366,13 @@ void VulkanPipeline::destroyAllPipelines()
     }
 
     std::cout << "[VulkanPipeline] Destroying all pipelines (" << pipeline_cache_.size() << ")" << std::endl;
+    
+    VkDevice device = vk_context_->getDevice();
+    vkDeviceWaitIdle(device);
 
     for (auto& pair : pipeline_cache_)
     {
         auto& pipeline = pair.second;
-        VkDevice device = vk_context_->getDevice();
 
         if (pipeline->pipeline != VK_NULL_HANDLE)
         {

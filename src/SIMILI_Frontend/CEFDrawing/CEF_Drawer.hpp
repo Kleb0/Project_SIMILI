@@ -85,6 +85,7 @@ public:
 	static void requestActiveRuntimeLayoutSync(const std::map<std::string, UIPanelFrameData>& panelFrames);
 	static void forceActiveLayoutSync();
 	void requestRuntimeLayoutSync(const std::map<std::string, UIPanelFrameData>& panelFrames);
+	void forceRepaint();
 	CEF_Resizer& getResizer();
 	
 	// Accessors
@@ -137,6 +138,9 @@ private:
 	bool runtime_layout_waiting_for_paint_;
 	bool runtime_layout_needs_second_invalidate_;
 	bool has_received_first_paint_;
+	bool is_initialized_render_complete_;
+	bool suppress_cef_repaints_;
+	int initial_paint_count_;
 	
 	std::mutex render_mutex_;
 	static CEF_Drawer* active_instance_;

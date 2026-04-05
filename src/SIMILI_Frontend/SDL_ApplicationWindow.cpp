@@ -704,6 +704,8 @@ void SDL_ApplicationWindow::cleanupVulkan()
 	}
 
 	VkDevice device = vk_context_->getDevice();
+	
+	vkDeviceWaitIdle(device);
 
 	if (vk_in_flight_fence_ != VK_NULL_HANDLE)
 	{
