@@ -534,10 +534,6 @@ namespace SIMILI {
 						}
 					}
 					
-					std::cout << "[RoutesManager] Calling handler->captureIFramePositions()" << std::endl;
-					handler->captureIFramePositions();
-					std::cout << "[RoutesManager] captureIFramePositions() completed" << std::endl;
-					
 					resp.statusCode = 200;
 					resp.statusMessage = "OK";
 					resp.body = "{\"success\": true}";
@@ -631,8 +627,6 @@ namespace SIMILI {
 					}
 
 					handler->updateUIPanelIFrames(uiPanelIFrames);
-					handler->cacheUIPanelFrameDatas();
-					handler->captureIFramePositions();
 
 					resp.statusCode = 200;
 					resp.statusMessage = "OK";

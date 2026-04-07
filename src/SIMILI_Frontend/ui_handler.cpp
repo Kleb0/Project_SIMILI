@@ -35,7 +35,7 @@ UIHandler* UIHandler::s_instance_ = nullptr;
 
 UIHandler::UIHandler() : parent_sdl_window_(nullptr), parent_window_(nullptr), window_handle_(nullptr), timer_id_(0),
 	last_viewport_update_time_(0), last_viewport_x_(0), last_viewport_y_(0), 
-	last_viewport_width_(0), last_viewport_height_(0), vk_scene_(nullptr),
+	last_viewport_width_(0), last_viewport_height_(0), last_frame_capture_time_(), vk_scene_(nullptr),
 	vk_renderer_(nullptr), vulkan_pipelines_(nullptr), main_camera_(nullptr), cube_mesh_ptr_(nullptr), scene_initialized_(false),
 	render_message_router_(nullptr), 
 	frame_datas_(nullptr),
@@ -1001,9 +1001,13 @@ bool UIHandler::handleSplitterEvent(const SDL_Event& event)
 
 	const bool handled = splitter_->handleEvent(event);
 	
+	const bool isWindowResizeEvent = (event.type == SDL_EVENT_WINDOW_RESIZED ||
+	                                   event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED ||
+	                                   event.type == SDL_EVENT_WINDOW_MAXIMIZED ||
+	                                   event.type == SDL_EVENT_WINDOW_RESTORED);
+	
 	if (handled)
 	{
-
 		if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
 		{
 			splitter_drag_start_frame_data_ = splitter_->getAllFrameDatas();
@@ -1018,6 +1022,16 @@ bool UIHandler::handleSplitterEvent(const SDL_Event& event)
 		}
 
 		cacheUIPanelFrameDatas();
+	}
+	else if (isWindowResizeEvent && cef_drawer_)
+	{
+		const auto currentFrameDataMap = splitter_->getAllFrameDatas();
+		if (!currentFrameDataMap.empty())
+		{
+			cef_drawer_->requestRuntimeLayoutSync(buildRuntimeLayoutFrameMap(currentFrameDataMap));
+			cef_drawer_->getResizer().forceLayoutSync();
+			cacheUIPanelFrameDatas();
+		}
 	}
 
 	return handled;
@@ -1066,6 +1080,15 @@ void UIHandler::captureIFramePositions()
 		return;
 	}
 
+	const std::chrono::milliseconds FRAME_CAPTURE_DEBOUNCE_MS(150);
+	auto currentTime = std::chrono::steady_clock::now();
+	auto timeSinceLastCapture = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - last_frame_capture_time_);
+	
+	if (last_frame_capture_time_.time_since_epoch().count() > 0 && timeSinceLastCapture < FRAME_CAPTURE_DEBOUNCE_MS)
+	{
+		return;
+	}
+
 	if (!frame_datas_)
 	{
 		std::cout << "[UIHandler] Cannot capture iframe positions - frame_datas_ not available" << std::endl;
@@ -1099,6 +1122,8 @@ void UIHandler::captureIFramePositions()
 	}
 
 	frame_datas_->catchFrameData(sdlWindow);
+	
+	last_frame_capture_time_ = currentTime;
 	
 	if (!splitter_ && !iframe_data_map_.empty() && parent_sdl_window_)
 	{
@@ -1213,6 +1238,99 @@ void UIHandler::captureIFramePositions()
 	// }
 }
 
+void UIHandler::forceCaptureIFramePositions()
+{
+	if (!isOwnerThread())
+	{
+		pending_iframe_capture_.store(true);
+		return;
+	}
+
+	if (!frame_datas_)
+	{
+		std::cout << "[UIHandler] Cannot capture iframe positions - frame_datas_ not available" << std::endl;
+		return;
+	}
+
+	if (!parent_sdl_window_)
+	{
+		std::cout << "[UIHandler] parent_sdl_window_ not available" << std::endl;
+		return;
+	}
+
+	SDL_Window* sdlWindow = parent_sdl_window_->getHandle();
+	if (!sdlWindow)
+	{
+		std::cout << "[UIHandler] SDL window handle not available" << std::endl;
+		return;
+	}
+
+	if (mouse_controller_)
+	{
+		mouse_controller_->setWindowHandle(sdlWindow);
+		
+		bool isMaximized = parent_sdl_window_->isMaximized();
+		int left = 0, top = 0, right = 0, bottom = 0;
+		if (isMaximized)
+		{
+			parent_sdl_window_->getBorderOffsets(left, top, right, bottom);
+		}
+		mouse_controller_->setMaximizedState(isMaximized, left, top);
+	}
+
+	frame_datas_->catchFrameData(sdlWindow);
+	
+	last_frame_capture_time_ = std::chrono::steady_clock::now();
+	
+	if (!splitter_ && !iframe_data_map_.empty() && parent_sdl_window_)
+	{
+		VkRenderPass renderPass = parent_sdl_window_->getRenderPass();
+		if (vk_renderer_ && renderPass != VK_NULL_HANDLE)
+		{
+			std::cout << "\n  [UIHANDLER] --------------------------------- SPLITTER CREATION TRIGGERED ---------------------------------" << std::endl;
+			std::cout << "[UIHandler] Frame data available - initializing splitter now" << std::endl;
+			startSplitter(vk_renderer_, renderPass);
+		}
+	}
+	
+	if (splitter_)
+	{
+		splitter_->syncFrameDatas(frame_datas_);
+	}
+	cacheUIPanelFrameDatas();
+	
+	if (parent_sdl_window_)
+	{
+		parent_sdl_window_->updateFrameDatas(frame_datas_);
+	}
+
+	if (mouse_controller_)
+	{
+		auto frameDataMap = getRuntimeFrameDataMap();
+		
+		if (frameDataMap.empty())
+		{
+			std::cout << "[UIHandler] WARNING: No frame data captured from FrameDatas" << std::endl;
+			return;
+		}
+
+		std::map<std::string, SIMILI::Input::MouseControlFrameData> mouseControlDataMap;
+		for (const auto& pair : frameDataMap)
+		{
+			const auto& data = pair.second;
+			SIMILI::Input::MouseControlFrameData convertedData;
+			convertedData.name = data.name;
+			convertedData.clientX = data.clientX;
+			convertedData.clientY = data.clientY;
+			convertedData.width = data.width;
+			convertedData.height = data.height;
+			mouseControlDataMap[pair.first] = convertedData;
+		}
+
+		mouse_controller_->updateMouseControlPanelBoundsFromFrameData(mouseControlDataMap);
+	}
+}
+
 void UIHandler::updateUIPanelIFrames(const std::map<std::string, IFrameData>& iframeDataMap)
 {
 	std::lock_guard<std::mutex> lock(ui_panel_mutex_);
@@ -1281,8 +1399,6 @@ void UIHandler::drawUIPanels(VkCommandBuffer commandBuffer, int drawableWidth, i
 	{
 		return;
 	}
-
-	cef_drawer_->syncWindowProperties();
 
 	SDL_Window* sdlWindow = cef_drawer_->getWindowHandle();
 	if (!sdlWindow)

@@ -334,13 +334,23 @@ int main(int argc, char* argv[])
 	handler->startRenderTimer();
 	std::cout << "[Main] Render timer started" << std::endl;
 
+	mainWindow.show();
+	std::cout << "[Main] SDL window shown before CEF creation" << std::endl;
+
+	SDL_Event dummyEvent;
+	for (int i = 0; i < 10; ++i)
+	{
+		while (SDL_PollEvent(&dummyEvent));
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	}
+
 	int windowWidth = 0;
 	int windowHeight = 0;
 	int windowPixelWidth = 0;
 	int windowPixelHeight = 0;
 	SDL_GetWindowSize(mainWindow.getHandle(), &windowWidth, &windowHeight);
 	SDL_GetWindowSizeInPixels(mainWindow.getHandle(), &windowPixelWidth, &windowPixelHeight);
-	std::cout << "[Main] Window pixel size: " << windowPixelWidth << "x" << windowPixelHeight << std::endl;
+	std::cout << "[Main] Window size after show: " << windowWidth << "x" << windowHeight << " (pixels: " << windowPixelWidth << "x" << windowPixelHeight << ")" << std::endl;
 
 	fs::path uiPath = resolveUiLayoutPath();
 	if (!fs::exists(uiPath))
@@ -354,7 +364,6 @@ int main(int argc, char* argv[])
 	}
 	std::cout << "[Main] Resolved UI layout path: " << uiPath.string() << std::endl;
 	
-	// Use HTTP server instead of file:// to fix iframe loading issues
 	std::string url = "http://localhost:8080/ui/main_layout.html";
 	std::cout << "[Main] Creating CEF browser with URL: " << url << std::endl;
 	if (!cefDrawer->createBrowser(handler, url, windowWidth, windowHeight))
@@ -368,8 +377,8 @@ int main(int argc, char* argv[])
 	}
 	std::cout << "[Main] CEF browser created successfully" << std::endl;
 	
-	std::cout << "[Main] Waiting for CEF initialization (processing CEF messages)..." << std::endl;
-	for (int i = 0; i < 60; ++i)
+	std::cout << "[Main] Waiting for CEF and JavaScript initialization..." << std::endl;
+	for (int i = 0; i < 120; ++i)
 	{
 		CefDoMessageLoopWork();
 		std::this_thread::sleep_for(std::chrono::milliseconds(16));
@@ -379,13 +388,15 @@ int main(int argc, char* argv[])
 	handler->initializeDefaultUIPanels();
 	std::cout << "[Main] Default UI panels initialized" << std::endl;
 
-	mainWindow.show();
-	handler->captureIFramePositions();
+	handler->forceCaptureIFramePositions();
+	std::cout << "[Main] Initial frame data captured" << std::endl;
 
 	std::cout << "[Main] SDL window shown" << std::endl;
 
 	// Main render loop
 	std::cout << "[Main] Starting main render loop..." << std::endl;
+	std::cout << "[Main] Swapchain state before loop: " << (mainWindow.getSwapchain() != VK_NULL_HANDLE) 
+	          << " (handle=" << mainWindow.getSwapchain() << ")" << std::endl;
 	bool running = true;
 	SDL_Event event;
 	

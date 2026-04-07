@@ -189,8 +189,6 @@ CefRefPtr<CefResourceHandler> LocalResourceRequestHandler::handleUIPanelUpdate(C
 		}
 		
 		handler->updateUIPanelIFrames(uiPanelIFrames);
-		handler->cacheUIPanelFrameDatas();
-		handler->captureIFramePositions();
 		
 		std::string response = "{\"success\": true, \"count\": " + std::to_string(uiPanelIFrames.size()) + "}";
 		return new SimpleResourceHandler("application/json", response);

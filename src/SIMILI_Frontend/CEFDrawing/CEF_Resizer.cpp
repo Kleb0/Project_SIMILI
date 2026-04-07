@@ -45,8 +45,6 @@ void CEF_Resizer::ensureTextureStorage(int width, int height)
 	}
 
 	VkDevice device = owner_.vk_context_->getDevice();
-	
-	vkDeviceWaitIdle(device);
 
 	if (owner_.texture_view_ != VK_NULL_HANDLE)
 	{
@@ -115,8 +113,85 @@ void CEF_Resizer::ensureTextureStorage(int width, int height)
 
 	vkCreateImageView(device, &viewInfo, nullptr, &owner_.texture_view_);
 	
-	// Reset layout flag since we just created a new texture
-	owner_.texture_layout_initialized_ = false;
+	VkCommandPool commandPool = VK_NULL_HANDLE;
+	VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+	VkFence fence = VK_NULL_HANDLE;
+	
+	VkFenceCreateInfo fenceInfo{};
+	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceInfo.flags = 0;
+	
+	if (vkCreateFence(device, &fenceInfo, nullptr, &fence) != VK_SUCCESS)
+	{
+		owner_.texture_layout_initialized_ = true;
+		owner_.descriptor_needs_update_ = true;
+		return;
+	}
+	
+	VkCommandPoolCreateInfo poolInfo{};
+	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	poolInfo.queueFamilyIndex = 0;
+	poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+	
+	if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) == VK_SUCCESS)
+	{
+		VkCommandBufferAllocateInfo allocInfo{};
+		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		allocInfo.commandPool = commandPool;
+		allocInfo.commandBufferCount = 1;
+		
+		if (vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer) == VK_SUCCESS)
+		{
+			VkCommandBufferBeginInfo beginInfo{};
+			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+			
+			vkBeginCommandBuffer(commandBuffer, &beginInfo);
+			
+			VkImageMemoryBarrier barrier{};
+			barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			barrier.oldLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+			barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+			barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier.image = owner_.texture_image_;
+			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			barrier.subresourceRange.baseMipLevel = 0;
+			barrier.subresourceRange.levelCount = 1;
+			barrier.subresourceRange.baseArrayLayer = 0;
+			barrier.subresourceRange.layerCount = 1;
+			barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			
+			vkCmdPipelineBarrier(commandBuffer, 
+				VK_PIPELINE_STAGE_HOST_BIT, 
+				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				0, 0, nullptr, 0, nullptr, 1, &barrier);
+			
+			vkEndCommandBuffer(commandBuffer);
+			
+			VkSubmitInfo submitInfo{};
+			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			submitInfo.commandBufferCount = 1;
+			submitInfo.pCommandBuffers = &commandBuffer;
+			
+			vkQueueSubmit(owner_.vk_context_->getGraphicsQueue(), 1, &submitInfo, fence);
+			vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
+			
+			vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+		}
+		
+		vkDestroyCommandPool(device, commandPool, nullptr);
+	}
+	
+	if (fence != VK_NULL_HANDLE)
+	{
+		vkDestroyFence(device, fence, nullptr);
+	}
+	
+	owner_.texture_layout_initialized_ = true;
+	owner_.descriptor_needs_update_ = true;
 }
 
 bool CEF_Resizer::rebuildUIPanelTextureLocked(const std::string& panelName, CEF_Drawer::UIPanelTextureData& textureData, CEF_Drawer::UIPanelFrameData& outFrame)
@@ -187,8 +262,6 @@ bool CEF_Resizer::rebuildUIPanelTextureLocked(const std::string& panelName, CEF_
 	if (textureData.texture_image != VK_NULL_HANDLE && (textureData.width != targetWidth || textureData.height != targetHeight))
 	{
 		VkDevice device = owner_.vk_context_->getDevice();
-		
-		vkDeviceWaitIdle(device);
 
 		if (textureData.texture_view != VK_NULL_HANDLE)
 		{
@@ -349,6 +422,24 @@ bool CEF_Resizer::rebuildUIPanelTextureLocked(const std::string& panelName, CEF_
 	{
 		VkCommandPool commandPool = VK_NULL_HANDLE;
 		VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+		VkFence fence = VK_NULL_HANDLE;
+		
+		VkFenceCreateInfo fenceInfo{};
+		fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+		fenceInfo.flags = 0;
+		
+		if (vkCreateFence(device, &fenceInfo, nullptr, &fence) != VK_SUCCESS)
+		{
+			textureData.texture_layout_initialized = true;
+			textureData.width = targetWidth;
+			textureData.height = targetHeight;
+			textureData.dirty = false;
+			outFrame.x = 0;
+			outFrame.y = 0;
+			outFrame.width = targetWidth;
+			outFrame.height = targetHeight;
+			return true;
+		}
 
 		VkCommandPoolCreateInfo poolInfo{};
 		poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -398,14 +489,19 @@ bool CEF_Resizer::rebuildUIPanelTextureLocked(const std::string& panelName, CEF_
 				submitInfo.commandBufferCount = 1;
 				submitInfo.pCommandBuffers = &commandBuffer;
 
-				vkQueueSubmit(owner_.vk_context_->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-				vkQueueWaitIdle(owner_.vk_context_->getGraphicsQueue());
+				vkQueueSubmit(owner_.vk_context_->getGraphicsQueue(), 1, &submitInfo, fence);
+				vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
 
 				vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
 				textureData.texture_layout_initialized = true;
 			}
 
 			vkDestroyCommandPool(device, commandPool, nullptr);
+		}
+		
+		if (fence != VK_NULL_HANDLE)
+		{
+			vkDestroyFence(device, fence, nullptr);
 		}
 	}
 
@@ -614,9 +710,14 @@ void CEF_Resizer::forceLayoutSync()
 	{
 		std::lock_guard<std::mutex> lock(owner_.render_mutex_);
 		owner_.runtime_layout_waiting_for_paint_ = true;
-		for (auto& texturePair : owner_.ui_panel_textures_)
+		
+		for (const auto& runtimeFramePair : owner_.runtime_layout_frames_)
 		{
-			texturePair.second.dirty = true;
+			auto textureIt = owner_.ui_panel_textures_.find(runtimeFramePair.first);
+			if (textureIt != owner_.ui_panel_textures_.end())
+			{
+				textureIt->second.dirty = true;
+			}
 		}
 	}
 

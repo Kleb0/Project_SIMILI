@@ -23,6 +23,7 @@
 #include <mutex>
 #include <atomic>
 #include <thread>
+#include <chrono>
 #include <SDL3/SDL.h>
 #include <d3d11.h>
 #include <d2d1.h>
@@ -216,6 +217,7 @@ public:
 	
 	
 	void captureIFramePositions();
+	void forceCaptureIFramePositions();
 	void initializeDefaultUIPanels();
 	void updateUIPanelIFrames(const std::map<std::string, IFrameData>& iframeDataMap);
 	void cacheUIPanelFrameDatas();
@@ -274,6 +276,8 @@ private:
 	int last_viewport_y_;
 	int last_viewport_width_;
 	int last_viewport_height_;
+	
+	std::chrono::steady_clock::time_point last_frame_capture_time_;
 	
 	CefRefPtr<CefMessageRouterRendererSide> render_message_router_;
 	

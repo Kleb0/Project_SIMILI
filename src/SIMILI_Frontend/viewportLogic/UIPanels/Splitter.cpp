@@ -181,6 +181,16 @@ void Splitter::syncFrameDatas(const SIMILI::Frontend::FrameDatas* frameDatas)
 	std::cout << "[Splitter] hasSourceGeometryChanged: " << (hasGeometryChanged ? "true" : "false") << std::endl;
 	std::cout << "[Splitter] shouldRefreshFromSource: " << (shouldRefresh ? "true" : "false") << std::endl;
 
+	bool windowSizeChanged = (windowWidth > 0 && windowHeight > 0 && 
+	                          (windowWidth != last_window_width_ || windowHeight != last_window_height_));
+
+	if (layout_ready_ && !hasGeometryChanged && !shouldRefresh && !windowSizeChanged)
+	{
+		std::cout << "[Splitter] No changes detected, skipping sync" << std::endl;
+		std::cout << "---------------- [Splitter] syncFrameDatas END ----------------\n" << std::endl;
+		return;
+	}
+
 	if (hasGeometryChanged || shouldRefresh)
 	{
 		std::cout << "[Splitter] Calling rebuildFromSource..." << std::endl;

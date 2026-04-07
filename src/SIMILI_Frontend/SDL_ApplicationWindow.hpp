@@ -81,6 +81,7 @@ public:
 	VkFence getInFlightFence() const { return vk_in_flight_fence_; }
 	bool initializeVulkan();
 	void cleanupVulkan();
+	bool recreateSwapchain();
 		
 	void processEvents();
 	
@@ -107,9 +108,15 @@ private:
 	VkCommandPool vk_command_pool_;
 	std::vector<VkCommandBuffer> vk_command_buffers_;
 	uint32_t current_image_index_;
+	uint32_t current_frame_;
+	static const int MAX_FRAMES_IN_FLIGHT = 2;
+	std::vector<VkSemaphore> vk_image_available_semaphores_;
+	std::vector<VkSemaphore> vk_render_finished_semaphores_;
+	std::vector<VkFence> vk_in_flight_fences_;
 	VkSemaphore vk_image_available_semaphore_;
 	VkSemaphore vk_render_finished_semaphore_;
 	VkFence vk_in_flight_fence_;
+	bool swapchain_needs_recreation_;
 	
 	void updateDpiScale();
 	void updateMaximizedState();

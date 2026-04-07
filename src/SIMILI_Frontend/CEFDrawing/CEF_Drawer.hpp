@@ -86,6 +86,7 @@ public:
 	static void forceActiveLayoutSync();
 	void requestRuntimeLayoutSync(const std::map<std::string, UIPanelFrameData>& panelFrames);
 	void forceRepaint();
+	void invalidateAllUIPanelTextures();
 	CEF_Resizer& getResizer();
 	
 	// Accessors
@@ -140,7 +141,10 @@ private:
 	bool has_received_first_paint_;
 	bool is_initialized_render_complete_;
 	bool suppress_cef_repaints_;
+	bool force_single_repaint_;
 	int initial_paint_count_;
+	bool descriptor_needs_update_;
+	VkImageView last_bound_texture_view_;
 	
 	std::mutex render_mutex_;
 	static CEF_Drawer* active_instance_;

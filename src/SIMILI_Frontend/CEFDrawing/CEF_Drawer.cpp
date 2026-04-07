@@ -53,7 +53,10 @@ CEF_Drawer::CEF_Drawer()
 	, has_received_first_paint_(false)
 	, is_initialized_render_complete_(false)
 	, suppress_cef_repaints_(false)
+	, force_single_repaint_(false)
 	, initial_paint_count_(0)
+	, descriptor_needs_update_(false)
+	, last_bound_texture_view_(VK_NULL_HANDLE)
 	, resizer_(std::make_unique<CEF_Resizer>(*this))
 {
 }
@@ -129,6 +132,11 @@ void CEF_Drawer::syncWindowProperties()
 		width_ = newWidth;
 		height_ = newHeight;
 		resizer_->ensureTextureStorage(width_, height_);
+		
+		if (is_initialized_render_complete_)
+		{
+			force_single_repaint_ = true;
+		}
 	}
 
 	if (browser_)
@@ -137,7 +145,10 @@ void CEF_Drawer::syncWindowProperties()
 		if (host)
 		{
 			host->WasResized();
-			host->Invalidate(PET_VIEW);
+			if (!is_initialized_render_complete_ || force_single_repaint_)
+			{
+				host->Invalidate(PET_VIEW);
+			}
 		}
 	}
 
@@ -192,7 +203,8 @@ void CEF_Drawer::setRenderPass(VkRenderPass renderPass)
 	}
 	else
 	{
-		std::cout << "[CEF_Drawer] Pipeline created successfully with render pass, pipeline_=" << pipeline_ << " (address: " << &pipeline_ << ")" << std::endl;
+		std::cout << "[CEF_Drawer] Pipeline created successfully with render pass, shared_pipeline=" 
+		 << (shared_pipeline_ ? shared_pipeline_->pipeline : VK_NULL_HANDLE) << std::endl;
 	}
 }
 
@@ -333,11 +345,11 @@ void CEF_Drawer::draw(VkCommandBuffer commandBuffer)
 	
 	std::lock_guard<std::mutex> lock(render_mutex_);
 	
-	if (pipeline_ == VK_NULL_HANDLE)
+	if (!shared_pipeline_ || shared_pipeline_->pipeline == VK_NULL_HANDLE)
 	{
 		if (!initialization_logged)
 		{
-			std::cout << "[CEF_Drawer] draw() pipeline is NULL (address: " << &pipeline_ << ")" << std::endl;
+			std::cout << "[CEF_Drawer] draw() shared_pipeline is NULL or invalid" << std::endl;
 		}
 		return;
 	}
@@ -351,9 +363,45 @@ void CEF_Drawer::draw(VkCommandBuffer commandBuffer)
 		return;
 	}
 	
+	if (descriptor_set_ == VK_NULL_HANDLE || texture_sampler_ == VK_NULL_HANDLE)
+	{
+		if (!initialization_logged)
+		{
+			std::cout << "[CEF_Drawer] draw() descriptor_set or texture_sampler is NULL" << std::endl;
+		}
+		return;
+	}
+	
+	if (descriptor_needs_update_ || last_bound_texture_view_ != texture_view_)
+	{
+		VkDescriptorImageInfo imageInfo{};
+		imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+		imageInfo.imageView = texture_view_;
+		imageInfo.sampler = texture_sampler_;
+		
+		VkWriteDescriptorSet descriptorWrite{};
+		descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrite.dstSet = descriptor_set_;
+		descriptorWrite.dstBinding = 0;
+		descriptorWrite.dstArrayElement = 0;
+		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		descriptorWrite.descriptorCount = 1;
+		descriptorWrite.pImageInfo = &imageInfo;
+		
+		vkUpdateDescriptorSets(vk_context_->getDevice(), 1, &descriptorWrite, 0, nullptr);
+		
+		descriptor_needs_update_ = false;
+		last_bound_texture_view_ = texture_view_;
+		
+		if (!initialization_logged)
+		{
+			std::cout << "[CEF_Drawer] Descriptor set updated with texture_view=" << texture_view_ << std::endl;
+		}
+	}
+	
 	if (!initialization_logged)
 	{
-		std::cout << "[CEF_Drawer] First successful draw() with pipeline_=" << pipeline_ << std::endl;
+		std::cout << "[CEF_Drawer] First successful draw() with shared_pipeline=" << shared_pipeline_->pipeline << std::endl;
 		initialization_logged = true;
 	}
 	
@@ -374,13 +422,10 @@ void CEF_Drawer::draw(VkCommandBuffer commandBuffer)
 	scissor.extent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
 	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 	
-	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shared_pipeline_->pipeline);
 	
-	if (descriptor_set_ != VK_NULL_HANDLE)
-	{
-		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-			pipeline_layout_, 0, 1, &descriptor_set_, 0, nullptr);
-	}
+	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		shared_pipeline_->layout, 0, 1, &descriptor_set_, 0, nullptr);
 	
 	VkBuffer vertexBuffers[] = {vertex_buffer_};
 	VkDeviceSize offsets[] = {0};
@@ -393,12 +438,39 @@ void CEF_Drawer::draw(VkCommandBuffer commandBuffer)
 void CEF_Drawer::updateUIPanelFrames(const std::map<std::string, UIPanelFrameData>& panelFrames)
 {
 	std::lock_guard<std::mutex> lock(render_mutex_);
-	ui_panel_frames_ = panelFrames;
-
-	for (auto& texturePair : ui_panel_textures_)
+	
+	for (const auto& newFramePair : panelFrames)
 	{
-		texturePair.second.dirty = true;
+		auto oldIt = ui_panel_frames_.find(newFramePair.first);
+		bool needsUpdate = false;
+		
+		if (oldIt == ui_panel_frames_.end())
+		{
+			needsUpdate = true;
+		}
+		else
+		{
+			const UIPanelFrameData& oldFrame = oldIt->second;
+			const UIPanelFrameData& newFrame = newFramePair.second;
+			
+			if (oldFrame.x != newFrame.x || oldFrame.y != newFrame.y ||
+			    oldFrame.width != newFrame.width || oldFrame.height != newFrame.height)
+			{
+				needsUpdate = true;
+			}
+		}
+		
+		if (needsUpdate)
+		{
+			auto textureIt = ui_panel_textures_.find(newFramePair.first);
+			if (textureIt != ui_panel_textures_.end())
+			{
+				textureIt->second.dirty = true;
+			}
+		}
 	}
+	
+	ui_panel_frames_ = panelFrames;
 
 	for (auto it = ui_panel_display_frames_.begin(); it != ui_panel_display_frames_.end();)
 	{
@@ -593,7 +665,14 @@ void CEF_Drawer::requestRuntimeLayoutSync(const std::map<std::string, UIPanelFra
 void CEF_Drawer::forceRepaint()
 {
 	std::lock_guard<std::mutex> lock(render_mutex_);
-	suppress_cef_repaints_ = false;
+	if (!is_initialized_render_complete_)
+	{
+		suppress_cef_repaints_ = false;
+	}
+	else
+	{
+		force_single_repaint_ = true;
+	}
 	
 	if (browser_)
 	{
@@ -613,6 +692,16 @@ void CEF_Drawer::forceRepaint()
 			}, browser_));
 		}
 	}
+}
+
+void CEF_Drawer::invalidateAllUIPanelTextures()
+{
+	std::lock_guard<std::mutex> lock(render_mutex_);
+	for (auto& texturePair : ui_panel_textures_)
+	{
+		texturePair.second.dirty = true;
+	}
+	std::cout << "[CEF_Drawer] Invalidated all UI panel textures count=" << ui_panel_textures_.size() << std::endl;
 }
 
 void CEF_Drawer::handleEvent(const SDL_Event& event)
@@ -884,9 +973,14 @@ const RectList& dirtyRects, const void* buffer, int width, int height)
 	
 	initial_paint_count_++;
 	
-	if (is_initialized_render_complete_ && suppress_cef_repaints_)
+	if (is_initialized_render_complete_ && suppress_cef_repaints_ && !force_single_repaint_)
 	{
 		return;
+	}
+	
+	if (force_single_repaint_)
+	{
+		force_single_repaint_ = false;
 	}
 	
 	bool isInitialRendering = initial_paint_count_ <= 3;
@@ -1462,6 +1556,87 @@ bool CEF_Drawer::createVulkanResources()
 	}
 	std::cout << "[CEF_Drawer::createVulkanResources] Texture sampler created" << std::endl;
 
+	VkCommandPool commandPool = VK_NULL_HANDLE;
+	VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+	VkFence fence = VK_NULL_HANDLE;
+	
+	VkFenceCreateInfo fenceInfo{};
+	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceInfo.flags = 0;
+	
+	if (vkCreateFence(vk_context_->getDevice(), &fenceInfo, nullptr, &fence) != VK_SUCCESS)
+	{
+		texture_layout_initialized_ = true;
+		descriptor_needs_update_ = true;
+		std::cout << "[CEF_Drawer] Vulkan resources created (pipeline will be created after render pass is set)" << std::endl;
+		return true;
+	}
+	
+	VkCommandPoolCreateInfo poolInfo{};
+	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	poolInfo.queueFamilyIndex = 0;
+	poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+	
+	if (vkCreateCommandPool(vk_context_->getDevice(), &poolInfo, nullptr, &commandPool) == VK_SUCCESS)
+	{
+		VkCommandBufferAllocateInfo allocInfo{};
+		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		allocInfo.commandPool = commandPool;
+		allocInfo.commandBufferCount = 1;
+		
+		if (vkAllocateCommandBuffers(vk_context_->getDevice(), &allocInfo, &commandBuffer) == VK_SUCCESS)
+		{
+			VkCommandBufferBeginInfo beginInfo{};
+			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+			
+			vkBeginCommandBuffer(commandBuffer, &beginInfo);
+			
+			VkImageMemoryBarrier barrier{};
+			barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			barrier.oldLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+			barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+			barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier.image = texture_image_;
+			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			barrier.subresourceRange.baseMipLevel = 0;
+			barrier.subresourceRange.levelCount = 1;
+			barrier.subresourceRange.baseArrayLayer = 0;
+			barrier.subresourceRange.layerCount = 1;
+			barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			
+			vkCmdPipelineBarrier(commandBuffer, 
+				VK_PIPELINE_STAGE_HOST_BIT, 
+				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				0, 0, nullptr, 0, nullptr, 1, &barrier);
+			
+			vkEndCommandBuffer(commandBuffer);
+			
+			VkSubmitInfo submitInfo{};
+			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			submitInfo.commandBufferCount = 1;
+			submitInfo.pCommandBuffers = &commandBuffer;
+			
+			vkQueueSubmit(vk_context_->getGraphicsQueue(), 1, &submitInfo, fence);
+			vkWaitForFences(vk_context_->getDevice(), 1, &fence, VK_TRUE, UINT64_MAX);
+			
+			vkFreeCommandBuffers(vk_context_->getDevice(), commandPool, 1, &commandBuffer);
+		}
+		
+		vkDestroyCommandPool(vk_context_->getDevice(), commandPool, nullptr);
+	}
+	
+	if (fence != VK_NULL_HANDLE)
+	{
+		vkDestroyFence(vk_context_->getDevice(), fence, nullptr);
+	}
+	
+	texture_layout_initialized_ = true;
+	descriptor_needs_update_ = true;
+	
 	std::cout << "[CEF_Drawer] Vulkan resources created (pipeline will be created after render pass is set)" << std::endl;
 	return true;
 }
@@ -1564,11 +1739,22 @@ void CEF_Drawer::updateTexture(const void* buffer, int width, int height)
 	if (!buffer || texture_image_ == VK_NULL_HANDLE)
 		return;
 
-	// Transition image layout from PREINITIALIZED to GENERAL on first use
 	if (!texture_layout_initialized_)
 	{
 		VkCommandPool commandPool = VK_NULL_HANDLE;
 		VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+		VkFence fence = VK_NULL_HANDLE;
+		
+		VkFenceCreateInfo fenceInfo{};
+		fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+		fenceInfo.flags = 0;
+		
+		if (vkCreateFence(vk_context_->getDevice(), &fenceInfo, nullptr, &fence) != VK_SUCCESS)
+		{
+			texture_layout_initialized_ = true;
+			descriptor_needs_update_ = true;
+			return;
+		}
 		
 		VkCommandPoolCreateInfo poolInfo{};
 		poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -1618,8 +1804,8 @@ void CEF_Drawer::updateTexture(const void* buffer, int width, int height)
 				submitInfo.commandBufferCount = 1;
 				submitInfo.pCommandBuffers = &commandBuffer;
 				
-				vkQueueSubmit(vk_context_->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-				vkQueueWaitIdle(vk_context_->getGraphicsQueue());
+				vkQueueSubmit(vk_context_->getGraphicsQueue(), 1, &submitInfo, fence);
+				vkWaitForFences(vk_context_->getDevice(), 1, &fence, VK_TRUE, UINT64_MAX);
 				
 				vkFreeCommandBuffers(vk_context_->getDevice(), commandPool, 1, &commandBuffer);
 			}
@@ -1627,7 +1813,13 @@ void CEF_Drawer::updateTexture(const void* buffer, int width, int height)
 			vkDestroyCommandPool(vk_context_->getDevice(), commandPool, nullptr);
 		}
 		
+		if (fence != VK_NULL_HANDLE)
+		{
+			vkDestroyFence(vk_context_->getDevice(), fence, nullptr);
+		}
+		
 		texture_layout_initialized_ = true;
+		descriptor_needs_update_ = true;
 		std::cout << "[CEF_Drawer] Texture layout transitioned to GENERAL" << std::endl;
 	}
 
@@ -1657,4 +1849,5 @@ void CEF_Drawer::updateTexture(const void* buffer, int width, int height)
 	}
 
 	vkUnmapMemory(vk_context_->getDevice(), texture_memory_);
+	descriptor_needs_update_ = true;
 }

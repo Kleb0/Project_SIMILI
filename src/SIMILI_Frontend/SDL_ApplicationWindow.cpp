@@ -22,9 +22,11 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, vk_render_pass_(VK_NULL_HANDLE)
 	, vk_command_pool_(VK_NULL_HANDLE)
 	, current_image_index_(0)
+	, current_frame_(0)
 	, vk_image_available_semaphore_(VK_NULL_HANDLE)
 	, vk_render_finished_semaphore_(VK_NULL_HANDLE)
 	, vk_in_flight_fence_(VK_NULL_HANDLE)
+	, swapchain_needs_recreation_(false)
 {
 }
 
@@ -317,9 +319,15 @@ void SDL_ApplicationWindow::processEvents()
 	
 	if (currentWidth != last_width_ || currentHeight != last_height_)
 	{
+		std::cout << "\n========================================" << std::endl;
+		std::cout << "[SDL_ApplicationWindow] *** WINDOW RESIZE DETECTED ***" << std::endl;
+		std::cout << "[SDL_ApplicationWindow] Old size: " << last_width_ << "x" << last_height_ << std::endl;
+		std::cout << "[SDL_ApplicationWindow] New size: " << currentWidth << "x" << currentHeight << std::endl;
+		std::cout << "========================================\n" << std::endl;
+		
 		last_width_ = currentWidth;
 		last_height_ = currentHeight;
-		std::cout << "[SDL_ApplicationWindow] Window resized to " << currentWidth << "x" << currentHeight << std::endl;
+		swapchain_needs_recreation_ = true;
 		captureFrameData();
 	}
 	
@@ -329,6 +337,7 @@ void SDL_ApplicationWindow::processEvents()
 	{
 		is_maximized_ = currentMax;
 		std::cout << "[SDL_ApplicationWindow] Window " << (is_maximized_ ? "MAXIMIZED" : "RESTORED") << std::endl;
+		swapchain_needs_recreation_ = true;
 		captureFrameData();
 	}
 
@@ -384,7 +393,7 @@ void SDL_ApplicationWindow::captureFrameData()
 	if (ui_handler_)
 	{
 		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-		handler->captureIFramePositions();
+		handler->forceCaptureIFramePositions();
 	}
 }
 
@@ -499,42 +508,112 @@ void SDL_ApplicationWindow::renderFrame()
 	static int render_frame_count = 0;
 	render_frame_count++;
 	
-	if (render_frame_count % 120 == 1) // Log every 2 seconds at 60 FPS
+	if (render_frame_count <= 100)
+	{
+		std::cout << "[SDL_ApplicationWindow] renderFrame() START frame " << render_frame_count 
+		          << " vk_context_=" << (vk_context_ != nullptr) 
+		          << " swapchain=" << (vk_swapchain_ != VK_NULL_HANDLE) << std::endl;
+	}
+	else if (render_frame_count % 600 == 1)
 	{
 		std::cout << "[SDL_ApplicationWindow] renderFrame() called " << render_frame_count << " times" << std::endl;
 	}
 	
 	if (!vk_context_ || vk_swapchain_ == VK_NULL_HANDLE)
 	{
-		if (render_frame_count % 120 == 1)
+		if (render_frame_count <= 100 || render_frame_count % 600 == 1)
 		{
-			std::cout << "[SDL_ApplicationWindow] renderFrame() early exit: vk_context_=" << (vk_context_ != nullptr) << " swapchain=" << (vk_swapchain_ != VK_NULL_HANDLE) << std::endl;
+			std::cout << "[SDL_ApplicationWindow] renderFrame() EARLY EXIT at frame " << render_frame_count 
+			          << ": vk_context_=" << (vk_context_ != nullptr) 
+			          << " swapchain=" << (vk_swapchain_ != VK_NULL_HANDLE) << std::endl;
 		}
 		return;
 	}
 
 	VkDevice device = vk_context_->getDevice();
 
-	vkWaitForFences(device, 1, &vk_in_flight_fence_, VK_TRUE, UINT64_MAX);
-	vkResetFences(device, 1, &vk_in_flight_fence_);
+	if (swapchain_needs_recreation_)
+	{
+		std::cout << "\n[SDL_ApplicationWindow] ========== SWAPCHAIN RECREATION START ==========" << std::endl;
+		vkDeviceWaitIdle(device);
+		
+		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+		{
+			if (vk_in_flight_fences_[i] != VK_NULL_HANDLE)
+			{
+				vkDestroyFence(device, vk_in_flight_fences_[i], nullptr);
+			}
+			if (vk_render_finished_semaphores_[i] != VK_NULL_HANDLE)
+			{
+				vkDestroySemaphore(device, vk_render_finished_semaphores_[i], nullptr);
+			}
+			if (vk_image_available_semaphores_[i] != VK_NULL_HANDLE)
+			{
+				vkDestroySemaphore(device, vk_image_available_semaphores_[i], nullptr);
+			}
+		}
+		
+		VkSemaphoreCreateInfo semaphoreInfo{};
+		semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+		
+		VkFenceCreateInfo fenceInfo{};
+		fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+		fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+		
+		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+		{
+			if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &vk_image_available_semaphores_[i]) != VK_SUCCESS ||
+				vkCreateSemaphore(device, &semaphoreInfo, nullptr, &vk_render_finished_semaphores_[i]) != VK_SUCCESS ||
+				vkCreateFence(device, &fenceInfo, nullptr, &vk_in_flight_fences_[i]) != VK_SUCCESS)
+			{
+				std::cerr << "[SDL_ApplicationWindow] Failed to recreate sync objects" << std::endl;
+				return;
+			}
+		}
+		
+		vk_image_available_semaphore_ = vk_image_available_semaphores_[0];
+		vk_render_finished_semaphore_ = vk_render_finished_semaphores_[0];
+		vk_in_flight_fence_ = vk_in_flight_fences_[0];
+		
+		current_frame_ = 0;
+		
+		if (!recreateSwapchain())
+		{
+			std::cerr << "[SDL_ApplicationWindow] Failed to recreate swapchain" << std::endl;
+			swapchain_needs_recreation_ = false;
+			return;
+		}
+		
+		swapchain_needs_recreation_ = false;
+		std::cout << "[SDL_ApplicationWindow] ========== SWAPCHAIN RECREATION COMPLETE ==========\n" << std::endl;
+		return;
+	}
 
-	VkResult result = vkAcquireNextImageKHR(device, vk_swapchain_, UINT64_MAX, vk_image_available_semaphore_, VK_NULL_HANDLE, &current_image_index_);
+	vkWaitForFences(device, 1, &vk_in_flight_fences_[current_frame_], VK_TRUE, UINT64_MAX);
+
+	VkResult result = vkAcquireNextImageKHR(device, vk_swapchain_, UINT64_MAX, vk_image_available_semaphores_[current_frame_], VK_NULL_HANDLE, &current_image_index_);
 	if (result == VK_ERROR_OUT_OF_DATE_KHR)
 	{
+		std::cout << "[SDL_ApplicationWindow] Swapchain out of date during acquire, will recreate next frame" << std::endl;
+		swapchain_needs_recreation_ = true;
+		vkResetFences(device, 1, &vk_in_flight_fences_[current_frame_]);
 		return;
 	}
 	else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
 	{
-		std::cerr << "[SDL_ApplicationWindow] Failed to acquire swapchain image" << std::endl;
+		std::cerr << "[SDL_ApplicationWindow] Failed to acquire swapchain image (result=" << result << ")" << std::endl;
+		vkResetFences(device, 1, &vk_in_flight_fences_[current_frame_]);
 		return;
 	}
+
+	vkResetFences(device, 1, &vk_in_flight_fences_[current_frame_]);
 
 	VkCommandBuffer commandBuffer = vk_command_buffers_[current_image_index_];
 	vkResetCommandBuffer(commandBuffer, 0);
 
 	VkCommandBufferBeginInfo beginInfo{};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	beginInfo.flags = 0;
 
 	if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
 	{
@@ -573,7 +652,7 @@ void SDL_ApplicationWindow::renderFrame()
 	VkSubmitInfo submitInfo{};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-	VkSemaphore waitSemaphores[] = {vk_image_available_semaphore_};
+	VkSemaphore waitSemaphores[] = {vk_image_available_semaphores_[current_frame_]};
 	VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 	submitInfo.waitSemaphoreCount = 1;
 	submitInfo.pWaitSemaphores = waitSemaphores;
@@ -581,11 +660,11 @@ void SDL_ApplicationWindow::renderFrame()
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &commandBuffer;
 
-	VkSemaphore signalSemaphores[] = {vk_render_finished_semaphore_};
+	VkSemaphore signalSemaphores[] = {vk_render_finished_semaphores_[current_frame_]};
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = signalSemaphores;
 
-	if (vkQueueSubmit(vk_context_->getGraphicsQueue(), 1, &submitInfo, vk_in_flight_fence_) != VK_SUCCESS)
+	if (vkQueueSubmit(vk_context_->getGraphicsQueue(), 1, &submitInfo, vk_in_flight_fences_[current_frame_]) != VK_SUCCESS)
 	{
 		std::cerr << "[SDL_ApplicationWindow] Failed to submit draw command buffer" << std::endl;
 		return;
@@ -604,12 +683,15 @@ void SDL_ApplicationWindow::renderFrame()
 	result = vkQueuePresentKHR(vk_context_->getPresentQueue(), &presentInfo);
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
 	{
-		return;
+		std::cout << "[SDL_ApplicationWindow] Swapchain " << (result == VK_ERROR_OUT_OF_DATE_KHR ? "out of date" : "suboptimal") << " after present, will recreate next frame" << std::endl;
+		swapchain_needs_recreation_ = true;
 	}
 	else if (result != VK_SUCCESS)
 	{
 		std::cerr << "[SDL_ApplicationWindow] Failed to present swapchain image" << std::endl;
 	}
+
+	current_frame_ = (current_frame_ + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
 void SDL_ApplicationWindow::setVKContext(VKContext* context)
@@ -707,23 +789,28 @@ void SDL_ApplicationWindow::cleanupVulkan()
 	
 	vkDeviceWaitIdle(device);
 
-	if (vk_in_flight_fence_ != VK_NULL_HANDLE)
+	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 	{
-		vkDestroyFence(device, vk_in_flight_fence_, nullptr);
-		vk_in_flight_fence_ = VK_NULL_HANDLE;
+		if (i < vk_in_flight_fences_.size() && vk_in_flight_fences_[i] != VK_NULL_HANDLE)
+		{
+			vkDestroyFence(device, vk_in_flight_fences_[i], nullptr);
+		}
+		if (i < vk_render_finished_semaphores_.size() && vk_render_finished_semaphores_[i] != VK_NULL_HANDLE)
+		{
+			vkDestroySemaphore(device, vk_render_finished_semaphores_[i], nullptr);
+		}
+		if (i < vk_image_available_semaphores_.size() && vk_image_available_semaphores_[i] != VK_NULL_HANDLE)
+		{
+			vkDestroySemaphore(device, vk_image_available_semaphores_[i], nullptr);
+		}
 	}
+	vk_in_flight_fences_.clear();
+	vk_render_finished_semaphores_.clear();
+	vk_image_available_semaphores_.clear();
 
-	if (vk_render_finished_semaphore_ != VK_NULL_HANDLE)
-	{
-		vkDestroySemaphore(device, vk_render_finished_semaphore_, nullptr);
-		vk_render_finished_semaphore_ = VK_NULL_HANDLE;
-	}
-
-	if (vk_image_available_semaphore_ != VK_NULL_HANDLE)
-	{
-		vkDestroySemaphore(device, vk_image_available_semaphore_, nullptr);
-		vk_image_available_semaphore_ = VK_NULL_HANDLE;
-	}
+	vk_in_flight_fence_ = VK_NULL_HANDLE;
+	vk_render_finished_semaphore_ = VK_NULL_HANDLE;
+	vk_image_available_semaphore_ = VK_NULL_HANDLE;
 
 	if (vk_command_pool_ != VK_NULL_HANDLE)
 	{
@@ -756,6 +843,68 @@ void SDL_ApplicationWindow::cleanupVulkan()
 	}
 
 	vk_surface_ = VK_NULL_HANDLE;
+}
+
+bool SDL_ApplicationWindow::recreateSwapchain()
+{
+	if (!vk_context_)
+	{
+		std::cerr << "[SDL_ApplicationWindow] recreateSwapchain() - No VKContext" << std::endl;
+		return false;
+	}
+
+	int width, height;
+	SDL_GetWindowSizeInPixels(window_, &width, &height);
+	std::cout << "[SDL_ApplicationWindow] recreateSwapchain() - New size: " << width << "x" << height << std::endl;
+
+	VkDevice device = vk_context_->getDevice();
+
+	for (auto framebuffer : vk_framebuffers_)
+	{
+		vkDestroyFramebuffer(device, framebuffer, nullptr);
+	}
+	vk_framebuffers_.clear();
+
+	for (auto imageView : vk_swapchain_image_views_)
+	{
+		vkDestroyImageView(device, imageView, nullptr);
+	}
+	vk_swapchain_image_views_.clear();
+
+	if (vk_swapchain_ != VK_NULL_HANDLE)
+	{
+		vkDestroySwapchainKHR(device, vk_swapchain_, nullptr);
+		vk_swapchain_ = VK_NULL_HANDLE;
+	}
+
+	if (!createSwapchain())
+	{
+		std::cerr << "[SDL_ApplicationWindow] Failed to recreate swapchain" << std::endl;
+		return false;
+	}
+
+	if (!createFramebuffers())
+	{
+		std::cerr << "[SDL_ApplicationWindow] Failed to recreate framebuffers" << std::endl;
+		return false;
+	}
+
+	std::cout << "[SDL_ApplicationWindow] Swapchain and framebuffers recreated successfully" << std::endl;
+	
+	if (ui_handler_)
+	{
+		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+		CEF_Drawer* cefDrawer = handler->getCEFDrawer();
+		if (cefDrawer)
+		{
+			std::cout << "[SDL_ApplicationWindow] Invalidating UI Panel textures after swapchain recreation" << std::endl;
+			cefDrawer->invalidateAllUIPanelTextures();
+			std::cout << "[SDL_ApplicationWindow] Syncing CEF window properties after swapchain recreation" << std::endl;
+			cefDrawer->syncWindowProperties();
+		}
+	}
+	
+	return true;
 }
 
 bool SDL_ApplicationWindow::createSwapchain()
@@ -847,6 +996,8 @@ bool SDL_ApplicationWindow::createSwapchain()
 		}
 	}
 
+	std::cout << "[SDL_ApplicationWindow] createSwapchain() SUCCESS: vk_swapchain_=" << vk_swapchain_ 
+	          << " imageCount=" << imageCount << std::endl;
 	return true;
 }
 
@@ -955,6 +1106,10 @@ bool SDL_ApplicationWindow::createCommandBuffers()
 
 bool SDL_ApplicationWindow::createSyncObjects()
 {
+	vk_image_available_semaphores_.resize(MAX_FRAMES_IN_FLIGHT);
+	vk_render_finished_semaphores_.resize(MAX_FRAMES_IN_FLIGHT);
+	vk_in_flight_fences_.resize(MAX_FRAMES_IN_FLIGHT);
+	
 	VkSemaphoreCreateInfo semaphoreInfo{};
 	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
@@ -962,12 +1117,19 @@ bool SDL_ApplicationWindow::createSyncObjects()
 	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 	fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-	if (vkCreateSemaphore(vk_context_->getDevice(), &semaphoreInfo, nullptr, &vk_image_available_semaphore_) != VK_SUCCESS ||
-		vkCreateSemaphore(vk_context_->getDevice(), &semaphoreInfo, nullptr, &vk_render_finished_semaphore_) != VK_SUCCESS ||
-		vkCreateFence(vk_context_->getDevice(), &fenceInfo, nullptr, &vk_in_flight_fence_) != VK_SUCCESS)
+	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 	{
-		return false;
+		if (vkCreateSemaphore(vk_context_->getDevice(), &semaphoreInfo, nullptr, &vk_image_available_semaphores_[i]) != VK_SUCCESS ||
+			vkCreateSemaphore(vk_context_->getDevice(), &semaphoreInfo, nullptr, &vk_render_finished_semaphores_[i]) != VK_SUCCESS ||
+			vkCreateFence(vk_context_->getDevice(), &fenceInfo, nullptr, &vk_in_flight_fences_[i]) != VK_SUCCESS)
+		{
+			return false;
+		}
 	}
+
+	vk_image_available_semaphore_ = vk_image_available_semaphores_[0];
+	vk_render_finished_semaphore_ = vk_render_finished_semaphores_[0];
+	vk_in_flight_fence_ = vk_in_flight_fences_[0];
 
 	return true;
 }

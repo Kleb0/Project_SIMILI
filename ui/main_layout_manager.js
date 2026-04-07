@@ -178,14 +178,12 @@ function scheduleUIPanelIFramesSync() {
 // Execute immediately instead of waiting for DOMContentLoaded (CEF issue)
 fetch('http://localhost:8080/api/debug/init-start', { method: 'POST', body: 'Init start from main_layout_manager' }).catch(() => {});
 initializeServerConnection();
-sendUIPanelIFramesToServer();
-setTimeout(sendUIPanelIFramesToServer, 500);
-setTimeout(sendUIPanelIFramesToServer, 1500);
 setInterval(pollServerLogs, 1000);
 
 window.addEventListener('load', () => {
-    sendUIPanelIFramesToServer();
-    scheduleUIPanelIFramesSync();
+    setTimeout(() => {
+        sendUIPanelIFramesToServer();
+    }, 800);
 });
 
 window.addEventListener('resize', () => {
