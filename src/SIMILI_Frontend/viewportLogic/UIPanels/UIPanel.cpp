@@ -29,6 +29,7 @@ UIPanel::UIPanel()
 	, initialized_(false)
 	, has_valid_bounds_(false)
 	, needs_redraw_(false)
+	, first_draw_done_(false)
 	, drawing_state_(DrawingState::IsNotReadyToBeDrawn)
 	, vk_context_(nullptr)
 	, vulkan_pipelines_(nullptr)
@@ -125,6 +126,17 @@ void UIPanel::updateFromFrameData(const SIMILI::Frontend::IFrameScreenData& fram
 	width_ = static_cast<int>(std::lround(static_cast<float>(frameData.width) * scaleX));
 	height_ = static_cast<int>(std::lround(static_cast<float>(frameData.height) * scaleY));
 
+	static int frame_log_count = 0;
+	if (frame_log_count < 3 || frame_log_count % 120 == 0)
+	{
+		std::cout << "[UIPanel::updateFromFrameData] " << name_ << std::endl;
+		std::cout << "  Window: logical=" << logicalWindowWidth << "x" << logicalWindowHeight << " drawable=" << drawableWidth << "x" << drawableHeight << std::endl;
+		std::cout << "  Scale: " << scaleX << " x " << scaleY << std::endl;
+		std::cout << "  FrameData (CEF logical): x=" << frameData.relativeX << " y=" << frameData.relativeY << " w=" << frameData.width << " h=" << frameData.height << std::endl;
+		std::cout << "  Calculated (pixels): x=" << x_ << " y=" << y_ << " w=" << width_ << " h=" << height_ << std::endl;
+	}
+	frame_log_count++;
+
 	if (x_ < 0)
 	{
 		width_ += x_;
@@ -209,11 +221,6 @@ void UIPanel::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawabl
 		return;
 	}
 	
-	if (drawing_state_ == DrawingState::HasBeenDrawn && !needs_redraw_)
-	{
-		return;
-	}
-	
 	if (!initialized_ || !has_valid_bounds_ || drawableWidth <= 0 || drawableHeight <= 0)
 	{
 		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
@@ -238,6 +245,20 @@ void UIPanel::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawabl
 		return;
 	}
 	
+	VkViewport viewport = {};
+	viewport.x = 0.0f;
+	viewport.y = static_cast<float>(drawableHeight); 
+	viewport.width = static_cast<float>(drawableWidth);
+	viewport.height = -static_cast<float>(drawableHeight);  
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+	VkRect2D scissor = {};
+	scissor.offset = {0, 0};
+	scissor.extent = {static_cast<uint32_t>(drawableWidth), static_cast<uint32_t>(drawableHeight)};
+	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+	
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shared_pipeline_->pipeline);
 
 	if (vk_descriptor_set_ != VK_NULL_HANDLE)
@@ -247,7 +268,11 @@ void UIPanel::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawabl
 
 	if (vk_vertex_buffer_ != VK_NULL_HANDLE)
 	{
-		updateGeometry(drawableWidth, drawableHeight);
+		if (needs_redraw_ || drawing_state_ == DrawingState::IsReadyToBeDrawn)
+		{
+			updateGeometry(drawableWidth, drawableHeight);
+			needs_redraw_ = false;
+		}
 		
 		VkBuffer vertexBuffers[] = {vk_vertex_buffer_};
 		VkDeviceSize offsets[] = {0};
@@ -315,9 +340,20 @@ void UIPanel::updateTextureRegion()
 	external_texture_view_ = textureView;
 	external_sampler_ = sampler;
 	texcoord_left_ = left;
-	texcoord_top_ = bottom;
+	texcoord_top_ = top;
 	texcoord_right_ = right;
-	texcoord_bottom_ = top;
+	texcoord_bottom_ = bottom;
+	
+	static int texcoord_log_count = 0;
+	bool force_texcoord_log = !first_draw_done_;
+	if (force_texcoord_log || texcoord_log_count < 3 || texcoord_log_count % 120 == 0)
+	{
+		std::cout << "[UIPanel::updateTextureRegion] " << name_ << (force_texcoord_log ? " (FIRST)" : "") << std::endl;
+		std::cout << "  Texture size: " << textureWidth << "x" << textureHeight << std::endl;
+		std::cout << "  PanelFrame: x=" << panelFrame.x << " y=" << panelFrame.y << " w=" << panelFrame.width << " h=" << panelFrame.height << std::endl;
+		std::cout << "  Texcoords: L=" << texcoord_left_ << " T=" << texcoord_top_ << " R=" << texcoord_right_ << " B=" << texcoord_bottom_ << std::endl;
+	}
+	if (!force_texcoord_log) texcoord_log_count++;
 	
 	if (drawing_state_ == DrawingState::IsNotReadyToBeDrawn)
 	{
@@ -487,10 +523,35 @@ void UIPanel::updateGeometry(int drawableWidth, int drawableHeight)
 		return;
 	}
 
+	// X: SDL coords [0, width] -> NDC [-1, +1]
 	float left = (static_cast<float>(x_) / static_cast<float>(drawableWidth)) * 2.0f - 1.0f;
 	float right = (static_cast<float>(x_ + width_) / static_cast<float>(drawableWidth)) * 2.0f - 1.0f;
-	float top = -1.0f + (static_cast<float>(y_) / static_cast<float>(drawableHeight)) * 2.0f;
-	float bottom = -1.0f + (static_cast<float>(y_ + height_) / static_cast<float>(drawableHeight)) * 2.0f;
+	
+	// Y: Invert because SDL has Y=0 at top, Vulkan NDC has Y=+1 at top
+	float top = 1.0f - (static_cast<float>(y_) / static_cast<float>(drawableHeight)) * 2.0f;
+	float bottom = 1.0f - (static_cast<float>(y_ + height_) / static_cast<float>(drawableHeight)) * 2.0f;
+
+	static int geom_log_count = 0;
+	bool force_log = !first_draw_done_;
+
+	if (force_log || geom_log_count < 3 || (geom_log_count % 120 == 0))
+	{
+		std::cout << "[UIPanel::updateGeometry] " << name_ << (force_log ? " (FIRST DRAW)" : "") << std::endl;
+		std::cout << "  Drawable: " << drawableWidth << "x" << drawableHeight << std::endl;
+		std::cout << "  Panel position (pixels): x=" << x_ << " y=" << y_ << " w=" << width_ << " h=" << height_ << std::endl;
+		std::cout << "  NDC coords: left=" << left << " right=" << right << " top=" << top << " bottom=" << bottom << std::endl;
+		std::cout << "  Texcoords: L=" << texcoord_left_ << " T=" << texcoord_top_ << " R=" << texcoord_right_ << " B=" << texcoord_bottom_ << std::endl;
+		std::cout << "  Vertices generated:" << std::endl;
+		std::cout << "    V0: pos(" << left << "," << top << ") tex(" << texcoord_left_ << "," << texcoord_top_ << ")" << std::endl;
+		std::cout << "    V1: pos(" << right << "," << bottom << ") tex(" << texcoord_right_ << "," << texcoord_bottom_ << ")" << std::endl;
+		std::cout << "    V2: pos(" << left << "," << bottom << ") tex(" << texcoord_left_ << "," << texcoord_bottom_ << ")" << std::endl;
+		std::cout << "    V3: pos(" << left << "," << top << ") tex(" << texcoord_left_ << "," << texcoord_top_ << ")" << std::endl;
+		std::cout << "    V4: pos(" << right << "," << top << ") tex(" << texcoord_right_ << "," << texcoord_top_ << ")" << std::endl;
+		std::cout << "    V5: pos(" << right << "," << bottom << ") tex(" << texcoord_right_ << "," << texcoord_bottom_ << ")" << std::endl;
+	}
+	if (!force_log) geom_log_count++;
+	
+	first_draw_done_ = true;
 
 	float vertices[] = {
 		left, top, texcoord_left_, texcoord_top_,
@@ -519,6 +580,15 @@ void UIPanel::forceTextureRebuild()
 	needs_redraw_ = true;
 	drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
 	std::cout << "[UIPanel::forceTextureRebuild] " << name_ << " - Texture rebuild forced, DrawingState reset to IsNotReadyToBeDrawn" << std::endl;
+}
+
+void UIPanel::forceRedraw()
+{
+	needs_redraw_ = true;
+	if (drawing_state_ == DrawingState::HasBeenDrawn)
+	{
+		drawing_state_ = DrawingState::IsReadyToBeDrawn;
+	}
 }
 
 void UIPanel::setVKContext(VKContext* context)

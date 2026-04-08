@@ -113,6 +113,7 @@ private:
 	std::vector<VkSemaphore> vk_image_available_semaphores_;
 	std::vector<VkSemaphore> vk_render_finished_semaphores_;
 	std::vector<VkFence> vk_in_flight_fences_;
+	std::vector<VkFence> vk_image_fences_;
 	VkSemaphore vk_image_available_semaphore_;
 	VkSemaphore vk_render_finished_semaphore_;
 	VkFence vk_in_flight_fence_;

@@ -1,6 +1,9 @@
 #pragma once
 
-#include "CEF_Drawer.hpp"
+#include <map>
+#include <string>
+
+class CEF_Drawer;
 
 class CEF_Resizer
 {
@@ -9,10 +12,14 @@ public:
 
 	void resize(int width, int height);
 	void ensureTextureStorage(int width, int height);
-	bool rebuildUIPanelTextureLocked(const std::string& panelName, CEF_Drawer::UIPanelTextureData& textureData, CEF_Drawer::UIPanelFrameData& outFrame);
+	
+	struct UIPanelTextureData;
+	struct UIPanelFrameData;
+	
+	bool rebuildUIPanelTextureLocked(const std::string& panelName, struct CEF_Drawer::UIPanelTextureData& textureData, struct CEF_Drawer::UIPanelFrameData& outFrame);
 	bool translateMousePosition(float inputX, float inputY, int& outputX, int& outputY);
 	void flushRuntimeLayoutSync();
-	std::string buildRuntimeLayoutSyncScript(const std::map<std::string, CEF_Drawer::UIPanelFrameData>& panelFrames) const;
+	std::string buildRuntimeLayoutSyncScript(const std::map<std::string, struct CEF_Drawer::UIPanelFrameData>& panelFrames) const;
 	void forceLayoutSync();
 
 private:

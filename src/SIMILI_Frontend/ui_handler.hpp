@@ -223,6 +223,8 @@ public:
 	void cacheUIPanelFrameDatas();
 	void drawUIPanels(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight);
 	void clearUIPanels();
+	void forceRebuildAllUIPanels();
+	void forceRedrawAllUIPanels();
 	void startSplitter(VKContext* vkContext, VkRenderPass renderPass);
 	bool handleSplitterEvent(const SDL_Event& event);
 	bool getResolvedViewportFrameData(SIMILI::Frontend::IFrameScreenData& outData) const;
@@ -242,6 +244,7 @@ public:
 	
 	CEF_Drawer* getCEFDrawer() const { return cef_drawer_; }
 	void setCEFDrawer(CEF_Drawer* drawer) { cef_drawer_ = drawer; }
+	Splitter* getSplitter() const { return splitter_.get(); }
 
 	ID3D11Device* getD3D11Device() const { return d3d11_device_; }
 	ID2D1Factory1* getD2D1Factory() const { return d2d_factory_; }

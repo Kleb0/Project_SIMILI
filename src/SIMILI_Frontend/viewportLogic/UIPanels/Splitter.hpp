@@ -31,6 +31,7 @@ public:
 	bool isReady() const;
 	bool isDragging() const { return dragging_; }
 	void setVulkanPipelines(VulkanPipeline* pipelines);
+	void forceRefreshLayout();
 
 private:
 	enum class Axis

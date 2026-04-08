@@ -27,6 +27,7 @@ public:
 	void updateFromFrameData(const SIMILI::Frontend::IFrameScreenData& frameData, SDL_Window* window, bool skipTextureRebuild = false);
 	void draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight);
 	void forceTextureRebuild();
+	void forceRedraw();
 	void setVKContext(VKContext* context);
 	void setRenderPass(VkRenderPass renderPass);
 	void setVulkanPipelines(VulkanPipeline* pipelines);
@@ -68,6 +69,7 @@ private:
 	bool initialized_;
 	bool has_valid_bounds_;
 	bool needs_redraw_;
+	bool first_draw_done_;
 	DrawingState drawing_state_;
 	VKContext* vk_context_;
 	VulkanPipeline* vulkan_pipelines_;

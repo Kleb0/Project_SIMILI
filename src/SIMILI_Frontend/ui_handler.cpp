@@ -1080,7 +1080,7 @@ void UIHandler::captureIFramePositions()
 		return;
 	}
 
-	const std::chrono::milliseconds FRAME_CAPTURE_DEBOUNCE_MS(150);
+	const std::chrono::milliseconds FRAME_CAPTURE_DEBOUNCE_MS(500);
 	auto currentTime = std::chrono::steady_clock::now();
 	auto timeSinceLastCapture = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - last_frame_capture_time_);
 	
@@ -1540,7 +1540,25 @@ void UIHandler::drawUIPanels(VkCommandBuffer commandBuffer, int drawableWidth, i
 		}
 
 		panelIt->second->updateFromFrameData(pair.second, sdlWindow, skipTextureRebuild);
+		
+		static int draw_debug_count = 0;
+		bool should_log = (draw_debug_count < 10 || draw_debug_count % 120 == 0);
+		if (should_log)
+		{
+			std::cout << "[UIHandler::drawUIPanels] About to draw panel: " << pair.first 
+			          << " state=" << static_cast<int>(panelIt->second->getDrawingState())
+			          << " at count=" << draw_debug_count << std::endl;
+		}
+		
 		panelIt->second->draw(commandBuffer, drawableWidth, drawableHeight);
+		
+		if (should_log)
+		{
+			std::cout << "[UIHandler::drawUIPanels] After draw panel: " << pair.first 
+			          << " state=" << static_cast<int>(panelIt->second->getDrawingState()) << std::endl;
+		}
+		draw_debug_count++;
+		
 		activePanelNames.insert(pair.first);
 	}
 
@@ -1577,6 +1595,33 @@ void UIHandler::clearUIPanels()
 	ui_panel_iframe_map_.clear();
 }
 
+void UIHandler::forceRebuildAllUIPanels()
+{
+	std::cout << "[UIHandler] Forcing rebuild of all UI panels..." << std::endl;
+	
+	for (auto& pair : ui_panels_)
+	{
+		if (pair.second)
+		{
+			pair.second->forceTextureRebuild();
+			std::cout << "[UIHandler] Forced rebuild for panel: " << pair.first << std::endl;
+		}
+	}
+	
+	ui_panels_initialized_ = false;
+	std::cout << "[UIHandler] All UI panels rebuild forced" << std::endl;
+}
+
+void UIHandler::forceRedrawAllUIPanels()
+{
+	for (auto& pair : ui_panels_)
+	{
+		if (pair.second)
+		{
+			pair.second->forceRedraw();
+		}
+	}
+}
 
 void UIHandler::CallTestFromServer()
 {

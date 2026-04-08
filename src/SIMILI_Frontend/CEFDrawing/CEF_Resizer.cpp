@@ -1,4 +1,5 @@
 #include "CEF_Resizer.hpp"
+#include "CEF_Drawer.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -402,6 +403,7 @@ bool CEF_Resizer::rebuildUIPanelTextureLocked(const std::string& panelName, CEF_
 	void* data;
 	vkMapMemory(device, textureData.texture_memory, 0, VK_WHOLE_SIZE, 0, &data);
 
+	// Copy pixels line by line (CEF buffer has Y=0 at top, standard image convention)
 	if (layout.rowPitch == targetWidth * 4)
 	{
 		memcpy(data, panelPixels.data(), targetWidth * targetHeight * 4);

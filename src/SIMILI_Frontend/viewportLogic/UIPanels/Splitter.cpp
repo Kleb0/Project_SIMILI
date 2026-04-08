@@ -125,6 +125,31 @@ void Splitter::setVulkanPipelines(VulkanPipeline* pipelines)
 	std::cout << "[Splitter::setVulkanPipelines] VulkanPipeline instance set" << std::endl;
 }
 
+void Splitter::forceRefreshLayout()
+{
+	std::lock_guard<std::mutex> lock(splitter_mutex_);
+	
+	if (!window_)
+	{
+		return;
+	}
+	
+	int windowWidth = 0;
+	int windowHeight = 0;
+	SDL_GetWindowSize(window_, &windowWidth, &windowHeight);
+	
+	if (windowWidth > 0 && windowHeight > 0)
+	{
+		last_window_width_ = windowWidth;
+		last_window_height_ = windowHeight;
+	}
+	
+	layout_ready_ = false;
+	
+	std::cout << "[Splitter::forceRefreshLayout] Layout refresh forced at window size: " 
+	          << windowWidth << "x" << windowHeight << std::endl;
+}
+
 void Splitter::syncFrameDatas(const SIMILI::Frontend::FrameDatas* frameDatas)
 {
 	std::cout << "\n---------------- [Splitter] syncFrameDatas START ----------------" << std::endl;
@@ -386,6 +411,20 @@ void Splitter::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawab
 	{
 		return;
 	}
+
+	VkViewport viewport = {};
+	viewport.x = 0.0f;
+	viewport.y = static_cast<float>(drawableHeight);  // Start from bottom
+	viewport.width = static_cast<float>(drawableWidth);
+	viewport.height = -static_cast<float>(drawableHeight);  // Negative height flips Y-axis
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+	VkRect2D scissor = {};
+	scissor.offset = {0, 0};
+	scissor.extent = {static_cast<uint32_t>(drawableWidth), static_cast<uint32_t>(drawableHeight)};
+	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shared_pipeline_->pipeline);
 	

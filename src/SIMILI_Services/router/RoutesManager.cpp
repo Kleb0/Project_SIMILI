@@ -534,6 +534,8 @@ namespace SIMILI {
 						}
 					}
 					
+					handler->captureIFramePositions();
+					
 					resp.statusCode = 200;
 					resp.statusMessage = "OK";
 					resp.body = "{\"success\": true}";

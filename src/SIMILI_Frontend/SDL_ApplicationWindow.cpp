@@ -1,6 +1,8 @@
 #include "SDL_ApplicationWindow.hpp"
 #include "ui_handler.hpp"
 #include "viewportLogic/ThreeDScreen/ThreeDScreen.hpp"
+#include "CEFDrawing/CEF_Drawer.hpp"
+#include "CEFDrawing/CEF_Resizer.hpp"
 #include "../../Engine/VulkanScene/VKcontext.hpp"
 #include <SDL3/SDL_vulkan.h>
 
@@ -310,16 +312,14 @@ void SDL_ApplicationWindow::processEvents()
 		last_x_ = currentX;
 		last_y_ = currentY;
 		std::cout << "[SDL_ApplicationWindow] Window moved to (" << currentX << ", " << currentY << ")" << std::endl;
-		captureFrameData();
 	}
 	
-	// Check for size changes
 	int currentWidth, currentHeight;
 	SDL_GetWindowSize(window_, &currentWidth, &currentHeight);
 	
 	if (currentWidth != last_width_ || currentHeight != last_height_)
 	{
-		std::cout << "\n========================================" << std::endl;
+		std::cout << "\n ========================================" << std::endl;
 		std::cout << "[SDL_ApplicationWindow] *** WINDOW RESIZE DETECTED ***" << std::endl;
 		std::cout << "[SDL_ApplicationWindow] Old size: " << last_width_ << "x" << last_height_ << std::endl;
 		std::cout << "[SDL_ApplicationWindow] New size: " << currentWidth << "x" << currentHeight << std::endl;
@@ -328,17 +328,14 @@ void SDL_ApplicationWindow::processEvents()
 		last_width_ = currentWidth;
 		last_height_ = currentHeight;
 		swapchain_needs_recreation_ = true;
-		captureFrameData();
 	}
 	
-	// Check for maximized state changes
 	bool currentMax = isMaximized();
 	if (currentMax != is_maximized_)
 	{
 		is_maximized_ = currentMax;
 		std::cout << "[SDL_ApplicationWindow] Window " << (is_maximized_ ? "MAXIMIZED" : "RESTORED") << std::endl;
 		swapchain_needs_recreation_ = true;
-		captureFrameData();
 	}
 
 	if (ui_handler_)
@@ -537,6 +534,8 @@ void SDL_ApplicationWindow::renderFrame()
 		std::cout << "\n[SDL_ApplicationWindow] ========== SWAPCHAIN RECREATION START ==========" << std::endl;
 		vkDeviceWaitIdle(device);
 		
+		vk_image_fences_.clear();
+		
 		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 		{
 			if (vk_in_flight_fences_[i] != VK_NULL_HANDLE)
@@ -576,6 +575,7 @@ void SDL_ApplicationWindow::renderFrame()
 		vk_in_flight_fence_ = vk_in_flight_fences_[0];
 		
 		current_frame_ = 0;
+		current_image_index_ = 0;
 		
 		if (!recreateSwapchain())
 		{
@@ -604,6 +604,11 @@ void SDL_ApplicationWindow::renderFrame()
 		std::cerr << "[SDL_ApplicationWindow] Failed to acquire swapchain image (result=" << result << ")" << std::endl;
 		vkResetFences(device, 1, &vk_in_flight_fences_[current_frame_]);
 		return;
+	}
+
+	if (vk_image_fences_[current_image_index_] != VK_NULL_HANDLE)
+	{
+		vkWaitForFences(device, 1, &vk_image_fences_[current_image_index_], VK_TRUE, UINT64_MAX);
 	}
 
 	vkResetFences(device, 1, &vk_in_flight_fences_[current_frame_]);
@@ -637,6 +642,20 @@ void SDL_ApplicationWindow::renderFrame()
 
 	vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
+	VkViewport viewport{};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = static_cast<float>(width);
+	viewport.height = static_cast<float>(height);
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+	VkRect2D scissor{};
+	scissor.offset = {0, 0};
+	scissor.extent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
+	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
 	drawCEF();
 	drawThreeDScreen();
 	drawUIPanels();
@@ -669,6 +688,8 @@ void SDL_ApplicationWindow::renderFrame()
 		std::cerr << "[SDL_ApplicationWindow] Failed to submit draw command buffer" << std::endl;
 		return;
 	}
+
+	vk_image_fences_[current_image_index_] = vk_in_flight_fences_[current_frame_];
 
 	VkPresentInfoKHR presentInfo{};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -807,6 +828,7 @@ void SDL_ApplicationWindow::cleanupVulkan()
 	vk_in_flight_fences_.clear();
 	vk_render_finished_semaphores_.clear();
 	vk_image_available_semaphores_.clear();
+	vk_image_fences_.clear();
 
 	vk_in_flight_fence_ = VK_NULL_HANDLE;
 	vk_render_finished_semaphore_ = VK_NULL_HANDLE;
@@ -853,9 +875,14 @@ bool SDL_ApplicationWindow::recreateSwapchain()
 		return false;
 	}
 
-	int width, height;
-	SDL_GetWindowSizeInPixels(window_, &width, &height);
-	std::cout << "[SDL_ApplicationWindow] recreateSwapchain() - New size: " << width << "x" << height << std::endl;
+	int drawableWidth, drawableHeight;
+	SDL_GetWindowSizeInPixels(window_, &drawableWidth, &drawableHeight);
+	
+	int logicalWidth, logicalHeight;
+	SDL_GetWindowSize(window_, &logicalWidth, &logicalHeight);
+	
+	std::cout << "[SDL_ApplicationWindow] recreateSwapchain() - New size (drawable): " << drawableWidth << "x" << drawableHeight << std::endl;
+	std::cout << "[SDL_ApplicationWindow] recreateSwapchain() - New size (logical): " << logicalWidth << "x" << logicalHeight << std::endl;
 
 	VkDevice device = vk_context_->getDevice();
 
@@ -883,6 +910,9 @@ bool SDL_ApplicationWindow::recreateSwapchain()
 		return false;
 	}
 
+	vk_image_fences_.clear();
+	vk_image_fences_.resize(vk_swapchain_images_.size(), VK_NULL_HANDLE);
+
 	if (!createFramebuffers())
 	{
 		std::cerr << "[SDL_ApplicationWindow] Failed to recreate framebuffers" << std::endl;
@@ -899,9 +929,26 @@ bool SDL_ApplicationWindow::recreateSwapchain()
 		{
 			std::cout << "[SDL_ApplicationWindow] Invalidating UI Panel textures after swapchain recreation" << std::endl;
 			cefDrawer->invalidateAllUIPanelTextures();
+			
+			std::cout << "[SDL_ApplicationWindow] Syncing CEF window dimensions (logical): " << logicalWidth << "x" << logicalHeight << std::endl;
+			cefDrawer->getResizer().resize(logicalWidth, logicalHeight);
+			
 			std::cout << "[SDL_ApplicationWindow] Syncing CEF window properties after swapchain recreation" << std::endl;
 			cefDrawer->syncWindowProperties();
 		}
+		
+		Splitter* splitter = handler->getSplitter();
+		if (splitter)
+		{
+			std::cout << "[SDL_ApplicationWindow] Forcing splitter layout refresh after swapchain recreation" << std::endl;
+			splitter->forceRefreshLayout();
+		}
+		
+		std::cout << "[SDL_ApplicationWindow] Forcing iframe position capture after swapchain recreation" << std::endl;
+		handler->forceCaptureIFramePositions();
+		
+		std::cout << "[SDL_ApplicationWindow] Forcing UI panels redraw after swapchain recreation" << std::endl;
+		handler->forceRedrawAllUIPanels();
 	}
 	
 	return true;
@@ -1109,6 +1156,7 @@ bool SDL_ApplicationWindow::createSyncObjects()
 	vk_image_available_semaphores_.resize(MAX_FRAMES_IN_FLIGHT);
 	vk_render_finished_semaphores_.resize(MAX_FRAMES_IN_FLIGHT);
 	vk_in_flight_fences_.resize(MAX_FRAMES_IN_FLIGHT);
+	vk_image_fences_.resize(vk_swapchain_images_.size(), VK_NULL_HANDLE);
 	
 	VkSemaphoreCreateInfo semaphoreInfo{};
 	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;

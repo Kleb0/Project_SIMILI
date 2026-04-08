@@ -312,6 +312,7 @@ void CEF_Drawer::draw(VkCommandBuffer commandBuffer)
 {
 	static int draw_call_count = 0;
 	static bool initialization_logged = false;
+	static bool skip_fullscreen_warning_logged = false;
 	
 	syncWindowProperties();
 	
@@ -321,6 +322,16 @@ void CEF_Drawer::draw(VkCommandBuffer commandBuffer)
 		{
 			std::cout << "[CEF_Drawer] draw() early return: initialized=" << initialized_ 
 					  << " vk_context=" << (vk_context_ != nullptr) << std::endl;
+		}
+		return;
+	}
+	
+	if (!ui_panel_frames_.empty())
+	{
+		if (!skip_fullscreen_warning_logged)
+		{
+			std::cout << "[CEF_Drawer] draw() SKIPPED - UI panels are active (" << ui_panel_frames_.size() << " panels), fullscreen CEF rendering disabled" << std::endl;
+			skip_fullscreen_warning_logged = true;
 		}
 		return;
 	}
@@ -410,9 +421,9 @@ void CEF_Drawer::draw(VkCommandBuffer commandBuffer)
 	
 	VkViewport viewport{};
 	viewport.x = 0.0f;
-	viewport.y = 0.0f;
+	viewport.y = static_cast<float>(height);  // Start from bottom
 	viewport.width = static_cast<float>(width);
-	viewport.height = static_cast<float>(height);
+	viewport.height = -static_cast<float>(height);  // Negative height flips Y-axis
 	viewport.minDepth = 0.0f;
 	viewport.maxDepth = 1.0f;
 	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
