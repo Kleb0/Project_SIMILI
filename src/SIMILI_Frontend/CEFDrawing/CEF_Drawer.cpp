@@ -421,9 +421,9 @@ void CEF_Drawer::draw(VkCommandBuffer commandBuffer)
 	
 	VkViewport viewport{};
 	viewport.x = 0.0f;
-	viewport.y = static_cast<float>(height);  // Start from bottom
+	viewport.y = 0.0f;
 	viewport.width = static_cast<float>(width);
-	viewport.height = -static_cast<float>(height);  // Negative height flips Y-axis
+	viewport.height = static_cast<float>(height);
 	viewport.minDepth = 0.0f;
 	viewport.maxDepth = 1.0f;
 	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
@@ -1241,12 +1241,12 @@ bool CEF_Drawer::createVertexBuffer()
 	};
 
 	std::array<Vertex, 6> vertices = {{
-		{{-1.0f, -1.0f}, {0.0f, 0.0f}},  // top-left (Vulkan NDC: Y=-1 is top)
-		{{-1.0f,  1.0f}, {0.0f, 1.0f}},  // bottom-left
-		{{ 1.0f,  1.0f}, {1.0f, 1.0f}},  // bottom-right
-		{{-1.0f, -1.0f}, {0.0f, 0.0f}},  // top-left
-		{{ 1.0f,  1.0f}, {1.0f, 1.0f}},  // bottom-right
-		{{ 1.0f, -1.0f}, {1.0f, 0.0f}}   // top-right
+		{{-1.0f, -1.0f}, {0.0f, 0.0f}},
+		{{-1.0f,  1.0f}, {0.0f, 1.0f}},
+		{{ 1.0f,  1.0f}, {1.0f, 1.0f}},
+		{{-1.0f, -1.0f}, {0.0f, 0.0f}},
+		{{ 1.0f,  1.0f}, {1.0f, 1.0f}},
+		{{ 1.0f, -1.0f}, {1.0f, 0.0f}}
 	}};
 
 	VkBufferCreateInfo bufferInfo{};

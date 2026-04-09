@@ -138,12 +138,7 @@ void Splitter::forceRefreshLayout()
 	int windowHeight = 0;
 	SDL_GetWindowSize(window_, &windowWidth, &windowHeight);
 	
-	if (windowWidth > 0 && windowHeight > 0)
-	{
-		last_window_width_ = windowWidth;
-		last_window_height_ = windowHeight;
-	}
-	
+	// Don't update last_window_width/height here - let syncFrameDatas handle scaling
 	layout_ready_ = false;
 	
 	std::cout << "[Splitter::forceRefreshLayout] Layout refresh forced at window size: " 
@@ -200,6 +195,15 @@ void Splitter::syncFrameDatas(const SIMILI::Frontend::FrameDatas* frameDatas)
 		std::cout << "[Splitter] WARNING: window_ is null" << std::endl;
 	}
 
+	// Initialize last_window_* on first call only
+	if (last_window_width_ <= 0 && last_window_height_ <= 0 && windowWidth > 0 && windowHeight > 0)
+	{
+		last_window_width_ = windowWidth;
+		last_window_height_ = windowHeight;
+		std::cout << "[Splitter] First sync - initialized reference window size: " 
+		          << last_window_width_ << "x" << last_window_height_ << std::endl;
+	}
+
 	bool hasGeometryChanged = hasSourceGeometryChanged(frameDataMap);
 	bool shouldRefresh = shouldRefreshFromSource(frameDataMap);
 	
@@ -222,6 +226,40 @@ void Splitter::syncFrameDatas(const SIMILI::Frontend::FrameDatas* frameDatas)
 		source_frame_data_map_ = frameDataMap;
 		rebuildFromSource(frameDataMap);
 		std::cout << "[Splitter] rebuildFromSource completed" << std::endl;
+		
+		// After rebuild, always check if we need to scale to current window size
+		// Scale if: window size is valid AND (it changed OR panels have different window size)
+		if (windowWidth > 0 && windowHeight > 0)
+		{
+			bool needsScaling = (windowWidth != last_window_width_ || windowHeight != last_window_height_);
+			std::cout << "[Splitter] Checking scaling need: windowWidth=" << windowWidth << " vs last=" << last_window_width_ 
+			          << ", windowHeight=" << windowHeight << " vs last=" << last_window_height_ 
+			          << " -> needsScaling=" << (needsScaling ? "true" : "false") << std::endl;
+			
+			// Also check if any panel has different window dimensions (from CEF frame data)
+			if (!needsScaling && !panel_state_map_.empty())
+			{
+				for (const auto& pair : panel_state_map_)
+				{
+					if (pair.second.frame.windowWidth != windowWidth || pair.second.frame.windowHeight != windowHeight)
+					{
+						needsScaling = true;
+						std::cout << "[Splitter] Panel " << pair.first << " has mismatched window size: "
+						          << pair.second.frame.windowWidth << "x" << pair.second.frame.windowHeight
+						          << " (expected " << windowWidth << "x" << windowHeight << ")" << std::endl;
+						break;
+					}
+				}
+			}
+			
+			if (needsScaling)
+			{
+				std::cout << "[Splitter] Window size mismatch detected, calling scaleLayoutToWindow..." << std::endl;
+				scaleLayoutToWindow(windowWidth, windowHeight);
+				refreshDerivedData();
+				std::cout << "[Splitter] Window scaling completed" << std::endl;
+			}
+		}
 	}
 	else if (windowWidth > 0 && windowHeight > 0 && (windowWidth != last_window_width_ || windowHeight != last_window_height_))
 	{
@@ -414,9 +452,9 @@ void Splitter::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawab
 
 	VkViewport viewport = {};
 	viewport.x = 0.0f;
-	viewport.y = static_cast<float>(drawableHeight);  // Start from bottom
+	viewport.y = 0.0f;
 	viewport.width = static_cast<float>(drawableWidth);
-	viewport.height = -static_cast<float>(drawableHeight);  // Negative height flips Y-axis
+	viewport.height = static_cast<float>(drawableHeight);
 	viewport.minDepth = 0.0f;
 	viewport.maxDepth = 1.0f;
 	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
@@ -903,6 +941,11 @@ void Splitter::rebuildFromSource(const std::map<std::string, SIMILI::Frontend::I
 {
 	panel_state_map_.clear();
 
+	int receivedWindowWidth = 0;
+	int receivedWindowHeight = 0;
+	int maxPanelRight = 0;
+	int maxPanelBottom = 0;
+
 	for (const auto& pair : frameDataMap)
 	{
 		PanelState state;
@@ -910,11 +953,90 @@ void Splitter::rebuildFromSource(const std::map<std::string, SIMILI::Frontend::I
 		state.client_offset_x = pair.second.clientX - pair.second.relativeX;
 		state.client_offset_y = pair.second.clientY - pair.second.relativeY;
 		panel_state_map_[pair.first] = state;
+
+		if (receivedWindowWidth == 0 && receivedWindowHeight == 0)
+		{
+			receivedWindowWidth = pair.second.windowWidth;
+			receivedWindowHeight = pair.second.windowHeight;
+		}
+
+		if (pair.second.width > 0 && pair.second.height > 0)
+		{
+			int panelRight = pair.second.relativeX + pair.second.width;
+			int panelBottom = pair.second.relativeY + pair.second.height;
+			maxPanelRight = std::max(maxPanelRight, panelRight);
+			maxPanelBottom = std::max(maxPanelBottom, panelBottom);
+		}
 	}
 
-	if (window_)
+	bool needsImmediateScaling = false;
+	float detectedOldWidth = 0.0f;
+	float detectedOldHeight = 0.0f;
+
+	if (receivedWindowWidth > 0 && receivedWindowHeight > 0 && maxPanelRight > 0 && maxPanelBottom > 0)
 	{
-		SDL_GetWindowSize(window_, &last_window_width_, &last_window_height_);
+		float panelUsageRatioX = static_cast<float>(maxPanelRight) / static_cast<float>(receivedWindowWidth);
+		float panelUsageRatioY = static_cast<float>(maxPanelBottom) / static_cast<float>(receivedWindowHeight);
+		
+		std::cout << "[Splitter::rebuildFromSource] Panel coverage: "
+		          << maxPanelRight << "x" << maxPanelBottom 
+		          << " vs window " << receivedWindowWidth << "x" << receivedWindowHeight
+		          << " (ratios: " << panelUsageRatioX << " x " << panelUsageRatioY << ")" << std::endl;
+
+		if (panelUsageRatioX < 0.8f || panelUsageRatioY < 0.85f)
+		{
+			detectedOldWidth = static_cast<float>(maxPanelRight) / 0.998f;
+			detectedOldHeight = static_cast<float>(maxPanelBottom) / 1.002f;
+			
+			if (detectedOldWidth > 100.0f && detectedOldHeight > 100.0f)
+			{
+				needsImmediateScaling = true;
+				std::cout << "[Splitter::rebuildFromSource] Detected stale panel coordinates!" << std::endl;
+				std::cout << "  Panels cover only " << (panelUsageRatioX * 100.0f) << "% x " 
+				          << (panelUsageRatioY * 100.0f) << "% of window" << std::endl;
+				std::cout << "  Inferred old window size: " << static_cast<int>(detectedOldWidth) 
+				          << "x" << static_cast<int>(detectedOldHeight) << std::endl;
+			}
+		}
+	}
+
+	if (receivedWindowWidth > 0 && receivedWindowHeight > 0)
+	{
+		if (needsImmediateScaling)
+		{
+			int oldWidth = static_cast<int>(std::lround(detectedOldWidth));
+			int oldHeight = static_cast<int>(std::lround(detectedOldHeight));
+			int newWidth = receivedWindowWidth;
+			int newHeight = receivedWindowHeight;
+			
+			std::cout << "[Splitter::rebuildFromSource] Applying immediate scale from "
+			          << oldWidth << "x" << oldHeight
+			          << " to " << newWidth << "x" << newHeight << std::endl;
+			
+			const float scaleX = static_cast<float>(newWidth) / static_cast<float>(oldWidth);
+			const float scaleY = static_cast<float>(newHeight) / static_cast<float>(oldHeight);
+			
+			for (auto& pair : panel_state_map_)
+			{
+				SIMILI::Frontend::IFrameScreenData& frame = pair.second.frame;
+				frame.relativeX = static_cast<int>(std::lround(static_cast<float>(frame.relativeX) * scaleX));
+				frame.relativeY = static_cast<int>(std::lround(static_cast<float>(frame.relativeY) * scaleY));
+				frame.width = std::max(1, static_cast<int>(std::lround(static_cast<float>(frame.width) * scaleX)));
+				frame.height = std::max(1, static_cast<int>(std::lround(static_cast<float>(frame.height) * scaleY)));
+				frame.windowWidth = newWidth;
+				frame.windowHeight = newHeight;
+			}
+			
+			last_window_width_ = newWidth;
+			last_window_height_ = newHeight;
+		}
+		else
+		{
+			last_window_width_ = receivedWindowWidth;
+			last_window_height_ = receivedWindowHeight;
+			std::cout << "[Splitter::rebuildFromSource] Updated last_window_ to: " 
+			          << last_window_width_ << "x" << last_window_height_ << std::endl;
+		}
 	}
 
 	layout_ready_ = !panel_state_map_.empty();
@@ -1353,8 +1475,9 @@ void Splitter::drawGeometry(VkCommandBuffer commandBuffer, const SplitterGeometr
 
 	const float left = (static_cast<float>(x) / static_cast<float>(drawableWidth)) * 2.0f - 1.0f;
 	const float right = (static_cast<float>(x + width) / static_cast<float>(drawableWidth)) * 2.0f - 1.0f;
-	const float top = 1.0f - (static_cast<float>(y) / static_cast<float>(drawableHeight)) * 2.0f;
-	const float bottom = 1.0f - (static_cast<float>(y + height) / static_cast<float>(drawableHeight)) * 2.0f;
+	// Y: With positive viewport, NDC Y=-1 is top, Y=+1 is bottom
+	const float top = (static_cast<float>(y) / static_cast<float>(drawableHeight)) * 2.0f - 1.0f;
+	const float bottom = (static_cast<float>(y + height) / static_cast<float>(drawableHeight)) * 2.0f - 1.0f;
 
 	// Simplified vertex format: only vec2 position (no texcoord)
 	const float vertices[] = {

@@ -247,9 +247,9 @@ void UIPanel::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawabl
 	
 	VkViewport viewport = {};
 	viewport.x = 0.0f;
-	viewport.y = static_cast<float>(drawableHeight); 
+	viewport.y = 0.0f;
 	viewport.width = static_cast<float>(drawableWidth);
-	viewport.height = -static_cast<float>(drawableHeight);  
+	viewport.height = static_cast<float>(drawableHeight);
 	viewport.minDepth = 0.0f;
 	viewport.maxDepth = 1.0f;
 	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
@@ -527,9 +527,10 @@ void UIPanel::updateGeometry(int drawableWidth, int drawableHeight)
 	float left = (static_cast<float>(x_) / static_cast<float>(drawableWidth)) * 2.0f - 1.0f;
 	float right = (static_cast<float>(x_ + width_) / static_cast<float>(drawableWidth)) * 2.0f - 1.0f;
 	
-	// Y: Invert because SDL has Y=0 at top, Vulkan NDC has Y=+1 at top
-	float top = 1.0f - (static_cast<float>(y_) / static_cast<float>(drawableHeight)) * 2.0f;
-	float bottom = 1.0f - (static_cast<float>(y_ + height_) / static_cast<float>(drawableHeight)) * 2.0f;
+	// Y: With positive viewport, NDC Y=-1 is top, Y=+1 is bottom
+	// SDL has Y=0 at top, so we map: pixel_y=0 -> NDC=-1, pixel_y=height -> NDC=+1
+	float top = (static_cast<float>(y_) / static_cast<float>(drawableHeight)) * 2.0f - 1.0f;
+	float bottom = (static_cast<float>(y_ + height_) / static_cast<float>(drawableHeight)) * 2.0f - 1.0f;
 
 	static int geom_log_count = 0;
 	bool force_log = !first_draw_done_;
