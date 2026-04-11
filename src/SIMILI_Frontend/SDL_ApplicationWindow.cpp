@@ -1,6 +1,7 @@
 #include "SDL_ApplicationWindow.hpp"
 #include "ui_handler.hpp"
 #include "viewportLogic/ThreeDScreen/ThreeDScreen.hpp"
+#include "viewportLogic/UIPanels/UIManager.hpp"
 #include "CEFDrawing/CEF_Drawer.hpp"
 #include "CEFDrawing/CEF_Resizer.hpp"
 #include "../../Engine/VulkanScene/VKcontext.hpp"
@@ -17,6 +18,7 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, ui_handler_(nullptr)
 	, threed_screen_(nullptr)
 	, frame_datas_(nullptr)
+	, ui_manager_(nullptr)
 	, vk_context_(nullptr)
 	, vulkan_pipelines_(nullptr)
 	, vk_surface_(VK_NULL_HANDLE)
@@ -31,12 +33,14 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, swapchain_needs_recreation_(false)
 {
 }
-
 SDL_ApplicationWindow::~SDL_ApplicationWindow()
 {
 	cleanupVulkan();
 	destroy();
 }
+
+// ========= Lifecycle  ======== //
+
 
 bool SDL_ApplicationWindow::create(const std::string& title, int width, int height, Uint32 flags)
 {
@@ -145,11 +149,22 @@ bool SDL_ApplicationWindow::create(const std::string& title, int width, int heig
 	std::cout << "[SDL_ApplicationWindow] Window created: " << title 
 	          << " (" << width << "x" << height << ") DPI scale: " << dpi_scale_ << std::endl;
 	
+	if (!ui_manager_)
+	{
+		ui_manager_ = new SIMILI::Frontend::UIManager();
+	}
+	
 	return true;
 }
 
 void SDL_ApplicationWindow::destroy()
 {
+	if (ui_manager_)
+	{
+		delete ui_manager_;
+		ui_manager_ = nullptr;
+	}
+	
 	if (window_)
 	{
 		SDL_DestroyWindow(window_);
@@ -157,6 +172,9 @@ void SDL_ApplicationWindow::destroy()
 		std::cout << "[SDL_ApplicationWindow] Window destroyed" << std::endl;
 	}
 }
+
+
+// ======== Window Management ======== //
 
 void SDL_ApplicationWindow::setPosition(int x, int y)
 {
@@ -167,6 +185,7 @@ void SDL_ApplicationWindow::setPosition(int x, int y)
 		last_y_ = y;
 	}
 }
+
 
 void SDL_ApplicationWindow::setSize(int width, int height)
 {
@@ -233,14 +252,7 @@ bool SDL_ApplicationWindow::isMaximized() const
 	return maximized;
 }
 
-bool SDL_ApplicationWindow::isVisible() const
-{
-	if (!window_)
-		return false;
-	
-	Uint32 flags = SDL_GetWindowFlags(window_);
-	return !(flags & SDL_WINDOW_HIDDEN);
-}
+// ======== Window Properties ======== //
 
 void SDL_ApplicationWindow::getPosition(int& x, int& y) const
 {
@@ -298,6 +310,69 @@ float SDL_ApplicationWindow::getDpiScale() const
 	return dpi_scale_;
 }
 
+
+bool SDL_ApplicationWindow::isVisible() const
+{
+	if (!window_)
+		return false;
+	
+	Uint32 flags = SDL_GetWindowFlags(window_);
+	return !(flags & SDL_WINDOW_HIDDEN);
+}
+
+
+// ========= Component Registration ======== //
+
+void SDL_ApplicationWindow::Set_UIHandler(void* handler)
+{
+	ui_handler_ = handler;
+}
+
+void SDL_ApplicationWindow::setThreeDScreen(ThreeDScreen* screen)
+{
+	threed_screen_ = screen;
+}
+
+void SDL_ApplicationWindow::setVKContext(VKContext* context)
+{
+	vk_context_ = context;
+	if (vulkan_pipelines_)
+	{
+		vulkan_pipelines_->setContext(context);
+		std::cout << "[SDL_ApplicationWindow] VKContext propagated to VulkanPipeline" << std::endl;
+	}
+}
+
+void SDL_ApplicationWindow::setVulkanPipelines(VulkanPipeline* pipelines)
+{
+	vulkan_pipelines_ = pipelines;
+	if (vulkan_pipelines_ && vk_context_)
+	{
+		vulkan_pipelines_->setContext(vk_context_);
+		std::cout << "[SDL_ApplicationWindow] Existing VKContext propagated to VulkanPipeline" << std::endl;
+	}
+	std::cout << "[SDL_ApplicationWindow] VulkanPipeline instance set" << std::endl;
+}
+
+void SDL_ApplicationWindow::updateFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas)
+{
+	frame_datas_ = frameDatas;
+}
+
+
+// ====== Event Handling ====== //
+
+bool SDL_ApplicationWindow::handleSplitterEvent(const SDL_Event& event)
+{
+	if (!ui_handler_)
+	{
+		return false;
+	}
+
+	UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+	return handler->handleSplitterEvent(event);
+}
+
 void SDL_ApplicationWindow::processEvents()
 {
 	if (!window_)
@@ -328,6 +403,12 @@ void SDL_ApplicationWindow::processEvents()
 		last_width_ = currentWidth;
 		last_height_ = currentHeight;
 		swapchain_needs_recreation_ = true;
+		
+		if (ui_handler_)
+		{
+			UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+			handler->updateWindowSize(currentWidth, currentHeight);
+		}
 	}
 	
 	bool currentMax = isMaximized();
@@ -343,162 +424,20 @@ void SDL_ApplicationWindow::processEvents()
 		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
 		handler->processPendingFrameUpdates();
 	}
-}
-
-void SDL_ApplicationWindow::updateDpiScale()
-{
-	std::cout << "[SDL_ApplicationWindow] updateDpiScale() entry" << std::endl;
 	
-	if (!window_)
-	{
-		std::cout << "[SDL_ApplicationWindow] No window, setting DPI scale to 1.0" << std::endl;
-		dpi_scale_ = 1.0f;
-		return;
-	}
-	
-	std::cout << "[SDL_ApplicationWindow] Getting display for window..." << std::endl;
-	SDL_DisplayID displayID = SDL_GetDisplayForWindow(window_);
-	std::cout << "[SDL_ApplicationWindow] DisplayID: " << displayID << std::endl;
-	
-	if (displayID != 0)
-	{
-		std::cout << "[SDL_ApplicationWindow] Getting content scale..." << std::endl;
-		dpi_scale_ = SDL_GetDisplayContentScale(displayID);
-		std::cout << "[SDL_ApplicationWindow] Content scale obtained: " << dpi_scale_ << std::endl;
-	}
-	else
-	{
-		std::cout << "[SDL_ApplicationWindow] Invalid display, setting DPI scale to 1.0" << std::endl;
-		dpi_scale_ = 1.0f;
-	}
-	
-	std::cout << "[SDL_ApplicationWindow] updateDpiScale() exit" << std::endl;
+	updateUIState();
 }
 
-void SDL_ApplicationWindow::updateMaximizedState()
+void SDL_ApplicationWindow::updateUIState()
 {
-	is_maximized_ = isMaximized();
-}
-
-void SDL_ApplicationWindow::Set_UIHandler(void* handler)
-{
-	ui_handler_ = handler;
-}
-
-void SDL_ApplicationWindow::captureFrameData()
-{
-	if (ui_handler_)
+	if (ui_manager_ && window_)
 	{
-		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-		handler->forceCaptureIFramePositions();
+		ui_manager_->updateUIState(window_);
 	}
 }
 
-void SDL_ApplicationWindow::setThreeDScreen(ThreeDScreen* screen)
-{
-	threed_screen_ = screen;
-}
 
-void SDL_ApplicationWindow::startSplitter()
-{
-	if (ui_handler_)
-	{
-		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-		handler->startSplitter(vk_context_, vk_render_pass_);
-	}
-}
-
-bool SDL_ApplicationWindow::handleSplitterEvent(const SDL_Event& event)
-{
-	if (!ui_handler_)
-	{
-		return false;
-	}
-
-	UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-	return handler->handleSplitterEvent(event);
-}
-
-void SDL_ApplicationWindow::renderThreeDScreen(const std::map<std::string, IFrameData>&)
-{
-	if (threed_screen_)
-	{
-		threed_screen_->render(frame_datas_, window_);
-	}
-}
-
-void SDL_ApplicationWindow::drawThreeDScreen()
-{
-	if (threed_screen_ && vk_command_buffers_.size() > current_image_index_)
-	{
-		threed_screen_->draw(vk_command_buffers_[current_image_index_], vk_render_pass_, vk_framebuffers_[current_image_index_]);
-	}
-}
-
-void SDL_ApplicationWindow::drawUIPanels()
-{
-	static int draw_ui_call_count = 0;
-	draw_ui_call_count++;
-	
-	if (draw_ui_call_count % 120 == 1) // Log every 2 seconds at 60 FPS 
-	{
-		std::cout << "[SDL_ApplicationWindow] drawUIPanels() called " << draw_ui_call_count << " times, ui_handler_=" << (ui_handler_ != nullptr) << std::endl;
-	}
-	
-	if (ui_handler_ && vk_command_buffers_.size() > current_image_index_)
-	{
-		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-		
-		int drawableWidth = 0;
-		int drawableHeight = 0;
-		SDL_GetWindowSizeInPixels(window_, &drawableWidth, &drawableHeight);
-		
-		handler->drawUIPanels(vk_command_buffers_[current_image_index_], drawableWidth, drawableHeight);
-	}
-}
-
-void SDL_ApplicationWindow::drawCEF()
-{
-	if (ui_handler_ && vk_command_buffers_.size() > current_image_index_)
-	{
-		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-		CEF_Drawer* cefDrawer = handler->getCEFDrawer();
-		
-		if (cefDrawer && cefDrawer->isInitialized())
-		{
-			static int call_count = 0;
-			if (call_count++ < 3)
-			{
-				std::cout << "[SDL_ApplicationWindow::drawCEF] Calling cefDrawer->draw() with commandBuffer index " << current_image_index_ << std::endl;
-			}
-			cefDrawer->draw(vk_command_buffers_[current_image_index_]);
-		}
-		else
-		{
-			static int warning_count = 0;
-			if (warning_count++ < 3)
-			{
-				std::cout << "[SDL_ApplicationWindow::drawCEF] WARNING: cefDrawer=" << cefDrawer 
-				          << " isInitialized=" << (cefDrawer ? cefDrawer->isInitialized() : false) << std::endl;
-			}
-		}
-	}
-	else
-	{
-		static int handler_warning = 0;
-		if (handler_warning++ < 3)
-		{
-			std::cout << "[SDL_ApplicationWindow::drawCEF] WARNING: ui_handler_=" << ui_handler_ 
-			          << " command_buffers_size=" << vk_command_buffers_.size()
-			          << " current_index=" << current_image_index_ << std::endl;
-		}
-	}
-}
-
-void SDL_ApplicationWindow::updateFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas)
-{
-	frame_datas_ = frameDatas;
-}
+// ====== Rendering ====== //
 
 void SDL_ApplicationWindow::renderFrame()
 {
@@ -715,26 +654,94 @@ void SDL_ApplicationWindow::renderFrame()
 	current_frame_ = (current_frame_ + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
-void SDL_ApplicationWindow::setVKContext(VKContext* context)
+void SDL_ApplicationWindow::renderThreeDScreen(const std::map<std::string, IFrameData>&)
 {
-	vk_context_ = context;
-	if (vulkan_pipelines_)
+	if (threed_screen_)
 	{
-		vulkan_pipelines_->setContext(context);
-		std::cout << "[SDL_ApplicationWindow] VKContext propagated to VulkanPipeline" << std::endl;
+		threed_screen_->render(frame_datas_, window_);
 	}
 }
 
-void SDL_ApplicationWindow::setVulkanPipelines(VulkanPipeline* pipelines)
+void SDL_ApplicationWindow::drawThreeDScreen()
 {
-	vulkan_pipelines_ = pipelines;
-	if (vulkan_pipelines_ && vk_context_)
+	if (threed_screen_ && vk_command_buffers_.size() > current_image_index_)
 	{
-		vulkan_pipelines_->setContext(vk_context_);
-		std::cout << "[SDL_ApplicationWindow] Existing VKContext propagated to VulkanPipeline" << std::endl;
+		threed_screen_->draw(vk_command_buffers_[current_image_index_], vk_render_pass_, vk_framebuffers_[current_image_index_]);
 	}
-	std::cout << "[SDL_ApplicationWindow] VulkanPipeline instance set" << std::endl;
 }
+
+void SDL_ApplicationWindow::drawUIPanels()
+{
+	static int draw_ui_call_count = 0;
+	draw_ui_call_count++;
+	
+	if (draw_ui_call_count % 120 == 1) // Log every 2 seconds at 60 FPS 
+	{
+		std::cout << "[SDL_ApplicationWindow] drawUIPanels() called " << draw_ui_call_count << " times, ui_handler_=" << (ui_handler_ != nullptr) << std::endl;
+	}
+	
+	if (ui_handler_ && vk_command_buffers_.size() > current_image_index_)
+	{
+		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+		
+		int drawableWidth = 0;
+		int drawableHeight = 0;
+		SDL_GetWindowSizeInPixels(window_, &drawableWidth, &drawableHeight);
+		
+		handler->drawUIPanels(vk_command_buffers_[current_image_index_], drawableWidth, drawableHeight);
+	}
+}
+
+void SDL_ApplicationWindow::drawCEF()
+{
+	if (ui_handler_ && vk_command_buffers_.size() > current_image_index_)
+	{
+		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+		CEF_Drawer* cefDrawer = handler->getCEFDrawer();
+		
+		if (cefDrawer && cefDrawer->isInitialized())
+		{
+			static int call_count = 0;
+			if (call_count++ < 3)
+			{
+				std::cout << "[SDL_ApplicationWindow::drawCEF] Calling cefDrawer->draw() with commandBuffer index " << current_image_index_ << std::endl;
+			}
+			cefDrawer->draw(vk_command_buffers_[current_image_index_]);
+		}
+		else
+		{
+			static int warning_count = 0;
+			if (warning_count++ < 3)
+			{
+				std::cout << "[SDL_ApplicationWindow::drawCEF] WARNING: cefDrawer=" << cefDrawer 
+				          << " isInitialized=" << (cefDrawer ? cefDrawer->isInitialized() : false) << std::endl;
+			}
+		}
+	}
+	else
+	{
+		static int handler_warning = 0;
+		if (handler_warning++ < 3)
+		{
+			std::cout << "[SDL_ApplicationWindow::drawCEF] WARNING: ui_handler_=" << ui_handler_ 
+			          << " command_buffers_size=" << vk_command_buffers_.size()
+			          << " current_index=" << current_image_index_ << std::endl;
+		}
+	}
+}
+
+void SDL_ApplicationWindow::startSplitter()
+{
+	if (ui_handler_)
+	{
+		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+		handler->startSplitter(vk_context_, vk_render_pass_);
+	}
+}
+
+
+
+// ===== Vulkan Lifecycle ====== //
 
 bool SDL_ApplicationWindow::initializeVulkan()
 {
@@ -867,6 +874,7 @@ void SDL_ApplicationWindow::cleanupVulkan()
 	vk_surface_ = VK_NULL_HANDLE;
 }
 
+
 bool SDL_ApplicationWindow::recreateSwapchain()
 {
 	if (!vk_context_)
@@ -883,6 +891,12 @@ bool SDL_ApplicationWindow::recreateSwapchain()
 	
 	std::cout << "[SDL_ApplicationWindow] recreateSwapchain() - New size (drawable): " << drawableWidth << "x" << drawableHeight << std::endl;
 	std::cout << "[SDL_ApplicationWindow] recreateSwapchain() - New size (logical): " << logicalWidth << "x" << logicalHeight << std::endl;
+
+	if (ui_handler_)
+	{
+		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+		handler->updateWindowSize(logicalWidth, logicalHeight);
+	}
 
 	VkDevice device = vk_context_->getDevice();
 
@@ -927,11 +941,11 @@ bool SDL_ApplicationWindow::recreateSwapchain()
 		CEF_Drawer* cefDrawer = handler->getCEFDrawer();
 		if (cefDrawer)
 		{
-			std::cout << "[SDL_ApplicationWindow] Invalidating UI Panel textures after swapchain recreation" << std::endl;
-			cefDrawer->invalidateAllUIPanelTextures();
-			
 			std::cout << "[SDL_ApplicationWindow] Syncing CEF window dimensions (logical): " << logicalWidth << "x" << logicalHeight << std::endl;
 			cefDrawer->getResizer().resize(logicalWidth, logicalHeight);
+			
+			std::cout << "[SDL_ApplicationWindow] Forcing CEF repaint with new window size" << std::endl;
+			cefDrawer->forceRepaint();
 			
 			std::cout << "[SDL_ApplicationWindow] Syncing CEF window properties after swapchain recreation" << std::endl;
 			cefDrawer->syncWindowProperties();
@@ -943,16 +957,59 @@ bool SDL_ApplicationWindow::recreateSwapchain()
 			std::cout << "[SDL_ApplicationWindow] Forcing splitter layout refresh after swapchain recreation" << std::endl;
 			splitter->forceRefreshLayout();
 		}
-		
-		std::cout << "[SDL_ApplicationWindow] Forcing iframe position capture after swapchain recreation" << std::endl;
-		handler->forceCaptureIFramePositions();
-		
-		std::cout << "[SDL_ApplicationWindow] Forcing UI panels redraw after swapchain recreation" << std::endl;
-		handler->forceRedrawAllUIPanels();
 	}
 	
 	return true;
 }
+
+
+
+// ==== private methods ==== //
+
+void SDL_ApplicationWindow::updateDpiScale()
+{
+	std::cout << "[SDL_ApplicationWindow] updateDpiScale() entry" << std::endl;
+	
+	if (!window_)
+	{
+		std::cout << "[SDL_ApplicationWindow] No window, setting DPI scale to 1.0" << std::endl;
+		dpi_scale_ = 1.0f;
+		return;
+	}
+	
+	std::cout << "[SDL_ApplicationWindow] Getting display for window..." << std::endl;
+	SDL_DisplayID displayID = SDL_GetDisplayForWindow(window_);
+	std::cout << "[SDL_ApplicationWindow] DisplayID: " << displayID << std::endl;
+	
+	if (displayID != 0)
+	{
+		std::cout << "[SDL_ApplicationWindow] Getting content scale..." << std::endl;
+		dpi_scale_ = SDL_GetDisplayContentScale(displayID);
+		std::cout << "[SDL_ApplicationWindow] Content scale obtained: " << dpi_scale_ << std::endl;
+	}
+	else
+	{
+		std::cout << "[SDL_ApplicationWindow] Invalid display, setting DPI scale to 1.0" << std::endl;
+		dpi_scale_ = 1.0f;
+	}
+	
+	std::cout << "[SDL_ApplicationWindow] updateDpiScale() exit" << std::endl;
+}
+
+void SDL_ApplicationWindow::updateMaximizedState()
+{
+	is_maximized_ = isMaximized();
+}
+
+void SDL_ApplicationWindow::captureFrameData()
+{
+	if (ui_handler_)
+	{
+		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+		handler->forceCaptureIFramePositions();
+	}
+}
+
 
 bool SDL_ApplicationWindow::createSwapchain()
 {

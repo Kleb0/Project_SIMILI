@@ -227,6 +227,8 @@ public:
 	void forceRedrawAllUIPanels();
 	void startSplitter(VKContext* vkContext, VkRenderPass renderPass);
 	bool handleSplitterEvent(const SDL_Event& event);
+	void updateWindowSize(int width, int height);
+	bool validateIFrameCoordinates(const std::map<std::string, IFrameData>& iframeDataMap, int& outMaxX, int& outMaxY) const;
 	bool getResolvedViewportFrameData(SIMILI::Frontend::IFrameScreenData& outData) const;
 	void processPendingFrameUpdates();
 	SIMILI::Frontend::FrameDatas* getFrameDatas() { return frame_datas_; }
@@ -279,6 +281,9 @@ private:
 	int last_viewport_y_;
 	int last_viewport_width_;
 	int last_viewport_height_;
+	
+	int current_window_width_;
+	int current_window_height_;
 	
 	std::chrono::steady_clock::time_point last_frame_capture_time_;
 	

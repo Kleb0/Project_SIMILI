@@ -35,7 +35,8 @@ UIHandler* UIHandler::s_instance_ = nullptr;
 
 UIHandler::UIHandler() : parent_sdl_window_(nullptr), parent_window_(nullptr), window_handle_(nullptr), timer_id_(0),
 	last_viewport_update_time_(0), last_viewport_x_(0), last_viewport_y_(0), 
-	last_viewport_width_(0), last_viewport_height_(0), last_frame_capture_time_(), vk_scene_(nullptr),
+	last_viewport_width_(0), last_viewport_height_(0), current_window_width_(1920), current_window_height_(1080), 
+	last_frame_capture_time_(), vk_scene_(nullptr),
 	vk_renderer_(nullptr), vulkan_pipelines_(nullptr), main_camera_(nullptr), cube_mesh_ptr_(nullptr), scene_initialized_(false),
 	render_message_router_(nullptr), 
 	frame_datas_(nullptr),
@@ -1331,6 +1332,72 @@ void UIHandler::forceCaptureIFramePositions()
 	}
 }
 
+void UIHandler::updateWindowSize(int width, int height)
+{
+	current_window_width_ = width;
+	current_window_height_ = height;
+	std::cout << "[UIHandler] Window size updated to: " << width << "x" << height << std::endl;
+}
+
+bool UIHandler::validateIFrameCoordinates(const std::map<std::string, IFrameData>& iframeDataMap, int& outMaxX, int& outMaxY) const
+{
+	if (iframeDataMap.empty())
+	{
+		outMaxX = 0;
+		outMaxY = 0;
+		return false;
+	}
+
+	outMaxX = 0;
+	outMaxY = 0;
+
+	for (const auto& pair : iframeDataMap)
+	{
+		const IFrameData& data = pair.second;
+		
+		if (data.width <= 0 || data.height <= 0)
+		{
+			continue;
+		}
+
+		int rightEdge = data.x + data.width;
+		int bottomEdge = data.y + data.height;
+
+		if (rightEdge > outMaxX)
+		{
+			outMaxX = rightEdge;
+		}
+		if (bottomEdge > outMaxY)
+		{
+			outMaxY = bottomEdge;
+		}
+	}
+
+	if (current_window_width_ <= 0 || current_window_height_ <= 0)
+	{
+		return true;
+	}
+
+	float coverageX = static_cast<float>(outMaxX) / static_cast<float>(current_window_width_);
+	float coverageY = static_cast<float>(outMaxY) / static_cast<float>(current_window_height_);
+
+	const float MIN_COVERAGE_THRESHOLD = 0.80f;
+	const float MAX_COVERAGE_THRESHOLD = 1.20f;
+
+	bool isValid = (coverageX >= MIN_COVERAGE_THRESHOLD && coverageY >= MIN_COVERAGE_THRESHOLD &&
+	                coverageX <= MAX_COVERAGE_THRESHOLD && coverageY <= MAX_COVERAGE_THRESHOLD);
+
+	if (!isValid)
+	{
+		std::cout << "[UIHandler::validateIFrameCoordinates] REJECTED stale coordinates:" << std::endl;
+		std::cout << "  Panel coverage: " << outMaxX << "x" << outMaxY 
+		          << " vs window " << current_window_width_ << "x" << current_window_height_ << std::endl;
+		std::cout << "  Coverage ratios: " << (coverageX * 100.0f) << "% x " << (coverageY * 100.0f) << "%" << std::endl;
+	}
+
+	return isValid;
+}
+
 void UIHandler::updateUIPanelIFrames(const std::map<std::string, IFrameData>& iframeDataMap)
 {
 	std::lock_guard<std::mutex> lock(ui_panel_mutex_);
@@ -1446,6 +1513,17 @@ void UIHandler::drawUIPanels(VkCommandBuffer commandBuffer, int drawableWidth, i
 		ui_panels_.clear();
 		return;
 	}
+	
+	static int panel_map_log_count = 0;
+	if (panel_map_log_count < 5 || panel_map_log_count % 120 == 0)
+	{
+		std::cout << "[UIHandler::drawUIPanels] Rendering " << panelFrameDataMap.size() << " panels at call " << panel_map_log_count << ":" << std::endl;
+		for (const auto& p : panelFrameDataMap)
+		{
+			std::cout << "  - " << p.first << " at (" << p.second.relativeX << "," << p.second.relativeY << ") size " << p.second.width << "x" << p.second.height << std::endl;
+		}
+	}
+	panel_map_log_count++;
 
 	CEF_Drawer::SDLWindowProperties windowProperties = cef_drawer_->getSDLWindowProperties();
 	if (drawableWidth <= 0 || drawableHeight <= 0)
@@ -1541,21 +1619,19 @@ void UIHandler::drawUIPanels(VkCommandBuffer commandBuffer, int drawableWidth, i
 
 		panelIt->second->updateFromFrameData(pair.second, sdlWindow, skipTextureRebuild);
 		
-		static int draw_debug_count = 0;
-		bool should_log = (draw_debug_count < 10 || draw_debug_count % 120 == 0);
-		if (should_log)
-		{
-			std::cout << "[UIHandler::drawUIPanels] About to draw panel: " << pair.first 
-			          << " state=" << static_cast<int>(panelIt->second->getDrawingState())
-			          << " at count=" << draw_debug_count << std::endl;
-		}
+		UIPanel::DrawingState preDrawState = panelIt->second->getDrawingState();
 		
 		panelIt->second->draw(commandBuffer, drawableWidth, drawableHeight);
 		
-		if (should_log)
+		UIPanel::DrawingState postDrawState = panelIt->second->getDrawingState();
+		
+		static int draw_debug_count = 0;
+		bool should_log = (draw_debug_count < 3 || draw_debug_count % 120 == 0);
+		if (should_log || preDrawState == UIPanel::DrawingState::IsNotReadyToBeDrawn)
 		{
-			std::cout << "[UIHandler::drawUIPanels] After draw panel: " << pair.first 
-			          << " state=" << static_cast<int>(panelIt->second->getDrawingState()) << std::endl;
+			std::cout << "[UIHandler::drawUIPanels] Panel " << pair.first 
+			          << " state: " << static_cast<int>(preDrawState) << "->" << static_cast<int>(postDrawState)
+			          << " at draw call " << draw_debug_count << std::endl;
 		}
 		draw_debug_count++;
 		

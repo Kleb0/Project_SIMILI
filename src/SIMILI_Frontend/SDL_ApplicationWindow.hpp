@@ -18,55 +18,71 @@ namespace SIMILI
 	namespace Frontend
 	{
 		class FrameDatas;
+		class UIManager;
 	}
 }
 
 class SDL_ApplicationWindow
 {
 public:
+	// === Lifecycle ===
 	SDL_ApplicationWindow();
 	~SDL_ApplicationWindow();
 	
 	bool create(const std::string& title, int width, int height, Uint32 flags = 0);
 	void destroy();
 	
+	// === Window Management ===
 	void setPosition(int x, int y);
 	void setSize(int width, int height);
 	void setTitle(const std::string& title);
-	
 	void show();
 	void hide();
 	void maximize();
 	void restore();
-	bool isMaximized() const;
-	bool isVisible() const;
 	
+	// === Window Properties ===
 	void getPosition(int& x, int& y) const;
 	void getSize(int& width, int& height) const;
 	SDL_Rect getBounds() const;
-	
 	void getBorderOffsets(int& left, int& top, int& right, int& bottom) const;
-	
 	float getDpiScale() const;
-	
-	SDL_Window* getHandle() const { return window_; }
+	bool isMaximized() const;
+	bool isVisible() const;
 	bool isValid() const { return window_ != nullptr; }
-	void Set_UIHandler(void* handler);
+	SDL_Window* getHandle() const { return window_; }
 	
+	// === Component Registration ===
+	void Set_UIHandler(void* handler);
 	void setThreeDScreen(ThreeDScreen* screen);
 	void setVKContext(VKContext* context);
 	void setVulkanPipelines(VulkanPipeline* pipelines);
+	void updateFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas);
+	
+	// === Component Access ===
 	VulkanPipeline* getVulkanPipelines() const { return vulkan_pipelines_; }
-	void startSplitter();
+	SIMILI::Frontend::UIManager* getUIManager() const { return ui_manager_; }
+	
+	// === Event Handling ===
+	void processEvents();
 	bool handleSplitterEvent(const SDL_Event& event);
+	void updateUIState();
+	
+	// === Rendering ===
+	void renderFrame();
 	void renderThreeDScreen(const std::map<std::string, IFrameData>& frameDataMap);
 	void drawThreeDScreen();
 	void drawUIPanels();
 	void drawCEF();
-	void updateFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas);
-	void renderFrame();
+	void startSplitter();
 	void setCurrentImageIndex(uint32_t index) { current_image_index_ = index; }
 	
+	// === Vulkan Lifecycle ===
+	bool initializeVulkan();
+	void cleanupVulkan();
+	bool recreateSwapchain();
+	
+	// === Vulkan Object Access ===
 	VkSurfaceKHR getVulkanSurface() const { return vk_surface_; }
 	VkSwapchainKHR getSwapchain() const { return vk_swapchain_; }
 	const std::vector<VkImage>& getSwapchainImages() const { return vk_swapchain_images_; }
@@ -79,13 +95,9 @@ public:
 	VkSemaphore getImageAvailableSemaphore() const { return vk_image_available_semaphore_; }
 	VkSemaphore getRenderFinishedSemaphore() const { return vk_render_finished_semaphore_; }
 	VkFence getInFlightFence() const { return vk_in_flight_fence_; }
-	bool initializeVulkan();
-	void cleanupVulkan();
-	bool recreateSwapchain();
-		
-	void processEvents();
 	
 private:
+	// === Window State ===
 	SDL_Window* window_;
 	bool is_maximized_;
 	int last_x_;
@@ -93,23 +105,34 @@ private:
 	int last_width_;
 	int last_height_;
 	float dpi_scale_;
+	
+	// === UI Components ===
 	void* ui_handler_;
 	ThreeDScreen* threed_screen_;
 	SIMILI::Frontend::FrameDatas* frame_datas_;
+	SIMILI::Frontend::UIManager* ui_manager_;
+	
+	// === Graphics Components ===
 	VKContext* vk_context_;
 	VulkanPipeline* vulkan_pipelines_;
 	
+	// === Vulkan Surface & Swapchain ===
 	VkSurfaceKHR vk_surface_;
 	VkSwapchainKHR vk_swapchain_;
 	std::vector<VkImage> vk_swapchain_images_;
 	std::vector<VkImageView> vk_swapchain_image_views_;
 	std::vector<VkFramebuffer> vk_framebuffers_;
+	bool swapchain_needs_recreation_;
+	
+	// === Vulkan Render Resources ===
 	VkRenderPass vk_render_pass_;
 	VkCommandPool vk_command_pool_;
 	std::vector<VkCommandBuffer> vk_command_buffers_;
 	uint32_t current_image_index_;
 	uint32_t current_frame_;
 	static const int MAX_FRAMES_IN_FLIGHT = 2;
+	
+	// === Vulkan Synchronization ===
 	std::vector<VkSemaphore> vk_image_available_semaphores_;
 	std::vector<VkSemaphore> vk_render_finished_semaphores_;
 	std::vector<VkFence> vk_in_flight_fences_;
@@ -117,8 +140,8 @@ private:
 	VkSemaphore vk_image_available_semaphore_;
 	VkSemaphore vk_render_finished_semaphore_;
 	VkFence vk_in_flight_fence_;
-	bool swapchain_needs_recreation_;
 	
+	// === Private Methods ===
 	void updateDpiScale();
 	void updateMaximizedState();
 	void captureFrameData();

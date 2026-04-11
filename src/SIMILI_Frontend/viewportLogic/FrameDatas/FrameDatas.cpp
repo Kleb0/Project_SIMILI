@@ -35,9 +35,19 @@ namespace SIMILI {
 
 				frameDataMap_.clear();
 
+				const int MIN_FRAME_DIMENSION = 10;
+
 				for (const auto& pair : allFrames)
 				{
 					const IFrameData& frameData = pair.second;
+					
+					if (frameData.width < MIN_FRAME_DIMENSION || frameData.height < MIN_FRAME_DIMENSION)
+					{
+						std::cout << "[FrameDatas] Skipping frame '" << frameData.name << "' with invalid dimensions: " 
+						          << frameData.width << "x" << frameData.height << " (min=" << MIN_FRAME_DIMENSION << ")" << std::endl;
+						continue;
+					}
+					
 					IFrameScreenData screenData;
 					
 					screenData.name = frameData.name;

@@ -2,6 +2,7 @@
 
 #include "../FrameDatas/FrameDatas.hpp"
 #include "../../../Engine/VulkanPipeline/VulkanPipeline.hpp"
+#include "PanelMapBuilder.hpp"
 #include <SDL3/SDL.h>
 #include <vulkan/vulkan.h>
 #include <map>
@@ -58,13 +59,6 @@ private:
 		int height;
 	};
 
-	struct PanelState
-	{
-		SIMILI::Frontend::IFrameScreenData frame;
-		int client_offset_x;
-		int client_offset_y;
-	};
-
 	SDL_Window* window_;
 	VKContext* vk_context_;
 	VulkanPipeline* vulkan_pipelines_;
@@ -87,17 +81,18 @@ private:
 	VkImageView dummy_texture_view_;
 	VkSampler dummy_texture_sampler_;
 	std::shared_ptr<VulkanPipeline::Pipeline> shared_pipeline_;
-	std::map<std::string, PanelState> panel_state_map_;
+	std::map<std::string, SIMILI::Frontend::PanelState> panel_state_map_;
 	std::map<std::string, SIMILI::Frontend::IFrameScreenData> source_frame_data_map_;
 	std::vector<SplitterGeometry> splitters_;
 	mutable std::mutex splitter_mutex_;
+	SIMILI::Frontend::PanelMapBuilder panel_map_builder_;
 
 	bool createGraphicsResources();
 	void destroyGraphicsResources();
 	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 	bool hasSourceGeometryChanged(const std::map<std::string, SIMILI::Frontend::IFrameScreenData>& frameDataMap) const;
 	bool shouldRefreshFromSource(const std::map<std::string, SIMILI::Frontend::IFrameScreenData>& frameDataMap) const;
-	void rebuildFromSource(const std::map<std::string, SIMILI::Frontend::IFrameScreenData>& frameDataMap);
+	void rebuildFromSource(const std::map<std::string, SIMILI::Frontend::IFrameScreenData>& frameDataMap, int currentWindowWidth, int currentWindowHeight);
 	void scaleLayoutToWindow(int newWindowWidth, int newWindowHeight);
 	void refreshDerivedData();
 	void rebuildSplitters();
@@ -105,7 +100,6 @@ private:
 	int pickSplitterIndex(int x, int y) const;
 	void beginDrag(int splitterIndex, int x, int y);
 	void endDrag();
-	void updateClientCoordinates();
 	int applyDelta(const SplitterGeometry& splitter, int delta);
 	int applyVerticalDelta(const std::string& leftPanelName, const std::string& rightPanelName, int delta, const std::vector<std::string>& linkedRightPanels);
 	int applyHorizontalDelta(const std::string& topPanelName, const std::string& bottomPanelName, int delta);

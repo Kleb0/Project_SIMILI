@@ -161,6 +161,19 @@ void ThreeDScreen::draw(VkCommandBuffer commandBuffer, VkRenderPass renderPass, 
 	scissor.offset = {x_, y_};
 	scissor.extent = {static_cast<uint32_t>(width_), static_cast<uint32_t>(height_)};
 	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+	// make the screen red here for debug purposes //
+	VkClearAttachment clearAttachment{};
+	clearAttachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	clearAttachment.colorAttachment = 0;
+	clearAttachment.clearValue.color = {{1.0f, 0.0f, 0.0f, 1.0f}};
+
+	VkClearRect clearRect{};
+	clearRect.rect = scissor;
+	clearRect.baseArrayLayer = 0;
+	clearRect.layerCount = 1;
+
+	vkCmdClearAttachments(commandBuffer, 1, &clearAttachment, 1, &clearRect);
 }
 
 void ThreeDScreen::setVKContext(VKContext* context)

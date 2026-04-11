@@ -138,11 +138,19 @@ void Splitter::forceRefreshLayout()
 	int windowHeight = 0;
 	SDL_GetWindowSize(window_, &windowWidth, &windowHeight);
 	
-	// Don't update last_window_width/height here - let syncFrameDatas handle scaling
-	layout_ready_ = false;
-	
 	std::cout << "[Splitter::forceRefreshLayout] Layout refresh forced at window size: " 
 	          << windowWidth << "x" << windowHeight << std::endl;
+	
+	if (layout_ready_ && !panel_state_map_.empty() && windowWidth > 0 && windowHeight > 0 &&
+	    (windowWidth != last_window_width_ || windowHeight != last_window_height_))
+	{
+		std::cout << "[Splitter::forceRefreshLayout] Window size changed from " 
+		          << last_window_width_ << "x" << last_window_height_ 
+		          << " to " << windowWidth << "x" << windowHeight 
+		          << " - scaling layout immediately" << std::endl;
+		scaleLayoutToWindow(windowWidth, windowHeight);
+		refreshDerivedData();
+	}
 }
 
 void Splitter::syncFrameDatas(const SIMILI::Frontend::FrameDatas* frameDatas)
@@ -222,9 +230,9 @@ void Splitter::syncFrameDatas(const SIMILI::Frontend::FrameDatas* frameDatas)
 
 	if (hasGeometryChanged || shouldRefresh)
 	{
-		std::cout << "[Splitter] Calling rebuildFromSource..." << std::endl;
+		std::cout << "[Splitter] Calling rebuildFromSource with current window size: " << windowWidth << "x" << windowHeight << std::endl;
 		source_frame_data_map_ = frameDataMap;
-		rebuildFromSource(frameDataMap);
+		rebuildFromSource(frameDataMap, windowWidth, windowHeight);
 		std::cout << "[Splitter] rebuildFromSource completed" << std::endl;
 		
 		// After rebuild, always check if we need to scale to current window size
@@ -398,6 +406,8 @@ bool Splitter::hasSourceGeometryChanged(const std::map<std::string, SIMILI::Fron
 {
 	if (source_frame_data_map_.size() != frameDataMap.size())
 	{
+		std::cout << "[Splitter::hasSourceGeometryChanged] Size changed: " 
+		          << source_frame_data_map_.size() << " -> " << frameDataMap.size() << std::endl;
 		return true;
 	}
 
@@ -406,17 +416,25 @@ bool Splitter::hasSourceGeometryChanged(const std::map<std::string, SIMILI::Fron
 		auto it = source_frame_data_map_.find(pair.first);
 		if (it == source_frame_data_map_.end())
 		{
+			std::cout << "[Splitter::hasSourceGeometryChanged] New panel detected: " << pair.first << std::endl;
 			return true;
 		}
 
 		const SIMILI::Frontend::IFrameScreenData& current = pair.second;
 		const SIMILI::Frontend::IFrameScreenData& previous = it->second;
-		if (current.relativeX != previous.relativeX || current.relativeY != previous.relativeY || current.width != previous.width || current.height != previous.height)
+		if (current.relativeX != previous.relativeX || current.relativeY != previous.relativeY || 
+		    current.width != previous.width || current.height != previous.height)
 		{
+			std::cout << "[Splitter::hasSourceGeometryChanged] Panel " << pair.first << " geometry changed:" << std::endl;
+			std::cout << "  Previous: (" << previous.relativeX << "," << previous.relativeY 
+			          << " " << previous.width << "x" << previous.height << ")" << std::endl;
+			std::cout << "  Current:  (" << current.relativeX << "," << current.relativeY 
+			          << " " << current.width << "x" << current.height << ")" << std::endl;
 			return true;
 		}
 	}
 
+	std::cout << "[Splitter::hasSourceGeometryChanged] No geometry changes detected" << std::endl;
 	return false;
 }
 
@@ -494,20 +512,31 @@ std::map<std::string, SIMILI::Frontend::IFrameScreenData> Splitter::getUIPanelFr
 {
 	std::lock_guard<std::mutex> lock(splitter_mutex_);
 	std::map<std::string, SIMILI::Frontend::IFrameScreenData> frameDataMap;
+	
+	static int call_count = 0;
+	bool should_log = (call_count++ % 120 == 0);
 
 	for (const auto& pair : panel_state_map_)
 	{
-		if (pair.first == "viewport_panel")
-		{
-			continue;
-		}
-
 		if (pair.second.frame.width <= 0 || pair.second.frame.height <= 0)
 		{
+			if (should_log)
+			{
+				std::cout << "[Splitter::getUIPanelFrameDatas] EXCLUDING " << pair.first 
+				          << " - invalid dimensions: " << pair.second.frame.width 
+				          << "x" << pair.second.frame.height << std::endl;
+			}
 			continue;
 		}
 
 		frameDataMap[pair.first] = pair.second.frame;
+		
+		if (should_log)
+		{
+			std::cout << "[Splitter::getUIPanelFrameDatas] INCLUDING " << pair.first 
+			          << " at (" << pair.second.frame.relativeX << "," << pair.second.frame.relativeY 
+			          << ") size " << pair.second.frame.width << "x" << pair.second.frame.height << std::endl;
+		}
 	}
 
 	return frameDataMap;
@@ -918,11 +947,14 @@ bool Splitter::shouldRefreshFromSource(const std::map<std::string, SIMILI::Front
 {
 	if (!layout_ready_)
 	{
+		std::cout << "[Splitter::shouldRefreshFromSource] Layout not ready - returning true" << std::endl;
 		return true;
 	}
 
 	if (panel_state_map_.size() != frameDataMap.size())
 	{
+		std::cout << "[Splitter::shouldRefreshFromSource] Panel count changed: " 
+		          << panel_state_map_.size() << " -> " << frameDataMap.size() << " - returning true" << std::endl;
 		return true;
 	}
 
@@ -930,171 +962,45 @@ bool Splitter::shouldRefreshFromSource(const std::map<std::string, SIMILI::Front
 	{
 		if (panel_state_map_.find(pair.first) == panel_state_map_.end())
 		{
+			std::cout << "[Splitter::shouldRefreshFromSource] New panel detected: " << pair.first << " - returning true" << std::endl;
 			return true;
 		}
 	}
 
+	std::cout << "[Splitter::shouldRefreshFromSource] No refresh needed - returning false" << std::endl;
 	return false;
 }
 
-void Splitter::rebuildFromSource(const std::map<std::string, SIMILI::Frontend::IFrameScreenData>& frameDataMap)
+void Splitter::rebuildFromSource(const std::map<std::string, SIMILI::Frontend::IFrameScreenData>& frameDataMap, int currentWindowWidth, int currentWindowHeight)
 {
-	panel_state_map_.clear();
-
-	int receivedWindowWidth = 0;
-	int receivedWindowHeight = 0;
-	int maxPanelRight = 0;
-	int maxPanelBottom = 0;
-
-	for (const auto& pair : frameDataMap)
-	{
-		PanelState state;
-		state.frame = pair.second;
-		state.client_offset_x = pair.second.clientX - pair.second.relativeX;
-		state.client_offset_y = pair.second.clientY - pair.second.relativeY;
-		panel_state_map_[pair.first] = state;
-
-		if (receivedWindowWidth == 0 && receivedWindowHeight == 0)
-		{
-			receivedWindowWidth = pair.second.windowWidth;
-			receivedWindowHeight = pair.second.windowHeight;
-		}
-
-		if (pair.second.width > 0 && pair.second.height > 0)
-		{
-			int panelRight = pair.second.relativeX + pair.second.width;
-			int panelBottom = pair.second.relativeY + pair.second.height;
-			maxPanelRight = std::max(maxPanelRight, panelRight);
-			maxPanelBottom = std::max(maxPanelBottom, panelBottom);
-		}
-	}
-
-	bool needsImmediateScaling = false;
-	float detectedOldWidth = 0.0f;
-	float detectedOldHeight = 0.0f;
-
-	if (receivedWindowWidth > 0 && receivedWindowHeight > 0 && maxPanelRight > 0 && maxPanelBottom > 0)
-	{
-		float panelUsageRatioX = static_cast<float>(maxPanelRight) / static_cast<float>(receivedWindowWidth);
-		float panelUsageRatioY = static_cast<float>(maxPanelBottom) / static_cast<float>(receivedWindowHeight);
-		
-		std::cout << "[Splitter::rebuildFromSource] Panel coverage: "
-		          << maxPanelRight << "x" << maxPanelBottom 
-		          << " vs window " << receivedWindowWidth << "x" << receivedWindowHeight
-		          << " (ratios: " << panelUsageRatioX << " x " << panelUsageRatioY << ")" << std::endl;
-
-		if (panelUsageRatioX < 0.8f || panelUsageRatioY < 0.85f)
-		{
-			detectedOldWidth = static_cast<float>(maxPanelRight) / 0.998f;
-			detectedOldHeight = static_cast<float>(maxPanelBottom) / 1.002f;
-			
-			if (detectedOldWidth > 100.0f && detectedOldHeight > 100.0f)
-			{
-				needsImmediateScaling = true;
-				std::cout << "[Splitter::rebuildFromSource] Detected stale panel coordinates!" << std::endl;
-				std::cout << "  Panels cover only " << (panelUsageRatioX * 100.0f) << "% x " 
-				          << (panelUsageRatioY * 100.0f) << "% of window" << std::endl;
-				std::cout << "  Inferred old window size: " << static_cast<int>(detectedOldWidth) 
-				          << "x" << static_cast<int>(detectedOldHeight) << std::endl;
-			}
-		}
-	}
-
-	if (receivedWindowWidth > 0 && receivedWindowHeight > 0)
-	{
-		if (needsImmediateScaling)
-		{
-			int oldWidth = static_cast<int>(std::lround(detectedOldWidth));
-			int oldHeight = static_cast<int>(std::lround(detectedOldHeight));
-			int newWidth = receivedWindowWidth;
-			int newHeight = receivedWindowHeight;
-			
-			std::cout << "[Splitter::rebuildFromSource] Applying immediate scale from "
-			          << oldWidth << "x" << oldHeight
-			          << " to " << newWidth << "x" << newHeight << std::endl;
-			
-			const float scaleX = static_cast<float>(newWidth) / static_cast<float>(oldWidth);
-			const float scaleY = static_cast<float>(newHeight) / static_cast<float>(oldHeight);
-			
-			for (auto& pair : panel_state_map_)
-			{
-				SIMILI::Frontend::IFrameScreenData& frame = pair.second.frame;
-				frame.relativeX = static_cast<int>(std::lround(static_cast<float>(frame.relativeX) * scaleX));
-				frame.relativeY = static_cast<int>(std::lround(static_cast<float>(frame.relativeY) * scaleY));
-				frame.width = std::max(1, static_cast<int>(std::lround(static_cast<float>(frame.width) * scaleX)));
-				frame.height = std::max(1, static_cast<int>(std::lround(static_cast<float>(frame.height) * scaleY)));
-				frame.windowWidth = newWidth;
-				frame.windowHeight = newHeight;
-			}
-			
-			last_window_width_ = newWidth;
-			last_window_height_ = newHeight;
-		}
-		else
-		{
-			last_window_width_ = receivedWindowWidth;
-			last_window_height_ = receivedWindowHeight;
-			std::cout << "[Splitter::rebuildFromSource] Updated last_window_ to: " 
-			          << last_window_width_ << "x" << last_window_height_ << std::endl;
-		}
-	}
-
+	panel_map_builder_.rebuildFromSource(
+		frameDataMap,
+		currentWindowWidth,
+		currentWindowHeight,
+		panel_state_map_,
+		last_window_width_,
+		last_window_height_
+	);
+	
 	layout_ready_ = !panel_state_map_.empty();
 	refreshDerivedData();
 }
 
 void Splitter::scaleLayoutToWindow(int newWindowWidth, int newWindowHeight)
 {
-	if (newWindowWidth <= 0 || newWindowHeight <= 0)
-	{
-		return;
-	}
-
-	if (last_window_width_ <= 0 || last_window_height_ <= 0)
-	{
-		last_window_width_ = newWindowWidth;
-		last_window_height_ = newWindowHeight;
-		return;
-	}
-
-	const float scaleX = static_cast<float>(newWindowWidth) / static_cast<float>(last_window_width_);
-	const float scaleY = static_cast<float>(newWindowHeight) / static_cast<float>(last_window_height_);
-	if (scaleX <= 0.0f || scaleY <= 0.0f)
-	{
-		return;
-	}
-
-	float dpiScale = 1.0f;
-	if (window_)
-	{
-		int drawableWidth = 0;
-		int drawableHeight = 0;
-		SDL_GetWindowSizeInPixels(window_, &drawableWidth, &drawableHeight);
-		if (newWindowWidth > 0 && drawableWidth > 0)
-		{
-			dpiScale = static_cast<float>(drawableWidth) / static_cast<float>(newWindowWidth);
-		}
-	}
-
-	for (auto& pair : panel_state_map_)
-	{
-		SIMILI::Frontend::IFrameScreenData& frame = pair.second.frame;
-		frame.relativeX = static_cast<int>(std::lround(static_cast<float>(frame.relativeX) * scaleX));
-		frame.relativeY = static_cast<int>(std::lround(static_cast<float>(frame.relativeY) * scaleY));
-		frame.width = std::max(1, static_cast<int>(std::lround(static_cast<float>(frame.width) * scaleX)));
-		frame.height = std::max(1, static_cast<int>(std::lround(static_cast<float>(frame.height) * scaleY)));
-		frame.windowWidth = newWindowWidth;
-		frame.windowHeight = newWindowHeight;
-		frame.dpiScale = dpiScale;
-	}
-
-	last_window_width_ = newWindowWidth;
-	last_window_height_ = newWindowHeight;
+	panel_map_builder_.scaleLayoutToWindow(
+		newWindowWidth,
+		newWindowHeight,
+		panel_state_map_,
+		last_window_width_,
+		last_window_height_,
+		window_
+	);
 }
 
 void Splitter::refreshDerivedData()
 {
-	updateClientCoordinates();
+	panel_map_builder_.updateClientCoordinates(panel_state_map_);
 	rebuildSplitters();
 	layout_ready_ = !panel_state_map_.empty();
 	if (splitters_.empty())
@@ -1108,7 +1014,7 @@ void Splitter::rebuildSplitters()
 {
 	splitters_.clear();
 
-	auto getPanel = [this](const std::string& panelName) -> const PanelState*
+	auto getPanel = [this](const std::string& panelName) -> const SIMILI::Frontend::PanelState*
 	{
 		auto it = panel_state_map_.find(panelName);
 		if (it == panel_state_map_.end())
@@ -1119,11 +1025,11 @@ void Splitter::rebuildSplitters()
 		return &it->second;
 	};
 
-	const PanelState* hierarchyPanel = getPanel("hierarchy_panel");
-	const PanelState* viewportPanel = getPanel("viewport_panel");
-	const PanelState* objectInspectorPanel = getPanel("object_inspector_panel");
-	const PanelState* historyPanel = getPanel("history_panel");
-	const PanelState* projectViewerPanel = getPanel("project_viewer_panel");
+	const SIMILI::Frontend::PanelState* hierarchyPanel = getPanel("hierarchy_panel");
+	const SIMILI::Frontend::PanelState* viewportPanel = getPanel("viewport_panel");
+	const SIMILI::Frontend::PanelState* objectInspectorPanel = getPanel("object_inspector_panel");
+	const SIMILI::Frontend::PanelState* historyPanel = getPanel("history_panel");
+	const SIMILI::Frontend::PanelState* projectViewerPanel = getPanel("project_viewer_panel");
 
 	int topRowTop = 0;
 	int topRowBottom = 0;
@@ -1160,7 +1066,7 @@ void Splitter::rebuildSplitters()
 		}
 	}
 
-	auto addVerticalSplitter = [this, topRowTop, topRowBottom](Type type, const PanelState* leftPanel, const PanelState* rightPanel)
+	auto addVerticalSplitter = [this, topRowTop, topRowBottom](Type type, const SIMILI::Frontend::PanelState* leftPanel, const SIMILI::Frontend::PanelState* rightPanel)
 	{
 		if (!leftPanel || !rightPanel)
 		{
@@ -1180,7 +1086,7 @@ void Splitter::rebuildSplitters()
 		splitters_.push_back({type, Axis::Vertical, x, topRowTop, thickness, height});
 	};
 
-	auto addHorizontalSplitter = [this](Type type, const PanelState* topPanel, const PanelState* bottomPanel)
+	auto addHorizontalSplitter = [this](Type type, const SIMILI::Frontend::PanelState* topPanel, const SIMILI::Frontend::PanelState* bottomPanel)
 	{
 		if (!topPanel || !bottomPanel)
 		{
@@ -1293,14 +1199,6 @@ void Splitter::endDrag()
 	drag_anchor_ = 0;
 }
 
-void Splitter::updateClientCoordinates()
-{
-	for (auto& pair : panel_state_map_)
-	{
-		pair.second.frame.clientX = pair.second.frame.relativeX + pair.second.client_offset_x;
-		pair.second.frame.clientY = pair.second.frame.relativeY + pair.second.client_offset_y;
-	}
-}
 
 int Splitter::applyDelta(const SplitterGeometry& splitter, int delta)
 {

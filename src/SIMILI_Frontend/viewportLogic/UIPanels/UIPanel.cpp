@@ -118,6 +118,20 @@ void UIPanel::updateFromFrameData(const SIMILI::Frontend::IFrameScreenData& fram
 		return;
 	}
 
+	const int MIN_FRAME_DIMENSION = 10;
+	if (frameData.width < MIN_FRAME_DIMENSION || frameData.height < MIN_FRAME_DIMENSION)
+	{
+		static int skip_count = 0;
+		if (skip_count++ % 60 == 0)
+		{
+			std::cout << "[UIPanel::updateFromFrameData] " << name_ 
+			          << " - Rejecting update with too small dimensions: " 
+			          << frameData.width << "x" << frameData.height << " (min=" << MIN_FRAME_DIMENSION << ")" << std::endl;
+		}
+		has_valid_bounds_ = false;
+		return;
+	}
+
 	float scaleX = static_cast<float>(drawableWidth) / static_cast<float>(logicalWindowWidth);
 	float scaleY = static_cast<float>(drawableHeight) / static_cast<float>(logicalWindowHeight);
 
@@ -137,29 +151,66 @@ void UIPanel::updateFromFrameData(const SIMILI::Frontend::IFrameScreenData& fram
 	}
 	frame_log_count++;
 
+	if (x_ >= drawableWidth)
+	{
+		std::cout << "[UIPanel::updateFromFrameData] WARNING: " << name_ 
+		          << " completely off-screen horizontally (x=" << x_ << " >= drawableWidth=" << drawableWidth 
+		          << ") - clamping to visible area" << std::endl;
+		x_ = (std::max)(0, drawableWidth - width_);
+	}
+	
+	if (y_ >= drawableHeight)
+	{
+		std::cout << "[UIPanel::updateFromFrameData] WARNING: " << name_ 
+		          << " completely off-screen vertically (y=" << y_ << " >= drawableHeight=" << drawableHeight 
+		          << ") - clamping to visible area" << std::endl;
+		y_ = (std::max)(0, drawableHeight - height_);
+	}
+
 	if (x_ < 0)
 	{
 		width_ += x_;
 		x_ = 0;
+		if (width_ < 1)
+		{
+			width_ = 1;
+		}
 	}
 
 	if (y_ < 0)
 	{
 		height_ += y_;
 		y_ = 0;
+		if (height_ < 1)
+		{
+			height_ = 1;
+		}
 	}
 
 	if (x_ + width_ > drawableWidth)
 	{
-		width_ = drawableWidth - x_;
+		width_ = (std::max)(1, drawableWidth - x_);
 	}
 
 	if (y_ + height_ > drawableHeight)
 	{
-		height_ = drawableHeight - y_;
+		height_ = (std::max)(1, drawableHeight - y_);
 	}
 
 	has_valid_bounds_ = width_ > 0 && height_ > 0;
+	
+	if (!has_valid_bounds_)
+	{
+		static int warn_count = 0;
+		if (warn_count++ % 60 == 0)
+		{
+			std::cout << "[UIPanel::updateFromFrameData] WARNING: " << name_ 
+			          << " has invalid bounds after clamping - x=" << x_ << " y=" << y_ 
+			          << " w=" << width_ << " h=" << height_ 
+			          << " (frameData: x=" << frameData.relativeX << " y=" << frameData.relativeY 
+			          << " w=" << frameData.width << " h=" << frameData.height << ")" << std::endl;
+		}
+	}
 
 	// Update display frame with SDL drawable coordinates (with DPI scaling)
 	CEF_Drawer::UIPanelFrameData displayFrame;
@@ -218,29 +269,66 @@ void UIPanel::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawabl
 	
 	if (drawing_state_ == DrawingState::IsNotReadyToBeDrawn)
 	{
+		static int not_ready_log_count = 0;
+		if (not_ready_log_count < 5 || not_ready_log_count % 60 == 0)
+		{
+			std::cout << "[UIPanel::draw] " << name_ << " - IsNotReadyToBeDrawn (count=" << not_ready_log_count << ")" << std::endl;
+		}
+		not_ready_log_count++;
 		return;
 	}
 	
 	if (!initialized_ || !has_valid_bounds_ || drawableWidth <= 0 || drawableHeight <= 0)
 	{
+		static int invalid_state_log_count = 0;
+		if (invalid_state_log_count < 5 || invalid_state_log_count % 60 == 0)
+		{
+			std::cout << "[UIPanel::draw] " << name_ << " - Invalid state: initialized=" << initialized_ 
+			          << " has_valid_bounds=" << has_valid_bounds_ 
+			          << " drawableSize=" << drawableWidth << "x" << drawableHeight 
+			          << " (count=" << invalid_state_log_count << ")" << std::endl;
+		}
+		invalid_state_log_count++;
 		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
 		return;
 	}
 
 	if (!vk_context_ || !shared_pipeline_ || shared_pipeline_->pipeline == VK_NULL_HANDLE)
 	{
+		static int missing_vulkan_log_count = 0;
+		if (missing_vulkan_log_count < 5 || missing_vulkan_log_count % 60 == 0)
+		{
+			std::cout << "[UIPanel::draw] " << name_ << " - Missing Vulkan resources: vk_context=" << (vk_context_ != nullptr)
+			          << " pipeline=" << (shared_pipeline_ ? shared_pipeline_->pipeline : VK_NULL_HANDLE)
+			          << " (count=" << missing_vulkan_log_count << ")" << std::endl;
+		}
+		missing_vulkan_log_count++;
 		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
 		return;
 	}
 
 	if (external_texture_view_ == VK_NULL_HANDLE || external_sampler_ == VK_NULL_HANDLE)
 	{
+		static int missing_texture_log_count = 0;
+		if (missing_texture_log_count < 5 || missing_texture_log_count % 60 == 0)
+		{
+			std::cout << "[UIPanel::draw] " << name_ << " - Missing texture: view=" << external_texture_view_
+			          << " sampler=" << external_sampler_
+			          << " (count=" << missing_texture_log_count << ")" << std::endl;
+		}
+		missing_texture_log_count++;
 		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
 		return;
 	}
 
 	if (!updateDescriptorTextureBinding())
 	{
+		static int descriptor_fail_log_count = 0;
+		if (descriptor_fail_log_count < 5 || descriptor_fail_log_count % 60 == 0)
+		{
+			std::cout << "[UIPanel::draw] " << name_ << " - updateDescriptorTextureBinding failed (count=" << descriptor_fail_log_count << ")" << std::endl;
+		}
+		descriptor_fail_log_count++;
 		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
 		return;
 	}
@@ -290,13 +378,13 @@ void UIPanel::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawabl
 
 void UIPanel::updateTextureRegion()
 {
-	external_texture_view_ = VK_NULL_HANDLE;
-	external_sampler_ = VK_NULL_HANDLE;
-	texcoord_left_ = 0.0f;
-	texcoord_top_ = 0.0f;
-	texcoord_right_ = 1.0f;
-	texcoord_bottom_ = 1.0f;
-
+	VkImageView oldTextureView = external_texture_view_;
+	VkSampler oldSampler = external_sampler_;
+	float oldTexcoordLeft = texcoord_left_;
+	float oldTexcoordTop = texcoord_top_;
+	float oldTexcoordRight = texcoord_right_;
+	float oldTexcoordBottom = texcoord_bottom_;
+	
 	VkImageView textureView = VK_NULL_HANDLE;
 	VkSampler sampler = VK_NULL_HANDLE;
 	int textureWidth = 0;
@@ -305,18 +393,65 @@ void UIPanel::updateTextureRegion()
 
 	if (!CEF_Drawer::getActiveUIPanelTextureRegion(name_, textureView, sampler, textureWidth, textureHeight, panelFrame))
 	{
+		static int get_texture_fail_count = 0;
+		if (get_texture_fail_count < 5 || get_texture_fail_count % 60 == 0)
+		{
+			std::cout << "[UIPanel::updateTextureRegion] " << name_ << " - getActiveUIPanelTextureRegion FAILED (count=" << get_texture_fail_count << ")" << std::endl;
+		}
+		get_texture_fail_count++;
+		
+		if (oldTextureView != VK_NULL_HANDLE && oldSampler != VK_NULL_HANDLE)
+		{
+			if (get_texture_fail_count <= 5)
+			{
+				std::cout << "[UIPanel::updateTextureRegion] " << name_ << " - Preserving existing texture during rebuild failure" << std::endl;
+			}
+			
+			if (drawing_state_ == DrawingState::IsNotReadyToBeDrawn)
+			{
+				drawing_state_ = DrawingState::HasBeenDrawn;
+			}
+			needs_redraw_ = true;
+			
+			return;
+		}
+		
+		external_texture_view_ = VK_NULL_HANDLE;
+		external_sampler_ = VK_NULL_HANDLE;
+		texcoord_left_ = 0.0f;
+		texcoord_top_ = 0.0f;
+		texcoord_right_ = 1.0f;
+		texcoord_bottom_ = 1.0f;
 		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
 		return;
 	}
 
 	if (textureWidth <= 0 || textureHeight <= 0)
 	{
+		if (oldTextureView != VK_NULL_HANDLE && oldSampler != VK_NULL_HANDLE)
+		{
+			if (drawing_state_ == DrawingState::IsNotReadyToBeDrawn)
+			{
+				drawing_state_ = DrawingState::HasBeenDrawn;
+			}
+			needs_redraw_ = true;
+			return;
+		}
 		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
 		return;
 	}
 	
 	if (textureView == VK_NULL_HANDLE || sampler == VK_NULL_HANDLE)
 	{
+		if (oldTextureView != VK_NULL_HANDLE && oldSampler != VK_NULL_HANDLE)
+		{
+			if (drawing_state_ == DrawingState::IsNotReadyToBeDrawn)
+			{
+				drawing_state_ = DrawingState::HasBeenDrawn;
+			}
+			needs_redraw_ = true;
+			return;
+		}
 		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
 		return;
 	}
@@ -326,13 +461,22 @@ void UIPanel::updateTextureRegion()
 	float right = static_cast<float>(panelFrame.x + panelFrame.width) / static_cast<float>(textureWidth);
 	float bottom = static_cast<float>(panelFrame.y + panelFrame.height) / static_cast<float>(textureHeight);
 
-	left = std::clamp(left, 0.0f, 1.0f);
-	top = std::clamp(top, 0.0f, 1.0f);
-	right = std::clamp(right, 0.0f, 1.0f);
-	bottom = std::clamp(bottom, 0.0f, 1.0f);
+	left = (std::clamp)(left, 0.0f, 1.0f);
+	top = (std::clamp)(top, 0.0f, 1.0f);
+	right = (std::clamp)(right, 0.0f, 1.0f);
+	bottom = (std::clamp)(bottom, 0.0f, 1.0f);
 
 	if (right <= left || bottom <= top)
 	{
+		if (oldTextureView != VK_NULL_HANDLE && oldSampler != VK_NULL_HANDLE)
+		{
+			if (drawing_state_ == DrawingState::IsNotReadyToBeDrawn)
+			{
+				drawing_state_ = DrawingState::HasBeenDrawn;
+			}
+			needs_redraw_ = true;
+			return;
+		}
 		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
 		return;
 	}

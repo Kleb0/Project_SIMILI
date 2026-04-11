@@ -57,6 +57,9 @@ CEF_Drawer::CEF_Drawer()
 	, initial_paint_count_(0)
 	, descriptor_needs_update_(false)
 	, last_bound_texture_view_(VK_NULL_HANDLE)
+	, paint_buffer_synchronized_(false)
+	, preserve_textures_during_resize_(false)
+	, resize_wait_frames_(0)
 	, resizer_(std::make_unique<CEF_Resizer>(*this))
 {
 }
@@ -129,6 +132,20 @@ void CEF_Drawer::syncWindowProperties()
 
 	{
 		std::lock_guard<std::mutex> lock(render_mutex_);
+		paint_buffer_synchronized_ = false;
+		
+		if (!preserve_textures_during_resize_)
+		{
+			preserve_textures_during_resize_ = true;
+			resize_wait_frames_ = 10;
+			std::cout << "[CEF_Drawer::syncWindowProperties] Activating texture preservation for resize: " << width_ << "x" << height_ << " -> " << newWidth << "x" << newHeight << std::endl;
+		}
+		else
+		{
+			resize_wait_frames_ = 10;
+			std::cout << "[CEF_Drawer::syncWindowProperties] Resize already in progress - resetting timeout" << std::endl;
+		}
+		
 		width_ = newWidth;
 		height_ = newHeight;
 		resizer_->ensureTextureStorage(width_, height_);
@@ -277,6 +294,7 @@ void CEF_Drawer::shutdown()
 		runtime_layout_sync_pending_ = false;
 		runtime_layout_waiting_for_paint_ = false;
 		has_received_first_paint_ = false;
+		paint_buffer_synchronized_ = false;
 		for (auto& texturePair : ui_panel_textures_)
 		{
 			if (texturePair.second.texture_view != VK_NULL_HANDLE)
@@ -315,6 +333,24 @@ void CEF_Drawer::draw(VkCommandBuffer commandBuffer)
 	static bool skip_fullscreen_warning_logged = false;
 	
 	syncWindowProperties();
+	
+	{
+		std::lock_guard<std::mutex> lock(render_mutex_);
+		if (preserve_textures_during_resize_ && resize_wait_frames_ > 0)
+		{
+			resize_wait_frames_--;
+			if (resize_wait_frames_ == 0)
+			{
+				preserve_textures_during_resize_ = false;
+				std::cout << "[CEF_Drawer::draw] Resize timeout reached - forcing texture rebuild" << std::endl;
+				paint_buffer_synchronized_ = true;
+				for (auto& texturePair : ui_panel_textures_)
+				{
+					texturePair.second.dirty = true;
+				}
+			}
+		}
+	}
 	
 	if (!initialized_ || !vk_context_)
 	{
@@ -708,6 +744,13 @@ void CEF_Drawer::forceRepaint()
 void CEF_Drawer::invalidateAllUIPanelTextures()
 {
 	std::lock_guard<std::mutex> lock(render_mutex_);
+	
+	if (preserve_textures_during_resize_)
+	{
+		std::cout << "[CEF_Drawer] Invalidation skipped - preserving textures during resize" << std::endl;
+		return;
+	}
+	
 	for (auto& texturePair : ui_panel_textures_)
 	{
 		texturePair.second.dirty = true;
@@ -969,11 +1012,28 @@ int CEF_Drawer::GetWindowsKeyCode(SDL_Scancode scancode, SDL_Keycode key)
 
 void CEF_Drawer::GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect)
 {
+	static int last_width = -1;
+	static int last_height = -1;
+	
 	rect.x = 0;
 	rect.y = 0;
 	rect.width = width_;
 	rect.height = height_;
-	std::cout << "[CEF_Drawer] GetViewRect called: " << width_ << "x" << height_ << std::endl;
+	
+	if (width_ != last_width || height_ != last_height)
+	{
+		std::cout << "[CEF_Drawer] GetViewRect size changed: " << last_width << "x" << last_height << " -> " << width_ << "x" << height_ << std::endl;
+		last_width = width_;
+		last_height = height_;
+	}
+	else
+	{
+		static int call_count = 0;
+		if (call_count++ % 120 == 0)
+		{
+			std::cout << "[CEF_Drawer] GetViewRect called: " << width_ << "x" << height_ << std::endl;
+		}
+	}
 }
 
 void CEF_Drawer::OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type,
@@ -1023,13 +1083,51 @@ const RectList& dirtyRects, const void* buffer, int width, int height)
 		
 		if (width != width_ || height != height_)
 		{
-			
+			std::cout << "[CEF_Drawer::OnPaint] CEF buffer size changed: " << width_ << "x" << height_ << " -> " << width << "x" << height << std::endl;
 			width_ = width;
-			height_ = height;
+			paint_buffer_synchronized_ = false;
+			resizer_->ensureTextureStorage(width_, height_);
+		}
+		
+		if (width == logical_width_ && height == logical_height_)
+		{
+			if (!paint_buffer_synchronized_)
+			{
+				paint_buffer_synchronized_ = true;
+				std::cout << "[CEF_Drawer::On Paint] Paint buffer synchronized with window size: " << width << "x" << height << std::endl;
+				
+				if (preserve_textures_during_resize_)
+				{
+					preserve_textures_during_resize_ = false;
+					resize_wait_frames_ = 0;
+					std::cout << "[CEF_Drawer::OnPaint] Resize complete - buffer synchronized, marking all textures as dirty for rebuild" << std::endl;
+					
+					for (auto& texturePair : ui_panel_textures_)
+					{
+						texturePair.second.dirty = true;
+					}
+				}
+			}
+		}
+		else
+		{
+			if (paint_buffer_synchronized_)
+			{
+				paint_buffer_synchronized_ = false;
+				std::cout << "[CEF_Drawer::OnPaint] Paint buffer desynchronized: buffer=" << width << "x" << height << " window=" << logical_width_ << "x" << logical_height_ << std::endl;
+			}
 			resizer_->ensureTextureStorage(width_, height_);
 		}
 
 		std::size_t bufferSize = static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4u;
+		
+		const int MIN_BUFFER_DIMENSION = 100;
+		if (width < MIN_BUFFER_DIMENSION || height < MIN_BUFFER_DIMENSION)
+		{
+			std::cout << "[CEF_Drawer::OnPaint] Ignoring paint with too small buffer: " << width << "x" << height << " (min=" << MIN_BUFFER_DIMENSION << ")" << std::endl;
+			return;
+		}
+		
 		paint_buffer_width_ = width;
 		paint_buffer_height_ = height;
 		paint_buffer_.resize(bufferSize);

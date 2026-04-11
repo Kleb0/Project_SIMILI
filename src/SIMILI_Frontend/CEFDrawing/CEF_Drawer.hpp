@@ -145,6 +145,9 @@ private:
 	int initial_paint_count_;
 	bool descriptor_needs_update_;
 	VkImageView last_bound_texture_view_;
+	bool paint_buffer_synchronized_;
+	bool preserve_textures_during_resize_;
+	int resize_wait_frames_;
 	
 	std::mutex render_mutex_;
 	static CEF_Drawer* active_instance_;

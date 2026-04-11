@@ -16,8 +16,28 @@ CEF_Resizer::CEF_Resizer(CEF_Drawer& owner)
 
 void CEF_Resizer::resize(int width, int height)
 {
+	const int MIN_WINDOW_DIMENSION = 100;
+	if (width < MIN_WINDOW_DIMENSION || height < MIN_WINDOW_DIMENSION)
+	{
+		std::cout << "[CEF_Resizer::resize] Ignoring resize to too small dimensions: " << width << "x" << height << " (min=" << MIN_WINDOW_DIMENSION << ")" << std::endl;
+		return;
+	}
+
 	{
 		std::lock_guard<std::mutex> lock(owner_.render_mutex_);
+		owner_.paint_buffer_synchronized_ = false;
+		
+		if (!owner_.preserve_textures_during_resize_)
+		{
+			owner_.preserve_textures_during_resize_ = true;
+			owner_.resize_wait_frames_ = 10;
+			std::cout << "[CEF_Resizer::resize] Activating texture preservation" << std::endl;
+		}
+		else
+		{
+			owner_.resize_wait_frames_ = 10;
+		}
+		
 		owner_.width_ = width;
 		owner_.height_ = height;
 		owner_.updateWindowProperties();
@@ -197,6 +217,11 @@ void CEF_Resizer::ensureTextureStorage(int width, int height)
 
 bool CEF_Resizer::rebuildUIPanelTextureLocked(const std::string& panelName, CEF_Drawer::UIPanelTextureData& textureData, CEF_Drawer::UIPanelFrameData& outFrame)
 {
+	if (!owner_.paint_buffer_synchronized_)
+	{
+		return false;
+	}
+	
 	auto sourceIt = owner_.ui_panel_frames_.find(panelName);
 	if (sourceIt == owner_.ui_panel_frames_.end())
 	{
@@ -217,6 +242,26 @@ bool CEF_Resizer::rebuildUIPanelTextureLocked(const std::string& panelName, CEF_
 	{
 		std::cout << "[CEF_Resizer::rebuildUIPanelTextureLocked] " << panelName << " - Invalid dimensions: source " << sourceFrame.width << "x" << sourceFrame.height << ", display " << displayFrame.width << "x" << displayFrame.height << std::endl;
 		return false;
+	}
+
+	const int MIN_PANEL_DIMENSION = 10;
+	if (sourceFrame.width < MIN_PANEL_DIMENSION || sourceFrame.height < MIN_PANEL_DIMENSION)
+	{
+		std::cout << "[CEF_Resizer::rebuildUIPanelTextureLocked] " << panelName << " - Dimensions too small (< " << MIN_PANEL_DIMENSION << "px): " << sourceFrame.width << "x" << sourceFrame.height << std::endl;
+		return false;
+	}
+
+	if (owner_.paint_buffer_width_ > 0 && owner_.paint_buffer_height_ > 0)
+	{
+		if (sourceFrame.x + sourceFrame.width > owner_.paint_buffer_width_ + 50 ||
+		    sourceFrame.y + sourceFrame.height > owner_.paint_buffer_height_ + 50)
+		{
+			std::cout << "[CEF_Resizer::rebuildUIPanelTextureLocked] " << panelName 
+			          << " - Panel region exceeds paint buffer: panel[" << sourceFrame.x << "," << sourceFrame.y 
+			          << " " << sourceFrame.width << "x" << sourceFrame.height << "] vs buffer " 
+			          << owner_.paint_buffer_width_ << "x" << owner_.paint_buffer_height_ << std::endl;
+			return false;
+		}
 	}
 
 	if (owner_.paint_buffer_.empty() || owner_.paint_buffer_width_ <= 0 || owner_.paint_buffer_height_ <= 0)

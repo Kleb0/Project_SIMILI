@@ -506,6 +506,10 @@ namespace SIMILI {
 						return resp;
 					}
 					
+					std::map<std::string, IFrameData> tempIFrameMap;
+					
+					const int MIN_IFRAME_DIMENSION = 10;
+					
 					for (const auto& iframe : requestData["iframes"])
 					{
 						if (iframe.contains("name") && iframe.contains("x") && iframe.contains("y") && 
@@ -519,8 +523,12 @@ namespace SIMILI {
 							int clientX = iframe.contains("clientX") ? iframe["clientX"].get<int>() : x;
 							int clientY = iframe.contains("clientY") ? iframe["clientY"].get<int>() : y;
 							
-							std::cout << "[RoutesManager] Processing iframe: " << name 
-								<< " (x=" << x << ", y=" << y << ", w=" << width << ", h=" << height << ")" << std::endl;
+							if (width < MIN_IFRAME_DIMENSION || height < MIN_IFRAME_DIMENSION)
+							{
+								std::cout << "[RoutesManager] Rejecting iframe '" << name << "' with too small dimensions: " 
+								          << width << "x" << height << " (min=" << MIN_IFRAME_DIMENSION << ")" << std::endl;
+								continue;
+							}
 							
 							IFrameData data;
 							data.name = name;
@@ -530,8 +538,29 @@ namespace SIMILI {
 							data.height = height;
 							data.clientX = clientX;
 							data.clientY = clientY;
-							handler->iframe_data_map_[name] = data;
+							tempIFrameMap[name] = data;
 						}
+					}
+					
+					int maxX = 0;
+					int maxY = 0;
+					bool coordsValid = handler->validateIFrameCoordinates(tempIFrameMap, maxX, maxY);
+					
+					if (!coordsValid)
+					{
+						std::cout << "[RoutesManager] Ignoring iframe update - coordinates appear stale" << std::endl;
+						resp.statusCode = 200;
+						resp.statusMessage = "OK";
+						resp.body = "{\"success\": true, \"message\": \"Coordinates rejected as stale\"}";
+						return resp;
+					}
+					
+					for (const auto& pair : tempIFrameMap)
+					{
+						std::cout << "[RoutesManager] Accepting iframe: " << pair.first 
+							<< " (x=" << pair.second.x << ", y=" << pair.second.y 
+							<< ", w=" << pair.second.width << ", h=" << pair.second.height << ")" << std::endl;
+						handler->iframe_data_map_[pair.first] = pair.second;
 					}
 					
 					handler->captureIFramePositions();
@@ -588,6 +617,8 @@ namespace SIMILI {
 					std::map<std::string, IFrameData> uiPanelIFrames;
 					std::map<std::string, CEF_Drawer::UIPanelFrameData> uiPanelFramesForDrawer;
 
+					const int MIN_PANEL_DIMENSION = 10;
+
 					for (const auto& iframe : requestData["iframes"])
 					{
 						if (iframe.contains("name") && iframe.contains("x") && iframe.contains("y") &&
@@ -599,12 +630,22 @@ namespace SIMILI {
 								continue;
 							}
 
+							int width = iframe["width"];
+							int height = iframe["height"];
+							
+							if (width < MIN_PANEL_DIMENSION || height < MIN_PANEL_DIMENSION)
+							{
+								std::cout << "[RoutesManager] Rejecting UI panel '" << name << "' with too small dimensions: " 
+								          << width << "x" << height << " (min=" << MIN_PANEL_DIMENSION << ")" << std::endl;
+								continue;
+							}
+
 							IFrameData data;
 							data.name = name;
 							data.x = iframe["x"];
 							data.y = iframe["y"];
-							data.width = iframe["width"];
-							data.height = iframe["height"];
+							data.width = width;
+							data.height = height;
 							data.clientX = iframe.contains("clientX") ? iframe["clientX"].get<int>() : data.x;
 							data.clientY = iframe.contains("clientY") ? iframe["clientY"].get<int>() : data.y;
 							uiPanelIFrames[name] = data;
