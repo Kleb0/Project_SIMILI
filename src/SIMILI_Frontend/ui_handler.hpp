@@ -65,10 +65,11 @@ public:
 	static UIHandler* getInstance();
 	static void setInstance(UIHandler* handler);
 
+	// =========================== CEF INTERFACE OVERRIDES =============================================
+
 	virtual CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler() override;
 	virtual CefRefPtr<CefRenderProcessHandler> GetRenderProcessHandler() override;
 	virtual void OnBeforeCommandLineProcessing(const CefString& process_type, CefRefPtr<CefCommandLine> command_line) override;
-
 	virtual void OnContextInitialized() override;
 
 	virtual void OnContextCreated(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefV8Context> context) override;
@@ -82,8 +83,8 @@ public:
 	virtual CefRefPtr<CefRenderHandler> GetRenderHandler() override;
 	virtual CefRefPtr<CefRequestHandler> GetRequestHandler() override;
 
+	// To be deleted later
 	virtual void OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) override;
-
 	virtual void OnAfterCreated(CefRefPtr<CefBrowser> browser) override;
 	virtual bool DoClose(CefRefPtr<CefBrowser> browser) override;
 	virtual void OnBeforeClose(CefRefPtr<CefBrowser> browser) override;
@@ -94,6 +95,9 @@ public:
 	virtual bool OnBeforeBrowse(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefRequest> request, bool user_gesture, bool is_redirect) override;
 	virtual CefRefPtr<CefResourceRequestHandler> GetResourceRequestHandler(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefRequest> request, bool is_navigation, bool is_download, const CefString& request_initiator, bool& disable_default_handling) override;
 
+	// ================== WindowManagement ======================================================
+
+
 	void CloseAllBrowsers(bool force_close);
 	void enableSlotTextureRendering(bool enable);
 	void enableCompositeTestRenderer(bool enable);
@@ -102,6 +106,11 @@ public:
 	void setParentWindow(SDL_Window* window) { parent_window_ = window; }
 	SDL_ApplicationWindow* getSDLParent() { return parent_sdl_window_; }
 	void Set_SDLParent(SDL_ApplicationWindow* parentWindow);
+	void setWindowDelegate(SimpleWindowDelegate* delegate) { window_delegate_ = delegate; }
+	SimpleWindowDelegate* getWindowDelegate() const { return window_delegate_; }
+	void updateWindowSize(int width, int height);
+
+	// ====================== VULKAN SCENE MANAGEMENT ==================================================
 	
 	void setVKScene(VKScene* scene) { vk_scene_ = scene; }
 	VKScene* getVKScene() const { return vk_scene_; }
@@ -109,13 +118,21 @@ public:
 	VKContext* getVKRenderer() const { return vk_renderer_; }
 	void setVulkanPipelines(VulkanPipeline* pipelines) { vulkan_pipelines_ = pipelines; }
 	VulkanPipeline* getVulkanPipelines() const { return vulkan_pipelines_; }
-	
 	void initializeSceneObjects();
 	void reinitializeSingleObject(ThreeDObject* obj);
 	void notifySceneChanged();
-	
+
+	// =================== UI PANELS MANAGEMENT=====================================================
+
+	// iframestates	
 	void captureIFramePositions();
 	void forceCaptureIFramePositions();
+	void initializeFrameDatas(SimpleWindowDelegate* windowDelegate);
+	SIMILI::Frontend::FrameDatas* getFrameDatas() { return frame_datas_; }
+	void setFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas) { frame_datas_ = frameDatas; }
+
+
+
 	void initializeDefaultUIPanels();
 	void updateUIPanelIFrames(const std::map<std::string, IFrameData>& iframeDataMap);
 	void cacheUIPanelFrameDatas();
@@ -125,44 +142,44 @@ public:
 	void forceRedrawAllUIPanels();
 	void startSplitter(VKContext* vkContext, VkRenderPass renderPass);
 	bool handleSplitterEvent(const SDL_Event& event);
-	void updateWindowSize(int width, int height);
 	bool validateIFrameCoordinates(const std::map<std::string, IFrameData>& iframeDataMap, int& outMaxX, int& outMaxY) const;
 	bool getResolvedViewportFrameData(SIMILI::Frontend::IFrameScreenData& outData) const;
 	void processPendingFrameUpdates();
-	
-	void initializeFrameDatas(SimpleWindowDelegate* windowDelegate);
-	SIMILI::Frontend::FrameDatas* getFrameDatas() { return frame_datas_; }
-	void setFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas) { frame_datas_ = frameDatas; }
-	
-	bool isCameraOperationLocked() const { return is_camera_operation_locked_; }
-	void setCameraOperationLocked(bool locked) { is_camera_operation_locked_ = locked; }
-	SIMILI::Input::MouseController* getMouseController() const { return mouse_controller_; }
-	void set_MouseControl(SIMILI::Input::MouseController* mouseControl);
-	
-	Overlay_HTML_Texture_Renderer* getSlotTextureRenderer() const { return slot_texture_renderer_; }
-	Overlay_HTML_Texture_Renderer* getCompositeTestRenderer() const { return composite_test_renderer_; }
-	CEF_Drawer* getCEFDrawer() const { return cef_drawer_; }
-	void setCEFDrawer(CEF_Drawer* drawer) { cef_drawer_ = drawer; }
-	void Set_DOM(CEF_Drawer* drawer);
-	Splitter* getSplitter() const { return splitter_.get(); }
-	
-	ID3D11Device* getD3D11Device() const { return d3d11_device_; }
-	ID2D1Factory1* getD2D1Factory() const { return d2d_factory_; }
-	ID2D1Device* getD2D1Device() const { return d2d_device_; }
-	IDXGIDevice1* getDXGIDevice() const { return dxgi_device_; }
-	
-	void setWindowDelegate(SimpleWindowDelegate* delegate) { window_delegate_ = delegate; }
-	SimpleWindowDelegate* getWindowDelegate() const { return window_delegate_; }
-	
-	void startRenderTimer();
-	
 	std::map<std::string, IFrameData> getUIPanelIFrames() const
 	{
 		std::lock_guard<std::mutex> lock(ui_panel_mutex_);
 		return ui_panel_iframe_map_;
 	}
 	std::map<std::string, IFrameData> getAllIFrames() const { return iframe_data_map_.snapshot(); }
+
 	
+
+	// ====================== MOUSE & CAMERA CONTROL==================================================
+
+	bool isCameraOperationLocked() const { return is_camera_operation_locked_; }
+	void setCameraOperationLocked(bool locked) { is_camera_operation_locked_ = locked; }
+	SIMILI::Input::MouseController* getMouseController() const { return mouse_controller_; }
+	void set_MouseControl(SIMILI::Input::MouseController* mouseControl);
+
+	// ========================== RENDERER ACCESSORS==============================================
+	
+	Overlay_HTML_Texture_Renderer* getSlotTextureRenderer() const { return slot_texture_renderer_; }
+	Overlay_HTML_Texture_Renderer* getCompositeTestRenderer() const { return composite_test_renderer_; }
+
+	CEF_Drawer* getCEFDrawer() const { return cef_drawer_; }
+	void setCEFDrawer(CEF_Drawer* drawer) { cef_drawer_ = drawer; }
+	void Set_DOM(CEF_Drawer* drawer);
+
+	Splitter* getSplitter() const { return splitter_.get(); }
+	
+	ID3D11Device* getD3D11Device() const { return d3d11_device_; }
+	ID2D1Factory1* getD2D1Factory() const { return d2d_factory_; }
+	ID2D1Device* getD2D1Device() const { return d2d_device_; }
+	IDXGIDevice1* getDXGIDevice() const { return dxgi_device_; }
+
+	// ============ UTILITIES ============================
+		
+	void startRenderTimer();
 	void CallTestFromServer();
 	
 	ThreadSafeIFrameMap iframe_data_map_;
@@ -170,29 +187,49 @@ public:
 	friend Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 interval, SDL_ApplicationWindow* parentWindow, CEF_Drawer* dom);
 
 private:
+	
+	// ===========================  PRIVATE HELPERS=====================
+
 	bool isOwnerThread() const;
 	bool hasRuntimeLayoutChanged(const std::map<std::string, SIMILI::Frontend::IFrameScreenData>& beforeMap, const std::map<std::string, SIMILI::Frontend::IFrameScreenData>& afterMap) const;
 	std::map<std::string, CEF_Drawer::UIPanelFrameData> buildRuntimeLayoutFrameMap(const std::map<std::string, SIMILI::Frontend::IFrameScreenData>& frameDataMap) const;
 	std::map<std::string, SIMILI::Frontend::IFrameScreenData> getRuntimeFrameDataMap() const;
 
+	// ================================= SINGLETON ===============
+
+
 	static UIHandler* s_instance_;
+
+	// ============================ CEF INTERNAL ===============
 	
 	CefRefPtr<CefResourceRequestHandler> resource_request_handler_;
 	CefRefPtr<CefMessageRouterRendererSide> render_message_router_;
 	typedef std::list<CefRefPtr<CefBrowser>> BrowserList;
 	BrowserList browser_list_;
+
+	// ============================= WINDOW HANDLES =======================================
+
 	
 	SDL_ApplicationWindow* parent_sdl_window_;
 	SDL_Window* parent_window_;
 	SDL_Window* window_handle_;
 	SDL_TimerID timer_id_;
+
+	// ============================== VULKAN S3D CENE ==========================================
+
 	
 	VKScene* vk_scene_;
-	VKContext* vk_renderer_;
-	VulkanPipeline* vulkan_pipelines_;
+	VKContext* vk_renderer_;	
 	Camera* main_camera_;
 	Mesh** cube_mesh_ptr_;
 	bool scene_initialized_;
+
+
+	// ============================== VULKAN PIPELINES ==========================================
+	VulkanPipeline* vulkan_pipelines_;
+
+	// ============================ VIEWPORT STATE ============================================
+
 	
 	Uint64 last_viewport_update_time_;
 	int last_viewport_x_;
@@ -203,11 +240,15 @@ private:
 	int current_window_height_;
 	
 	std::chrono::steady_clock::time_point last_frame_capture_time_;
+	// =============================== FRAME DATA & INPUT =======================================
+
 	
 	SIMILI::Frontend::FrameDatas* frame_datas_;
 	SimpleWindowDelegate* window_delegate_;
 	SIMILI::Input::MouseController* mouse_controller_;
 	bool is_camera_operation_locked_;
+
+	// ============================== OTHER UI ELEMENT RENDERERS ==========================================
 	
 	Overlay_HTML_Texture_Renderer* slot_texture_renderer_;
 	Overlay_HTML_Texture_Renderer* composite_test_renderer_;
@@ -219,6 +260,9 @@ private:
 	ID2D1Factory1* d2d_factory_;
 	ID2D1Device* d2d_device_;
 
+	// ============================= UI PANELS STATE drawing ===========================================
+
+
 	std::map<std::string, IFrameData> ui_panel_iframe_map_;
 	std::map<std::string, SIMILI::Frontend::IFrameScreenData> ui_panel_frame_data_map_;
 	std::map<std::string, std::unique_ptr<UIPanel>> ui_panels_;
@@ -226,6 +270,8 @@ private:
 	std::map<std::string, SIMILI::Frontend::IFrameScreenData> splitter_drag_start_frame_data_;
 	bool ui_panels_initialized_;
 	mutable std::mutex ui_panel_mutex_;
+
+	// ============================  THREAD SAFETY ============================================
 	
 	std::thread::id owner_thread_id_;
 	std::atomic_bool pending_iframe_capture_;
