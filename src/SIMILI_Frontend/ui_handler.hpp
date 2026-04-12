@@ -10,6 +10,7 @@
 #include "CEFDrawing/CEF_Drawer.hpp"
 #include "viewportLogic/FrameDatas/FrameDatas.hpp"
 #include "viewportLogic/UIPanels/UIPanel.hpp"
+#include "viewportLogic/UIPanels/UIManager.hpp"
 #include "viewportLogic/UIPanels/Splitter.hpp"
 #include "viewportLogic/Keymanagement/MouseStates/Mouse_State.hpp"
 #include "viewportLogic/Keymanagement/MouseStates/Mouse_Above_Overlay_State.hpp"
@@ -124,33 +125,25 @@ public:
 
 	// =================== UI PANELS MANAGEMENT=====================================================
 
-	// iframestates	
 	void captureIFramePositions();
 	void forceCaptureIFramePositions();
 	void initializeFrameDatas(SimpleWindowDelegate* windowDelegate);
 	SIMILI::Frontend::FrameDatas* getFrameDatas() { return frame_datas_; }
 	void setFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas) { frame_datas_ = frameDatas; }
-
-
+	SIMILI::Frontend::UIManager* getUIManager() { return ui_manager_; }
 
 	void initializeDefaultUIPanels();
 	void updateUIPanelIFrames(const std::map<std::string, IFrameData>& iframeDataMap);
 	void cacheUIPanelFrameDatas();
-	void drawUIPanels(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight);
 	void clearUIPanels();
-	void forceRebuildAllUIPanels();
-	void forceRedrawAllUIPanels();
+	void setUIManager(SIMILI::Frontend::UIManager* manager) { ui_manager_ = manager; }
 	void startSplitter(VKContext* vkContext, VkRenderPass renderPass);
 	bool handleSplitterEvent(const SDL_Event& event);
 	bool validateIFrameCoordinates(const std::map<std::string, IFrameData>& iframeDataMap, int& outMaxX, int& outMaxY) const;
 	bool getResolvedViewportFrameData(SIMILI::Frontend::IFrameScreenData& outData) const;
 	void processPendingFrameUpdates();
-	std::map<std::string, IFrameData> getUIPanelIFrames() const
-	{
-		std::lock_guard<std::mutex> lock(ui_panel_mutex_);
-		return ui_panel_iframe_map_;
-	}
 	std::map<std::string, IFrameData> getAllIFrames() const { return iframe_data_map_.snapshot(); }
+
 
 	
 
@@ -244,6 +237,7 @@ private:
 
 	
 	SIMILI::Frontend::FrameDatas* frame_datas_;
+	SIMILI::Frontend::UIManager* ui_manager_;
 	SimpleWindowDelegate* window_delegate_;
 	SIMILI::Input::MouseController* mouse_controller_;
 	bool is_camera_operation_locked_;
@@ -262,14 +256,8 @@ private:
 
 	// ============================= UI PANELS STATE drawing ===========================================
 
-
-	std::map<std::string, IFrameData> ui_panel_iframe_map_;
-	std::map<std::string, SIMILI::Frontend::IFrameScreenData> ui_panel_frame_data_map_;
-	std::map<std::string, std::unique_ptr<UIPanel>> ui_panels_;
 	std::unique_ptr<Splitter> splitter_;
 	std::map<std::string, SIMILI::Frontend::IFrameScreenData> splitter_drag_start_frame_data_;
-	bool ui_panels_initialized_;
-	mutable std::mutex ui_panel_mutex_;
 
 	// ============================  THREAD SAFETY ============================================
 	

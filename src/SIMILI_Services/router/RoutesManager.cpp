@@ -738,30 +738,39 @@ namespace SIMILI {
 					return resp;
 				}
 
-				const auto& allUIPanels = handler->getUIPanelIFrames();
-				json responseData = json::array();
-
-				for (const auto& pair : allUIPanels)
-				{
-					json iframeJson;
-					iframeJson["name"] = pair.second.name;
-					iframeJson["x"] = pair.second.x;
-					iframeJson["y"] = pair.second.y;
-					iframeJson["width"] = pair.second.width;
-					iframeJson["height"] = pair.second.height;
-					iframeJson["clientX"] = pair.second.clientX;
-					iframeJson["clientY"] = pair.second.clientY;
-					responseData.push_back(iframeJson);
-				}
-
-				resp.statusCode = 200;
-				resp.statusMessage = "OK";
-				resp.body = responseData.dump();
-
+			auto* uiManager = handler->getUIManager();
+			if (!uiManager)
+			{
+				resp.statusCode = 500;
+				resp.statusMessage = "Internal Server Error";
+				resp.body = "{\"success\": false, \"error\": \"UIManager not available\"}";
 				return resp;
-			}, "Get all UI panel iframes");
-			
-			std::cout << "[RoutesManager] IFrame routes registered" << std::endl;
+			}
+
+			const auto& allUIPanels = uiManager->getUIPanelIFrames();
+			json responseData = json::array();
+
+			for (const auto& pair : allUIPanels)
+			{
+				json iframeJson;
+				iframeJson["name"] = pair.second.name;
+				iframeJson["x"] = pair.second.x;
+				iframeJson["y"] = pair.second.y;
+				iframeJson["width"] = pair.second.width;
+				iframeJson["height"] = pair.second.height;
+				iframeJson["clientX"] = pair.second.clientX;
+				iframeJson["clientY"] = pair.second.clientY;
+				responseData.push_back(iframeJson);
+			}
+
+			resp.statusCode = 200;
+			resp.statusMessage = "OK";
+			resp.body = responseData.dump();
+
+			return resp;
+		}, "Get all UI panel iframes");
+		
+		std::cout << "[RoutesManager] IFrame routes registered" << std::endl;
 		}
 	}
 }

@@ -19,6 +19,11 @@ endif()
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MP /O2")
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MP /O2")
 
+# Add /bigobj flag for MSVC to handle large object files (needed for Unity builds)
+if(MSVC)
+    add_compile_options(/bigobj)
+endif()
+
 
 option(USE_CEF "Enable Chromium Embedded Framework for UI" ON) 
 

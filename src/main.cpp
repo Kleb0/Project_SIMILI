@@ -211,6 +211,12 @@ int main(int argc, char* argv[])
 	auto* frameDatas = new SIMILI::Frontend::FrameDatas(handler.get());
 	handler->setFrameDatas(frameDatas);
 	std::cout << "[Main] FrameDatas created and linked to UIHandler" << std::endl;
+
+	std::cout << "[Main] Creating UIManager..." << std::endl;
+	SIMILI::Frontend::UIManager myUIManager;
+	mainWindow.setUIManager(&myUIManager);
+	handler->setUIManager(&myUIManager);
+	std::cout << "[Main] UIManager created and linked to SDL_ApplicationWindow and UIHandler" << std::endl;
 	
 	SDL_StartTextInput(mainWindow.getHandle());
 	

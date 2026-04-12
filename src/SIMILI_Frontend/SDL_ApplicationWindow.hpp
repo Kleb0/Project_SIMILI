@@ -57,6 +57,7 @@ public:
 	void setThreeDScreen(ThreeDScreen* screen);
 	void setVKContext(VKContext* context);
 	void setVulkanPipelines(VulkanPipeline* pipelines);
+	void setUIManager(SIMILI::Frontend::UIManager* manager) { ui_manager_ = manager; }
 	void updateFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas);
 	
 	// === Component Access ===

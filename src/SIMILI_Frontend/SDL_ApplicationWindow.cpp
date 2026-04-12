@@ -2,6 +2,7 @@
 #include "ui_handler.hpp"
 #include "viewportLogic/ThreeDScreen/ThreeDScreen.hpp"
 #include "viewportLogic/UIPanels/UIManager.hpp"
+#include "viewportLogic/UIPanels/Splitter.hpp"
 #include "CEFDrawing/CEF_Drawer.hpp"
 #include "CEFDrawing/CEF_Resizer.hpp"
 #include "../../Engine/VulkanScene/VKcontext.hpp"
@@ -149,21 +150,14 @@ bool SDL_ApplicationWindow::create(const std::string& title, int width, int heig
 	std::cout << "[SDL_ApplicationWindow] Window created: " << title 
 	          << " (" << width << "x" << height << ") DPI scale: " << dpi_scale_ << std::endl;
 	
-	if (!ui_manager_)
-	{
-		ui_manager_ = new SIMILI::Frontend::UIManager();
-	}
+	// ui_manager_ will be set externally via setUIManager()
 	
 	return true;
 }
 
 void SDL_ApplicationWindow::destroy()
 {
-	if (ui_manager_)
-	{
-		delete ui_manager_;
-		ui_manager_ = nullptr;
-	}
+	// ui_manager_ is not owned by SDL_ApplicationWindow, so we don't delete it
 	
 	if (window_)
 	{
@@ -677,19 +671,50 @@ void SDL_ApplicationWindow::drawUIPanels()
 	
 	if (draw_ui_call_count % 120 == 1) // Log every 2 seconds at 60 FPS 
 	{
-		std::cout << "[SDL_ApplicationWindow] drawUIPanels() called " << draw_ui_call_count << " times, ui_handler_=" << (ui_handler_ != nullptr) << std::endl;
+		std::cout << "[SDL_ApplicationWindow] drawUIPanels() called " << draw_ui_call_count << " times, ui_manager_=" << (ui_manager_ != nullptr) << std::endl;
 	}
 	
-	if (ui_handler_ && vk_command_buffers_.size() > current_image_index_)
+	if (!ui_manager_ || !vk_command_buffers_.size() > current_image_index_)
+	{
+		return;
+	}
+
+	int drawableWidth = 0;
+	int drawableHeight = 0;
+	SDL_GetWindowSizeInPixels(window_, &drawableWidth, &drawableHeight);
+
+	VkCommandBuffer commandBuffer = vk_command_buffers_[current_image_index_];
+
+	// Get panel frame data from splitter (via UIHandler) or from cached data
+	std::map<std::string, SIMILI::Frontend::IFrameScreenData> panelFrameDataMap;
+	if (ui_handler_)
 	{
 		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-		
-		int drawableWidth = 0;
-		int drawableHeight = 0;
-		SDL_GetWindowSizeInPixels(window_, &drawableWidth, &drawableHeight);
-		
-		handler->drawUIPanels(vk_command_buffers_[current_image_index_], drawableWidth, drawableHeight);
+		Splitter* splitter = handler->getSplitter();
+		if (splitter)
+		{
+			panelFrameDataMap = splitter->getUIPanelFrameDatas();
+		}
 	}
+
+	if (panelFrameDataMap.empty())
+	{
+		panelFrameDataMap = ui_manager_->getUIPanelFrameDatas();
+	}
+
+	// Skip texture rebuild if splitter is dragging
+	bool skipTextureRebuild = false;
+	if (ui_handler_)
+	{
+		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+		Splitter* splitter = handler->getSplitter();
+		if (splitter && splitter->isDragging())
+		{
+			skipTextureRebuild = true;
+		}
+	}
+
+	ui_manager_->drawUIPanels(commandBuffer, drawableWidth, drawableHeight, panelFrameDataMap, skipTextureRebuild);
 }
 
 void SDL_ApplicationWindow::drawCEF()

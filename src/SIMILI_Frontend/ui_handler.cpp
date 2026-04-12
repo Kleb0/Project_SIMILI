@@ -40,6 +40,7 @@ UIHandler::UIHandler() : parent_sdl_window_(nullptr), parent_window_(nullptr), w
 	vk_renderer_(nullptr), vulkan_pipelines_(nullptr), main_camera_(nullptr), cube_mesh_ptr_(nullptr), scene_initialized_(false),
 	render_message_router_(nullptr), 
 	frame_datas_(nullptr),
+	ui_manager_(nullptr),
 	window_delegate_(nullptr),
 	mouse_controller_(nullptr),
 	is_camera_operation_locked_(false),
@@ -55,10 +56,10 @@ UIHandler::UIHandler() : parent_sdl_window_(nullptr), parent_window_(nullptr), w
 	owner_thread_id_(std::this_thread::get_id()),
 	pending_iframe_capture_(false),
 	pending_ui_panel_cache_(false),
-	ui_panels_initialized_(false),
 	resource_request_handler_(nullptr)
 {
 	mouse_controller_ = new SIMILI::Input::MouseController();
+	ui_manager_ = nullptr;
 
 	HRESULT hr = S_OK;
 	D2D1_FACTORY_OPTIONS options = {};
@@ -154,6 +155,7 @@ UIHandler::~UIHandler()
 		delete mouse_controller_;
 		mouse_controller_ = nullptr;
 	}
+	// ui_manager_ is not owned by UIHandler, so we don't delete it
 	if (frame_datas_)
 	{
 		delete frame_datas_;
@@ -169,12 +171,9 @@ UIHandler::~UIHandler()
 		delete composite_test_renderer_;
 		composite_test_renderer_ = nullptr;
 	}
-	ui_panels_.clear();
-	ui_panel_frame_data_map_.clear();
-	ui_panel_iframe_map_.clear();
 	if (cef_drawer_)
 	{
-		cef_drawer_ = nullptr; // CEF will release it via reference counting
+		cef_drawer_ = nullptr;
 	}
 
 	if (d2d_device_)
@@ -392,47 +391,10 @@ void UIHandler::OnBeforeClose(CefRefPtr<CefBrowser> browser)
 
 void UIHandler::initializeDefaultUIPanels()
 {
-	std::cout << "[UIHandler] Initializing default UI panels..." << std::endl;
-	
-	std::map<std::string, IFrameData> defaultPanels;
-	
-	for (int i = 0; i < 1; i++)
+	if (ui_manager_)
 	{
-		std::string panelName = "temp_panel_" + std::to_string(i);
-		
-		IFrameData panelData;
-		panelData.name = panelName;
-		panelData.x = 0;
-		panelData.y = 0;
-		panelData.width = 100;
-		panelData.height = 100;
-		panelData.clientX = 0;
-		panelData.clientY = 0;
-		
-		defaultPanels[panelName] = panelData;
-		iframe_data_map_[panelName] = panelData;
+		ui_manager_->initializeDefaultUIPanels();
 	}
-	
-	std::map<std::string, CEF_Drawer::UIPanelFrameData> uiPanelFramesForDrawer;
-	for (const auto& pair : defaultPanels)
-	{
-		CEF_Drawer::UIPanelFrameData panelFrame;
-		panelFrame.x = pair.second.x;
-		panelFrame.y = pair.second.y;
-		panelFrame.width = pair.second.width;
-		panelFrame.height = pair.second.height;
-		uiPanelFramesForDrawer[pair.first] = panelFrame;
-	}
-	
-	if (cef_drawer_)
-	{
-		cef_drawer_->updateUIPanelFrames(uiPanelFramesForDrawer);
-	}
-	
-	updateUIPanelIFrames(defaultPanels);
-	cacheUIPanelFrameDatas();
-	
-	std::cout << "[UIHandler] Default UI panels initialized: " << defaultPanels.size() << " panels" << std::endl;
 }
 
 
@@ -953,6 +915,15 @@ void UIHandler::startSplitter(VKContext* vkContext, VkRenderPass renderPass)
 		return;
 	}
 
+	if (ui_manager_)
+	{
+		ui_manager_->setVKContext(vkContext);
+		ui_manager_->setVulkanPipelines(vulkan_pipelines_);
+		ui_manager_->setRenderPass(renderPass);
+		ui_manager_->setCEFDrawer(cef_drawer_);
+		std::cout << "[UIHandler] UIManager initialized with Vulkan resources" << std::endl;
+	}
+
 	if (!splitter_)
 	{
 		splitter_ = std::make_unique<Splitter>();
@@ -1400,20 +1371,10 @@ bool UIHandler::validateIFrameCoordinates(const std::map<std::string, IFrameData
 
 void UIHandler::updateUIPanelIFrames(const std::map<std::string, IFrameData>& iframeDataMap)
 {
-	std::lock_guard<std::mutex> lock(ui_panel_mutex_);
-	ui_panel_iframe_map_.clear();
-
-	for (const auto& pair : iframeDataMap)
+	if (ui_manager_)
 	{
-		if (pair.first == "viewport_panel")
-		{
-			continue;
-		}
-
-		ui_panel_iframe_map_[pair.first] = pair.second;
+		ui_manager_->updateUIPanelIFrames(iframeDataMap);
 	}
-
-	std::cout << "[UIHandler] UI panel iframe count received: " << ui_panel_iframe_map_.size() << std::endl;
 	pending_ui_panel_cache_.store(true);
 }
 
@@ -1425,278 +1386,27 @@ void UIHandler::cacheUIPanelFrameDatas()
 		return;
 	}
 
-	if (splitter_)
+	if (ui_manager_)
 	{
-		auto splitterFrameDataMap = splitter_->getUIPanelFrameDatas();
-		if (!splitterFrameDataMap.empty())
+		std::map<std::string, SIMILI::Frontend::IFrameScreenData> splitterFrameDataMap;
+		if (splitter_)
 		{
-			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
-			ui_panel_frame_data_map_ = std::move(splitterFrameDataMap);
-			return;
+			splitterFrameDataMap = splitter_->getUIPanelFrameDatas();
 		}
-	}
-
-	if (!frame_datas_)
-	{
-		return;
-	}
-
-	const auto& frameDataMap = frame_datas_->getFrameData();
-	std::lock_guard<std::mutex> lock(ui_panel_mutex_);
-	ui_panel_frame_data_map_.clear();
-
-	if (ui_panel_iframe_map_.empty())
-	{
-		return;
-	}
-
-	for (const auto& pair : ui_panel_iframe_map_)
-	{
-		auto frameIt = frameDataMap.find(pair.first);
-		if (frameIt != frameDataMap.end())
-		{
-			ui_panel_frame_data_map_[pair.first] = frameIt->second;
-		}
-	}
-}
-
-void UIHandler::drawUIPanels(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight)
-{
-	if (!cef_drawer_)
-	{
-		return;
-	}
-
-	SDL_Window* sdlWindow = cef_drawer_->getWindowHandle();
-	if (!sdlWindow)
-	{
-		return;
-	}
-
-	std::map<std::string, SIMILI::Frontend::IFrameScreenData> panelFrameDataMap;
-	if (splitter_)
-	{
-		panelFrameDataMap = splitter_->getUIPanelFrameDatas();
-		if (!ui_panels_initialized_)
-		{
-			std::cout << "[UIHandler] drawUIPanels: Got " << panelFrameDataMap.size() << " panels from splitter" << std::endl;
-			for (const auto& p : panelFrameDataMap)
-			{
-				std::cout << "[UIHandler]   - Panel in map: " << p.first << " (X:" << p.second.relativeX << " Y:" << p.second.relativeY << " W:" << p.second.width << " H:" << p.second.height << ")" << std::endl;
-			}
-		}
-	}
-	else
-	{
-		if (!ui_panels_initialized_)
-		{
-			std::cout << "[UIHandler] drawUIPanels: No splitter available" << std::endl;
-		}
-	}
-
-	if (panelFrameDataMap.empty())
-	{
-		std::lock_guard<std::mutex> lock(ui_panel_mutex_);
-		panelFrameDataMap = ui_panel_frame_data_map_;
-		if (!ui_panels_initialized_)
-		{
-			std::cout << "[UIHandler] drawUIPanels: Got " << panelFrameDataMap.size() << " panels from cached frame data" << std::endl;
-		}
-	}
-
-	if (panelFrameDataMap.empty())
-	{
-		if (!ui_panels_initialized_)
-		{
-			std::cout << "[UIHandler] drawUIPanels: No panel data available - clearing panels" << std::endl;
-		}
-		ui_panels_.clear();
-		return;
-	}
-	
-	static int panel_map_log_count = 0;
-	if (panel_map_log_count < 5 || panel_map_log_count % 120 == 0)
-	{
-		std::cout << "[UIHandler::drawUIPanels] Rendering " << panelFrameDataMap.size() << " panels at call " << panel_map_log_count << ":" << std::endl;
-		for (const auto& p : panelFrameDataMap)
-		{
-			std::cout << "  - " << p.first << " at (" << p.second.relativeX << "," << p.second.relativeY << ") size " << p.second.width << "x" << p.second.height << std::endl;
-		}
-	}
-	panel_map_log_count++;
-
-	CEF_Drawer::SDLWindowProperties windowProperties = cef_drawer_->getSDLWindowProperties();
-	if (drawableWidth <= 0 || drawableHeight <= 0)
-	{
-		drawableWidth = windowProperties.drawable_width;
-		drawableHeight = windowProperties.drawable_height;
-	}
-	if (drawableWidth <= 0 || drawableHeight <= 0)
-	{
-		SDL_GetWindowSizeInPixels(sdlWindow, &drawableWidth, &drawableHeight);
-	}
-	if (drawableWidth <= 0 || drawableHeight <= 0)
-	{
-		return;
-	}
-
-	bool skipTextureRebuild = splitter_ && splitter_->isDragging();
-
-	std::set<std::string> activePanelNames;
-
-	for (const auto& pair : panelFrameDataMap)
-	{
-		if (pair.first == "viewport_panel")
-		{
-			if (!ui_panels_initialized_)
-			{
-				std::cout << "[UIHandler] Skipping viewport_panel from UI rendering" << std::endl;
-			}
-			continue;
-		}
-
-		if (pair.second.width <= 0 || pair.second.height <= 0)
-		{
-			if (!ui_panels_initialized_)
-			{
-				std::cout << "[UIHandler] Skipping panel '" << pair.first << "' with invalid dimensions: " << pair.second.width << "x" << pair.second.height << std::endl;
-			}
-			continue;
-		}
-		
-		auto panelIt = ui_panels_.find(pair.first);
-		if (panelIt == ui_panels_.end())
-		{
-			std::cout << "[UIHandler] Creating new UIPanel: " << pair.first << std::endl;
-			auto panel = std::make_unique<UIPanel>();
-			if (!panel->initialize(pair.first))
-			{
-				std::cout << "[UIHandler] Failed to initialize panel: " << pair.first << std::endl;
-				continue;
-			}
-
-			if (vk_renderer_)
-			{
-				panel->setVKContext(vk_renderer_);
-				std::cout << "[UIHandler] VKContext set for panel: " << pair.first << std::endl;
-			}
-			else
-			{
-				std::cout << "[UIHandler] No VKContext available for panel: " << pair.first << std::endl;
-			}
-
-			if (vulkan_pipelines_)
-			{
-				panel->setVulkanPipelines(vulkan_pipelines_);
-				std::cout << "[UIHandler] VulkanPipelines set for panel: " << pair.first << std::endl;
-			}
-			else
-			{
-				std::cout << "[UIHandler] No VulkanPipelines available for panel: " << pair.first << std::endl;
-			}
-
-			if (parent_sdl_window_)
-			{
-				VkRenderPass renderPass = parent_sdl_window_->getRenderPass();
-				if (renderPass != VK_NULL_HANDLE)
-				{
-					panel->setRenderPass(renderPass);
-					std::cout << "[UIHandler] RenderPass set for panel: " << pair.first << std::endl;
-				}
-				else
-				{
-					std::cout << "[UIHandler] RenderPass is NULL for panel: " << pair.first << std::endl;
-				}
-			}
-			else
-			{
-				std::cout << "[UIHandler] No SDL window available for panel: " << pair.first << std::endl;
-			}
-
-			panelIt = ui_panels_.emplace(pair.first, std::move(panel)).first;
-			std::cout << "[UIHandler] Panel created and stored: " << pair.first << std::endl;
-		}
-
-		panelIt->second->updateFromFrameData(pair.second, sdlWindow, skipTextureRebuild);
-		
-		UIPanel::DrawingState preDrawState = panelIt->second->getDrawingState();
-		
-		panelIt->second->draw(commandBuffer, drawableWidth, drawableHeight);
-		
-		UIPanel::DrawingState postDrawState = panelIt->second->getDrawingState();
-		
-		static int draw_debug_count = 0;
-		bool should_log = (draw_debug_count < 3 || draw_debug_count % 120 == 0);
-		if (should_log || preDrawState == UIPanel::DrawingState::IsNotReadyToBeDrawn)
-		{
-			std::cout << "[UIHandler::drawUIPanels] Panel " << pair.first 
-			          << " state: " << static_cast<int>(preDrawState) << "->" << static_cast<int>(postDrawState)
-			          << " at draw call " << draw_debug_count << std::endl;
-		}
-		draw_debug_count++;
-		
-		activePanelNames.insert(pair.first);
-	}
-
-	for (auto it = ui_panels_.begin(); it != ui_panels_.end();)
-	{
-		if (activePanelNames.find(it->first) == activePanelNames.end())
-		{
-			it = ui_panels_.erase(it);
-		}
-		else
-		{
-			++it;
-		}
-	}
-
-	if (!ui_panels_initialized_ && !ui_panels_.empty())
-	{
-		ui_panels_initialized_ = true;
-		std::cout << "[UIHandler] UI Panels initialization completed with " << ui_panels_.size() << " panels" << std::endl;
+		ui_manager_->cacheUIPanelFrameDatas(frame_datas_, splitterFrameDataMap);
 	}
 }
 
 void UIHandler::clearUIPanels()
 {
-	ui_panels_.clear();
+	if (ui_manager_)
+	{
+		ui_manager_->clearUIPanels();
+	}
 	splitter_.reset();
 	iframe_data_map_.clear();
 	pending_iframe_capture_.store(false);
 	pending_ui_panel_cache_.store(false);
-	ui_panels_initialized_ = false;
-
-	std::lock_guard<std::mutex> lock(ui_panel_mutex_);
-	ui_panel_frame_data_map_.clear();
-	ui_panel_iframe_map_.clear();
-}
-
-void UIHandler::forceRebuildAllUIPanels()
-{
-	std::cout << "[UIHandler] Forcing rebuild of all UI panels..." << std::endl;
-	
-	for (auto& pair : ui_panels_)
-	{
-		if (pair.second)
-		{
-			pair.second->forceTextureRebuild();
-			std::cout << "[UIHandler] Forced rebuild for panel: " << pair.first << std::endl;
-		}
-	}
-	
-	ui_panels_initialized_ = false;
-	std::cout << "[UIHandler] All UI panels rebuild forced" << std::endl;
-}
-
-void UIHandler::forceRedrawAllUIPanels()
-{
-	for (auto& pair : ui_panels_)
-	{
-		if (pair.second)
-		{
-			pair.second->forceRedraw();
-		}
-	}
 }
 
 void UIHandler::CallTestFromServer()

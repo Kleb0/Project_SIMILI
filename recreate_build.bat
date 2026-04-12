@@ -1,7 +1,35 @@
 @echo off
+setlocal EnableExtensions
+
 echo ========================================
 echo  SIMILI - Recreate Build Folder
 echo ========================================
+echo.
+
+cd /d "%~dp0"
+
+REM Auto-detect Visual Studio installation
+set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+if not exist "%VSWHERE%" (
+    echo ERROR: vswhere.exe not found. Please install Visual Studio 2017 or later.
+    pause
+    exit /b 1
+)
+
+for /f "usebackq tokens=*" %%i in (`"%VSWHERE%" -latest -property installationPath`) do set "VS_PATH=%%i"
+if not defined VS_PATH (
+    echo ERROR: Visual Studio installation not found
+    pause
+    exit /b 1
+)
+
+for /f "usebackq tokens=*" %%i in (`"%VSWHERE%" -latest -property installationVersion`) do set "VS_VERSION=%%i"
+for /f "tokens=1 delims=." %%a in ("%VS_VERSION%") do set "VS_MAJOR=%%a"
+
+echo Detected Visual Studio %VS_VERSION% at: %VS_PATH%
+
+call "%VS_PATH%\VC\Auxiliary\Build\vcvars64.bat"
+echo === Visual Studio Environment initialized ===
 echo.
 
 cd /d "%~dp0"
@@ -21,7 +49,8 @@ cd build
 
 echo.
 echo [3/4] Running CMake configuration with vcpkg toolchain...
-cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
+echo Using CMake generator: Visual Studio %VS_MAJOR%
+cmake .. -G "Visual Studio %VS_MAJOR%" -A x64 -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
 
 if %ERRORLEVEL% NEQ 0 (
     echo.
