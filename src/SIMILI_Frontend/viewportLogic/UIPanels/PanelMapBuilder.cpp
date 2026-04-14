@@ -1,4 +1,7 @@
 #include "PanelMapBuilder.hpp"
+#include "UIPanel.hpp"
+#include "../../CEFDrawing/CEF_Drawer.hpp"
+#include "../../../Engine/VulkanScene/VKcontext.hpp"
 #include <iostream>
 #include <algorithm>
 #include <cmath>
@@ -15,12 +18,10 @@ namespace SIMILI {
 		}
 
 		void PanelMapBuilder::rebuildFromSource(
-			const std::map<std::string, IFrameScreenData>& frameDataMap,
-			int currentWindowWidth,
-			int currentWindowHeight,
-			std::map<std::string, PanelState>& panelStateMap,
-			int& lastWindowWidth,
-			int& lastWindowHeight)
+		const std::map<std::string, IFrameScreenData>& frameDataMap,
+		int currentWindowWidth, int currentWindowHeight,
+		std::map<std::string, PanelState>& panelStateMap,
+		int& lastWindowWidth, int& lastWindowHeight)
 		{
 			std::cout << "[PanelMapBuilder::rebuildFromSource] Called with " << frameDataMap.size() << " panels for window " 
 			          << currentWindowWidth << "x" << currentWindowHeight << std::endl;
@@ -53,8 +54,8 @@ namespace SIMILI {
 				{
 					int panelRight = pair.second.relativeX + pair.second.width;
 					int panelBottom = pair.second.relativeY + pair.second.height;
-					maxPanelRight = std::max(maxPanelRight, panelRight);
-					maxPanelBottom = std::max(maxPanelBottom, panelBottom);
+					maxPanelRight = (std::max)(maxPanelRight, panelRight);
+					maxPanelBottom = (std::max)(maxPanelBottom, panelBottom);
 				}
 			}
 
@@ -101,13 +102,13 @@ namespace SIMILI {
 								IFrameScreenData& frame = pair.second.frame;
 								frame.relativeX = static_cast<int>(std::lround(static_cast<float>(frame.relativeX) * scaleX));
 								frame.relativeY = static_cast<int>(std::lround(static_cast<float>(frame.relativeY) * scaleY));
-								frame.width = std::max(1, static_cast<int>(std::lround(static_cast<float>(frame.width) * scaleX)));
-								frame.height = std::max(1, static_cast<int>(std::lround(static_cast<float>(frame.height) * scaleY)));
-								
-								if (frame.relativeX >= currentWindowWidth) frame.relativeX = std::max(0, currentWindowWidth - frame.width);
-								if (frame.relativeY >= currentWindowHeight) frame.relativeY = std::max(0, currentWindowHeight - frame.height);
-								if (frame.relativeX + frame.width > currentWindowWidth) frame.width = std::max(1, currentWindowWidth - frame.relativeX);
-								if (frame.relativeY + frame.height > currentWindowHeight) frame.height = std::max(1, currentWindowHeight - frame.relativeY);
+							frame.width = (std::max)(1, static_cast<int>(std::lround(static_cast<float>(frame.width) * scaleX)));
+							frame.height = (std::max)(1, static_cast<int>(std::lround(static_cast<float>(frame.height) * scaleY)));
+							
+							if (frame.relativeX >= currentWindowWidth) frame.relativeX = (std::max)(0, currentWindowWidth - frame.width);
+							if (frame.relativeY >= currentWindowHeight) frame.relativeY = (std::max)(0, currentWindowHeight - frame.height);
+							if (frame.relativeX + frame.width > currentWindowWidth) frame.width = (std::max)(1, currentWindowWidth - frame.relativeX);
+							if (frame.relativeY + frame.height > currentWindowHeight) frame.height = (std::max)(1, currentWindowHeight - frame.relativeY);
 								
 								frame.windowWidth = currentWindowWidth;
 								frame.windowHeight = currentWindowHeight;
@@ -152,16 +153,13 @@ namespace SIMILI {
 								IFrameScreenData& frame = pair.second.frame;
 								frame.relativeX = static_cast<int>(std::lround(static_cast<float>(frame.relativeX) * scaleX));
 								frame.relativeY = static_cast<int>(std::lround(static_cast<float>(frame.relativeY) * scaleY));
-								frame.width = std::max(1, static_cast<int>(std::lround(static_cast<float>(frame.width) * scaleX)));
-								frame.height = std::max(1, static_cast<int>(std::lround(static_cast<float>(frame.height) * scaleY)));
-								
-								if (frame.relativeX >= currentWindowWidth) frame.relativeX = std::max(0, currentWindowWidth - frame.width);
-								if (frame.relativeY >= currentWindowHeight) frame.relativeY = std::max(0, currentWindowHeight - frame.height);
-								if (frame.relativeX + frame.width > currentWindowWidth) frame.width = std::max(1, currentWindowWidth - frame.relativeX);
-								if (frame.relativeY + frame.height > currentWindowHeight) frame.height = std::max(1, currentWindowHeight - frame.relativeY);
-								
-								frame.windowWidth = currentWindowWidth;
-								frame.windowHeight = currentWindowHeight;
+								frame.width = (std::max)(1, static_cast<int>(std::lround(static_cast<float>(frame.width) * scaleX)));
+								frame.height = (std::max)(1, static_cast<int>(std::lround(static_cast<float>(frame.height) * scaleY)));
+							
+								if (frame.relativeX >= currentWindowWidth) frame.relativeX = (std::max)(0, currentWindowWidth - frame.width);
+								if (frame.relativeY >= currentWindowHeight) frame.relativeY = (std::max)(0, currentWindowHeight - frame.height);
+								if (frame.relativeX + frame.width > currentWindowWidth) frame.width = (std::max)(1, currentWindowWidth - frame.relativeX);
+								if (frame.relativeY + frame.height > currentWindowHeight) frame.height = (std::max)(1, currentWindowHeight - frame.relativeY);
 							}
 							
 							lastWindowWidth = currentWindowWidth;
@@ -225,33 +223,33 @@ namespace SIMILI {
 						
 						frame.relativeX = static_cast<int>(std::lround(static_cast<float>(frame.relativeX) * scaleX));
 						frame.relativeY = static_cast<int>(std::lround(static_cast<float>(frame.relativeY) * scaleY));
-						frame.width = std::max(1, static_cast<int>(std::lround(static_cast<float>(frame.width) * scaleX)));
-						frame.height = std::max(1, static_cast<int>(std::lround(static_cast<float>(frame.height) * scaleY)));
+						frame.width = (std::max)(1, static_cast<int>(std::lround(static_cast<float>(frame.width) * scaleX)));
+						frame.height = (std::max)(1, static_cast<int>(std::lround(static_cast<float>(frame.height) * scaleY)));
 						
 						if (frame.relativeX >= currentWindowWidth)
 						{
-							frame.relativeX = std::max(0, currentWindowWidth - frame.width);
+							frame.relativeX = (std::max)(0, currentWindowWidth - frame.width);
 							std::cout << "[PanelMapBuilder::rebuildFromSource] CLAMPED " << pair.first 
 							          << " - was off-screen horizontally, moved to x=" << frame.relativeX << std::endl;
 						}
 						
 						if (frame.relativeY >= currentWindowHeight)
 						{
-							frame.relativeY = std::max(0, currentWindowHeight - frame.height);
+							frame.relativeY = (std::max)(0, currentWindowHeight - frame.height);
 							std::cout << "[PanelMapBuilder::rebuildFromSource] CLAMPED " << pair.first 
 							          << " - was off-screen vertically, moved to y=" << frame.relativeY << std::endl;
 						}
 						
 						if (frame.relativeX + frame.width > currentWindowWidth)
 						{
-							frame.width = std::max(1, currentWindowWidth - frame.relativeX);
+							frame.width = (std::max)(1, currentWindowWidth - frame.relativeX);
 							std::cout << "[PanelMapBuilder::rebuildFromSource] CLAMPED " << pair.first 
 							          << " width from " << oldW << " to " << frame.width << std::endl;
 						}
 						
 						if (frame.relativeY + frame.height > currentWindowHeight)
 						{
-							frame.height = std::max(1, currentWindowHeight - frame.relativeY);
+							frame.height = (std::max)(1, currentWindowHeight - frame.relativeY);
 							std::cout << "[PanelMapBuilder::rebuildFromSource] CLAMPED " << pair.first 
 							          << " height from " << oldH << " to " << frame.height << std::endl;
 						}
@@ -284,12 +282,9 @@ namespace SIMILI {
 		}
 
 		void PanelMapBuilder::scaleLayoutToWindow(
-			int newWindowWidth,
-			int newWindowHeight,
-			std::map<std::string, PanelState>& panelStateMap,
-			int& lastWindowWidth,
-			int& lastWindowHeight,
-			SDL_Window* window)
+		int newWindowWidth,int newWindowHeight,
+		std::map<std::string, PanelState>& panelStateMap,
+		int& lastWindowWidth, int& lastWindowHeight,SDL_Window* window)
 		{
 			if (newWindowWidth <= 0 || newWindowHeight <= 0)
 			{
@@ -337,33 +332,33 @@ namespace SIMILI {
 				
 				frame.relativeX = static_cast<int>(std::lround(static_cast<float>(frame.relativeX) * scaleX));
 				frame.relativeY = static_cast<int>(std::lround(static_cast<float>(frame.relativeY) * scaleY));
-				frame.width = std::max(1, static_cast<int>(std::lround(static_cast<float>(frame.width) * scaleX)));
-				frame.height = std::max(1, static_cast<int>(std::lround(static_cast<float>(frame.height) * scaleY)));
+				frame.width = (std::max)(1, static_cast<int>(std::lround(static_cast<float>(frame.width) * scaleX)));
+				frame.height = (std::max)(1, static_cast<int>(std::lround(static_cast<float>(frame.height) * scaleY)));
 				
 				if (frame.relativeX >= newWindowWidth)
 				{
-					frame.relativeX = std::max(0, newWindowWidth - frame.width);
+					frame.relativeX = (std::max)(0, newWindowWidth - frame.width);
 					std::cout << "[PanelMapBuilder::scaleLayoutToWindow] CLAMPED " << pair.first 
 					          << " - was off-screen horizontally, moved to x=" << frame.relativeX << std::endl;
 				}
 				
 				if (frame.relativeY >= newWindowHeight)
 				{
-					frame.relativeY = std::max(0, newWindowHeight - frame.height);
+					frame.relativeY = (std::max)(0, newWindowHeight - frame.height);
 					std::cout << "[PanelMapBuilder::scaleLayoutToWindow] CLAMPED " << pair.first 
 					          << " - was off-screen vertically, moved to y=" << frame.relativeY << std::endl;
 				}
 				
 				if (frame.relativeX + frame.width > newWindowWidth)
 				{
-					frame.width = std::max(1, newWindowWidth - frame.relativeX);
+					frame.width = (std::max)(1, newWindowWidth - frame.relativeX);
 					std::cout << "[PanelMapBuilder::scaleLayoutToWindow] CLAMPED " << pair.first 
 					          << " width to " << frame.width << std::endl;
 				}
 				
 				if (frame.relativeY + frame.height > newWindowHeight)
 				{
-					frame.height = std::max(1, newWindowHeight - frame.relativeY);
+					frame.height = (std::max)(1, newWindowHeight - frame.relativeY);
 					std::cout << "[PanelMapBuilder::scaleLayoutToWindow] CLAMPED " << pair.first 
 					          << " height to " << frame.height << std::endl;
 				}
@@ -391,10 +386,44 @@ namespace SIMILI {
 			}
 		}
 
+		void PanelMapBuilder::syncSplittersAndPanes(
+		const std::map<std::string, IFrameScreenData>& frameDataMap,
+		int currentWindowWidth, int currentWindowHeight,
+		std::map<std::string, PanelState>& panelStateMap,
+		std::vector<SplitterDefinition>& splitterList,
+		int& lastWindowWidth, int& lastWindowHeight,
+		SDL_Window* window)
+		{
+			std::cout << "[PanelMapBuilder::syncSplittersAndPanes] Called with " << frameDataMap.size() 
+			          << " panels for window " << currentWindowWidth << "x" << currentWindowHeight << std::endl;
+
+			rebuildFromSource(frameDataMap, currentWindowWidth, currentWindowHeight, panelStateMap, lastWindowWidth, lastWindowHeight);
+
+			if (currentWindowWidth > 0 && currentWindowHeight > 0 && window)
+			{
+				int windowWidth = 0;
+				int windowHeight = 0;
+				SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+				
+				if (windowWidth > 0 && windowHeight > 0 && 
+				    (windowWidth != lastWindowWidth || windowHeight != lastWindowHeight))
+				{
+					std::cout << "[PanelMapBuilder::syncSplittersAndPanes] Window size changed, scaling..." << std::endl;
+					scaleLayoutToWindow(windowWidth, windowHeight, panelStateMap, lastWindowWidth, lastWindowHeight, window);
+				}
+			}
+
+			updateClientCoordinates(panelStateMap);
+
+			buildSplitters(panelStateMap, splitterList);
+
+			std::cout << "[PanelMapBuilder::syncSplittersAndPanes] Completed - " << panelStateMap.size() 
+			          << " panels, " << splitterList.size() << " splitters" << std::endl;
+		}
+
 		void PanelMapBuilder::createViewportPanel(
-			std::map<std::string, PanelState>& panelStateMap,
-			int currentWindowWidth,
-			int currentWindowHeight)
+		std::map<std::string, PanelState>& panelStateMap,
+		int currentWindowWidth, int currentWindowHeight)
 		{
 			std::cout << "[PanelMapBuilder::createViewportPanel] Checking viewport_panel auto-creation: window=" 
 			          << currentWindowWidth << "x" << currentWindowHeight 
@@ -416,12 +445,12 @@ namespace SIMILI {
 					{
 						if (frame.relativeX < (currentWindowWidth / 4))
 						{
-							leftPanelRight = std::max(leftPanelRight, frame.relativeX + frame.width);
+							leftPanelRight = (std::max)(leftPanelRight, frame.relativeX + frame.width);
 						}
 						
 						if (frame.relativeX > (currentWindowWidth * 3 / 4))
 						{
-							rightPanelLeft = std::min(rightPanelLeft, frame.relativeX);
+							rightPanelLeft = (std::min)(rightPanelLeft, frame.relativeX);
 						}
 					}
 				}
@@ -441,10 +470,10 @@ namespace SIMILI {
 						const auto& frame = pair.second.frame;
 						if (frame.width > 0 && frame.height > 0)
 						{
-							topPanelBottom = std::max(topPanelBottom, frame.relativeY + frame.height);
+							topPanelBottom = (std::max)(topPanelBottom, frame.relativeY + frame.height);
 							if (frame.relativeY + frame.height > (currentWindowHeight / 2))
 							{
-								bottomPanelTop = std::min(bottomPanelTop, frame.relativeY);
+								bottomPanelTop = (std::min)(bottomPanelTop, frame.relativeY);
 							}
 						}
 					}
@@ -484,5 +513,160 @@ namespace SIMILI {
 				}
 			}
 		}
+
+	void PanelMapBuilder::buildSplitters(
+	const std::map<std::string, PanelState>& panelStateMap,
+	std::vector<SplitterDefinition>& splitterList)
+	{
+		splitterList.clear();
+
+		const int splitterThickness = 5;
+
+		std::vector<const PanelState*> panels;
+		for (const auto& pair : panelStateMap)
+		{
+			panels.push_back(&pair.second);
+		}
+
+		for (size_t i = 0; i < panels.size(); ++i)
+		{
+			const auto& panel1 = *panels[i];
+			
+			for (size_t j = i + 1; j < panels.size(); ++j)
+			{
+				const auto& panel2 = *panels[j];
+				
+				int panel1Right = panel1.frame.relativeX + panel1.frame.width;
+				int panel2Right = panel2.frame.relativeX + panel2.frame.width;
+				int panel1Bottom = panel1.frame.relativeY + panel1.frame.height;
+				int panel2Bottom = panel2.frame.relativeY + panel2.frame.height;
+				
+				if (abs(panel1Right - panel2.frame.relativeX) < 20 || 
+				    abs(panel2Right - panel1.frame.relativeX) < 20)
+				{
+					int overlapTop = (std::max)(panel1.frame.relativeY, panel2.frame.relativeY);
+					int overlapBottom = (std::min)(panel1Bottom, panel2Bottom);
+					
+					if (overlapBottom > overlapTop + 50)
+					{
+						int splitterX = (panel1Right <= panel2.frame.relativeX) ? panel1Right : panel2Right;
+						
+						SplitterDefinition splitter;
+						splitter.x = splitterX;
+						splitter.y = overlapTop;
+						splitter.width = splitterThickness;
+						splitter.height = overlapBottom - overlapTop;
+						splitter.isVertical = true;
+						
+						splitterList.push_back(splitter);
+					}
+				}
+				
+				if (abs(panel1Bottom - panel2.frame.relativeY) < 20 || 
+				    abs(panel2Bottom - panel1.frame.relativeY) < 20)
+				{
+					int overlapLeft = (std::max)(panel1.frame.relativeX, panel2.frame.relativeX);
+					int overlapRight = (std::min)(panel1Right, panel2Right);
+					
+					if (overlapRight > overlapLeft + 50)
+					{
+						int splitterY = (panel1Bottom <= panel2.frame.relativeY) ? panel1Bottom : panel2Bottom;
+						
+						SplitterDefinition splitter;
+						splitter.x = overlapLeft;
+						splitter.y = splitterY;
+						splitter.width = overlapRight - overlapLeft;
+						splitter.height = splitterThickness;
+						splitter.isVertical = false;
+						
+						splitterList.push_back(splitter);
+					}
+				}
+			}
+		}
+
+		std::cout << "[PanelMapBuilder::buildSplitters] Created " << splitterList.size() 
+		          << " splitters (thickness=" << splitterThickness << "px)" << std::endl;
+	}
+
+		void PanelMapBuilder::drawUIPanels(
+		VkCommandBuffer commandBuffer,
+		int drawableWidth, int drawableHeight,
+		const std::map<std::string, IFrameScreenData>& panelFrameDataMap,
+		bool skipTextureRebuild, VKContext* vkContext,
+		VulkanPipeline* vulkanPipelines,
+		VkRenderPass renderPass, CEF_Drawer* cefDrawer,
+		std::map<std::string, std::unique_ptr<UIPanel>>& uiPanels,
+		SDL_Window* window)
+		{
+	
+			if (!cefDrawer)
+			{
+				std::cout << "[PanelMapBuilder] drawUIPanels: cefDrawer is null" << std::endl;
+				return;
+			}
+
+			if (panelFrameDataMap.empty())
+			{
+				std::cout << "[PanelMapBuilder] drawUIPanels: No panel data available" << std::endl;
+				return;
+			}
+
+				std::cout << "[PanelMapBuilder] drawUIPanels: Drawing " << panelFrameDataMap.size() 
+				<< " UI panels with CEF_Drawer" << std::endl;
+
+			for (const auto& pair : panelFrameDataMap)
+			{
+				const std::string& panelName = pair.first;
+				const auto& frameData = pair.second;
+
+				if (panelName == "viewport_panel")
+				{
+					continue;
+				}
+
+				std::cout << "[PanelMapBuilder] Drawing panel '" << panelName << "' at (" 
+					<< frameData.relativeX << "," << frameData.relativeY << ") size " 
+					<< frameData.width << "x" << frameData.height << std::endl;
+
+				auto it = uiPanels.find(panelName);
+
+				if (it == uiPanels.end())
+				{
+					std::cout << "[PanelMapBuilder] Creating new UIPanel for '" << panelName << "'" << std::endl;
+					auto newPanel = std::make_unique<UIPanel>();
+					if (newPanel->initialize(panelName))
+					{
+						newPanel->setVKContext(vkContext);
+						newPanel->setVulkanPipelines(vulkanPipelines);
+						newPanel->setRenderPass(renderPass);
+
+						uiPanels[panelName] = std::move(newPanel);
+						it = uiPanels.find(panelName);
+					}
+
+				}
+
+				if (it != uiPanels.end() && it->second)
+				{
+					it->second->updateFromFrameData(frameData, window, skipTextureRebuild);
+					it->second->draw(commandBuffer, drawableWidth, drawableHeight);
+				}
+			}
+		}
+
+		void PanelMapBuilder::clearUIPanels(std::map<std::string, std::unique_ptr<UIPanel>>& uiPanels)
+		{
+			for (auto& pair : uiPanels)
+			{
+				if (pair.second)
+				{
+					pair.second->shutdown();
+				}
+			}
+			uiPanels.clear();
+			std::cout << "[PanelMapBuilder] clearUIPanels: All UI panels cleared" << std::endl;
+		}
+
 	}
 }

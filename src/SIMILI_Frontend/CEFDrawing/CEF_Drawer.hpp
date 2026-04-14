@@ -85,7 +85,8 @@ public:
 	static void requestActiveRuntimeLayoutSync(const std::map<std::string, UIPanelFrameData>& panelFrames);
 	static void forceActiveLayoutSync();
 	void requestRuntimeLayoutSync(const std::map<std::string, UIPanelFrameData>& panelFrames);
-	void forceRepaint();
+	
+	
 	void invalidateAllUIPanelTextures();
 	CEF_Resizer& getResizer();
 	

@@ -709,38 +709,6 @@ void CEF_Drawer::requestRuntimeLayoutSync(const std::map<std::string, UIPanelFra
 	CefPostTask(TID_UI, base::BindOnce(&CEF_Resizer::flushRuntimeLayoutSync, base::Unretained(resizer_.get())));
 }
 
-void CEF_Drawer::forceRepaint()
-{
-	std::lock_guard<std::mutex> lock(render_mutex_);
-	if (!is_initialized_render_complete_)
-	{
-		suppress_cef_repaints_ = false;
-	}
-	else
-	{
-		force_single_repaint_ = true;
-	}
-	
-	if (browser_)
-	{
-		CefRefPtr<CefBrowserHost> host = browser_->GetHost();
-		if (host)
-		{
-			CefPostTask(TID_UI, base::BindOnce([](CefRefPtr<CefBrowser> browser) {
-				if (browser)
-				{
-					CefRefPtr<CefBrowserHost> host = browser->GetHost();
-					if (host)
-					{
-						host->WasResized();
-						host->Invalidate(PET_VIEW);
-					}
-				}
-			}, browser_));
-		}
-	}
-}
-
 void CEF_Drawer::invalidateAllUIPanelTextures()
 {
 	std::lock_guard<std::mutex> lock(render_mutex_);

@@ -27,11 +27,6 @@
 #include <thread>
 #include <chrono>
 #include <SDL3/SDL.h>
-#include <d3d11.h>
-#include <d2d1.h>
-#include <d2d1_1.h>
-#include <dxgi1_2.h>
-#include <dcomp.h>
 
 class SimpleWindowDelegate;
 
@@ -84,16 +79,8 @@ public:
 	virtual CefRefPtr<CefRenderHandler> GetRenderHandler() override;
 	virtual CefRefPtr<CefRequestHandler> GetRequestHandler() override;
 
-	// To be deleted later
-	virtual void OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) override;
-	virtual void OnAfterCreated(CefRefPtr<CefBrowser> browser) override;
-	virtual bool DoClose(CefRefPtr<CefBrowser> browser) override;
-	virtual void OnBeforeClose(CefRefPtr<CefBrowser> browser) override;
 
-	virtual bool OnPreKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& event, CefEventHandle os_event, bool* is_keyboard_shortcut) override;
-	virtual bool OnKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& event, CefEventHandle os_event) override;
-
-	virtual bool OnBeforeBrowse(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefRequest> request, bool user_gesture, bool is_redirect) override;
+	// ============ Essential to load resources from html, css and js files ============================
 	virtual CefRefPtr<CefResourceRequestHandler> GetResourceRequestHandler(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefRequest> request, bool is_navigation, bool is_download, const CefString& request_initiator, bool& disable_default_handling) override;
 
 	// ================== WindowManagement ======================================================
@@ -136,16 +123,16 @@ public:
 	void updateUIPanelIFrames(const std::map<std::string, IFrameData>& iframeDataMap);
 	void cacheUIPanelFrameDatas();
 	void clearUIPanels();
+
 	void setUIManager(SIMILI::Frontend::UIManager* manager) { ui_manager_ = manager; }
-	void startSplitter(VKContext* vkContext, VkRenderPass renderPass);
+	void startManager(VKContext* vkContext, VkRenderPass renderPass);
+
 	bool handleSplitterEvent(const SDL_Event& event);
 	bool validateIFrameCoordinates(const std::map<std::string, IFrameData>& iframeDataMap, int& outMaxX, int& outMaxY) const;
 	bool getResolvedViewportFrameData(SIMILI::Frontend::IFrameScreenData& outData) const;
 	void processPendingFrameUpdates();
 	std::map<std::string, IFrameData> getAllIFrames() const { return iframe_data_map_.snapshot(); }
 
-
-	
 
 	// ====================== MOUSE & CAMERA CONTROL==================================================
 
@@ -164,11 +151,6 @@ public:
 	void Set_DOM(CEF_Drawer* drawer);
 
 	Splitter* getSplitter() const { return splitter_.get(); }
-	
-	ID3D11Device* getD3D11Device() const { return d3d11_device_; }
-	ID2D1Factory1* getD2D1Factory() const { return d2d_factory_; }
-	ID2D1Device* getD2D1Device() const { return d2d_device_; }
-	IDXGIDevice1* getDXGIDevice() const { return dxgi_device_; }
 
 	// ============ UTILITIES ============================
 		
@@ -190,7 +172,6 @@ private:
 
 	// ================================= SINGLETON ===============
 
-
 	static UIHandler* s_instance_;
 
 	// ============================ CEF INTERNAL ===============
@@ -201,7 +182,6 @@ private:
 	BrowserList browser_list_;
 
 	// ============================= WINDOW HANDLES =======================================
-
 	
 	SDL_ApplicationWindow* parent_sdl_window_;
 	SDL_Window* parent_window_;
@@ -217,12 +197,10 @@ private:
 	Mesh** cube_mesh_ptr_;
 	bool scene_initialized_;
 
-
 	// ============================== VULKAN PIPELINES ==========================================
 	VulkanPipeline* vulkan_pipelines_;
 
 	// ============================ VIEWPORT STATE ============================================
-
 	
 	Uint64 last_viewport_update_time_;
 	int last_viewport_x_;
@@ -234,7 +212,6 @@ private:
 	
 	std::chrono::steady_clock::time_point last_frame_capture_time_;
 	// =============================== FRAME DATA & INPUT =======================================
-
 	
 	SIMILI::Frontend::FrameDatas* frame_datas_;
 	SIMILI::Frontend::UIManager* ui_manager_;
@@ -247,12 +224,6 @@ private:
 	Overlay_HTML_Texture_Renderer* slot_texture_renderer_;
 	Overlay_HTML_Texture_Renderer* composite_test_renderer_;
 	CEF_Drawer* cef_drawer_;
-
-	ID3D11Device* d3d11_device_;
-	ID3D11DeviceContext* d3d11_device_context_;
-	IDXGIDevice1* dxgi_device_;
-	ID2D1Factory1* d2d_factory_;
-	ID2D1Device* d2d_device_;
 
 	// ============================= UI PANELS STATE drawing ===========================================
 

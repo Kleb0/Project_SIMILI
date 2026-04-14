@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 #include <vulkan/vulkan.h>
 #include "UIPanel.hpp"
+#include "PanelMapBuilder.hpp"
 #include "FrameDatas/FrameDatas.hpp"
 #include <map>
 #include <string>
@@ -52,14 +53,16 @@ namespace SIMILI {
 			void initializeDefaultUIPanels();
 			void updateUIPanelIFrames(const std::map<std::string, IFrameData>& iframeDataMap);
 			void cacheUIPanelFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas, const std::map<std::string, IFrameScreenData>& splitterFrameDataMap);
-			void drawUIPanels(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild);
+			void syncFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas, SDL_Window* sdlWindow);
+			
+			void RenderUI(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild);
+			void drawUIPanels(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild, SDL_Window* window);
+		
 			void clearUIPanels();
-			void forceRebuildAllUIPanels();
-			void forceRedrawAllUIPanels();
 
 			std::map<std::string, IFrameData> getUIPanelIFrames() const;
 			std::map<std::string, IFrameScreenData> getUIPanelFrameDatas() const;
-
+		
 		private:
 			UIState current_state_;
 			UIState previous_state_;
@@ -87,6 +90,8 @@ namespace SIMILI {
 			std::map<std::string, std::unique_ptr<UIPanel>> ui_panels_;
 			bool ui_panels_initialized_;
 			mutable std::mutex ui_panel_mutex_;
+			
+			PanelMapBuilder panel_map_builder_;
 		};
 	}
 }

@@ -397,6 +397,11 @@ int main(int argc, char* argv[])
 	handler->forceCaptureIFramePositions();
 	std::cout << "[Main] Initial frame data captured" << std::endl;
 
+
+	// Needs to be changed
+	mainWindow.startSplitter();
+	std::cout << "[Main] Splitter started and UIManager configured" << std::endl;
+
 	std::cout << "[Main] SDL window shown" << std::endl;
 
 	// Main render loop

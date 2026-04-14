@@ -42,9 +42,7 @@ void CEF_Resizer::resize(int width, int height)
 		owner_.height_ = height;
 		owner_.updateWindowProperties();
 		ensureTextureStorage(owner_.width_, owner_.height_);
-	}
-	
-	owner_.forceRepaint();
+	}	
 	
 	if (owner_.browser_)
 	{
@@ -643,7 +641,7 @@ void CEF_Resizer::flushRuntimeLayoutSync()
 
 	mainFrame->ExecuteJavaScript(script, mainFrame->GetURL(), 0);
 
-	owner_.forceRepaint();
+	
 
 	CefRefPtr<CefBrowserHost> host = browser->GetHost();
 	if (host)
@@ -767,8 +765,7 @@ void CEF_Resizer::forceLayoutSync()
 			}
 		}
 	}
-
-	owner_.forceRepaint();
+	
 
 	CefRefPtr<CefBrowserHost> host = owner_.browser_->GetHost();
 	if (host)

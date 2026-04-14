@@ -47,11 +47,6 @@ UIHandler::UIHandler() : parent_sdl_window_(nullptr), parent_window_(nullptr), w
 	slot_texture_renderer_(nullptr),
 	composite_test_renderer_(nullptr),
 	cef_drawer_(nullptr),
-	d3d11_device_(nullptr),
-	d3d11_device_context_(nullptr),
-	dxgi_device_(nullptr),
-	d2d_factory_(nullptr),
-	d2d_device_(nullptr),
 	splitter_(nullptr),
 	owner_thread_id_(std::this_thread::get_id()),
 	pending_iframe_capture_(false),
@@ -60,48 +55,6 @@ UIHandler::UIHandler() : parent_sdl_window_(nullptr), parent_window_(nullptr), w
 {
 	mouse_controller_ = new SIMILI::Input::MouseController();
 	ui_manager_ = nullptr;
-
-	HRESULT hr = S_OK;
-	D2D1_FACTORY_OPTIONS options = {};
-	options.debugLevel = D2D1_DEBUG_LEVEL_NONE;
-	hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory1), &options, (void**)&d2d_factory_);
-	
-	if (SUCCEEDED(hr))
-	{
-		UINT creationFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
-		D3D_FEATURE_LEVEL featureLevels[] = {
-			D3D_FEATURE_LEVEL_11_1,
-			D3D_FEATURE_LEVEL_11_0,
-			D3D_FEATURE_LEVEL_10_1,
-			D3D_FEATURE_LEVEL_10_0,
-			D3D_FEATURE_LEVEL_9_3,
-			D3D_FEATURE_LEVEL_9_2,
-			D3D_FEATURE_LEVEL_9_1
-		};
-		D3D_FEATURE_LEVEL featureLevel;
-		hr = D3D11CreateDevice(
-			nullptr,
-			D3D_DRIVER_TYPE_HARDWARE,
-			0,
-			creationFlags,
-			featureLevels,
-			ARRAYSIZE(featureLevels),
-			D3D11_SDK_VERSION,
-			&d3d11_device_,
-			&featureLevel,
-			&d3d11_device_context_
-		);
-	}
-	
-	if (SUCCEEDED(hr))
-	{
-		hr = d3d11_device_->QueryInterface(__uuidof(IDXGIDevice1), (void**)&dxgi_device_);
-	}
-	
-	if (SUCCEEDED(hr) && d2d_factory_)
-	{
-		hr = d2d_factory_->CreateDevice(dxgi_device_, &d2d_device_);
-	}
 	
 	s_instance_ = this;
 }
@@ -174,32 +127,6 @@ UIHandler::~UIHandler()
 	if (cef_drawer_)
 	{
 		cef_drawer_ = nullptr;
-	}
-
-	if (d2d_device_)
-	{
-		d2d_device_->Release();
-		d2d_device_ = nullptr;
-	}
-	if (dxgi_device_)
-	{
-		dxgi_device_->Release();
-		dxgi_device_ = nullptr;
-	}
-	if (d3d11_device_context_)
-	{
-		d3d11_device_context_->Release();
-		d3d11_device_context_ = nullptr;
-	}
-	if (d3d11_device_)
-	{
-		d3d11_device_->Release();
-		d3d11_device_ = nullptr;
-	}
-	if (d2d_factory_)
-	{
-		d2d_factory_->Release();
-		d2d_factory_ = nullptr;
 	}
 	
 	if (s_instance_ == this)
@@ -351,42 +278,22 @@ CefRefPtr<CefRequestHandler> UIHandler::GetRequestHandler()
 	return this;
 }
 
-
-void UIHandler::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) 
+CefRefPtr<CefResourceRequestHandler> UIHandler::GetResourceRequestHandler(
+	CefRefPtr<CefBrowser> browser,
+	CefRefPtr<CefFrame> frame,
+	CefRefPtr<CefRequest> request,
+	bool is_navigation,
+	bool is_download,
+	const CefString& request_initiator,
+	bool& disable_default_handling)
 {
-}
-
-void UIHandler::OnAfterCreated(CefRefPtr<CefBrowser> browser) 
-{
-	CEF_REQUIRE_UI_THREAD();
-	browser_list_.push_back(browser);
-}
-
-
-
-bool UIHandler::DoClose(CefRefPtr<CefBrowser> browser) 
-{
-	CEF_REQUIRE_UI_THREAD();
-	return false;
-}
-
-void UIHandler::OnBeforeClose(CefRefPtr<CefBrowser> browser) 
-{
-	CEF_REQUIRE_UI_THREAD();
-
-	for (auto it = browser_list_.begin(); it != browser_list_.end(); ++it) 
+	if (!resource_request_handler_)
 	{
-		if ((*it)->IsSame(browser)) 
-		{
-			browser_list_.erase(it);
-			break;
-		}
+		resource_request_handler_ = ResourcesLoader::createRequestHandler();
+		std::cout << "[UIHandler] Resource handler created and cached" << std::endl;
 	}
-
-	if (browser_list_.empty()) 
-	{
-		CefQuitMessageLoop();
-	}
+	
+	return resource_request_handler_;
 }
 
 void UIHandler::initializeDefaultUIPanels()
@@ -609,7 +516,6 @@ void UIHandler::enableCompositeTestRenderer(bool enable)
 	{
 		composite_test_renderer_ = new Overlay_HTML_Texture_Renderer("file:///ui/Composite_Test.html");
 
-		composite_test_renderer_->setSharedDevices(d3d11_device_, dxgi_device_, d2d_factory_, d2d_device_);
 		composite_test_renderer_->enableDirectComposition(true);
 		composite_test_renderer_->SetParentByName("viewport_panel");
 		// composite_test_renderer_->FilterColor(0, 0, 250);
@@ -736,83 +642,6 @@ void UIHandler::notifySceneChanged()
 	}
 }
 
-// ------------ End of Scene Update ------------- 
-
-// ---------- Keyboard Handler Implementation ---------
-
-bool UIHandler::OnPreKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& event,
-	CefEventHandle os_event, bool* is_keyboard_shortcut)
-{
-	// if (!overlay_viewport_ || !overlay_viewport_->getHandle())
-	// 	return false;
-	
-	auto& keyManager = SIMILI::Input::KeyManager::getInstance();
-	
-	if (event.type == KEYEVENT_KEYDOWN || event.type == KEYEVENT_RAWKEYDOWN)
-	{
-		LPARAM lParam = 1 | (event.native_key_code << 16);
-				
-		keyManager.handleKeyDown(static_cast<int>(event.windows_key_code), lParam);
-		
-		// Additionally send mode keys (1-4) to HTML renderer for UI visual feedback
-		if (event.windows_key_code >= '1' && event.windows_key_code <= '4')
-		{
-			// HtmlTextureRenderer* html_renderer = overlay_viewport_->getHtmlTextureRenderer();
-			// if (html_renderer) 
-			// {
-			// 	html_renderer->sendKeyEvent(event);
-
-			// }
-		}
-		
-		return true; 
-	}
-	else if (event.type == KEYEVENT_KEYUP)
-	{
-		
-		keyManager.handleKeyUp(static_cast<int>(event.windows_key_code));
-		return true;
-	}
-	
-	return false;
-}
-
-bool UIHandler::OnKeyEvent(CefRefPtr<CefBrowser> browser, const CefKeyEvent& event,
-CefEventHandle os_event)
-{
-
-	return false;
-}
-
-bool UIHandler::OnBeforeBrowse(CefRefPtr<CefBrowser> browser,
-	CefRefPtr<CefFrame> frame,
-	CefRefPtr<CefRequest> request,
-	bool user_gesture,
-	bool is_redirect)
-{
-	std::string url = request->GetURL().ToString();
-	std::cout << "[UIHandler] OnBeforeBrowse: " << url << std::endl;
-	return false;
-}
-
-CefRefPtr<CefResourceRequestHandler> UIHandler::GetResourceRequestHandler(
-	CefRefPtr<CefBrowser> browser,
-	CefRefPtr<CefFrame> frame,
-	CefRefPtr<CefRequest> request,
-	bool is_navigation,
-	bool is_download,
-	const CefString& request_initiator,
-	bool& disable_default_handling)
-{
-	if (!resource_request_handler_)
-	{
-		resource_request_handler_ = ResourcesLoader::createRequestHandler();
-		std::cout << "[UIHandler] Resource handler created and cached" << std::endl;
-	}
-	
-	return resource_request_handler_;
-}
-
 void UIHandler::set_MouseControl(SIMILI::Input::MouseController* mouseControl)
 {
 	if (mouse_controller_ == mouseControl)
@@ -907,11 +736,11 @@ void UIHandler::processPendingFrameUpdates()
 	}
 }
 
-void UIHandler::startSplitter(VKContext* vkContext, VkRenderPass renderPass)
+void UIHandler::startManager(VKContext* vkContext, VkRenderPass renderPass)
 {
 	if (!parent_window_ || !vkContext || renderPass == VK_NULL_HANDLE)
 	{
-		std::cerr << "[UIHandler] Cannot start splitter: missing resources" << std::endl;
+		std::cerr << "[UIHandler] Cannot start Manager: missing resources" << std::endl;
 		return;
 	}
 
@@ -929,12 +758,7 @@ void UIHandler::startSplitter(VKContext* vkContext, VkRenderPass renderPass)
 		splitter_ = std::make_unique<Splitter>();
 	}
 
-	if (!splitter_->initialize(parent_window_, vkContext, renderPass))
-	{
-		std::cerr << "[UIHandler] Failed to initialize splitter" << std::endl;
-		splitter_.reset();
-		return;
-	}
+
 
 	if (vulkan_pipelines_)
 	{
@@ -948,18 +772,13 @@ void UIHandler::startSplitter(VKContext* vkContext, VkRenderPass renderPass)
 		return;
 	}
 
-	if (!splitter_->finalizeInitialization())
-	{
-		std::cerr << "[UIHandler] Failed to finalize splitter initialization" << std::endl;
-		splitter_.reset();
-		return;
-	}
+
 
 	std::cout << "[UIHandler] Splitter initialized" << std::endl;
 
 	if (frame_datas_)
 	{
-		splitter_->syncFrameDatas(frame_datas_);
+		// splitter_->syncFrameDatas(frame_datas_);
 		cacheUIPanelFrameDatas();
 	}
 }
@@ -971,7 +790,7 @@ bool UIHandler::handleSplitterEvent(const SDL_Event& event)
 		return false;
 	}
 
-	const bool handled = splitter_->handleEvent(event);
+	const bool handled = false; // splitter_->handleEvent(event);
 	
 	const bool isWindowResizeEvent = (event.type == SDL_EVENT_WINDOW_RESIZED ||
 	                                   event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED ||
@@ -980,30 +799,17 @@ bool UIHandler::handleSplitterEvent(const SDL_Event& event)
 	
 	if (handled)
 	{
-		if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
-		{
-			splitter_drag_start_frame_data_ = splitter_->getAllFrameDatas();
-		}
-		else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP)
-		{
-			const auto currentFrameDataMap = splitter_->getAllFrameDatas();		
-
-			cef_drawer_->requestRuntimeLayoutSync(buildRuntimeLayoutFrameMap(currentFrameDataMap));
-			cef_drawer_->getResizer().forceLayoutSync();
-			splitter_drag_start_frame_data_.clear();
-		}
-
 		cacheUIPanelFrameDatas();
 	}
 	else if (isWindowResizeEvent && cef_drawer_)
 	{
-		const auto currentFrameDataMap = splitter_->getAllFrameDatas();
-		if (!currentFrameDataMap.empty())
-		{
-			cef_drawer_->requestRuntimeLayoutSync(buildRuntimeLayoutFrameMap(currentFrameDataMap));
-			cef_drawer_->getResizer().forceLayoutSync();
-			cacheUIPanelFrameDatas();
-		}
+		// const auto currentFrameDataMap = splitter_->getAllFrameDatas();
+		// if (!currentFrameDataMap.empty())
+		// {
+		// 	cef_drawer_->requestRuntimeLayoutSync(buildRuntimeLayoutFrameMap(currentFrameDataMap));
+		// 	cef_drawer_->getResizer().forceLayoutSync();
+		// 	cacheUIPanelFrameDatas();
+		// }
 	}
 
 	return handled;
@@ -1011,10 +817,6 @@ bool UIHandler::handleSplitterEvent(const SDL_Event& event)
 
 bool UIHandler::getResolvedViewportFrameData(SIMILI::Frontend::IFrameScreenData& outData) const
 {
-	if (splitter_ && splitter_->getViewportFrameData(outData))
-	{
-		return true;
-	}
 
 	if (!frame_datas_)
 	{
@@ -1028,7 +830,7 @@ std::map<std::string, SIMILI::Frontend::IFrameScreenData> UIHandler::getRuntimeF
 {
 	if (splitter_)
 	{
-		auto frameDataMap = splitter_->getAllFrameDatas();
+		std::map<std::string, SIMILI::Frontend::IFrameScreenData> frameDataMap; // splitter_->getAllFrameDatas();
 		if (!frameDataMap.empty())
 		{
 			return frameDataMap;
@@ -1104,14 +906,20 @@ void UIHandler::captureIFramePositions()
 		{
 			std::cout << "\n  [UIHANDLER] --------------------------------- SPLITTER CREATION TRIGGERED ---------------------------------" << std::endl;
 			std::cout << "[UIHandler] Frame data available - initializing splitter now" << std::endl;
-			startSplitter(vk_renderer_, renderPass);
+			startManager(vk_renderer_->getContext(), renderPass);
 		}
 	}
 	
-	if (splitter_)
+	if (ui_manager_)
 	{
-		splitter_->syncFrameDatas(frame_datas_);
+		ui_manager_->syncFrameDatas(frame_datas_, sdlWindow);
+		std::cout << "[UIHandler] UI panel frame data synced to UIManager" << std::endl;
 	}
+	else
+	{
+		std::cout << "[UIHandler] WARNING: ui_manager_ is null, cannot sync frame data" << std::endl;
+	}
+
 	cacheUIPanelFrameDatas();
 	
 	if (parent_sdl_window_)
@@ -1259,16 +1067,21 @@ void UIHandler::forceCaptureIFramePositions()
 		VkRenderPass renderPass = parent_sdl_window_->getRenderPass();
 		if (vk_renderer_ && renderPass != VK_NULL_HANDLE)
 		{
-			std::cout << "\n  [UIHANDLER] --------------------------------- SPLITTER CREATION TRIGGERED ---------------------------------" << std::endl;
-			std::cout << "[UIHandler] Frame data available - initializing splitter now" << std::endl;
-			startSplitter(vk_renderer_, renderPass);
+			std::cout << "\n  [UIHANDLER] --------------------------------- UI MANAGER CREATION TRIGGERED ---------------------------------" << std::endl;
+			std::cout << "[UIHandler] Frame data available - initializing UIManager now" << std::endl;		
 		}
 	}
 	
-	if (splitter_)
+	if (ui_manager_)
 	{
-		splitter_->syncFrameDatas(frame_datas_);
+		ui_manager_->syncFrameDatas(frame_datas_, sdlWindow);
+		std::cout << "[UIHandler] FORCE - UI panel frame data synced to UIManager" << std::endl;
 	}
+	else
+	{
+		std::cout << "[UIHandler] FORCE - WARNING: ui_manager_ is null, cannot sync frame data" << std::endl;
+	}
+
 	cacheUIPanelFrameDatas();
 	
 	if (parent_sdl_window_)
@@ -1386,23 +1199,17 @@ void UIHandler::cacheUIPanelFrameDatas()
 		return;
 	}
 
-	if (ui_manager_)
+	if (ui_manager_ && frame_datas_)
 	{
-		std::map<std::string, SIMILI::Frontend::IFrameScreenData> splitterFrameDataMap;
-		if (splitter_)
-		{
-			splitterFrameDataMap = splitter_->getUIPanelFrameDatas();
-		}
-		ui_manager_->cacheUIPanelFrameDatas(frame_datas_, splitterFrameDataMap);
+		auto frameDataMap = ui_manager_->getUIPanelFrameDatas();
+		std::cout << "[UIHandler] cacheUIPanelFrameDatas: Retrieved " << frameDataMap.size() 
+				  << " panel frame data from UIManager" << std::endl;
 	}
 }
 
 void UIHandler::clearUIPanels()
 {
-	if (ui_manager_)
-	{
-		ui_manager_->clearUIPanels();
-	}
+
 	splitter_.reset();
 	iframe_data_map_.clear();
 	pending_iframe_capture_.store(false);

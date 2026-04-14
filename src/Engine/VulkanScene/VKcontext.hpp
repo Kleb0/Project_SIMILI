@@ -38,12 +38,14 @@ public:
     uint32_t getGraphicsQueueFamily() const { return graphicsQueueFamily; }
     uint32_t getPresentQueueFamily() const { return presentQueueFamily; }
     VkSurfaceKHR getSurface() const { return surface_; }
+    VKContext* getContext() { return this; }
     void setThreeDScreen(ThreeDScreen* screen) { three_d_screen_ = screen; }
     ThreeDScreen* getThreeDScreen() const { return three_d_screen_; }
 
     void setCamera(Camera* cam);
     Camera* getCamera() const { return camera_; }
     void ProjectOnThreeDScreen();
+
 
 private:
     int width = 800;

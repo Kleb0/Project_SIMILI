@@ -258,6 +258,15 @@ void UIPanel::updateFromFrameData(const SIMILI::Frontend::IFrameScreenData& fram
 			updateTextureRegion();
 		}
 	}
+
+	if (has_valid_bounds_ && shared_pipeline_ && vk_vertex_buffer_ != VK_NULL_HANDLE)
+	{
+		if (drawing_state_ == DrawingState::IsNotReadyToBeDrawn)
+		{
+			drawing_state_ = DrawingState::IsReadyToBeDrawn;
+			needs_redraw_ = true;
+		}
+	}
 }
 
 void UIPanel::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight)
@@ -307,26 +316,68 @@ void UIPanel::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawabl
 		return;
 	}
 
-	if (external_texture_view_ == VK_NULL_HANDLE || external_sampler_ == VK_NULL_HANDLE)
+	VkImageView textureToUse = external_texture_view_;
+	VkSampler samplerToUse = external_sampler_;
+	
+	if (textureToUse == VK_NULL_HANDLE || samplerToUse == VK_NULL_HANDLE)
 	{
-		static int missing_texture_log_count = 0;
-		if (missing_texture_log_count < 5 || missing_texture_log_count % 60 == 0)
+		if (vk_texture_view_ != VK_NULL_HANDLE && vk_sampler_ != VK_NULL_HANDLE)
 		{
-			std::cout << "[UIPanel::draw] " << name_ << " - Missing texture: view=" << external_texture_view_
-			          << " sampler=" << external_sampler_
-			          << " (count=" << missing_texture_log_count << ")" << std::endl;
+			static int using_fallback_log_count = 0;
+			if (using_fallback_log_count < 5 || using_fallback_log_count % 60 == 0)
+			{
+				std::cout << "[UIPanel::draw] " << name_ << " - Using fallback internal texture (count=" << using_fallback_log_count << ")" << std::endl;
+			}
+			using_fallback_log_count++;
+			textureToUse = vk_texture_view_;
+			samplerToUse = vk_sampler_;
 		}
-		missing_texture_log_count++;
-		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
-		return;
+		else
+		{
+			static int missing_texture_log_count = 0;
+			if (missing_texture_log_count < 5 || missing_texture_log_count % 60 == 0)
+			{
+				std::cout << "[UIPanel::draw] " << name_ << " - Missing all textures (count=" << missing_texture_log_count << ")" << std::endl;
+			}
+			missing_texture_log_count++;
+			drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
+			return;
+		}
 	}
 
-	if (!updateDescriptorTextureBinding())
+	VkImageView textureForBinding = (textureToUse != VK_NULL_HANDLE) ? textureToUse : vk_texture_view_;
+	VkSampler samplerForBinding = (samplerToUse != VK_NULL_HANDLE) ? samplerToUse : vk_sampler_;
+	
+	if (textureForBinding != VK_NULL_HANDLE && samplerForBinding != VK_NULL_HANDLE)
+	{
+		if (bound_texture_view_ != textureForBinding || bound_sampler_ != samplerForBinding)
+		{
+			VkDescriptorImageInfo imageInfo{};
+			imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+			imageInfo.imageView = textureForBinding;
+			imageInfo.sampler = samplerForBinding;
+			
+			VkWriteDescriptorSet descriptorWrite{};
+			descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			descriptorWrite.dstSet = vk_descriptor_set_;
+			descriptorWrite.dstBinding = 0;
+			descriptorWrite.dstArrayElement = 0;
+			descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			descriptorWrite.descriptorCount = 1;
+			descriptorWrite.pImageInfo = &imageInfo;
+			
+			vkUpdateDescriptorSets(vk_context_->getDevice(), 1, &descriptorWrite, 0, nullptr);
+			
+			bound_texture_view_ = textureForBinding;
+			bound_sampler_ = samplerForBinding;
+		}
+	}
+	else
 	{
 		static int descriptor_fail_log_count = 0;
 		if (descriptor_fail_log_count < 5 || descriptor_fail_log_count % 60 == 0)
 		{
-			std::cout << "[UIPanel::draw] " << name_ << " - updateDescriptorTextureBinding failed (count=" << descriptor_fail_log_count << ")" << std::endl;
+			std::cout << "[UIPanel::draw] " << name_ << " - No valid texture for binding (count=" << descriptor_fail_log_count << ")" << std::endl;
 		}
 		descriptor_fail_log_count++;
 		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;

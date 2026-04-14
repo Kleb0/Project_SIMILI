@@ -691,10 +691,6 @@ void SDL_ApplicationWindow::drawUIPanels()
 	{
 		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
 		Splitter* splitter = handler->getSplitter();
-		if (splitter)
-		{
-			panelFrameDataMap = splitter->getUIPanelFrameDatas();
-		}
 	}
 
 	if (panelFrameDataMap.empty())
@@ -708,13 +704,10 @@ void SDL_ApplicationWindow::drawUIPanels()
 	{
 		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
 		Splitter* splitter = handler->getSplitter();
-		if (splitter && splitter->isDragging())
-		{
-			skipTextureRebuild = true;
-		}
+
 	}
 
-	ui_manager_->drawUIPanels(commandBuffer, drawableWidth, drawableHeight, panelFrameDataMap, skipTextureRebuild);
+	ui_manager_->drawUIPanels(commandBuffer, drawableWidth, drawableHeight, panelFrameDataMap, skipTextureRebuild, window_);
 }
 
 void SDL_ApplicationWindow::drawCEF()
@@ -760,7 +753,7 @@ void SDL_ApplicationWindow::startSplitter()
 	if (ui_handler_)
 	{
 		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-		handler->startSplitter(vk_context_, vk_render_pass_);
+		handler->startManager(vk_context_, vk_render_pass_);
 	}
 }
 
@@ -970,7 +963,7 @@ bool SDL_ApplicationWindow::recreateSwapchain()
 			cefDrawer->getResizer().resize(logicalWidth, logicalHeight);
 			
 			std::cout << "[SDL_ApplicationWindow] Forcing CEF repaint with new window size" << std::endl;
-			cefDrawer->forceRepaint();
+
 			
 			std::cout << "[SDL_ApplicationWindow] Syncing CEF window properties after swapchain recreation" << std::endl;
 			cefDrawer->syncWindowProperties();
@@ -980,7 +973,7 @@ bool SDL_ApplicationWindow::recreateSwapchain()
 		if (splitter)
 		{
 			std::cout << "[SDL_ApplicationWindow] Forcing splitter layout refresh after swapchain recreation" << std::endl;
-			splitter->forceRefreshLayout();
+			// splitter->forceRefreshLayout();
 		}
 	}
 	
