@@ -162,6 +162,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/UIPanels
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/ThreeDScreen
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/Frontend_Debug_Tools
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_HomeFramework
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/example
@@ -216,6 +217,7 @@ file(GLOB CEF_UI_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/FrameDatas/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/ThreeDScreen/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/UIPanels/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/Frontend_Debug_Tools/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_HomeFramework/*.cpp"
 )
 list(REMOVE_ITEM CEF_UI_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/main_ui.cpp")
@@ -423,6 +425,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/ContextualMenuLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/FrameDatas
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/ThreeDScreen
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/Frontend_Debug_Tools
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_HomeFramework
     ${SDL3_INCLUDE_DIR}
 	${Vulkan_INCLUDE_DIRS}

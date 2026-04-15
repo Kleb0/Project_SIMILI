@@ -188,31 +188,21 @@ namespace SIMILI {
 
 		void UIManager::drawUIPanels(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild, SDL_Window* window)
 		{
-		std::map<std::string, IFrameScreenData> effectivePanelFrameDataMap;
-		if (!panelFrameDataMap.empty())
-		{
-			effectivePanelFrameDataMap = panelFrameDataMap;
-		}
-		else
-		{
-			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
-			effectivePanelFrameDataMap = ui_panel_frame_data_map_;
-		}
+			std::map<std::string, IFrameScreenData> effectivePanelFrameDataMap;
+			if (!panelFrameDataMap.empty())
+			{
+				effectivePanelFrameDataMap = panelFrameDataMap;
+			}
+			else
+			{
+				std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+				effectivePanelFrameDataMap = ui_panel_frame_data_map_;
+			}
 
-		panel_map_builder_.drawUIPanels(
-			commandBuffer, 
-			drawableWidth, 
-			drawableHeight, 
-			effectivePanelFrameDataMap, 
-			skipTextureRebuild,
-			vk_context_,
-			vulkan_pipelines_,
-			vk_render_pass_,
-			cef_drawer_,
-			ui_panels_,
-			window
-		);
-	}
+			panel_map_builder_.drawUIPanels( commandBuffer, drawableWidth, drawableHeight, 
+			effectivePanelFrameDataMap, skipTextureRebuild, vk_context_, vulkan_pipelines_,
+			vk_render_pass_, cef_drawer_, ui_panels_, window);
+		}
 
 		void UIManager::RenderUI(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild)
 		{

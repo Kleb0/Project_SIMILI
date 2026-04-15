@@ -20,6 +20,7 @@
         "${workspaceFolder}/src/SIMILI_Frontend/viewportLogic/FrameDatas",
         "${workspaceFolder}/src/SIMILI_Frontend/viewportLogic/UIPanels",
         "${workspaceFolder}/src/SIMILI_Frontend/viewportLogic/ThreeDScreen",
+        "${workspaceFolder}/src/SIMILI_Frontend/Frontend_Debug_Tools",
         "${workspaceFolder}/src/Engine/PrimitivesCreation",
         "${workspaceFolder}/src/Engine/SceneObjectContainer",
         "${workspaceFolder}/src/WorldObjects",

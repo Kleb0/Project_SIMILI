@@ -10,6 +10,8 @@
 class ThreeDScreen;
 class VKContext;
 class VulkanPipeline;
+class App_Border;
+class Enable_UI_Debug_Tools;
 
 struct IFrameData;
 
@@ -63,6 +65,7 @@ public:
 	// === Component Access ===
 	VulkanPipeline* getVulkanPipelines() const { return vulkan_pipelines_; }
 	SIMILI::Frontend::UIManager* getUIManager() const { return ui_manager_; }
+	App_Border* getAppBorder() const { return app_border_; }
 	
 	// === Event Handling ===
 	void processEvents();
@@ -76,6 +79,7 @@ public:
 	void drawUIPanels();
 	void drawCEF();
 	void startSplitter();
+	void activateDebugRender();
 	void setCurrentImageIndex(uint32_t index) { current_image_index_ = index; }
 	
 	// === Vulkan Lifecycle ===
@@ -112,6 +116,8 @@ private:
 	ThreeDScreen* threed_screen_;
 	SIMILI::Frontend::FrameDatas* frame_datas_;
 	SIMILI::Frontend::UIManager* ui_manager_;
+	App_Border* app_border_;
+	Enable_UI_Debug_Tools* debug_tools_;
 	
 	// === Graphics Components ===
 	VKContext* vk_context_;

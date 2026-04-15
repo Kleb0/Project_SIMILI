@@ -5,6 +5,8 @@
 #include "viewportLogic/UIPanels/Splitter.hpp"
 #include "CEFDrawing/CEF_Drawer.hpp"
 #include "CEFDrawing/CEF_Resizer.hpp"
+#include "App_Border.hpp"
+#include "Frontend_Debug_Tools/Enable_UI_Debug_Tools.hpp"
 #include "../../Engine/VulkanScene/VKcontext.hpp"
 #include <SDL3/SDL_vulkan.h>
 
@@ -20,6 +22,8 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, threed_screen_(nullptr)
 	, frame_datas_(nullptr)
 	, ui_manager_(nullptr)
+	, app_border_(nullptr)
+	, debug_tools_(nullptr)
 	, vk_context_(nullptr)
 	, vulkan_pipelines_(nullptr)
 	, vk_surface_(VK_NULL_HANDLE)
@@ -36,6 +40,16 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 }
 SDL_ApplicationWindow::~SDL_ApplicationWindow()
 {
+	if (debug_tools_)
+	{
+		delete debug_tools_;
+		debug_tools_ = nullptr;
+	}
+	if (app_border_)
+	{
+		delete app_border_;
+		app_border_ = nullptr;
+	}
 	cleanupVulkan();
 	destroy();
 }
@@ -150,7 +164,16 @@ bool SDL_ApplicationWindow::create(const std::string& title, int width, int heig
 	std::cout << "[SDL_ApplicationWindow] Window created: " << title 
 	          << " (" << width << "x" << height << ") DPI scale: " << dpi_scale_ << std::endl;
 	
-	// ui_manager_ will be set externally via setUIManager()
+	if (!app_border_)
+	{
+		app_border_ = new App_Border();
+	}
+	app_border_->updateDimensions(width, height);
+	
+	if (!debug_tools_)
+	{
+		debug_tools_ = new Enable_UI_Debug_Tools();
+	}
 	
 	return true;
 }
@@ -188,6 +211,11 @@ void SDL_ApplicationWindow::setSize(int width, int height)
 		SDL_SetWindowSize(window_, width, height);
 		last_width_ = width;
 		last_height_ = height;
+		
+		if (app_border_)
+		{
+			app_border_->updateDimensions(width, height);
+		}
 	}
 }
 
@@ -398,6 +426,11 @@ void SDL_ApplicationWindow::processEvents()
 		last_height_ = currentHeight;
 		swapchain_needs_recreation_ = true;
 		
+		if (app_border_)
+		{
+			app_border_->updateDimensions(currentWidth, currentHeight);
+		}
+		
 		if (ui_handler_)
 		{
 			UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
@@ -589,9 +622,16 @@ void SDL_ApplicationWindow::renderFrame()
 	scissor.extent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
 	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
+	activateDebugRender();
+
 	drawCEF();
 	drawThreeDScreen();
 	drawUIPanels();
+
+	if (debug_tools_)
+	{
+		debug_tools_->drawDebugTools(commandBuffer, width, height);
+	}
 
 	vkCmdEndRenderPass(commandBuffer);
 
@@ -754,6 +794,19 @@ void SDL_ApplicationWindow::startSplitter()
 	{
 		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
 		handler->startManager(vk_context_, vk_render_pass_);
+	}
+
+	if (debug_tools_ && vk_context_ && vk_render_pass_ != VK_NULL_HANDLE && vulkan_pipelines_ && app_border_)
+	{
+		debug_tools_->initialize(vk_context_, vk_render_pass_, vulkan_pipelines_, app_border_);
+	}
+}
+
+void SDL_ApplicationWindow::activateDebugRender()
+{
+	if (debug_tools_)
+	{
+		debug_tools_->activateDebugRender();
 	}
 }
 
