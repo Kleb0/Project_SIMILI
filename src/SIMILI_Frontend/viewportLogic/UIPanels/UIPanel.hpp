@@ -26,8 +26,7 @@ public:
 	void shutdown();
 	void updateFromFrameData(const SIMILI::Frontend::IFrameScreenData& frameData, SDL_Window* window, bool skipTextureRebuild = false);
 	void draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight);
-	void forceTextureRebuild();
-	void forceRedraw();
+
 	void setVKContext(VKContext* context);
 	void setRenderPass(VkRenderPass renderPass);
 	void setVulkanPipelines(VulkanPipeline* pipelines);

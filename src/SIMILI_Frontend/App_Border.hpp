@@ -1,5 +1,13 @@
 #pragma once
 
+enum class BorderState
+{
+	Init,
+	Maximized,
+	Reduced,
+	Updating
+};
+
 class App_Border
 {
 public:
@@ -16,8 +24,14 @@ public:
 	int getWidth() const;
 	int getHeight() const;
 
+	int getReferenceWindowWidth() const;
+	int getReferenceWindowHeight() const;
+
 	void enableDebugLine(bool enabled);
 	bool isDebugLineEnabled() const;
+
+	BorderState getCurrentState() const;
+	void setState(BorderState newState);
 
 private:
 	static constexpr int BORDER_OFFSET = 3;
@@ -28,6 +42,9 @@ private:
 	int bottom_;
 	int width_;
 	int height_;
+	int reference_window_width_;
+	int reference_window_height_;
 	bool first_update_;
 	bool debug_line_enabled_;
+	BorderState current_state_;
 };

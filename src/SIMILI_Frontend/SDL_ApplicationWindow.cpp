@@ -168,7 +168,10 @@ bool SDL_ApplicationWindow::create(const std::string& title, int width, int heig
 	{
 		app_border_ = new App_Border();
 	}
+	app_border_->setState(BorderState::Init);
 	app_border_->updateDimensions(width, height);
+	
+	std::cout << "[SDL_ApplicationWindow] App_Border initialized with state: Init" << std::endl;
 	
 	if (!debug_tools_)
 	{
@@ -211,11 +214,6 @@ void SDL_ApplicationWindow::setSize(int width, int height)
 		SDL_SetWindowSize(window_, width, height);
 		last_width_ = width;
 		last_height_ = height;
-		
-		if (app_border_)
-		{
-			app_border_->updateDimensions(width, height);
-		}
 	}
 }
 
@@ -425,11 +423,6 @@ void SDL_ApplicationWindow::processEvents()
 		last_width_ = currentWidth;
 		last_height_ = currentHeight;
 		swapchain_needs_recreation_ = true;
-		
-		if (app_border_)
-		{
-			app_border_->updateDimensions(currentWidth, currentHeight);
-		}
 		
 		if (ui_handler_)
 		{

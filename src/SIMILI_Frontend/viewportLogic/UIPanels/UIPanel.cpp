@@ -122,12 +122,6 @@ void UIPanel::updateFromFrameData(const SIMILI::Frontend::IFrameScreenData& fram
 	if (frameData.width < MIN_FRAME_DIMENSION || frameData.height < MIN_FRAME_DIMENSION)
 	{
 		static int skip_count = 0;
-		if (skip_count++ % 60 == 0)
-		{
-			std::cout << "[UIPanel::updateFromFrameData] " << name_ 
-			          << " - Rejecting update with too small dimensions: " 
-			          << frameData.width << "x" << frameData.height << " (min=" << MIN_FRAME_DIMENSION << ")" << std::endl;
-		}
 		has_valid_bounds_ = false;
 		return;
 	}
@@ -140,32 +134,6 @@ void UIPanel::updateFromFrameData(const SIMILI::Frontend::IFrameScreenData& fram
 	width_ = static_cast<int>(std::lround(static_cast<float>(frameData.width) * scaleX));
 	height_ = static_cast<int>(std::lround(static_cast<float>(frameData.height) * scaleY));
 
-	static int frame_log_count = 0;
-	if (frame_log_count < 3 || frame_log_count % 120 == 0)
-	{
-		std::cout << "[UIPanel::updateFromFrameData] " << name_ << std::endl;
-		std::cout << "  Window: logical=" << logicalWindowWidth << "x" << logicalWindowHeight << " drawable=" << drawableWidth << "x" << drawableHeight << std::endl;
-		std::cout << "  Scale: " << scaleX << " x " << scaleY << std::endl;
-		std::cout << "  FrameData (CEF logical): x=" << frameData.relativeX << " y=" << frameData.relativeY << " w=" << frameData.width << " h=" << frameData.height << std::endl;
-		std::cout << "  Calculated (pixels): x=" << x_ << " y=" << y_ << " w=" << width_ << " h=" << height_ << std::endl;
-	}
-	frame_log_count++;
-
-	if (x_ >= drawableWidth)
-	{
-		std::cout << "[UIPanel::updateFromFrameData] WARNING: " << name_ 
-		          << " completely off-screen horizontally (x=" << x_ << " >= drawableWidth=" << drawableWidth 
-		          << ") - clamping to visible area" << std::endl;
-		x_ = (std::max)(0, drawableWidth - width_);
-	}
-	
-	if (y_ >= drawableHeight)
-	{
-		std::cout << "[UIPanel::updateFromFrameData] WARNING: " << name_ 
-		          << " completely off-screen vertically (y=" << y_ << " >= drawableHeight=" << drawableHeight 
-		          << ") - clamping to visible area" << std::endl;
-		y_ = (std::max)(0, drawableHeight - height_);
-	}
 
 	if (x_ < 0)
 	{
@@ -198,19 +166,6 @@ void UIPanel::updateFromFrameData(const SIMILI::Frontend::IFrameScreenData& fram
 	}
 
 	has_valid_bounds_ = width_ > 0 && height_ > 0;
-	
-	if (!has_valid_bounds_)
-	{
-		static int warn_count = 0;
-		if (warn_count++ % 60 == 0)
-		{
-			std::cout << "[UIPanel::updateFromFrameData] WARNING: " << name_ 
-			          << " has invalid bounds after clamping - x=" << x_ << " y=" << y_ 
-			          << " w=" << width_ << " h=" << height_ 
-			          << " (frameData: x=" << frameData.relativeX << " y=" << frameData.relativeY 
-			          << " w=" << frameData.width << " h=" << frameData.height << ")" << std::endl;
-		}
-	}
 
 	// Update display frame with SDL drawable coordinates (with DPI scaling)
 	CEF_Drawer::UIPanelFrameData displayFrame;
@@ -444,19 +399,10 @@ void UIPanel::updateTextureRegion()
 
 	if (!CEF_Drawer::getActiveUIPanelTextureRegion(name_, textureView, sampler, textureWidth, textureHeight, panelFrame))
 	{
-		static int get_texture_fail_count = 0;
-		if (get_texture_fail_count < 5 || get_texture_fail_count % 60 == 0)
-		{
-			std::cout << "[UIPanel::updateTextureRegion] " << name_ << " - getActiveUIPanelTextureRegion FAILED (count=" << get_texture_fail_count << ")" << std::endl;
-		}
-		get_texture_fail_count++;
+
 		
 		if (oldTextureView != VK_NULL_HANDLE && oldSampler != VK_NULL_HANDLE)
 		{
-			if (get_texture_fail_count <= 5)
-			{
-				std::cout << "[UIPanel::updateTextureRegion] " << name_ << " - Preserving existing texture during rebuild failure" << std::endl;
-			}
 			
 			if (drawing_state_ == DrawingState::IsNotReadyToBeDrawn)
 			{
@@ -538,18 +484,7 @@ void UIPanel::updateTextureRegion()
 	texcoord_top_ = top;
 	texcoord_right_ = right;
 	texcoord_bottom_ = bottom;
-	
-	static int texcoord_log_count = 0;
-	bool force_texcoord_log = !first_draw_done_;
-	if (force_texcoord_log || texcoord_log_count < 3 || texcoord_log_count % 120 == 0)
-	{
-		std::cout << "[UIPanel::updateTextureRegion] " << name_ << (force_texcoord_log ? " (FIRST)" : "") << std::endl;
-		std::cout << "  Texture size: " << textureWidth << "x" << textureHeight << std::endl;
-		std::cout << "  PanelFrame: x=" << panelFrame.x << " y=" << panelFrame.y << " w=" << panelFrame.width << " h=" << panelFrame.height << std::endl;
-		std::cout << "  Texcoords: L=" << texcoord_left_ << " T=" << texcoord_top_ << " R=" << texcoord_right_ << " B=" << texcoord_bottom_ << std::endl;
-	}
-	if (!force_texcoord_log) texcoord_log_count++;
-	
+		
 	if (drawing_state_ == DrawingState::IsNotReadyToBeDrawn)
 	{
 		drawing_state_ = DrawingState::IsReadyToBeDrawn;
@@ -726,26 +661,6 @@ void UIPanel::updateGeometry(int drawableWidth, int drawableHeight)
 	// SDL has Y=0 at top, so we map: pixel_y=0 -> NDC=-1, pixel_y=height -> NDC=+1
 	float top = (static_cast<float>(y_) / static_cast<float>(drawableHeight)) * 2.0f - 1.0f;
 	float bottom = (static_cast<float>(y_ + height_) / static_cast<float>(drawableHeight)) * 2.0f - 1.0f;
-
-	static int geom_log_count = 0;
-	bool force_log = !first_draw_done_;
-
-	if (force_log || geom_log_count < 3 || (geom_log_count % 120 == 0))
-	{
-		std::cout << "[UIPanel::updateGeometry] " << name_ << (force_log ? " (FIRST DRAW)" : "") << std::endl;
-		std::cout << "  Drawable: " << drawableWidth << "x" << drawableHeight << std::endl;
-		std::cout << "  Panel position (pixels): x=" << x_ << " y=" << y_ << " w=" << width_ << " h=" << height_ << std::endl;
-		std::cout << "  NDC coords: left=" << left << " right=" << right << " top=" << top << " bottom=" << bottom << std::endl;
-		std::cout << "  Texcoords: L=" << texcoord_left_ << " T=" << texcoord_top_ << " R=" << texcoord_right_ << " B=" << texcoord_bottom_ << std::endl;
-		std::cout << "  Vertices generated:" << std::endl;
-		std::cout << "    V0: pos(" << left << "," << top << ") tex(" << texcoord_left_ << "," << texcoord_top_ << ")" << std::endl;
-		std::cout << "    V1: pos(" << right << "," << bottom << ") tex(" << texcoord_right_ << "," << texcoord_bottom_ << ")" << std::endl;
-		std::cout << "    V2: pos(" << left << "," << bottom << ") tex(" << texcoord_left_ << "," << texcoord_bottom_ << ")" << std::endl;
-		std::cout << "    V3: pos(" << left << "," << top << ") tex(" << texcoord_left_ << "," << texcoord_top_ << ")" << std::endl;
-		std::cout << "    V4: pos(" << right << "," << top << ") tex(" << texcoord_right_ << "," << texcoord_top_ << ")" << std::endl;
-		std::cout << "    V5: pos(" << right << "," << bottom << ") tex(" << texcoord_right_ << "," << texcoord_bottom_ << ")" << std::endl;
-	}
-	if (!force_log) geom_log_count++;
 	
 	first_draw_done_ = true;
 
@@ -767,25 +682,7 @@ void UIPanel::updateGeometry(int drawableWidth, int drawableHeight)
 	}
 }
 
-void UIPanel::forceTextureRebuild()
-{
-	last_frame_x_ = -1;
-	last_frame_y_ = -1;
-	last_frame_width_ = -1;
-	last_frame_height_ = -1;
-	needs_redraw_ = true;
-	drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
-	std::cout << "[UIPanel::forceTextureRebuild] " << name_ << " - Texture rebuild forced, DrawingState reset to IsNotReadyToBeDrawn" << std::endl;
-}
 
-void UIPanel::forceRedraw()
-{
-	needs_redraw_ = true;
-	if (drawing_state_ == DrawingState::HasBeenDrawn)
-	{
-		drawing_state_ = DrawingState::IsReadyToBeDrawn;
-	}
-}
 
 void UIPanel::setVKContext(VKContext* context)
 {

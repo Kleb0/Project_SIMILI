@@ -8,8 +8,11 @@ App_Border::App_Border()
 	, bottom_(BORDER_OFFSET)
 	, width_(0)
 	, height_(0)
+	, reference_window_width_(0)
+	, reference_window_height_(0)
 	, first_update_(true)
 	, debug_line_enabled_(false)
+	, current_state_(BorderState::Init)
 {
 }
 
@@ -19,19 +22,27 @@ App_Border::~App_Border()
 
 void App_Border::updateDimensions(int windowWidth, int windowHeight)
 {
-	left_ = BORDER_OFFSET;
-	top_ = BORDER_OFFSET;
-	right_ = windowWidth - BORDER_OFFSET;
-	bottom_ = windowHeight - BORDER_OFFSET;
-	width_ = right_ - left_;
-	height_ = bottom_ - top_;
-	
-	if (first_update_)
+	if (current_state_ == BorderState::Init)
 	{
-		std::cout << "[App_Border] Dimensions initiales: " << "left=" << left_ << " top=" << top_ 
-        << " right=" << right_ << " bottom=" << bottom_ << " width=" << width_ << " height=" << height_ << std::endl;
-		first_update_ = false;
+		left_ = BORDER_OFFSET;
+		top_ = BORDER_OFFSET;
+		right_ = windowWidth - BORDER_OFFSET;
+		bottom_ = windowHeight - BORDER_OFFSET;
+		width_ = right_ - left_;
+		height_ = bottom_ - top_;
+		reference_window_width_ = windowWidth;
+		reference_window_height_ = windowHeight;
+		
+		if (first_update_)
+		{
+			std::cout << "[App_Border] Dimensions initiales: " << "left=" << left_ << " top=" << top_ 
+        << " right=" << right_ << " bottom=" << bottom_ << " width=" << width_ << " height=" << height_ 
+        << " ref_window=" << reference_window_width_ << "x" << reference_window_height_ << std::endl;
+			first_update_ = false;
+		}
+		return;
 	}
+
 }
 
 int App_Border::getLeft() const
@@ -72,4 +83,24 @@ void App_Border::enableDebugLine(bool enabled)
 bool App_Border::isDebugLineEnabled() const
 {
 	return debug_line_enabled_;
+}
+
+BorderState App_Border::getCurrentState() const
+{
+	return current_state_;
+}
+
+void App_Border::setState(BorderState newState)
+{
+	current_state_ = newState;
+}
+
+int App_Border::getReferenceWindowWidth() const
+{
+	return reference_window_width_;
+}
+
+int App_Border::getReferenceWindowHeight() const
+{
+	return reference_window_height_;
 }

@@ -85,15 +85,6 @@ void Border_DebugRectangle::draw(VkCommandBuffer commandBuffer, int drawableWidt
 		return;
 	}
 
-	static int draw_count = 0;
-	draw_count++;
-	if (draw_count <= 5 || draw_count % 100 == 0)
-	{
-		std::cout << "[Border_DebugRectangle] draw() called - frame " << draw_count 
-		          << " initialized=" << initialized_ 
-		          << " debugEnabled=" << border->isDebugLineEnabled() << std::endl;
-	}
-
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shared_pipeline_->pipeline);
 
 	VkBuffer vertexBuffers[] = { vk_vertex_buffer_ };
@@ -110,15 +101,37 @@ void Border_DebugRectangle::draw(VkCommandBuffer commandBuffer, int drawableWidt
 	int right = border->getRight();
 	int bottom = border->getBottom();
 
+	int refWidth = border->getReferenceWindowWidth();
+	int refHeight = border->getReferenceWindowHeight();
+
+	if (refWidth <= 0 || refHeight <= 0)
+	{
+		return;
+	}
+
+	VkViewport viewport{};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = static_cast<float>(refWidth);
+	viewport.height = static_cast<float>(refHeight);
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+	VkRect2D scissor{};
+	scissor.offset = {0, 0};
+	scissor.extent = {static_cast<uint32_t>(refWidth), static_cast<uint32_t>(refHeight)};
+	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
 	const int thickness = 5;
 
-	float nx_left = (left / (float)drawableWidth) * 2.0f - 1.0f;
-	float ny_top = (top / (float)drawableHeight) * 2.0f - 1.0f;
-	float nx_right = (right / (float)drawableWidth) * 2.0f - 1.0f;
-	float ny_bottom = (bottom / (float)drawableHeight) * 2.0f - 1.0f;
+	float nx_left = (left / (float)refWidth) * 2.0f - 1.0f;
+	float ny_top = (top / (float)refHeight) * 2.0f - 1.0f;
+	float nx_right = (right / (float)refWidth) * 2.0f - 1.0f;
+	float ny_bottom = (bottom / (float)refHeight) * 2.0f - 1.0f;
 
-	float thickness_x = (thickness / (float)drawableWidth) * 2.0f;
-	float thickness_y = (thickness / (float)drawableHeight) * 2.0f;
+	float thickness_x = (thickness / (float)refWidth) * 2.0f;
+	float thickness_y = (thickness / (float)refHeight) * 2.0f;
 
 	std::vector<float> vertices;
 	vertices.reserve(48);
@@ -188,7 +201,19 @@ void Border_DebugRectangle::draw(VkCommandBuffer commandBuffer, int drawableWidt
 	}
 
 	vkCmdDraw(commandBuffer, 24, 1, 0, 0);
-}
+	VkViewport fullViewport{};
+	fullViewport.x = 0.0f;
+	fullViewport.y = 0.0f;
+	fullViewport.width = static_cast<float>(drawableWidth);
+	fullViewport.height = static_cast<float>(drawableHeight);
+	fullViewport.minDepth = 0.0f;
+	fullViewport.maxDepth = 1.0f;
+	vkCmdSetViewport(commandBuffer, 0, 1, &fullViewport);
+
+	VkRect2D fullScissor{};
+	fullScissor.offset = {0, 0};
+	fullScissor.extent = {static_cast<uint32_t>(drawableWidth), static_cast<uint32_t>(drawableHeight)};
+	vkCmdSetScissor(commandBuffer, 0, 1, &fullScissor);}
 
 void Border_DebugRectangle::drawLine(VkCommandBuffer commandBuffer, int x1, int y1, int x2, int y2, int thickness, int drawableWidth, int drawableHeight)
 {

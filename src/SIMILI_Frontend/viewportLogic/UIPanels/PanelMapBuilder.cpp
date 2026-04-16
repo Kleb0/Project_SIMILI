@@ -612,9 +612,6 @@ namespace SIMILI {
 				return;
 			}
 
-				std::cout << "[PanelMapBuilder] drawUIPanels: Drawing " << panelFrameDataMap.size() 
-				<< " UI panels with CEF_Drawer" << std::endl;
-
 			for (const auto& pair : panelFrameDataMap)
 			{
 				const std::string& panelName = pair.first;
@@ -625,15 +622,10 @@ namespace SIMILI {
 					continue;
 				}
 
-				std::cout << "[PanelMapBuilder] Drawing panel '" << panelName << "' at (" 
-					<< frameData.relativeX << "," << frameData.relativeY << ") size " 
-					<< frameData.width << "x" << frameData.height << std::endl;
-
 				auto it = uiPanels.find(panelName);
 
 				if (it == uiPanels.end())
 				{
-					std::cout << "[PanelMapBuilder] Creating new UIPanel for '" << panelName << "'" << std::endl;
 					auto newPanel = std::make_unique<UIPanel>();
 					if (newPanel->initialize(panelName))
 					{
