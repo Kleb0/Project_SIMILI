@@ -18,6 +18,7 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, last_width_(800)
 	, last_height_(600)
 	, dpi_scale_(1.0f)
+	, window_state_(WindowRenderState::Init)
 	, ui_handler_(nullptr)
 	, threed_screen_(nullptr)
 	, frame_datas_(nullptr)
@@ -398,7 +399,6 @@ void SDL_ApplicationWindow::processEvents()
 	if (!window_)
 		return;
 	
-	// Check for position changes
 	int currentX, currentY;
 	SDL_GetWindowPosition(window_, &currentX, &currentY);
 	
@@ -424,6 +424,11 @@ void SDL_ApplicationWindow::processEvents()
 		last_height_ = currentHeight;
 		swapchain_needs_recreation_ = true;
 		
+		if (app_border_)
+		{
+			app_border_->updateDimensions(currentWidth, currentHeight);
+		}
+		
 		if (ui_handler_)
 		{
 			UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
@@ -437,6 +442,42 @@ void SDL_ApplicationWindow::processEvents()
 		is_maximized_ = currentMax;
 		std::cout << "[SDL_ApplicationWindow] Window " << (is_maximized_ ? "MAXIMIZED" : "RESTORED") << std::endl;
 		swapchain_needs_recreation_ = true;
+	}
+
+	if (app_border_)
+	{
+		BorderState borderState = app_border_->getCurrentState();
+		
+		static BorderState last_logged_state = BorderState::Init;
+		if (borderState != last_logged_state)
+		{
+			std::string stateName;
+			switch (borderState)
+			{
+				case BorderState::Init: stateName = "Init"; break;
+				case BorderState::Maximized: stateName = "Maximized"; break;
+				case BorderState::Reduced: stateName = "Reduced"; break;
+				case BorderState::Updating: stateName = "Updating"; break;
+			}
+			std::cout << "[SDL_ApplicationWindow] App_Border state changed to: " << stateName << std::endl;
+			last_logged_state = borderState;
+		}
+		
+		switch (borderState)
+		{
+			case BorderState::Init:
+				window_state_ = WindowRenderState::Init;
+				break;
+			case BorderState::Maximized:
+				window_state_ = WindowRenderState::Maximized;
+				break;
+			case BorderState::Reduced:
+				window_state_ = WindowRenderState::Reduced;
+				break;
+			case BorderState::Updating:
+				window_state_ = WindowRenderState::Updating;
+				break;
+		}
 	}
 
 	if (ui_handler_)
@@ -615,15 +656,33 @@ void SDL_ApplicationWindow::renderFrame()
 	scissor.extent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
 	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-	activateDebugRender();
-
-	drawCEF();
-	drawThreeDScreen();
-	drawUIPanels();
-
-	if (debug_tools_)
+	static int state_log_counter = 0;
+	if (state_log_counter % 60 == 0)
 	{
-		debug_tools_->drawDebugTools(commandBuffer, width, height);
+		std::string stateName;
+		switch (window_state_)
+		{
+			case WindowRenderState::Init: stateName = "Init"; break;
+			case WindowRenderState::Maximized: stateName = "Maximized"; break;
+			case WindowRenderState::Reduced: stateName = "Reduced"; break;
+			case WindowRenderState::Updating: stateName = "Updating"; break;
+		}
+		std::cout << "[SDL_ApplicationWindow] window_state_ = " << stateName << std::endl;
+	}
+	state_log_counter++;
+
+	if (window_state_ == WindowRenderState::Init)
+	{
+		activateDebugRender();
+
+		drawCEF();
+		drawThreeDScreen();
+		drawUIPanels();
+
+		if (debug_tools_)
+		{
+			debug_tools_->drawDebugTools(commandBuffer, width, height);
+		}
 	}
 
 	vkCmdEndRenderPass(commandBuffer);

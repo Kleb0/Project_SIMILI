@@ -22,7 +22,7 @@ App_Border::~App_Border()
 
 void App_Border::updateDimensions(int windowWidth, int windowHeight)
 {
-	if (current_state_ == BorderState::Init)
+	if (first_update_)
 	{
 		left_ = BORDER_OFFSET;
 		top_ = BORDER_OFFSET;
@@ -33,16 +33,46 @@ void App_Border::updateDimensions(int windowWidth, int windowHeight)
 		reference_window_width_ = windowWidth;
 		reference_window_height_ = windowHeight;
 		
-		if (first_update_)
+		std::cout << "[App_Border] Dimensions initiales: " << "left=" << left_ << " top=" << top_ 
+			<< " right=" << right_ << " bottom=" << bottom_ << " width=" << width_ << " height=" << height_ 
+			<< " ref_window=" << reference_window_width_ << "x" << reference_window_height_ << std::endl;
+		
+		first_update_ = false;
+		current_state_ = BorderState::Init;
+		return;
+	}
+
+	if (windowWidth > reference_window_width_ || windowHeight > reference_window_height_)
+	{
+		if (current_state_ != BorderState::Maximized)
 		{
-			std::cout << "[App_Border] Dimensions initiales: " << "left=" << left_ << " top=" << top_ 
-        << " right=" << right_ << " bottom=" << bottom_ << " width=" << width_ << " height=" << height_ 
-        << " ref_window=" << reference_window_width_ << "x" << reference_window_height_ << std::endl;
-			first_update_ = false;
+			std::cout << "[App_Border] Passage en etat MAXIMIZED (window: " << windowWidth << "x" << windowHeight 
+				<< " vs reference: " << reference_window_width_ << "x" << reference_window_height_ << ")" << std::endl;
+			current_state_ = BorderState::Maximized;
 		}
 		return;
 	}
 
+	if (windowWidth == reference_window_width_ && windowHeight == reference_window_height_)
+	{
+		if (current_state_ != BorderState::Init)
+		{
+			std::cout << "[App_Border] Retour en etat INIT (dimensions de reference)" << std::endl;
+			current_state_ = BorderState::Init;
+		}
+		return;
+	}
+
+	if (windowWidth < reference_window_width_ || windowHeight < reference_window_height_)
+	{
+		if (current_state_ != BorderState::Reduced)
+		{
+			std::cout << "[App_Border] Passage en etat REDUCED (window: " << windowWidth << "x" << windowHeight 
+				<< " vs reference: " << reference_window_width_ << "x" << reference_window_height_ << ")" << std::endl;
+			current_state_ = BorderState::Reduced;
+		}
+		return;
+	}
 }
 
 int App_Border::getLeft() const

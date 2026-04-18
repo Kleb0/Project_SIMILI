@@ -74,6 +74,7 @@ void Border_DebugRectangle::setVulkanPipelines(VulkanPipeline* pipelines)
 
 void Border_DebugRectangle::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, App_Border* border)
 {
+
 	if (!initialized_ || !border || !border->isDebugLineEnabled())
 	{
 		return;
@@ -213,7 +214,9 @@ void Border_DebugRectangle::draw(VkCommandBuffer commandBuffer, int drawableWidt
 	VkRect2D fullScissor{};
 	fullScissor.offset = {0, 0};
 	fullScissor.extent = {static_cast<uint32_t>(drawableWidth), static_cast<uint32_t>(drawableHeight)};
-	vkCmdSetScissor(commandBuffer, 0, 1, &fullScissor);}
+	vkCmdSetScissor(commandBuffer, 0, 1, &fullScissor);
+
+}
 
 void Border_DebugRectangle::drawLine(VkCommandBuffer commandBuffer, int x1, int y1, int x2, int y2, int thickness, int drawableWidth, int drawableHeight)
 {
@@ -225,6 +228,7 @@ void Border_DebugRectangle::drawLine(VkCommandBuffer commandBuffer, int x1, int 
 	float dx = nx2 - nx1;
 	float dy = ny2 - ny1;
 	float length = std::sqrt(dx * dx + dy * dy);
+
 	if (length < 0.0001f)
 	{
 		return;
@@ -237,7 +241,8 @@ void Border_DebugRectangle::drawLine(VkCommandBuffer commandBuffer, int x1, int 
 	perpX *= halfThickness;
 	perpY *= halfThickness;
 
-	float vertices[12] = {
+	float vertices[12] = 
+	{
 		nx1 - perpX, ny1 - perpY,
 		nx1 + perpX, ny1 + perpY,
 		nx2 - perpX, ny2 - perpY,
@@ -249,6 +254,7 @@ void Border_DebugRectangle::drawLine(VkCommandBuffer commandBuffer, int x1, int 
 
 	void* data;
 	VkDevice device = vk_context_->getDevice();
+
 	if (vkMapMemory(device, vk_vertex_buffer_memory_, 0, sizeof(vertices), 0, &data) == VK_SUCCESS)
 	{
 		memcpy(data, vertices, sizeof(vertices));

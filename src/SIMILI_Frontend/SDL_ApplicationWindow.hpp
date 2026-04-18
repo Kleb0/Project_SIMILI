@@ -13,6 +13,14 @@ class VulkanPipeline;
 class App_Border;
 class Enable_UI_Debug_Tools;
 
+enum class WindowRenderState
+{
+	Init,
+	Maximized,
+	Reduced,
+	Updating
+};
+
 struct IFrameData;
 
 namespace SIMILI
@@ -110,6 +118,7 @@ private:
 	int last_width_;
 	int last_height_;
 	float dpi_scale_;
+	WindowRenderState window_state_;
 	
 	// === UI Components ===
 	void* ui_handler_;
