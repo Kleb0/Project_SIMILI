@@ -543,17 +543,7 @@ namespace SIMILI {
 					}
 					
 					int maxX = 0;
-					int maxY = 0;
-					bool coordsValid = handler->validateIFrameCoordinates(tempIFrameMap, maxX, maxY);
-					
-					if (!coordsValid)
-					{
-						std::cout << "[RoutesManager] Ignoring iframe update - coordinates appear stale" << std::endl;
-						resp.statusCode = 200;
-						resp.statusMessage = "OK";
-						resp.body = "{\"success\": true, \"message\": \"Coordinates rejected as stale\"}";
-						return resp;
-					}
+					int maxY = 0;	
 					
 					for (const auto& pair : tempIFrameMap)
 					{
@@ -668,8 +658,6 @@ namespace SIMILI {
 					{
 						cefDrawer->updateUIPanelFrames(uiPanelFramesForDrawer);
 					}
-
-					handler->updateUIPanelIFrames(uiPanelIFrames);
 
 					resp.statusCode = 200;
 					resp.statusMessage = "OK";

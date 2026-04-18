@@ -120,7 +120,6 @@ public:
 	SIMILI::Frontend::UIManager* getUIManager() { return ui_manager_; }
 
 	void initializeDefaultUIPanels();
-	void updateUIPanelIFrames(const std::map<std::string, IFrameData>& iframeDataMap);
 	void cacheUIPanelFrameDatas();
 	void clearUIPanels();
 
@@ -128,7 +127,6 @@ public:
 	void startManager(VKContext* vkContext, VkRenderPass renderPass);
 
 	bool handleSplitterEvent(const SDL_Event& event);
-	bool validateIFrameCoordinates(const std::map<std::string, IFrameData>& iframeDataMap, int& outMaxX, int& outMaxY) const;
 	bool getResolvedViewportFrameData(SIMILI::Frontend::IFrameScreenData& outData) const;
 	void processPendingFrameUpdates();
 	std::map<std::string, IFrameData> getAllIFrames() const { return iframe_data_map_.snapshot(); }

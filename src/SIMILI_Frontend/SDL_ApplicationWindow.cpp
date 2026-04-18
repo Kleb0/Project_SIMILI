@@ -422,18 +422,11 @@ void SDL_ApplicationWindow::processEvents()
 		
 		last_width_ = currentWidth;
 		last_height_ = currentHeight;
-		swapchain_needs_recreation_ = true;
-		
-		if (app_border_)
-		{
-			app_border_->updateDimensions(currentWidth, currentHeight);
-		}
-		
-		if (ui_handler_)
-		{
-			UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-			handler->updateWindowSize(currentWidth, currentHeight);
-		}
+		swapchain_needs_recreation_ = true;		
+
+		app_border_->updateDimensions(currentWidth, currentHeight);
+
+
 	}
 	
 	bool currentMax = isMaximized();

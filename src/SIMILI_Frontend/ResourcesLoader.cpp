@@ -132,73 +132,73 @@ CefRefPtr<CefResourceHandler> LocalResourceRequestHandler::handleUIPanelUpdate(C
 		}
 	}
 	
-	try
+	if (!json::accept(body))
 	{
-		json requestData = json::parse(body);
-		
-		if (!requestData.contains("iframes") || !requestData["iframes"].is_array())
+		std::cout << "[LocalResourceRequestHandler] ERROR: Invalid JSON" << std::endl;
+		return new SimpleResourceHandler("application/json", "{\"success\": false, \"error\": \"Invalid JSON\"}");
+	}
+	
+	json requestData = json::parse(body, nullptr, false);
+	if (requestData.is_discarded())
+	{
+		std::cout << "[LocalResourceRequestHandler] ERROR: JSON parse failed" << std::endl;
+		return new SimpleResourceHandler("application/json", "{\"success\": false, \"error\": \"JSON parse failed\"}");
+	}
+	
+	if (!requestData.contains("iframes") || !requestData["iframes"].is_array())
+	{
+		return new SimpleResourceHandler("application/json", "{\"success\": false, \"error\": \"Missing iframes array\"}");
+	}
+	
+	UIHandler* handler = UIHandler::getInstance();
+	if (!handler)
+	{
+		return new SimpleResourceHandler("application/json", "{\"success\": false, \"error\": \"Handler not available\"}");
+	}
+	
+	std::map<std::string, IFrameData> uiPanelIFrames;
+	std::map<std::string, CEF_Drawer::UIPanelFrameData> uiPanelFramesForDrawer;
+	
+	for (const auto& iframe : requestData["iframes"])
+	{
+		if (iframe.contains("name") && iframe.contains("x") && iframe.contains("y") &&
+			iframe.contains("width") && iframe.contains("height"))
 		{
-			return new SimpleResourceHandler("application/json", "{\"success\": false, \"error\": \"Missing iframes array\"}");
-		}
-		
-		UIHandler* handler = UIHandler::getInstance();
-		if (!handler)
-		{
-			return new SimpleResourceHandler("application/json", "{\"success\": false, \"error\": \"Handler not available\"}");
-		}
-		
-		std::map<std::string, IFrameData> uiPanelIFrames;
-		std::map<std::string, CEF_Drawer::UIPanelFrameData> uiPanelFramesForDrawer;
-		
-		for (const auto& iframe : requestData["iframes"])
-		{
-			if (iframe.contains("name") && iframe.contains("x") && iframe.contains("y") &&
-				iframe.contains("width") && iframe.contains("height"))
+			std::string name = iframe["name"];
+			if (name == "viewport_panel")
 			{
-				std::string name = iframe["name"];
-				if (name == "viewport_panel")
-				{
-					continue;
-				}
-				
-				IFrameData data;
-				data.name = name;
-				data.x = iframe["x"];
-				data.y = iframe["y"];
-				data.width = iframe["width"];
-				data.height = iframe["height"];
-				data.clientX = iframe.contains("clientX") ? iframe["clientX"].get<int>() : data.x;
-				data.clientY = iframe.contains("clientY") ? iframe["clientY"].get<int>() : data.y;
-				uiPanelIFrames[name] = data;
-				
-				handler->iframe_data_map_[name] = data;
-				
-				CEF_Drawer::UIPanelFrameData panelFrame;
-				panelFrame.x = data.x;
-				panelFrame.y = data.y;
-				panelFrame.width = data.width;
-				panelFrame.height = data.height;
-				uiPanelFramesForDrawer[name] = panelFrame;
+				continue;
 			}
+			
+			IFrameData data;
+			data.name = name;
+			data.x = iframe["x"];
+			data.y = iframe["y"];
+			data.width = iframe["width"];
+			data.height = iframe["height"];
+			data.clientX = iframe.contains("clientX") ? iframe["clientX"].get<int>() : data.x;
+			data.clientY = iframe.contains("clientY") ? iframe["clientY"].get<int>() : data.y;
+			uiPanelIFrames[name] = data;
+			
+			handler->iframe_data_map_[name] = data;
+			
+			CEF_Drawer::UIPanelFrameData panelFrame;
+			panelFrame.x = data.x;
+			panelFrame.y = data.y;
+			panelFrame.width = data.width;
+			panelFrame.height = data.height;
+			uiPanelFramesForDrawer[name] = panelFrame;
 		}
-		
-		CEF_Drawer* cefDrawer = handler->getCEFDrawer();
-		if (cefDrawer)
-		{
-			cefDrawer->updateUIPanelFrames(uiPanelFramesForDrawer);
-		}
-		
-		handler->updateUIPanelIFrames(uiPanelIFrames);
-		
-		std::string response = "{\"success\": true, \"count\": " + std::to_string(uiPanelIFrames.size()) + "}";
-		return new SimpleResourceHandler("application/json", response);
 	}
-	catch (const std::exception& e)
+	
+	CEF_Drawer* cefDrawer = handler->getCEFDrawer();
+	if (cefDrawer)
 	{
-		std::cout << "[LocalResourceRequestHandler] ERROR: JSON parse - " << e.what() << std::endl;
-		std::string error = "{\"success\": false, \"error\": \"" + std::string(e.what()) + "\"}";
-		return new SimpleResourceHandler("application/json", error);
+		cefDrawer->updateUIPanelFrames(uiPanelFramesForDrawer);
 	}
+			
+	std::string response = "{\"success\": true, \"count\": " + std::to_string(uiPanelIFrames.size()) + "}";
+	return new SimpleResourceHandler("application/json", response);
 }
 
 std::string LocalResourceRequestHandler::loadFileContent(const std::string& filePath)

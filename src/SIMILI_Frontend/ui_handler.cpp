@@ -1123,73 +1123,8 @@ void UIHandler::updateWindowSize(int width, int height)
 	std::cout << "[UIHandler] Window size updated to: " << width << "x" << height << std::endl;
 }
 
-bool UIHandler::validateIFrameCoordinates(const std::map<std::string, IFrameData>& iframeDataMap, int& outMaxX, int& outMaxY) const
-{
-	if (iframeDataMap.empty())
-	{
-		outMaxX = 0;
-		outMaxY = 0;
-		return false;
-	}
 
-	outMaxX = 0;
-	outMaxY = 0;
 
-	for (const auto& pair : iframeDataMap)
-	{
-		const IFrameData& data = pair.second;
-		
-		if (data.width <= 0 || data.height <= 0)
-		{
-			continue;
-		}
-
-		int rightEdge = data.x + data.width;
-		int bottomEdge = data.y + data.height;
-
-		if (rightEdge > outMaxX)
-		{
-			outMaxX = rightEdge;
-		}
-		if (bottomEdge > outMaxY)
-		{
-			outMaxY = bottomEdge;
-		}
-	}
-
-	if (current_window_width_ <= 0 || current_window_height_ <= 0)
-	{
-		return true;
-	}
-
-	float coverageX = static_cast<float>(outMaxX) / static_cast<float>(current_window_width_);
-	float coverageY = static_cast<float>(outMaxY) / static_cast<float>(current_window_height_);
-
-	const float MIN_COVERAGE_THRESHOLD = 0.80f;
-	const float MAX_COVERAGE_THRESHOLD = 1.20f;
-
-	bool isValid = (coverageX >= MIN_COVERAGE_THRESHOLD && coverageY >= MIN_COVERAGE_THRESHOLD &&
-	                coverageX <= MAX_COVERAGE_THRESHOLD && coverageY <= MAX_COVERAGE_THRESHOLD);
-
-	if (!isValid)
-	{
-		std::cout << "[UIHandler::validateIFrameCoordinates] REJECTED stale coordinates:" << std::endl;
-		std::cout << "  Panel coverage: " << outMaxX << "x" << outMaxY 
-		          << " vs window " << current_window_width_ << "x" << current_window_height_ << std::endl;
-		std::cout << "  Coverage ratios: " << (coverageX * 100.0f) << "% x " << (coverageY * 100.0f) << "%" << std::endl;
-	}
-
-	return isValid;
-}
-
-void UIHandler::updateUIPanelIFrames(const std::map<std::string, IFrameData>& iframeDataMap)
-{
-	if (ui_manager_)
-	{
-		ui_manager_->updateUIPanelIFrames(iframeDataMap);
-	}
-	pending_ui_panel_cache_.store(true);
-}
 
 void UIHandler::cacheUIPanelFrameDatas()
 {

@@ -33,7 +33,7 @@ void App_Border::updateDimensions(int windowWidth, int windowHeight)
 		reference_window_width_ = windowWidth;
 		reference_window_height_ = windowHeight;
 		
-		std::cout << "[App_Border] Dimensions initiales: " << "left=" << left_ << " top=" << top_ 
+		std::cout << "[App_Border] Initial dimensions: " << "left=" << left_ << " top=" << top_ 
 			<< " right=" << right_ << " bottom=" << bottom_ << " width=" << width_ << " height=" << height_ 
 			<< " ref_window=" << reference_window_width_ << "x" << reference_window_height_ << std::endl;
 		
@@ -46,9 +46,13 @@ void App_Border::updateDimensions(int windowWidth, int windowHeight)
 	{
 		if (current_state_ != BorderState::Maximized)
 		{
-			std::cout << "[App_Border] Passage en etat MAXIMIZED (window: " << windowWidth << "x" << windowHeight 
-				<< " vs reference: " << reference_window_width_ << "x" << reference_window_height_ << ")" << std::endl;
+
 			current_state_ = BorderState::Maximized;
+
+			// translate in english 
+
+			std::cout << "[App_Border] Switching to MAXIMIZED state (window: " << windowWidth << "x" << windowHeight 
+				<< " vs reference: " << reference_window_width_ << "x" << reference_window_height_ << ")" << std::endl;
 		}
 		return;
 	}
@@ -57,7 +61,7 @@ void App_Border::updateDimensions(int windowWidth, int windowHeight)
 	{
 		if (current_state_ != BorderState::Init)
 		{
-			std::cout << "[App_Border] Retour en etat INIT (dimensions de reference)" << std::endl;
+			std::cout << "[App_Border] Returning to INIT state (reference dimensions)" << std::endl;
 			current_state_ = BorderState::Init;
 		}
 		return;
@@ -67,7 +71,7 @@ void App_Border::updateDimensions(int windowWidth, int windowHeight)
 	{
 		if (current_state_ != BorderState::Reduced)
 		{
-			std::cout << "[App_Border] Passage en etat REDUCED (window: " << windowWidth << "x" << windowHeight 
+			std::cout << "[App_Border] Switching to REDUCED state (window: " << windowWidth << "x" << windowHeight 
 				<< " vs reference: " << reference_window_width_ << "x" << reference_window_height_ << ")" << std::endl;
 			current_state_ = BorderState::Reduced;
 		}
