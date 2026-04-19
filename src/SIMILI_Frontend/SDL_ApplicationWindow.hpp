@@ -6,6 +6,7 @@
 #include <iostream>
 #include <map>
 #include <vector>
+#include "viewportLogic/FrameDatas/FrameDatas.hpp"
 
 class ThreeDScreen;
 class VKContext;
@@ -27,7 +28,6 @@ namespace SIMILI
 {
 	namespace Frontend
 	{
-		class FrameDatas;
 		class UIManager;
 	}
 }
@@ -84,7 +84,7 @@ public:
 	void renderFrame();
 	void renderThreeDScreen(const std::map<std::string, IFrameData>& frameDataMap);
 	void drawThreeDScreen();
-	void drawUIPanels();
+	void preparePanels();
 	void drawCEF();
 	void startSplitter();
 	void activateDebugRender();
@@ -160,7 +160,12 @@ private:
 
 	static int render_frame_count;
 
-	
+	// === Panel Rendering Data ===
+	int prepared_drawable_width_;
+	int prepared_drawable_height_;
+	std::map<std::string, SIMILI::Frontend::IFrameScreenData> prepared_panel_frame_data_map_;
+	bool prepared_skip_texture_rebuild_;
+
 	// === Private Methods ===
 	void updateDpiScale();
 	void updateMaximizedState();

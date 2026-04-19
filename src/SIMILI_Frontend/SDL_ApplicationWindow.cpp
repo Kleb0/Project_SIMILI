@@ -41,6 +41,9 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, vk_in_flight_fence_(VK_NULL_HANDLE)
 	, swapchain_needs_recreation_(false)
 	, frame_acquisition_succeeded_(false)
+	, prepared_drawable_width_(0)
+	, prepared_drawable_height_(0)
+	, prepared_skip_texture_rebuild_(false)
 {
 }
 SDL_ApplicationWindow::~SDL_ApplicationWindow()
@@ -501,22 +504,53 @@ void SDL_ApplicationWindow::renderFrame()
 	// ===== Frame Counter & Debug Logging =====
 	frameCounter();
 
-	// ===== Swapchain Setup & Image Acquisition =====
-	swapchainSetup(render_frame_count);
-	if (!frame_acquisition_succeeded_)
+	// ===== Synchronize window_state_ with app_border_ state EARLY =====
+	if (app_border_)
 	{
-		return;
+		BorderState borderState = app_border_->getCurrentState();
+		
+		static int sync_log_counter = 0;
+		if (sync_log_counter % 120 == 0)
+		{
+			std::string borderStateName;
+			switch (borderState)
+			{
+				case BorderState::Init: borderStateName = "Init"; break;
+				case BorderState::Maximized: borderStateName = "Maximized"; break;
+				case BorderState::Reduced: borderStateName = "Reduced"; break;
+				case BorderState::Updating: borderStateName = "Updating"; break;
+			}
+			std::cout << "[SDL_ApplicationWindow::renderFrame] App_Border state = " << borderStateName << std::endl;
+		}
+		sync_log_counter++;
+		
+		switch (borderState)
+		{
+			case BorderState::Init:
+				window_state_ = WindowRenderState::Init;
+				break;
+			case BorderState::Maximized:
+				window_state_ = WindowRenderState::Maximized;
+				break;
+			case BorderState::Reduced:
+				window_state_ = WindowRenderState::Reduced;
+				break;
+			case BorderState::Updating:
+				window_state_ = WindowRenderState::Updating;
+				break;
+		}
+	}
+	else
+	{
+		static bool logged_null_border = false;
+		if (!logged_null_border)
+		{
+			std::cout << "[SDL_ApplicationWindow::renderFrame] WARNING: app_border_ is null!" << std::endl;
+			logged_null_border = true;
+		}
 	}
 
-	// ===== Render Pass, Viewport & Scissor Setup =======
-	renderPassViewportAndScissorSetup();
-
-	// Get command buffer and window dimensions for state-based rendering
-	VkCommandBuffer commandBuffer = vk_command_buffers_[current_image_index_];
-	int width, height;
-	SDL_GetWindowSizeInPixels(window_, &width, &height);
-
-	// ===== State-Based Rendering =====
+	// ===== State-Based Early Exit =====
 	static int state_log_counter = 0;
 	if (state_log_counter % 60 == 0)
 	{
@@ -532,25 +566,58 @@ void SDL_ApplicationWindow::renderFrame()
 	}
 	state_log_counter++;
 
-	// ------- Main rendering logic based on window state ------- //
+	// ===== State-Based Rendering Control =====
+	if (window_state_ != WindowRenderState::Init)
+	{
+		static int skip_log_counter = 0;
+		if (skip_log_counter % 60 == 0)
+		{
+			std::cout << "[SDL_ApplicationWindow] Rendering BLACK SCREEN - window not in Init state" << std::endl;
+		}
+		skip_log_counter++;
+	}
+
+	// ===== Swapchain Setup & Image Acquisition =====
+	swapchainSetup(render_frame_count);
+	if (!frame_acquisition_succeeded_)
+	{
+		return;
+	}
+
+	// ===== Render Pass, Viewport & Scissor Setup =======
+	renderPassViewportAndScissorSetup();
+
+	// Get command buffer and window dimensions for state-based rendering
+	VkCommandBuffer commandBuffer = vk_command_buffers_[current_image_index_];
+	int width, height;
+	SDL_GetWindowSizeInPixels(window_, &width, &height);
+
+	// ------- Main rendering logic ------- //
+	// ONLY render content when in Init state - otherwise just clear to black
 	if (window_state_ == WindowRenderState::Init)
 	{
 		activateDebugRender();
 
 		drawCEF();
 		drawThreeDScreen();
-		drawUIPanels();
+		
+		preparePanels();
+
+		if (ui_manager_)
+		{
+			ui_manager_->drawUIPanels(commandBuffer, prepared_drawable_width_, prepared_drawable_height_, 
+				prepared_panel_frame_data_map_, prepared_skip_texture_rebuild_, window_);
+		}
 
 		if (debug_tools_)
 		{
 			debug_tools_->drawDebugTools(commandBuffer, width, height);
 		}
 	}
+	// If not Init, we just cleared to black in renderPassViewportAndScissorSetup() - that's the black screen
 
-	// ===== Finalize Command Buffer & Submit to Graphics Queue =====
 	finalizeAndSubmitCommandBuffer(commandBuffer);
 
-	// ===== Present to Screen & Advance Frame Counter =====
 	presentToScreen();
 }
 
@@ -570,50 +637,33 @@ void SDL_ApplicationWindow::drawThreeDScreen()
 	}
 }
 
-void SDL_ApplicationWindow::drawUIPanels()
+void SDL_ApplicationWindow::preparePanels()
 {
-	static int draw_ui_call_count = 0;
-	draw_ui_call_count++;
-	
-	if (draw_ui_call_count % 120 == 1) // Log every 2 seconds at 60 FPS 
-	{
-		std::cout << "[SDL_ApplicationWindow] drawUIPanels() called " << draw_ui_call_count << " times, ui_manager_=" << (ui_manager_ != nullptr) << std::endl;
-	}
-	
-	if (!ui_manager_ || !vk_command_buffers_.size() > current_image_index_)
+	if (!ui_manager_ || vk_command_buffers_.size() <= current_image_index_)
 	{
 		return;
 	}
 
-	int drawableWidth = 0;
-	int drawableHeight = 0;
-	SDL_GetWindowSizeInPixels(window_, &drawableWidth, &drawableHeight);
+	SDL_GetWindowSizeInPixels(window_, &prepared_drawable_width_, &prepared_drawable_height_);
 
-	VkCommandBuffer commandBuffer = vk_command_buffers_[current_image_index_];
-
-	// Get panel frame data from splitter (via UIHandler) or from cached data
-	std::map<std::string, SIMILI::Frontend::IFrameScreenData> panelFrameDataMap;
+	prepared_panel_frame_data_map_.clear();
 	if (ui_handler_)
 	{
 		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
 		Splitter* splitter = handler->getSplitter();
 	}
 
-	if (panelFrameDataMap.empty())
+	if (prepared_panel_frame_data_map_.empty())
 	{
-		panelFrameDataMap = ui_manager_->getUIPanelFrameDatas();
+		prepared_panel_frame_data_map_ = ui_manager_->getUIPanelFrameDatas();
 	}
 
-	// Skip texture rebuild if splitter is dragging
-	bool skipTextureRebuild = false;
+	prepared_skip_texture_rebuild_ = false;
 	if (ui_handler_)
 	{
 		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
 		Splitter* splitter = handler->getSplitter();
-
 	}
-
-	ui_manager_->drawUIPanels(commandBuffer, drawableWidth, drawableHeight, panelFrameDataMap, skipTextureRebuild, window_);
 }
 
 void SDL_ApplicationWindow::drawCEF()
@@ -675,7 +725,6 @@ void SDL_ApplicationWindow::activateDebugRender()
 		debug_tools_->activateDebugRender();
 	}
 }
-
 
 
 // ===== Vulkan Lifecycle ====== //
@@ -968,6 +1017,11 @@ void SDL_ApplicationWindow::handleSwapchainRecreation()
 void SDL_ApplicationWindow::swapchainSetup(int render_frame_count)
 {
 	frame_acquisition_succeeded_ = false;
+
+	if (swapchain_needs_recreation_)
+	{
+		handleSwapchainRecreation();
+	}
 
 	// ===== Context & Swapchain Validation =====
 	if (!vk_context_ || vk_swapchain_ == VK_NULL_HANDLE)

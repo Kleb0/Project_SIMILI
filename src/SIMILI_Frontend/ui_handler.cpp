@@ -438,11 +438,11 @@ static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 i
 		// 	}
 		// }
 		
-		if (parentWindow)
-		{
-			auto frameDataMap = handler->getAllIFrames();
-			parentWindow->renderThreeDScreen(frameDataMap);
-		}
+		// if (parentWindow)
+		// {
+		// 	auto frameDataMap = handler->getAllIFrames();
+		// 	parentWindow->renderThreeDScreen(frameDataMap);
+		// }
 	}
 	
 	return interval; 	
