@@ -156,15 +156,27 @@ private:
 	VkSemaphore vk_image_available_semaphore_;
 	VkSemaphore vk_render_finished_semaphore_;
 	VkFence vk_in_flight_fence_;
+	bool frame_acquisition_succeeded_;
+
+	static int render_frame_count;
+
 	
 	// === Private Methods ===
 	void updateDpiScale();
 	void updateMaximizedState();
 	void captureFrameData();
+
+	// ===== Vulkan Resource Management ===== //
 	bool createSwapchain();
 	bool createRenderPass();
 	bool createFramebuffers();
 	bool createCommandPool();
 	bool createCommandBuffers();
 	bool createSyncObjects();
+	void handleSwapchainRecreation();
+	void swapchainSetup(int render_frame_count);
+	void renderPassViewportAndScissorSetup();
+	void finalizeAndSubmitCommandBuffer(VkCommandBuffer commandBuffer);
+	void presentToScreen();
+	void frameCounter();
 };
