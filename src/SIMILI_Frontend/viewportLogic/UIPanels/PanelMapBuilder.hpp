@@ -64,14 +64,16 @@ namespace SIMILI {
 
 			void updateClientCoordinates(std::map<std::string, PanelState>& panelStateMap);
 
-			void drawUIPanels(
-				VkCommandBuffer commandBuffer,int drawableWidth,
+			void drawInsideAppBorders(
+				VkCommandBuffer commandBuffer, int drawableWidth,
 				int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap,
-				bool skipTextureRebuild, 
+				bool skipTextureRebuild,
 				class VKContext* vkContext, class VulkanPipeline* vulkanPipelines, VkRenderPass renderPass,
 				class CEF_Drawer* cefDrawer,
 				std::map<std::string, std::unique_ptr<class UIPanel>>& uiPanels,
-				SDL_Window* window);
+				SDL_Window* window,
+				int appBorderLeft, int appBorderTop,
+				int appBorderWidth, int appBorderHeight);
 
 			void clearUIPanels(std::map<std::string, std::unique_ptr<class UIPanel>>& uiPanels);
 

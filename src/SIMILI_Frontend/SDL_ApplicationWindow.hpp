@@ -165,6 +165,7 @@ private:
 	int prepared_drawable_height_;
 	std::map<std::string, SIMILI::Frontend::IFrameScreenData> prepared_panel_frame_data_map_;
 	bool prepared_skip_texture_rebuild_;
+	bool borders_set_for_init_;
 
 	// === Private Methods ===
 	void updateDpiScale();

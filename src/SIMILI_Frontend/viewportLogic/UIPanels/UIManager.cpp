@@ -27,6 +27,10 @@ namespace SIMILI {
 			, vulkan_pipelines_(nullptr)
 			, vk_render_pass_(VK_NULL_HANDLE)
 			, cef_drawer_(nullptr)
+			, app_border_left_(0)
+			, app_border_top_(0)
+			, app_border_width_(0)
+			, app_border_height_(0)
 			, ui_panels_initialized_(false)
 		{
 
@@ -186,7 +190,15 @@ namespace SIMILI {
 			}
 		}
 
-		void UIManager::drawUIPanels(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild, SDL_Window* window)
+		void UIManager::setBorders(int borderLeft, int borderTop, int borderWidth, int borderHeight)
+		{
+			app_border_left_ = borderLeft;
+			app_border_top_ = borderTop;
+			app_border_width_ = borderWidth;
+			app_border_height_ = borderHeight;
+		}
+
+		void UIManager::drawUIPanelsInsideBorders(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild, SDL_Window* window)
 		{
 			std::map<std::string, IFrameScreenData> effectivePanelFrameDataMap;
 			if (!panelFrameDataMap.empty())
@@ -199,15 +211,10 @@ namespace SIMILI {
 				effectivePanelFrameDataMap = ui_panel_frame_data_map_;
 			}
 
-			panel_map_builder_.drawUIPanels( commandBuffer, drawableWidth, drawableHeight, 
-			effectivePanelFrameDataMap, skipTextureRebuild, vk_context_, vulkan_pipelines_,
-			vk_render_pass_, cef_drawer_, ui_panels_, window);
-		}
-
-		void UIManager::RenderUI(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild)
-		{
-			std::cout << "[UIManager] RenderUI called with " << panelFrameDataMap.size() << " panels" << std::endl;
-			drawUIPanels(commandBuffer, drawableWidth, drawableHeight, panelFrameDataMap, skipTextureRebuild, nullptr);
+			panel_map_builder_.drawInsideAppBorders(commandBuffer, drawableWidth, drawableHeight,
+				effectivePanelFrameDataMap, skipTextureRebuild, vk_context_, vulkan_pipelines_,
+				vk_render_pass_, cef_drawer_, ui_panels_, window,
+				app_border_left_, app_border_top_, app_border_width_, app_border_height_);
 		}
 
 		void UIManager::clearUIPanels()

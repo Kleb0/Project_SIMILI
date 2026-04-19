@@ -589,7 +589,7 @@ namespace SIMILI {
 		          << " splitters (thickness=" << splitterThickness << "px)" << std::endl;
 	}
 
-		void PanelMapBuilder::drawUIPanels(
+		void PanelMapBuilder::drawInsideAppBorders(
 		VkCommandBuffer commandBuffer,
 		int drawableWidth, int drawableHeight,
 		const std::map<std::string, IFrameScreenData>& panelFrameDataMap,
@@ -597,20 +597,39 @@ namespace SIMILI {
 		VulkanPipeline* vulkanPipelines,
 		VkRenderPass renderPass, CEF_Drawer* cefDrawer,
 		std::map<std::string, std::unique_ptr<UIPanel>>& uiPanels,
-		SDL_Window* window)
+		SDL_Window* window,
+		int appBorderLeft, int appBorderTop,
+		int appBorderWidth, int appBorderHeight)
 		{
 	
 			if (!cefDrawer)
 			{
-				std::cout << "[PanelMapBuilder] drawUIPanels: cefDrawer is null" << std::endl;
+				std::cout << "[PanelMapBuilder] drawInsideAppBorders: cefDrawer is null" << std::endl;
 				return;
 			}
 
 			if (panelFrameDataMap.empty())
 			{
-				std::cout << "[PanelMapBuilder] drawUIPanels: No panel data available" << std::endl;
+				std::cout << "[PanelMapBuilder] drawInsideAppBorders: No panel data available" << std::endl;
 				return;
 			}
+
+			// Viewport offset = App_Border origin: NDC(-1,-1) maps to (borderLeft, borderTop) on screen.
+			// This translates the entire group of panels by the border offset, without any clipping.
+			VkViewport viewport = {};
+			viewport.x = static_cast<float>(appBorderLeft);
+			viewport.y = static_cast<float>(appBorderTop);
+			viewport.width  = static_cast<float>(appBorderWidth);
+			viewport.height = static_cast<float>(appBorderHeight);
+			viewport.minDepth = 0.0f;
+			viewport.maxDepth = 1.0f;
+			vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+			// Full-framebuffer scissor: no clipping.
+			VkRect2D scissor = {};
+			scissor.offset = {0, 0};
+			scissor.extent = {static_cast<uint32_t>(drawableWidth), static_cast<uint32_t>(drawableHeight)};
+			vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
 			for (const auto& pair : panelFrameDataMap)
 			{
@@ -642,7 +661,7 @@ namespace SIMILI {
 				if (it != uiPanels.end() && it->second)
 				{
 					it->second->updateFromFrameData(frameData, window, skipTextureRebuild);
-					it->second->draw(commandBuffer, drawableWidth, drawableHeight);
+					it->second->draw(commandBuffer, appBorderWidth, appBorderHeight);
 				}
 			}
 		}

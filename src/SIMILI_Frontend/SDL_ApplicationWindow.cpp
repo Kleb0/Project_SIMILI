@@ -44,6 +44,7 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, prepared_drawable_width_(0)
 	, prepared_drawable_height_(0)
 	, prepared_skip_texture_rebuild_(false)
+	, borders_set_for_init_(false)
 {
 }
 SDL_ApplicationWindow::~SDL_ApplicationWindow()
@@ -469,12 +470,15 @@ void SDL_ApplicationWindow::processEvents()
 				break;
 			case BorderState::Maximized:
 				window_state_ = WindowRenderState::Maximized;
+				borders_set_for_init_ = false;
 				break;
 			case BorderState::Reduced:
 				window_state_ = WindowRenderState::Reduced;
+				borders_set_for_init_ = false;
 				break;
 			case BorderState::Updating:
 				window_state_ = WindowRenderState::Updating;
+				borders_set_for_init_ = false;
 				break;
 		}
 	}
@@ -605,8 +609,33 @@ void SDL_ApplicationWindow::renderFrame()
 
 		if (ui_manager_)
 		{
-			ui_manager_->drawUIPanels(commandBuffer, prepared_drawable_width_, prepared_drawable_height_, 
-				prepared_panel_frame_data_map_, prepared_skip_texture_rebuild_, window_);
+			if (app_border_ && !borders_set_for_init_)
+			{
+
+				// ------------------ architectural explanation ---------------------
+				// Set the borders of the UIManager inside which the UI will be drawn.
+				// In PanelMapBuilder::drawInsideAppBorders, the Vulkan viewport is set with an offset:
+				
+				//   viewport.x = static_cast<float>(appBorderLeft);
+				//   viewport.y = static_cast<float>(appBorderTop);
+				//   viewport.width  = static_cast<float>(appBorderWidth);
+				//   viewport.height = static_cast<float>(appBorderHeight);
+				
+				// Considering that each panel is drawn individually, 
+				// this translates (shifts) the entire UI group as a whole: NDC(-1,-1) maps to (borderLeft, borderTop) on screen.
+				// All panels are part of the same render pass and draw call group.
+				// An offset can be applied here (e.g. getLeft()+N) to displace the UI without any clipping.
+
+				// if you write getLeft() + 50 you will see an offset 
+				// -------------------- end of explanation ---------------------
+
+				ui_manager_->setBorders(
+					app_border_->getLeft(), app_border_->getTop(),
+					app_border_->getWidth(), app_border_->getHeight());
+				borders_set_for_init_ = true;
+			}
+			ui_manager_->drawUIPanelsInsideBorders(commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
+			prepared_panel_frame_data_map_, prepared_skip_texture_rebuild_, window_);
 		}
 
 		if (debug_tools_)
@@ -616,7 +645,7 @@ void SDL_ApplicationWindow::renderFrame()
 	}
 	// If not Init, we just cleared to black in renderPassViewportAndScissorSetup() - that's the black screen
 
-	finalizeAndSubmitCommandBuffer(commandBuffer);
+	finalizeAndSubmitCommandBuffer(commandBuffer); 
 
 	presentToScreen();
 }

@@ -55,8 +55,8 @@ namespace SIMILI {
 			void cacheUIPanelFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas, const std::map<std::string, IFrameScreenData>& splitterFrameDataMap);
 			void syncFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas, SDL_Window* sdlWindow);
 			
-			void RenderUI(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild);
-			void drawUIPanels(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild, SDL_Window* window);
+			void drawUIPanelsInsideBorders(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild, SDL_Window* window);
+			void setBorders(int borderLeft, int borderTop, int borderWidth, int borderHeight);
 		
 			void clearUIPanels();
 
@@ -84,6 +84,11 @@ namespace SIMILI {
 			VulkanPipeline* vulkan_pipelines_;
 			VkRenderPass vk_render_pass_;
 			CEF_Drawer* cef_drawer_;
+
+			int app_border_left_;
+			int app_border_top_;
+			int app_border_width_;
+			int app_border_height_;
 
 			std::map<std::string, IFrameData> ui_panel_iframe_map_;
 			std::map<std::string, IFrameScreenData> ui_panel_frame_data_map_;
