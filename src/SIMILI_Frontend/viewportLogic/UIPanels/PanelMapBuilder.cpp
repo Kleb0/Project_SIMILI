@@ -102,13 +102,13 @@ namespace SIMILI {
 								IFrameScreenData& frame = pair.second.frame;
 								frame.relativeX = static_cast<int>(std::lround(static_cast<float>(frame.relativeX) * scaleX));
 								frame.relativeY = static_cast<int>(std::lround(static_cast<float>(frame.relativeY) * scaleY));
-							frame.width = (std::max)(1, static_cast<int>(std::lround(static_cast<float>(frame.width) * scaleX)));
-							frame.height = (std::max)(1, static_cast<int>(std::lround(static_cast<float>(frame.height) * scaleY)));
+								frame.width = (std::max)(1, static_cast<int>(std::lround(static_cast<float>(frame.width) * scaleX)));
+								frame.height = (std::max)(1, static_cast<int>(std::lround(static_cast<float>(frame.height) * scaleY)));
 							
-							if (frame.relativeX >= currentWindowWidth) frame.relativeX = (std::max)(0, currentWindowWidth - frame.width);
-							if (frame.relativeY >= currentWindowHeight) frame.relativeY = (std::max)(0, currentWindowHeight - frame.height);
-							if (frame.relativeX + frame.width > currentWindowWidth) frame.width = (std::max)(1, currentWindowWidth - frame.relativeX);
-							if (frame.relativeY + frame.height > currentWindowHeight) frame.height = (std::max)(1, currentWindowHeight - frame.relativeY);
+								if (frame.relativeX >= currentWindowWidth) frame.relativeX = (std::max)(0, currentWindowWidth - frame.width);
+								if (frame.relativeY >= currentWindowHeight) frame.relativeY = (std::max)(0, currentWindowHeight - frame.height);
+								if (frame.relativeX + frame.width > currentWindowWidth) frame.width = (std::max)(1, currentWindowWidth - frame.relativeX);
+								if (frame.relativeY + frame.height > currentWindowHeight) frame.height = (std::max)(1, currentWindowHeight - frame.relativeY);
 								
 								frame.windowWidth = currentWindowWidth;
 								frame.windowHeight = currentWindowHeight;
@@ -386,7 +386,7 @@ namespace SIMILI {
 			}
 		}
 
-		void PanelMapBuilder::syncSplittersAndPanes(
+		void PanelMapBuilder::syncSplittersAndPanels(
 		const std::map<std::string, IFrameScreenData>& frameDataMap,
 		int currentWindowWidth, int currentWindowHeight,
 		std::map<std::string, PanelState>& panelStateMap,

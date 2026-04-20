@@ -460,6 +460,16 @@ void SDL_ApplicationWindow::processEvents()
 				case BorderState::Updating: stateName = "Updating"; break;
 			}
 			std::cout << "[SDL_ApplicationWindow] App_Border state changed to: " << stateName << std::endl;
+
+			if (borderState == BorderState::Maximized && window_)
+			{
+				int drawW, drawH;
+				SDL_GetWindowSizeInPixels(window_, &drawW, &drawH);
+				std::cout << "[SDL_ApplicationWindow] App_Border ref size = "
+					<< app_border_->getReferenceWindowWidth() << "x" << app_border_->getReferenceWindowHeight()
+					<< " | drawable = " << drawW << "x" << drawH << std::endl;
+			}
+
 			last_logged_state = borderState;
 		}
 		
@@ -643,7 +653,18 @@ void SDL_ApplicationWindow::renderFrame()
 			debug_tools_->drawDebugTools(commandBuffer, width, height);
 		}
 	}
-	// If not Init, we just cleared to black in renderPassViewportAndScissorSetup() - that's the black screen
+
+	// ------ when state is Maximized for SDL3 window
+	else if (window_state_ == WindowRenderState::Maximized)
+	{
+		activateDebugRender();
+
+		if (debug_tools_)
+		{
+			debug_tools_->drawDebugTools(commandBuffer, width, height);
+		}
+	}
+	// For Reduced and Updating states, we just cleared to black in renderPassViewportAndScissorSetup()
 
 	finalizeAndSubmitCommandBuffer(commandBuffer); 
 

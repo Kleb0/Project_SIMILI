@@ -8,8 +8,10 @@
 
 class VKContext;
 
-namespace SIMILI {
-	namespace Frontend {
+namespace SIMILI 
+{
+	namespace Frontend 
+	{
 		
 		struct PanelState
 		{
@@ -29,64 +31,50 @@ namespace SIMILI {
 
 		class PanelMapBuilder
 		{
-		public:
-			PanelMapBuilder();
-			~PanelMapBuilder();
+			public:
+				PanelMapBuilder();
+				~PanelMapBuilder();
 
-			void syncSplittersAndPanes(
-				const std::map<std::string, IFrameScreenData>& frameDataMap,
-				int currentWindowWidth,
-				int currentWindowHeight,
-				std::map<std::string, PanelState>& panelStateMap,
-				std::vector<SplitterDefinition>& splitterList,
-				int& lastWindowWidth,
-				int& lastWindowHeight,
-				SDL_Window* window = nullptr
-			);
+				void syncSplittersAndPanels(const std::map<std::string, IFrameScreenData>& frameDataMap,
+					int currentWindowWidth,int currentWindowHeight,
+					std::map<std::string, PanelState>& panelStateMap,
+					std::vector<SplitterDefinition>& splitterList,
+					int& lastWindowWidth,int& lastWindowHeight,
+					SDL_Window* window = nullptr);
 
-			void rebuildFromSource(
-				const std::map<std::string, IFrameScreenData>& frameDataMap,
-				int currentWindowWidth,
-				int currentWindowHeight,
-				std::map<std::string, PanelState>& panelStateMap,
-				int& lastWindowWidth,
-				int& lastWindowHeight
-			);
+				void rebuildFromSource(
+					const std::map<std::string, IFrameScreenData>& frameDataMap,
+					int currentWindowWidth,int currentWindowHeight,
+					std::map<std::string, PanelState>& panelStateMap,
+					int& lastWindowWidth, int& lastWindowHeight	);
 
-			void scaleLayoutToWindow(
-				int newWindowWidth,
-				int newWindowHeight,
-				std::map<std::string, PanelState>& panelStateMap,
-				int& lastWindowWidth,
-				int& lastWindowHeight,
-				SDL_Window* window
-			);
+				void scaleLayoutToWindow(
+					int newWindowWidth,int newWindowHeight,
+					std::map<std::string, PanelState>& panelStateMap,
+					int& lastWindowWidth, int& lastWindowHeight,
+					SDL_Window* window );
 
-			void updateClientCoordinates(std::map<std::string, PanelState>& panelStateMap);
+				void updateClientCoordinates(std::map<std::string, PanelState>& panelStateMap);
 
-			void drawInsideAppBorders(
-				VkCommandBuffer commandBuffer, int drawableWidth,
-				int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap,
-				bool skipTextureRebuild,
-				class VKContext* vkContext, class VulkanPipeline* vulkanPipelines, VkRenderPass renderPass,
-				class CEF_Drawer* cefDrawer,
-				std::map<std::string, std::unique_ptr<class UIPanel>>& uiPanels,
-				SDL_Window* window,
-				int appBorderLeft, int appBorderTop,
-				int appBorderWidth, int appBorderHeight);
+				void drawInsideAppBorders( VkCommandBuffer commandBuffer, int drawableWidth,
+					int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap,
+					bool skipTextureRebuild,
+					class VKContext* vkContext, class VulkanPipeline* vulkanPipelines, VkRenderPass renderPass,
+					class CEF_Drawer* cefDrawer,
+					std::map<std::string, std::unique_ptr<class UIPanel>>& uiPanels,
+					SDL_Window* window,
+					int appBorderLeft, int appBorderTop,
+					int appBorderWidth, int appBorderHeight);
 
-			void clearUIPanels(std::map<std::string, std::unique_ptr<class UIPanel>>& uiPanels);
+				void clearUIPanels(std::map<std::string, std::unique_ptr<class UIPanel>>& uiPanels);
 
-	private:
-		void createViewportPanel(
-			std::map<std::string, PanelState>& panelStateMap,
-			int currentWindowWidth,
-			int currentWindowHeight
-		);
-			void buildSplitters(
-				const std::map<std::string, PanelState>& panelStateMap,
-				std::vector<SplitterDefinition>& splitterList
-			);
+			private:
+
+				void createViewportPanel(std::map<std::string, PanelState>& panelStateMap,
+				int currentWindowWidth, int currentWindowHeight);
+
+				void buildSplitters(const std::map<std::string, PanelState>& panelStateMap,
+					std::vector<SplitterDefinition>& splitterList);
 		};
 	}
 }

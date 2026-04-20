@@ -97,13 +97,31 @@ void Border_DebugRectangle::draw(VkCommandBuffer commandBuffer, int drawableWidt
 		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shared_pipeline_->layout, 0, 1, &vk_descriptor_set_, 0, nullptr);
 	}
 
-	int left = border->getLeft();
-	int top = border->getTop();
-	int right = border->getRight();
-	int bottom = border->getBottom();
+	int left;
+	int top;
+	int right;
+	int bottom;
+	int refWidth;
+	int refHeight;
 
-	int refWidth = border->getReferenceWindowWidth();
-	int refHeight = border->getReferenceWindowHeight();
+	if (border->getCurrentState() == BorderState::Maximized)
+	{
+		refWidth  = drawableWidth;
+		refHeight = drawableHeight;
+		left   = 3;
+		top    = 3;
+		right  = drawableWidth  - 3;
+		bottom = drawableHeight - 3;
+	}
+	else
+	{
+		left   = border->getLeft();
+		top    = border->getTop();
+		right  = border->getRight();
+		bottom = border->getBottom();
+		refWidth  = border->getReferenceWindowWidth();
+		refHeight = border->getReferenceWindowHeight();
+	}
 
 	if (refWidth <= 0 || refHeight <= 0)
 	{
