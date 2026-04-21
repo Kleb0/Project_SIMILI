@@ -5,6 +5,7 @@
 #include <iostream>
 #include <algorithm>
 #include <set>
+#include <cmath>
 
 namespace SIMILI {
 	namespace Frontend {
@@ -215,6 +216,64 @@ namespace SIMILI {
 				effectivePanelFrameDataMap, skipTextureRebuild, vk_context_, vulkan_pipelines_,
 				vk_render_pass_, cef_drawer_, ui_panels_, window,
 				app_border_left_, app_border_top_, app_border_width_, app_border_height_);
+		}
+
+		void UIManager::drawFullScreenUIPanelsInsideBorders(
+			VkCommandBuffer commandBuffer,
+			int drawableWidth, int drawableHeight,
+			const std::map<std::string, IFrameScreenData>& panelFrameDataMap,
+			bool skipTextureRebuild, SDL_Window* window,
+			int referenceWindowWidth, int referenceWindowHeight)
+		{
+			if (referenceWindowWidth <= 0 || referenceWindowHeight <= 0 || !window)
+			{
+				return;
+			}
+
+			int currentLogicalW = 0, currentLogicalH = 0;
+			SDL_GetWindowSize(window, &currentLogicalW, &currentLogicalH);
+			if (currentLogicalW <= 0 || currentLogicalH <= 0)
+			{
+				return;
+			}
+
+			float scaleX = static_cast<float>(currentLogicalW) / static_cast<float>(referenceWindowWidth);
+			float scaleY = static_cast<float>(currentLogicalH) / static_cast<float>(referenceWindowHeight);
+
+			const std::map<std::string, IFrameScreenData>* sourceMap = &panelFrameDataMap;
+			std::map<std::string, IFrameScreenData> fallbackSource;
+			if (panelFrameDataMap.empty())
+			{
+				std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+				fallbackSource = ui_panel_frame_data_map_;
+				sourceMap = &fallbackSource;
+			}
+
+			std::map<std::string, IFrameScreenData> scaledFrameDataMap;
+			for (const auto& pair : *sourceMap)
+			{
+				IFrameScreenData scaled = pair.second;
+				scaled.relativeX = static_cast<int>(std::round(pair.second.relativeX * scaleX));
+				scaled.relativeY = static_cast<int>(std::round(pair.second.relativeY * scaleY));
+				scaled.width     = static_cast<int>(std::round(pair.second.width     * scaleX));
+				scaled.height    = static_cast<int>(std::round(pair.second.height    * scaleY));
+				scaled.clientX   = static_cast<int>(std::round(pair.second.clientX   * scaleX));
+				scaled.clientY   = static_cast<int>(std::round(pair.second.clientY   * scaleY));
+				scaledFrameDataMap[pair.first] = scaled;
+			}
+
+			static constexpr int BORDER = 3;
+			int borderLeft   = BORDER;
+			int borderTop    = BORDER;
+			int borderWidth  = drawableWidth  - 2 * BORDER;
+			int borderHeight = drawableHeight - 2 * BORDER;
+
+			panel_map_builder_.drawInsideAppBorders(
+				commandBuffer, drawableWidth, drawableHeight,
+				scaledFrameDataMap, skipTextureRebuild,
+				vk_context_, vulkan_pipelines_, vk_render_pass_, cef_drawer_,
+				ui_panels_, window,
+				borderLeft, borderTop, borderWidth, borderHeight);
 		}
 
 		void UIManager::clearUIPanels()

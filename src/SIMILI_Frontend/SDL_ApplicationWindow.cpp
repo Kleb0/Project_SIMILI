@@ -9,6 +9,7 @@
 #include "Frontend_Debug_Tools/Enable_UI_Debug_Tools.hpp"
 #include "../../Engine/VulkanScene/VKcontext.hpp"
 #include <SDL3/SDL_vulkan.h>
+#include <set>
 
 // Static member definition
 int SDL_ApplicationWindow::render_frame_count = 0;
@@ -659,6 +660,19 @@ void SDL_ApplicationWindow::renderFrame()
 	{
 		activateDebugRender();
 
+		drawCEF();
+		drawThreeDScreen();
+
+		preparePanels();
+
+		if (ui_manager_ && app_border_)
+		{
+			ui_manager_->drawFullScreenUIPanelsInsideBorders(
+				commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
+				prepared_panel_frame_data_map_, prepared_skip_texture_rebuild_, window_,
+				app_border_->getReferenceWindowWidth(), app_border_->getReferenceWindowHeight());
+		}
+
 		if (debug_tools_)
 		{
 			debug_tools_->drawDebugTools(commandBuffer, width, height);
@@ -706,6 +720,24 @@ void SDL_ApplicationWindow::preparePanels()
 	if (prepared_panel_frame_data_map_.empty())
 	{
 		prepared_panel_frame_data_map_ = ui_manager_->getUIPanelFrameDatas();
+	}
+
+	{
+		std::set<std::string> seenBounds;
+		for (auto it = prepared_panel_frame_data_map_.begin(); it != prepared_panel_frame_data_map_.end(); )
+		{
+			const auto& d = it->second;
+			std::string key = std::to_string(d.relativeX) + "," + std::to_string(d.relativeY)
+			                + "," + std::to_string(d.width) + "," + std::to_string(d.height);
+			if (!seenBounds.insert(key).second)
+			{
+				it = prepared_panel_frame_data_map_.erase(it);
+			}
+			else
+			{
+				++it;
+			}
+		}
 	}
 
 	prepared_skip_texture_rebuild_ = false;

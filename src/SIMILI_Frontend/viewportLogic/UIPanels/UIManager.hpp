@@ -56,6 +56,7 @@ namespace SIMILI {
 			void syncFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas, SDL_Window* sdlWindow);
 			
 			void drawUIPanelsInsideBorders(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild, SDL_Window* window);
+			void drawFullScreenUIPanelsInsideBorders(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild, SDL_Window* window, int referenceWindowWidth, int referenceWindowHeight);
 			void setBorders(int borderLeft, int borderTop, int borderWidth, int borderHeight);
 		
 			void clearUIPanels();

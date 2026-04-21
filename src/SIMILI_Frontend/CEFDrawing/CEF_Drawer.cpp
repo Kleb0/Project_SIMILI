@@ -341,13 +341,7 @@ void CEF_Drawer::draw(VkCommandBuffer commandBuffer)
 			resize_wait_frames_--;
 			if (resize_wait_frames_ == 0)
 			{
-				preserve_textures_during_resize_ = false;
-				std::cout << "[CEF_Drawer::draw] Resize timeout reached - forcing texture rebuild" << std::endl;
-				paint_buffer_synchronized_ = true;
-				for (auto& texturePair : ui_panel_textures_)
-				{
-					texturePair.second.dirty = true;
-				}
+				std::cout << "[CEF_Drawer::draw] Resize timeout reached - waiting for synchronized OnPaint" << std::endl;
 			}
 		}
 	}
