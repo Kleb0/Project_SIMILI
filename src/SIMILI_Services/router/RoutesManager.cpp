@@ -605,7 +605,6 @@ namespace SIMILI {
 					}
 
 					std::map<std::string, IFrameData> uiPanelIFrames;
-					std::map<std::string, CEF_Drawer::UIPanelFrameData> uiPanelFramesForDrawer;
 
 					const int MIN_PANEL_DIMENSION = 10;
 
@@ -641,23 +640,10 @@ namespace SIMILI {
 							uiPanelIFrames[name] = data;
 							
 							handler->iframe_data_map_[name] = data;
-
-							CEF_Drawer::UIPanelFrameData panelFrame;
-							panelFrame.x = data.x;
-							panelFrame.y = data.y;
-							panelFrame.width = data.width;
-							panelFrame.height = data.height;
-							uiPanelFramesForDrawer[name] = panelFrame;
 						}
 					}
 
 					std::cout << "[RoutesManager] Created " << uiPanelIFrames.size() << " UI panels" << std::endl;
-
-					CEF_Drawer* cefDrawer = handler->getCEFDrawer();
-					if (cefDrawer)
-					{
-						cefDrawer->updateUIPanelFrames(uiPanelFramesForDrawer);
-					}
 
 					resp.statusCode = 200;
 					resp.statusMessage = "OK";

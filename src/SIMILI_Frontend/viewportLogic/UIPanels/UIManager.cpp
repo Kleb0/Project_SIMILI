@@ -1,6 +1,5 @@
 #include "UIManager.hpp"
 #include "../../ThreadSafeIFrameMap.hpp"
-#include "../../CEFDrawing/CEF_Drawer.hpp"
 #include "../../../Engine/VulkanScene/VKcontext.hpp"
 #include <iostream>
 #include <algorithm>
@@ -27,7 +26,6 @@ namespace SIMILI {
 			, vk_context_(nullptr)
 			, vulkan_pipelines_(nullptr)
 			, vk_render_pass_(VK_NULL_HANDLE)
-			, cef_drawer_(nullptr)
 			, app_border_left_(0)
 			, app_border_top_(0)
 			, app_border_width_(0)
@@ -199,6 +197,30 @@ namespace SIMILI {
 			app_border_height_ = borderHeight;
 		}
 
+		void UIManager::setCEFTextureForAllPanels(VkImageView view, VkSampler sampler, int cefWidth, int cefHeight)
+		{
+			if (cefWidth <= 0 || cefHeight <= 0)
+				return;
+			const float fw = static_cast<float>(cefWidth);
+			const float fh = static_cast<float>(cefHeight);
+			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+			for (auto& pair : ui_panels_)
+			{
+				if (!pair.second)
+					continue;
+				float u0 = 0.0f, v0 = 0.0f, u1 = 1.0f, v1 = 1.0f;
+				auto it = ui_panel_frame_data_map_.find(pair.first);
+				if (it != ui_panel_frame_data_map_.end())
+				{
+					u0 = static_cast<float>(it->second.relativeX) / fw;
+					v0 = static_cast<float>(it->second.relativeY) / fh;
+					u1 = static_cast<float>(it->second.relativeX + it->second.width) / fw;
+					v1 = static_cast<float>(it->second.relativeY + it->second.height) / fh;
+				}
+				pair.second->setCEFTexture(view, sampler, u0, v0, u1, v1);
+			}
+		}
+
 		void UIManager::drawUIPanelsInsideBorders(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild, SDL_Window* window)
 		{
 			std::map<std::string, IFrameScreenData> effectivePanelFrameDataMap;
@@ -214,7 +236,7 @@ namespace SIMILI {
 
 			panel_map_builder_.drawInsideAppBorders(commandBuffer, drawableWidth, drawableHeight,
 				effectivePanelFrameDataMap, skipTextureRebuild, vk_context_, vulkan_pipelines_,
-				vk_render_pass_, cef_drawer_, ui_panels_, window,
+				vk_render_pass_, ui_panels_, window,
 				app_border_left_, app_border_top_, app_border_width_, app_border_height_);
 		}
 
@@ -271,7 +293,7 @@ namespace SIMILI {
 			panel_map_builder_.drawInsideAppBorders(
 				commandBuffer, drawableWidth, drawableHeight,
 				scaledFrameDataMap, skipTextureRebuild,
-				vk_context_, vulkan_pipelines_, vk_render_pass_, cef_drawer_,
+				vk_context_, vulkan_pipelines_, vk_render_pass_,
 				ui_panels_, window,
 				borderLeft, borderTop, borderWidth, borderHeight);
 		}

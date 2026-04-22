@@ -60,7 +60,6 @@ namespace SIMILI
 					int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap,
 					bool skipTextureRebuild,
 					class VKContext* vkContext, class VulkanPipeline* vulkanPipelines, VkRenderPass renderPass,
-					class CEF_Drawer* cefDrawer,
 					std::map<std::string, std::unique_ptr<class UIPanel>>& uiPanels,
 					SDL_Window* window,
 					int appBorderLeft, int appBorderTop,

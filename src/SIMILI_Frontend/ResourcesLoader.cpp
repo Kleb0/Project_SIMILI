@@ -1,6 +1,5 @@
 #include "ResourcesLoader.hpp"
 #include "ui_handler.hpp"
-#include "CEFDrawing/CEF_Drawer.hpp"
 #include "../ThirdParty/json.hpp"
 #include <iostream>
 #include <fstream>
@@ -157,7 +156,6 @@ CefRefPtr<CefResourceHandler> LocalResourceRequestHandler::handleUIPanelUpdate(C
 	}
 	
 	std::map<std::string, IFrameData> uiPanelIFrames;
-	std::map<std::string, CEF_Drawer::UIPanelFrameData> uiPanelFramesForDrawer;
 	
 	for (const auto& iframe : requestData["iframes"])
 	{
@@ -181,20 +179,7 @@ CefRefPtr<CefResourceHandler> LocalResourceRequestHandler::handleUIPanelUpdate(C
 			uiPanelIFrames[name] = data;
 			
 			handler->iframe_data_map_[name] = data;
-			
-			CEF_Drawer::UIPanelFrameData panelFrame;
-			panelFrame.x = data.x;
-			panelFrame.y = data.y;
-			panelFrame.width = data.width;
-			panelFrame.height = data.height;
-			uiPanelFramesForDrawer[name] = panelFrame;
 		}
-	}
-	
-	CEF_Drawer* cefDrawer = handler->getCEFDrawer();
-	if (cefDrawer)
-	{
-		cefDrawer->updateUIPanelFrames(uiPanelFramesForDrawer);
 	}
 			
 	std::string response = "{\"success\": true, \"count\": " + std::to_string(uiPanelIFrames.size()) + "}";

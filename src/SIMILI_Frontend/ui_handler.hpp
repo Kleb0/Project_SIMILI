@@ -7,7 +7,6 @@
 #include "include/views/cef_browser_view.h"
 #include "include/views/cef_window.h"
 #include "SDL_ApplicationWindow.hpp"
-#include "CEFDrawing/CEF_Drawer.hpp"
 #include "viewportLogic/FrameDatas/FrameDatas.hpp"
 #include "viewportLogic/UIPanels/UIPanel.hpp"
 #include "viewportLogic/UIPanels/UIManager.hpp"
@@ -144,10 +143,6 @@ public:
 	Overlay_HTML_Texture_Renderer* getSlotTextureRenderer() const { return slot_texture_renderer_; }
 	Overlay_HTML_Texture_Renderer* getCompositeTestRenderer() const { return composite_test_renderer_; }
 
-	CEF_Drawer* getCEFDrawer() const { return cef_drawer_; }
-	void setCEFDrawer(CEF_Drawer* drawer) { cef_drawer_ = drawer; }
-	void Set_DOM(CEF_Drawer* drawer);
-
 	Splitter* getSplitter() const { return splitter_.get(); }
 
 	// ============ UTILITIES ============================
@@ -157,7 +152,7 @@ public:
 	
 	ThreadSafeIFrameMap iframe_data_map_;
 	
-	friend Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 interval, SDL_ApplicationWindow* parentWindow, CEF_Drawer* dom);
+	friend Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 interval, SDL_ApplicationWindow* parentWindow);
 
 private:
 	
@@ -165,7 +160,6 @@ private:
 
 	bool isOwnerThread() const;
 	bool hasRuntimeLayoutChanged(const std::map<std::string, SIMILI::Frontend::IFrameScreenData>& beforeMap, const std::map<std::string, SIMILI::Frontend::IFrameScreenData>& afterMap) const;
-	std::map<std::string, CEF_Drawer::UIPanelFrameData> buildRuntimeLayoutFrameMap(const std::map<std::string, SIMILI::Frontend::IFrameScreenData>& frameDataMap) const;
 	std::map<std::string, SIMILI::Frontend::IFrameScreenData> getRuntimeFrameDataMap() const;
 
 	// ================================= SINGLETON ===============
@@ -221,7 +215,6 @@ private:
 	
 	Overlay_HTML_Texture_Renderer* slot_texture_renderer_;
 	Overlay_HTML_Texture_Renderer* composite_test_renderer_;
-	CEF_Drawer* cef_drawer_;
 
 	// ============================= UI PANELS STATE drawing ===========================================
 

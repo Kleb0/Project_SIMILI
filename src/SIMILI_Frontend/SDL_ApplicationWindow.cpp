@@ -3,17 +3,40 @@
 #include "viewportLogic/ThreeDScreen/ThreeDScreen.hpp"
 #include "viewportLogic/UIPanels/UIManager.hpp"
 #include "viewportLogic/UIPanels/Splitter.hpp"
-#include "CEFDrawing/CEF_Drawer.hpp"
-#include "CEFDrawing/CEF_Resizer.hpp"
 #include "App_Border.hpp"
 #include "Frontend_Debug_Tools/Enable_UI_Debug_Tools.hpp"
 #include "../../Engine/VulkanScene/VKcontext.hpp"
+#include "../../Engine/VulkanPipeline/VulkanPipeline.hpp"
+#include "../../Engine/GLSL_Compiler/GLSLCompiler.hpp"
 #include <SDL3/SDL_vulkan.h>
 #include "include/cef_browser.h"
 #include <set>
+#include <cstring>
 
 // Static member definition
 int SDL_ApplicationWindow::render_frame_count = 0;
+
+// ======== AppRenderHandler ========
+
+AppRenderHandler::AppRenderHandler(SDL_ApplicationWindow* owner)
+	: owner_(owner)
+{
+}
+
+void AppRenderHandler::GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect)
+{
+	int w = 1920, h = 1080;
+	if (owner_ && owner_->getHandle())
+		SDL_GetWindowSize(owner_->getHandle(), &w, &h);
+	rect = CefRect(0, 0, w, h);
+}
+
+void AppRenderHandler::OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type,
+	const RectList& dirtyRects, const void* buffer, int width, int height)
+{
+	if (owner_)
+		owner_->onCEFPaint(type, buffer, width, height);
+}
 
 SDL_ApplicationWindow::SDL_ApplicationWindow()
 	: window_(nullptr)
@@ -47,7 +70,18 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, prepared_drawable_height_(0)
 	, prepared_skip_texture_rebuild_(false)
 	, borders_set_for_init_(false)
-	, cef_drawer_(nullptr)
+	, browser_(nullptr)
+	, cef_render_handler_(new AppRenderHandler(this))
+	, cef_shared_pipeline_(nullptr)
+	, cef_descriptor_set_layout_(VK_NULL_HANDLE)
+	, cef_paint_width_(0)
+	, cef_paint_height_(0)
+	, cef_texture_image_(VK_NULL_HANDLE)
+	, cef_texture_memory_(VK_NULL_HANDLE)
+	, cef_texture_view_(VK_NULL_HANDLE)
+	, cef_texture_sampler_(VK_NULL_HANDLE)
+	, cef_texture_uploaded_width_(0)
+	, cef_texture_uploaded_height_(0)
 {
 }
 SDL_ApplicationWindow::~SDL_ApplicationWindow()
@@ -391,19 +425,312 @@ void SDL_ApplicationWindow::updateFrameDatas(SIMILI::Frontend::FrameDatas* frame
 	frame_datas_ = frameDatas;
 }
 
-void SDL_ApplicationWindow::setCEFDrawer(CEF_Drawer* drawer)
+void SDL_ApplicationWindow::onCEFPaint(CefRenderHandler::PaintElementType type, const void* buffer, int width, int height)
 {
-	cef_drawer_ = drawer;
+	std::lock_guard<std::mutex> lock(render_mutex_);
+	const size_t size = static_cast<size_t>(width) * static_cast<size_t>(height) * 4;
+	cef_paint_buffer_.resize(size);
+	if (buffer && size > 0)
+		std::memcpy(cef_paint_buffer_.data(), buffer, size);
+	cef_paint_width_ = width;
+	cef_paint_height_ = height;
+}
+
+void SDL_ApplicationWindow::setRenderPass(VkRenderPass renderPass)
+{
+	std::lock_guard<std::mutex> lock(render_mutex_);
+
+	std::cout << "[SDL_ApplicationWindow] setRenderPass called with renderPass=" << renderPass << std::endl;
+
+	if (renderPass == VK_NULL_HANDLE)
+	{
+		std::cerr << "[SDL_ApplicationWindow] ERROR: Render pass is VK_NULL_HANDLE!" << std::endl;
+		return;
+	}
+
+	vk_render_pass_ = renderPass;
+	std::cout << "[SDL_ApplicationWindow] Render pass set: " << renderPass << std::endl;
+
+	if (cef_shared_pipeline_)
+	{
+		std::cout << "[SDL_ApplicationWindow] Releasing old CEF pipeline (shared_ptr)" << std::endl;
+		cef_shared_pipeline_.reset();
+	}
+
+	if (!vulkan_pipelines_ || !vulkan_pipelines_->isInitialized())
+	{
+		std::cerr << "[SDL_ApplicationWindow] ERROR: VulkanPipeline system is not initialized" << std::endl;
+		return;
+	}
+
+	if (!createCEFPipeline())
+	{
+		std::cerr << "[SDL_ApplicationWindow] Failed to create CEF Vulkan pipeline with render pass" << std::endl;
+	}
+	else
+	{
+		std::cout << "[SDL_ApplicationWindow] CEF pipeline created successfully, handle="
+			<< (cef_shared_pipeline_ ? cef_shared_pipeline_->pipeline : VK_NULL_HANDLE) << std::endl;
+	}
+}
+
+bool SDL_ApplicationWindow::createCEFPipeline()
+{
+	const std::string vertexShaderGLSL = R"(
+#version 450
+
+layout(location = 0) in vec2 aPosition;
+layout(location = 1) in vec2 aTexCoord;
+
+layout(location = 0) out vec2 vTexCoord;
+
+void main() {
+    gl_Position = vec4(aPosition, 0.0, 1.0);
+    vTexCoord = aTexCoord;
+}
+)";
+
+	const std::string fragmentShaderGLSL = R"(
+#version 450
+
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 0) out vec4 outColor;
+
+layout(binding = 0) uniform sampler2D texSampler;
+
+void main() {
+    outColor = texture(texSampler, vTexCoord);
+}
+)";
+
+	std::vector<uint32_t> vertexSPIRV = GLSLCompiler::compileGLSL(vertexShaderGLSL, GLSLCompiler::ShaderType::Vertex);
+	if (vertexSPIRV.empty())
+	{
+		std::cerr << "[SDL_ApplicationWindow] Failed to compile CEF vertex shader: " << GLSLCompiler::getLastError() << std::endl;
+		return false;
+	}
+
+	std::vector<uint32_t> fragmentSPIRV = GLSLCompiler::compileGLSL(fragmentShaderGLSL, GLSLCompiler::ShaderType::Fragment);
+	if (fragmentSPIRV.empty())
+	{
+		std::cerr << "[SDL_ApplicationWindow] Failed to compile CEF fragment shader: " << GLSLCompiler::getLastError() << std::endl;
+		return false;
+	}
+
+	std::vector<char> vertShaderBytes = GLSLCompiler::spirvToBytes(vertexSPIRV);
+	std::vector<char> fragShaderBytes = GLSLCompiler::spirvToBytes(fragmentSPIRV);
+
+	if (cef_descriptor_set_layout_ != VK_NULL_HANDLE)
+	{
+		vkDestroyDescriptorSetLayout(vk_context_->getDevice(), cef_descriptor_set_layout_, nullptr);
+		cef_descriptor_set_layout_ = VK_NULL_HANDLE;
+	}
+
+	VkDescriptorSetLayoutBinding layoutBinding{};
+	layoutBinding.binding = 0;
+	layoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	layoutBinding.descriptorCount = 1;
+	layoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	layoutBinding.pImmutableSamplers = nullptr;
+
+	VkDescriptorSetLayoutCreateInfo layoutInfo{};
+	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	layoutInfo.bindingCount = 1;
+	layoutInfo.pBindings = &layoutBinding;
+
+	if (vkCreateDescriptorSetLayout(vk_context_->getDevice(), &layoutInfo, nullptr, &cef_descriptor_set_layout_) != VK_SUCCESS)
+	{
+		std::cerr << "[SDL_ApplicationWindow] Failed to create CEF descriptor set layout" << std::endl;
+		return false;
+	}
+
+	VkVertexInputAttributeDescription attr0{};
+	attr0.binding = 0;
+	attr0.location = 0;
+	attr0.format = VK_FORMAT_R32G32_SFLOAT;
+	attr0.offset = 0;
+
+	VkVertexInputAttributeDescription attr1{};
+	attr1.binding = 0;
+	attr1.location = 1;
+	attr1.format = VK_FORMAT_R32G32_SFLOAT;
+	attr1.offset = 2 * sizeof(float);
+
+	VulkanPipeline::PipelineConfig config;
+	config.name = "cef_app_window_texture";
+	config.vertexShaderCode = vertShaderBytes;
+	config.fragmentShaderCode = fragShaderBytes;
+	config.renderPass = vk_render_pass_;
+	config.descriptorSetLayout = cef_descriptor_set_layout_;
+	config.enableBlending = true;
+	config.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	config.vertexBindingStride = 4 * sizeof(float);
+	config.vertexAttributes = { attr0, attr1 };
+
+	cef_shared_pipeline_ = vulkan_pipelines_->getOrCreatePipeline(config);
+
+	if (!cef_shared_pipeline_ || cef_shared_pipeline_->pipeline == VK_NULL_HANDLE)
+	{
+		std::cerr << "[SDL_ApplicationWindow] Failed to create CEF pipeline from factory" << std::endl;
+		return false;
+	}
+
+	std::cout << "[SDL_ApplicationWindow] CEF pipeline acquired: " << cef_shared_pipeline_->pipeline << std::endl;
+	return true;
+}
+
+void SDL_ApplicationWindow::uploadCEFPaintBuffer()
+{
+	std::vector<unsigned char> localBuffer;
+	int w = 0, h = 0;
+	{
+		std::lock_guard<std::mutex> lock(render_mutex_);
+		if (cef_paint_buffer_.empty() || cef_paint_width_ <= 0 || cef_paint_height_ <= 0)
+			return;
+		localBuffer = cef_paint_buffer_;
+		w = cef_paint_width_;
+		h = cef_paint_height_;
+	}
+
+	VkDevice device = vk_context_->getDevice();
+
+	if (cef_texture_image_ != VK_NULL_HANDLE && (w != cef_texture_uploaded_width_ || h != cef_texture_uploaded_height_))
+	{
+		vkQueueWaitIdle(vk_context_->getGraphicsQueue());
+		if (cef_texture_view_ != VK_NULL_HANDLE) { vkDestroyImageView(device, cef_texture_view_, nullptr); cef_texture_view_ = VK_NULL_HANDLE; }
+		if (cef_texture_sampler_ != VK_NULL_HANDLE) { vkDestroySampler(device, cef_texture_sampler_, nullptr); cef_texture_sampler_ = VK_NULL_HANDLE; }
+		if (cef_texture_image_ != VK_NULL_HANDLE) { vkDestroyImage(device, cef_texture_image_, nullptr); cef_texture_image_ = VK_NULL_HANDLE; }
+		if (cef_texture_memory_ != VK_NULL_HANDLE) { vkFreeMemory(device, cef_texture_memory_, nullptr); cef_texture_memory_ = VK_NULL_HANDLE; }
+	}
+
+	if (cef_texture_image_ == VK_NULL_HANDLE)
+	{
+		VkImageCreateInfo imgInfo{};
+		imgInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		imgInfo.imageType = VK_IMAGE_TYPE_2D;
+		imgInfo.extent = { (uint32_t)w, (uint32_t)h, 1 };
+		imgInfo.mipLevels = 1; imgInfo.arrayLayers = 1;
+		imgInfo.format = VK_FORMAT_B8G8R8A8_UNORM;
+		imgInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		imgInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		imgInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		imgInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		imgInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		if (vkCreateImage(device, &imgInfo, nullptr, &cef_texture_image_) != VK_SUCCESS) return;
+
+		VkMemoryRequirements memReq;
+		vkGetImageMemoryRequirements(device, cef_texture_image_, &memReq);
+		VkPhysicalDeviceMemoryProperties memProps;
+		vkGetPhysicalDeviceMemoryProperties(vk_context_->getPhysicalDevice(), &memProps);
+		uint32_t memIdx = 0;
+		for (uint32_t i = 0; i < memProps.memoryTypeCount; i++)
+		{
+			if ((memReq.memoryTypeBits & (1 << i)) && (memProps.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+			{ memIdx = i; break; }
+		}
+		VkMemoryAllocateInfo allocInfo{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+		allocInfo.allocationSize = memReq.size; allocInfo.memoryTypeIndex = memIdx;
+		if (vkAllocateMemory(device, &allocInfo, nullptr, &cef_texture_memory_) != VK_SUCCESS) return;
+		vkBindImageMemory(device, cef_texture_image_, cef_texture_memory_, 0);
+
+		VkImageViewCreateInfo viewInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+		viewInfo.image = cef_texture_image_; viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		viewInfo.format = VK_FORMAT_B8G8R8A8_UNORM;
+		viewInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+		if (vkCreateImageView(device, &viewInfo, nullptr, &cef_texture_view_) != VK_SUCCESS) return;
+
+		VkSamplerCreateInfo samplerInfo{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+		samplerInfo.magFilter = VK_FILTER_LINEAR; samplerInfo.minFilter = VK_FILTER_LINEAR;
+		samplerInfo.addressModeU = samplerInfo.addressModeV = samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		if (vkCreateSampler(device, &samplerInfo, nullptr, &cef_texture_sampler_) != VK_SUCCESS) return;
+
+		cef_texture_uploaded_width_ = 0;
+		cef_texture_uploaded_height_ = 0;
+	}
+
+	VkDeviceSize bufSize = (VkDeviceSize)w * h * 4;
+	VkBufferCreateInfo stagingInfo{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+	stagingInfo.size = bufSize; stagingInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+	VkBuffer staging = VK_NULL_HANDLE;
+	if (vkCreateBuffer(device, &stagingInfo, nullptr, &staging) != VK_SUCCESS) return;
+
+	VkMemoryRequirements stagingReq;
+	vkGetBufferMemoryRequirements(device, staging, &stagingReq);
+	VkPhysicalDeviceMemoryProperties memProps2;
+	vkGetPhysicalDeviceMemoryProperties(vk_context_->getPhysicalDevice(), &memProps2);
+	uint32_t stagingIdx = 0;
+	for (uint32_t i = 0; i < memProps2.memoryTypeCount; i++)
+	{
+		if ((stagingReq.memoryTypeBits & (1 << i)) && (memProps2.memoryTypes[i].propertyFlags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)))
+		{ stagingIdx = i; break; }
+	}
+	VkMemoryAllocateInfo stagingAlloc{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+	stagingAlloc.allocationSize = stagingReq.size; stagingAlloc.memoryTypeIndex = stagingIdx;
+	VkDeviceMemory stagingMem = VK_NULL_HANDLE;
+	if (vkAllocateMemory(device, &stagingAlloc, nullptr, &stagingMem) != VK_SUCCESS) { vkDestroyBuffer(device, staging, nullptr); return; }
+	vkBindBufferMemory(device, staging, stagingMem, 0);
+	void* mapped = nullptr;
+	vkMapMemory(device, stagingMem, 0, bufSize, 0, &mapped);
+	std::memcpy(mapped, localBuffer.data(), static_cast<size_t>(bufSize));
+	vkUnmapMemory(device, stagingMem);
+
+	VkCommandPoolCreateInfo poolInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+	poolInfo.queueFamilyIndex = vk_context_->getGraphicsQueueFamily();
+	poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+	VkCommandPool pool = VK_NULL_HANDLE;
+	vkCreateCommandPool(device, &poolInfo, nullptr, &pool);
+	VkCommandBufferAllocateInfo cmdAlloc{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+	cmdAlloc.commandPool = pool; cmdAlloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY; cmdAlloc.commandBufferCount = 1;
+	VkCommandBuffer cmd = VK_NULL_HANDLE;
+	vkAllocateCommandBuffers(device, &cmdAlloc, &cmd);
+	VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	vkBeginCommandBuffer(cmd, &beginInfo);
+
+	VkImageMemoryBarrier toTransfer{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+	toTransfer.oldLayout = (cef_texture_uploaded_width_ == 0) ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_GENERAL;
+	toTransfer.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	toTransfer.srcQueueFamilyIndex = toTransfer.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	toTransfer.image = cef_texture_image_;
+	toTransfer.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	toTransfer.srcAccessMask = (cef_texture_uploaded_width_ == 0) ? 0 : VK_ACCESS_SHADER_READ_BIT;
+	toTransfer.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &toTransfer);
+
+	VkBufferImageCopy region{};
+	region.imageSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+	region.imageExtent = { (uint32_t)w, (uint32_t)h, 1 };
+	vkCmdCopyBufferToImage(cmd, staging, cef_texture_image_, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+	VkImageMemoryBarrier toGeneral{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+	toGeneral.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	toGeneral.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+	toGeneral.srcQueueFamilyIndex = toGeneral.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	toGeneral.image = cef_texture_image_;
+	toGeneral.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	toGeneral.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	toGeneral.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &toGeneral);
+
+	vkEndCommandBuffer(cmd);
+	VkSubmitInfo submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
+	submit.commandBufferCount = 1; submit.pCommandBuffers = &cmd;
+	vkQueueSubmit(vk_context_->getGraphicsQueue(), 1, &submit, VK_NULL_HANDLE);
+	vkQueueWaitIdle(vk_context_->getGraphicsQueue());
+	vkDestroyCommandPool(device, pool, nullptr);
+	vkFreeMemory(device, stagingMem, nullptr);
+	vkDestroyBuffer(device, staging, nullptr);
+
+	cef_texture_uploaded_width_ = w;
+	cef_texture_uploaded_height_ = h;
+
+	if (ui_manager_)
+		ui_manager_->setCEFTextureForAllPanels(cef_texture_view_, cef_texture_sampler_, cef_texture_uploaded_width_, cef_texture_uploaded_height_);
 }
 
 void SDL_ApplicationWindow::SetHTMLAdressToDraw(CefRefPtr<CefClient> client, const std::string& url, int width, int height)
 {
-	if (!cef_drawer_ || !cef_drawer_->isInitialized())
-	{
-		std::cerr << "[SDL_ApplicationWindow] SetHTMLAdressToDraw: CEF_Drawer non initialisé" << std::endl;
-		return;
-	}
-
 	CefBrowserSettings browser_settings;
 	browser_settings.windowless_frame_rate = 60;
 	browser_settings.javascript = STATE_ENABLED;
@@ -423,7 +750,7 @@ void SDL_ApplicationWindow::SetHTMLAdressToDraw(CefRefPtr<CefClient> client, con
 
 	std::cout << "[SDL_ApplicationWindow] Browser CEF créé : " << url << " (" << width << "x" << height << ")" << std::endl;
 
-	cef_drawer_->setBrowser(browser, url, width, height);
+	browser_ = browser;
 }
 
 
@@ -784,44 +1111,13 @@ void SDL_ApplicationWindow::preparePanels()
 		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
 		Splitter* splitter = handler->getSplitter();
 	}
+
+	if (vk_context_)
+		uploadCEFPaintBuffer();
 }
 
 void SDL_ApplicationWindow::drawCEF()
 {
-	if (ui_handler_ && vk_command_buffers_.size() > current_image_index_)
-	{
-		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-		CEF_Drawer* cefDrawer = handler->getCEFDrawer();
-		
-		if (cefDrawer && cefDrawer->isInitialized())
-		{
-			static int call_count = 0;
-			if (call_count++ < 3)
-			{
-				std::cout << "[SDL_ApplicationWindow::drawCEF] Calling cefDrawer->draw() with commandBuffer index " << current_image_index_ << std::endl;
-			}
-			cefDrawer->draw(vk_command_buffers_[current_image_index_]);
-		}
-		else
-		{
-			static int warning_count = 0;
-			if (warning_count++ < 3)
-			{
-				std::cout << "[SDL_ApplicationWindow::drawCEF] WARNING: cefDrawer=" << cefDrawer 
-				          << " isInitialized=" << (cefDrawer ? cefDrawer->isInitialized() : false) << std::endl;
-			}
-		}
-	}
-	else
-	{
-		static int handler_warning = 0;
-		if (handler_warning++ < 3)
-		{
-			std::cout << "[SDL_ApplicationWindow::drawCEF] WARNING: ui_handler_=" << ui_handler_ 
-			          << " command_buffers_size=" << vk_command_buffers_.size()
-			          << " current_index=" << current_image_index_ << std::endl;
-		}
-	}
 }
 
 void SDL_ApplicationWindow::startSplitter()
@@ -1044,18 +1340,6 @@ bool SDL_ApplicationWindow::recreateSwapchain()
 	if (ui_handler_)
 	{
 		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-		CEF_Drawer* cefDrawer = handler->getCEFDrawer();
-		if (cefDrawer)
-		{
-			std::cout << "[SDL_ApplicationWindow] Syncing CEF window dimensions (logical): " << logicalWidth << "x" << logicalHeight << std::endl;
-			cefDrawer->getResizer().resize(logicalWidth, logicalHeight);
-			
-			std::cout << "[SDL_ApplicationWindow] Forcing CEF repaint with new window size" << std::endl;
-
-			
-			std::cout << "[SDL_ApplicationWindow] Syncing CEF window properties after swapchain recreation" << std::endl;
-			cefDrawer->syncWindowProperties();
-		}
 		
 		Splitter* splitter = handler->getSplitter();
 		if (splitter)

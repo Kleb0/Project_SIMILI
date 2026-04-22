@@ -31,6 +31,7 @@ class UIPanel
 		void setVKContext(VKContext* context);
 		void setRenderPass(VkRenderPass renderPass);
 		void setVulkanPipelines(VulkanPipeline* pipelines);
+		void setCEFTexture(VkImageView view, VkSampler sampler, float u0, float v0, float u1, float v1);
 
 		const std::string& getName() const { return name_; }
 		DrawingState getDrawingState() const { return drawing_state_; }
@@ -39,7 +40,6 @@ class UIPanel
 
 		bool createTexture();
 		bool createShaderProgram();
-		void updateTextureRegion();
 		void updateGeometry(int drawableWidth, int drawableHeight);
 
 		bool createVulkanResources();

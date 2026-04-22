@@ -46,7 +46,6 @@ UIHandler::UIHandler() : parent_sdl_window_(nullptr), parent_window_(nullptr), w
 	is_camera_operation_locked_(false),
 	slot_texture_renderer_(nullptr),
 	composite_test_renderer_(nullptr),
-	cef_drawer_(nullptr),
 	splitter_(nullptr),
 	owner_thread_id_(std::this_thread::get_id()),
 	pending_iframe_capture_(false),
@@ -68,7 +67,7 @@ void UIHandler::startRenderTimer()
 			UIHandler* handler = static_cast<UIHandler*>(param);
 			if (handler)
 			{
-				return RenderTimerProc(param, timerID, interval, handler->parent_sdl_window_, handler->getCEFDrawer());
+				return RenderTimerProc(param, timerID, interval, handler->parent_sdl_window_);
 			}
 			return 0;
 		};
@@ -124,11 +123,6 @@ UIHandler::~UIHandler()
 		delete composite_test_renderer_;
 		composite_test_renderer_ = nullptr;
 	}
-	if (cef_drawer_)
-	{
-		cef_drawer_ = nullptr;
-	}
-	
 	if (s_instance_ == this)
 	{
 		s_instance_ = nullptr;
@@ -211,11 +205,6 @@ void UIHandler::Set_SDLParent(SDL_ApplicationWindow* parentWindow)
 	}
 }
 
-void UIHandler::Set_DOM(CEF_Drawer* drawer)
-{
-	cef_drawer_ = drawer;
-}
-
 void UIHandler::OnContextCreated(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefV8Context> context) 
 {
 	if (!render_message_router_) 
@@ -270,7 +259,9 @@ CefRefPtr<CefKeyboardHandler> UIHandler::GetKeyboardHandler()
 
 CefRefPtr<CefRenderHandler> UIHandler::GetRenderHandler()
 {
-	return cef_drawer_;
+	if (parent_sdl_window_)
+		return parent_sdl_window_->getRenderHandler();
+	return nullptr;
 }
 
 CefRefPtr<CefRequestHandler> UIHandler::GetRequestHandler()
@@ -321,7 +312,7 @@ void UIHandler::CloseAllBrowsers(bool force_close)
 // ------------------- Render Timer Callback -------------------
 
 
-static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 interval, SDL_ApplicationWindow* parentWindow, CEF_Drawer* dom) 
+static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 interval, SDL_ApplicationWindow* parentWindow) 
 {
 	auto it = g_timerHandlerMap.find(timerID);
 	if (it == g_timerHandlerMap.end()) 
@@ -699,23 +690,6 @@ bool UIHandler::hasRuntimeLayoutChanged(const std::map<std::string, SIMILI::Fron
 	return false;
 }
 
-std::map<std::string, CEF_Drawer::UIPanelFrameData> UIHandler::buildRuntimeLayoutFrameMap(const std::map<std::string, SIMILI::Frontend::IFrameScreenData>& frameDataMap) const
-{
-	std::map<std::string, CEF_Drawer::UIPanelFrameData> layoutFrameMap;
-
-	for (const auto& pair : frameDataMap)
-	{
-		CEF_Drawer::UIPanelFrameData panelFrame;
-		panelFrame.x = pair.second.relativeX;
-		panelFrame.y = pair.second.relativeY;
-		panelFrame.width = pair.second.width;
-		panelFrame.height = pair.second.height;
-		layoutFrameMap[pair.first] = panelFrame;
-	}
-
-	return layoutFrameMap;
-}
-
 void UIHandler::processPendingFrameUpdates()
 {
 	if (!isOwnerThread())
@@ -749,7 +723,6 @@ void UIHandler::startManager(VKContext* vkContext, VkRenderPass renderPass)
 		ui_manager_->setVKContext(vkContext);
 		ui_manager_->setVulkanPipelines(vulkan_pipelines_);
 		ui_manager_->setRenderPass(renderPass);
-		ui_manager_->setCEFDrawer(cef_drawer_);
 		std::cout << "[UIHandler] UIManager initialized with Vulkan resources" << std::endl;
 	}
 
@@ -801,7 +774,7 @@ bool UIHandler::handleSplitterEvent(const SDL_Event& event)
 	{
 		cacheUIPanelFrameDatas();
 	}
-	else if (isWindowResizeEvent && cef_drawer_)
+	else if (isWindowResizeEvent)
 	{
 		// const auto currentFrameDataMap = splitter_->getAllFrameDatas();
 		// if (!currentFrameDataMap.empty())

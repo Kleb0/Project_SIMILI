@@ -1,7 +1,6 @@
 #define GLM_ENABLE_EXPERIMENTAL
 
 #include "UIPanel.hpp"
-#include "../../CEFDrawing/CEF_Drawer.hpp"
 #include "../../../Engine/VulkanScene/VKcontext.hpp"
 #include "../../../Engine/GLSL_Compiler/GLSLCompiler.hpp"
 #include <algorithm>
@@ -167,22 +166,6 @@ void UIPanel::updateFromFrameData(const SIMILI::Frontend::IFrameScreenData& fram
 
 	has_valid_bounds_ = width_ > 0 && height_ > 0;
 
-	// Update display frame with SDL drawable coordinates (with DPI scaling)
-	CEF_Drawer::UIPanelFrameData displayFrame;
-	displayFrame.x = x_;
-	displayFrame.y = y_;
-	displayFrame.width = width_;
-	displayFrame.height = height_;
-	CEF_Drawer::updateActiveUIPanelDisplayFrame(name_, displayFrame);
-
-	// Update source frame with CEF logical coordinates (without DPI scaling)
-	CEF_Drawer::UIPanelFrameData sourceFrame;
-	sourceFrame.x = frameData.relativeX;
-	sourceFrame.y = frameData.relativeY;
-	sourceFrame.width = frameData.width;
-	sourceFrame.height = frameData.height;
-	CEF_Drawer::updateActiveUIPanelSourceFrame(name_, sourceFrame);
-
 	const bool frameGeometryChanged =
 		frameData.relativeX != last_frame_x_ || frameData.relativeY != last_frame_y_ ||
 		frameData.width != last_frame_width_ || frameData.height != last_frame_height_;
@@ -206,12 +189,8 @@ void UIPanel::updateFromFrameData(const SIMILI::Frontend::IFrameScreenData& fram
 
 	if (!skipTextureRebuild)
 	{
-		const bool isTextureDirty = CEF_Drawer::isActiveUIPanelTextureDirty(name_);
-		if (frameGeometryChanged || isTextureDirty || hasNoTexture)
-		{
+		if (frameGeometryChanged || hasNoTexture)
 			needs_redraw_ = true;
-			updateTextureRegion();
-		}
 	}
 
 	if (has_valid_bounds_ && shared_pipeline_ && vk_vertex_buffer_ != VK_NULL_HANDLE)
@@ -368,115 +347,6 @@ void UIPanel::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawabl
 	}
 }
 
-void UIPanel::updateTextureRegion()
-{
-	VkImageView oldTextureView = external_texture_view_;
-	VkSampler oldSampler = external_sampler_;
-	float oldTexcoordLeft = texcoord_left_;
-	float oldTexcoordTop = texcoord_top_;
-	float oldTexcoordRight = texcoord_right_;
-	float oldTexcoordBottom = texcoord_bottom_;
-	
-	VkImageView textureView = VK_NULL_HANDLE;
-	VkSampler sampler = VK_NULL_HANDLE;
-	int textureWidth = 0;
-	int textureHeight = 0;
-	CEF_Drawer::UIPanelFrameData panelFrame = {};
-
-	if (!CEF_Drawer::getActiveUIPanelTextureRegion(name_, textureView, sampler, textureWidth, textureHeight, panelFrame))
-	{
-
-		
-		if (oldTextureView != VK_NULL_HANDLE && oldSampler != VK_NULL_HANDLE)
-		{
-			
-			if (drawing_state_ == DrawingState::IsNotReadyToBeDrawn)
-			{
-				drawing_state_ = DrawingState::HasBeenDrawn;
-			}
-			needs_redraw_ = true;
-			
-			return;
-		}
-		
-		external_texture_view_ = VK_NULL_HANDLE;
-		external_sampler_ = VK_NULL_HANDLE;
-		texcoord_left_ = 0.0f;
-		texcoord_top_ = 0.0f;
-		texcoord_right_ = 1.0f;
-		texcoord_bottom_ = 1.0f;
-		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
-		return;
-	}
-
-	if (textureWidth <= 0 || textureHeight <= 0)
-	{
-		if (oldTextureView != VK_NULL_HANDLE && oldSampler != VK_NULL_HANDLE)
-		{
-			if (drawing_state_ == DrawingState::IsNotReadyToBeDrawn)
-			{
-				drawing_state_ = DrawingState::HasBeenDrawn;
-			}
-			needs_redraw_ = true;
-			return;
-		}
-		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
-		return;
-	}
-	
-	if (textureView == VK_NULL_HANDLE || sampler == VK_NULL_HANDLE)
-	{
-		if (oldTextureView != VK_NULL_HANDLE && oldSampler != VK_NULL_HANDLE)
-		{
-			if (drawing_state_ == DrawingState::IsNotReadyToBeDrawn)
-			{
-				drawing_state_ = DrawingState::HasBeenDrawn;
-			}
-			needs_redraw_ = true;
-			return;
-		}
-		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
-		return;
-	}
-
-	float left = static_cast<float>(panelFrame.x) / static_cast<float>(textureWidth);
-	float top = static_cast<float>(panelFrame.y) / static_cast<float>(textureHeight);
-	float right = static_cast<float>(panelFrame.x + panelFrame.width) / static_cast<float>(textureWidth);
-	float bottom = static_cast<float>(panelFrame.y + panelFrame.height) / static_cast<float>(textureHeight);
-
-	left = (std::clamp)(left, 0.0f, 1.0f);
-	top = (std::clamp)(top, 0.0f, 1.0f);
-	right = (std::clamp)(right, 0.0f, 1.0f);
-	bottom = (std::clamp)(bottom, 0.0f, 1.0f);
-
-	if (right <= left || bottom <= top)
-	{
-		if (oldTextureView != VK_NULL_HANDLE && oldSampler != VK_NULL_HANDLE)
-		{
-			if (drawing_state_ == DrawingState::IsNotReadyToBeDrawn)
-			{
-				drawing_state_ = DrawingState::HasBeenDrawn;
-			}
-			needs_redraw_ = true;
-			return;
-		}
-		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
-		return;
-	}
-
-	external_texture_view_ = textureView;
-	external_sampler_ = sampler;
-	texcoord_left_ = left;
-	texcoord_top_ = top;
-	texcoord_right_ = right;
-	texcoord_bottom_ = bottom;
-		
-	if (drawing_state_ == DrawingState::IsNotReadyToBeDrawn)
-	{
-		drawing_state_ = DrawingState::IsReadyToBeDrawn;
-		needs_redraw_ = true;
-	}
-}
 
 bool UIPanel::updateDescriptorTextureBinding()
 {
@@ -526,6 +396,7 @@ bool UIPanel::createTexture()
 	{
 		return false;
 	}
+		
 
 	VkDevice device = vk_context_->getDevice();
 
@@ -536,33 +407,28 @@ bool UIPanel::createTexture()
 		255
 	};
 
-	VkImageCreateInfo imageInfo{};
-	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	imageInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageInfo.extent.width = 1;
-	imageInfo.extent.height = 1;
-	imageInfo.extent.depth = 1;
-	imageInfo.mipLevels = 1;
-	imageInfo.arrayLayers = 1;
-	imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	// Texture 1x1 LINEAR + HOST_VISIBLE : map direct, pas de staging buffer
+	VkImageCreateInfo imageInfo{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+	imageInfo.imageType    = VK_IMAGE_TYPE_2D;
+	imageInfo.extent       = { 1, 1, 1 };
+	imageInfo.mipLevels    = 1;
+	imageInfo.arrayLayers  = 1;
+	imageInfo.format       = VK_FORMAT_R8G8B8A8_UNORM;
+	imageInfo.tiling       = VK_IMAGE_TILING_LINEAR;
 	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	imageInfo.usage        = VK_IMAGE_USAGE_SAMPLED_BIT;
+	imageInfo.samples      = VK_SAMPLE_COUNT_1_BIT;
+	imageInfo.sharingMode  = VK_SHARING_MODE_EXCLUSIVE;
 
 	if (vkCreateImage(device, &imageInfo, nullptr, &vk_texture_image_) != VK_SUCCESS)
-	{
 		return false;
-	}
 
-	VkMemoryRequirements memRequirements;
-	vkGetImageMemoryRequirements(device, vk_texture_image_, &memRequirements);
+	VkMemoryRequirements memReq;
+	vkGetImageMemoryRequirements(device, vk_texture_image_, &memReq);
 
-	VkMemoryAllocateInfo allocInfo{};
-	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	allocInfo.allocationSize = memRequirements.size;
-	allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	VkMemoryAllocateInfo allocInfo{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+	allocInfo.allocationSize  = memReq.size;
+	allocInfo.memoryTypeIndex = findMemoryType(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 	if (vkAllocateMemory(device, &allocInfo, nullptr, &vk_texture_memory_) != VK_SUCCESS)
 	{
@@ -572,6 +438,42 @@ bool UIPanel::createTexture()
 	}
 
 	vkBindImageMemory(device, vk_texture_image_, vk_texture_memory_, 0);
+
+	void* mapped = nullptr;
+	vkMapMemory(device, vk_texture_memory_, 0, memReq.size, 0, &mapped);
+	std::memcpy(mapped, pixel, 4);
+	vkUnmapMemory(device, vk_texture_memory_);
+
+	// Transition UNDEFINED → GENERAL (une seule barrière, pas de copy)
+	VkCommandPoolCreateInfo poolInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+	poolInfo.queueFamilyIndex = vk_context_->getGraphicsQueueFamily();
+	poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+	VkCommandPool pool = VK_NULL_HANDLE;
+	vkCreateCommandPool(device, &poolInfo, nullptr, &pool);
+
+	VkCommandBufferAllocateInfo cmdAlloc{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+	cmdAlloc.commandPool = pool; cmdAlloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY; cmdAlloc.commandBufferCount = 1;
+	VkCommandBuffer cmd = VK_NULL_HANDLE;
+	vkAllocateCommandBuffers(device, &cmdAlloc, &cmd);
+
+	VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	vkBeginCommandBuffer(cmd, &beginInfo);
+
+	VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+	barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED; barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+	barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.image = vk_texture_image_;
+	barrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	barrier.srcAccessMask = 0; barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+	vkEndCommandBuffer(cmd);
+	VkSubmitInfo submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
+	submit.commandBufferCount = 1; submit.pCommandBuffers = &cmd;
+	vkQueueSubmit(vk_context_->getGraphicsQueue(), 1, &submit, VK_NULL_HANDLE);
+	vkQueueWaitIdle(vk_context_->getGraphicsQueue());
+	vkDestroyCommandPool(device, pool, nullptr);
 
 	VkImageViewCreateInfo viewInfo{};
 	viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -703,6 +605,21 @@ void UIPanel::setVulkanPipelines(VulkanPipeline* pipelines)
 {
 	vulkan_pipelines_ = pipelines;
 	std::cout << "[UIPanel::setVulkanPipelines] " << name_ << " - VulkanPipeline instance set" << std::endl;
+}
+
+void UIPanel::setCEFTexture(VkImageView view, VkSampler sampler, float u0, float v0, float u1, float v1)
+{
+	external_texture_view_ = view;
+	external_sampler_ = sampler;
+	texcoord_left_   = u0;
+	texcoord_top_    = v0;
+	texcoord_right_  = u1;
+	texcoord_bottom_ = v1;
+	bound_texture_view_ = VK_NULL_HANDLE;
+	bound_sampler_ = VK_NULL_HANDLE;
+	needs_redraw_ = true;
+	if (view != VK_NULL_HANDLE && sampler != VK_NULL_HANDLE && has_valid_bounds_ && drawing_state_ == DrawingState::IsNotReadyToBeDrawn)
+		drawing_state_ = DrawingState::IsReadyToBeDrawn;
 }
 
 bool UIPanel::createVulkanResources()

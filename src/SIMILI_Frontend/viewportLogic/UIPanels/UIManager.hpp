@@ -12,7 +12,6 @@
 
 class VKContext;
 class VulkanPipeline;
-class CEF_Drawer;
 struct IFrameData;
 
 namespace SIMILI {
@@ -48,7 +47,6 @@ namespace SIMILI {
 			void setVKContext(VKContext* context) { vk_context_ = context; }
 			void setVulkanPipelines(VulkanPipeline* pipelines) { vulkan_pipelines_ = pipelines; }
 			void setRenderPass(VkRenderPass renderPass) { vk_render_pass_ = renderPass; }
-			void setCEFDrawer(CEF_Drawer* drawer) { cef_drawer_ = drawer; }
 
 			void initializeDefaultUIPanels();
 			void updateUIPanelIFrames(const std::map<std::string, IFrameData>& iframeDataMap);
@@ -58,6 +56,7 @@ namespace SIMILI {
 			void drawUIPanelsInsideBorders(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild, SDL_Window* window);
 			void drawFullScreenUIPanelsInsideBorders(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild, SDL_Window* window, int referenceWindowWidth, int referenceWindowHeight);
 			void setBorders(int borderLeft, int borderTop, int borderWidth, int borderHeight);
+			void setCEFTextureForAllPanels(VkImageView view, VkSampler sampler, int cefWidth, int cefHeight);
 		
 			void clearUIPanels();
 
@@ -84,7 +83,6 @@ namespace SIMILI {
 			VKContext* vk_context_;
 			VulkanPipeline* vulkan_pipelines_;
 			VkRenderPass vk_render_pass_;
-			CEF_Drawer* cef_drawer_;
 
 			int app_border_left_;
 			int app_border_top_;

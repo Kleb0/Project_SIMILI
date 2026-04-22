@@ -4,7 +4,6 @@
 #include "include/cef_sandbox_win.h"
 #include "SIMILI_Frontend/ui_handler.hpp"
 #include "SIMILI_Frontend/SDL_ApplicationWindow.hpp"
-#include "SIMILI_Frontend/CEFDrawing/CEF_Drawer.hpp"
 #include "SIMILI_Frontend/viewportLogic/Keymanagement/MouseController.hpp"
 #include "SIMILI_Frontend/viewportLogic/overlay_viewport.hpp"
 #include "SIMILI_Frontend/viewportLogic/FrameDatas/FrameDatas.hpp"
@@ -189,23 +188,7 @@ int main(int argc, char* argv[])
 	vkRenderer.setThreeDScreen(&myThreeDScreen);
 	std::cout << "[Main] ThreeDScreen initialized and linked to SDL_ApplicationWindow" << std::endl;
 	
-	std::cout << "[Main] Creating CEF_Drawer..." << std::endl;
-	CefRefPtr<CEF_Drawer> cefDrawer(new CEF_Drawer());
-	std::cout << "[Main] CEF_Drawer created" << std::endl;
-	std::cout << "[Main] Initializing CEF_Drawer..." << std::endl;
-	if (!cefDrawer->initialize(mainWindow.getHandle(), &vkRenderer, mainWindow.getVulkanPipelines()))
-	{
-		std::cerr << "[Main] Failed to initialize CEF Drawer" << std::endl;
-		mainWindow.destroy();
-		SDL_Quit();
-		return -1;
-	}
-	std::cout << "[Main] CEF_Drawer initialized successfully" << std::endl;
-	handler->setCEFDrawer(cefDrawer.get());
-	std::cout << "[Main] CEF_Drawer linked to UIHandler" << std::endl;
-	
 	handler->Set_SDLParent(&mainWindow);
-	handler->Set_DOM(cefDrawer.get());
 	mainWindow.Set_UIHandler(handler.get());
 	
 	auto* frameDatas = new SIMILI::Frontend::FrameDatas(handler.get());
@@ -267,12 +250,9 @@ int main(int argc, char* argv[])
 		SDL_Quit();
 		return -1;
 	}
-	
-	std::cout << "[Main] Setting render pass on CEF_Drawer..." << std::endl;
-	cefDrawer->setRenderPass(renderPass);
-	std::cout << "[Main] CEF render pass configured" << std::endl;
-	std::cout << "[Main] CEF_Drawer pipeline status: " << (cefDrawer->hasPipeline() ? "CREATED" : "NOT CREATED") << std::endl;
-	
+
+	mainWindow.setRenderPass(renderPass);
+	std::cout << "[Main] Render pass configured on SDL_ApplicationWindow" << std::endl;
 
 
 	myThreeDScreen.setVKContext(&vkRenderer);
@@ -371,7 +351,6 @@ int main(int argc, char* argv[])
 	std::cout << "[Main] Resolved UI layout path: " << uiPath.string() << std::endl;
 	
 	std::string url = "http://localhost:8080/ui/main_layout.html";
-	mainWindow.setCEFDrawer(cefDrawer.get());
 	mainWindow.SetHTMLAdressToDraw(handler, url, windowWidth, windowHeight);
 	std::cout << "[Main] CEF browser created successfully" << std::endl;
 	
@@ -412,16 +391,12 @@ int main(int argc, char* argv[])
 				running = false;
 			}
 			
-			if (!mainWindow.handleSplitterEvent(event))
-			{
-				cefDrawer->handleEvent(event);
-			}
+			mainWindow.handleSplitterEvent(event);
 		}
 		
 		mainWindow.processEvents();
 		
 		CefDoMessageLoopWork();
-		cefDrawer->syncWindowProperties();
 		
 		mainWindow.renderFrame();
 	}

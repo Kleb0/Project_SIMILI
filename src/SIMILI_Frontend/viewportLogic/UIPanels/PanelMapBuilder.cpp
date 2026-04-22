@@ -1,6 +1,5 @@
 #include "PanelMapBuilder.hpp"
 #include "UIPanel.hpp"
-#include "../../CEFDrawing/CEF_Drawer.hpp"
 #include "../../../Engine/VulkanScene/VKcontext.hpp"
 #include <iostream>
 #include <algorithm>
@@ -595,19 +594,13 @@ namespace SIMILI {
 		const std::map<std::string, IFrameScreenData>& panelFrameDataMap,
 		bool skipTextureRebuild, VKContext* vkContext,
 		VulkanPipeline* vulkanPipelines,
-		VkRenderPass renderPass, CEF_Drawer* cefDrawer,
+		VkRenderPass renderPass,
 		std::map<std::string, std::unique_ptr<UIPanel>>& uiPanels,
 		SDL_Window* window,
 		int appBorderLeft, int appBorderTop,
 		int appBorderWidth, int appBorderHeight)
 		{
 	
-			if (!cefDrawer)
-			{
-				std::cout << "[PanelMapBuilder] drawInsideAppBorders: cefDrawer is null" << std::endl;
-				return;
-			}
-
 			if (panelFrameDataMap.empty())
 			{
 				std::cout << "[PanelMapBuilder] drawInsideAppBorders: No panel data available" << std::endl;
