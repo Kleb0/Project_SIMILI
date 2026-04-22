@@ -1,5 +1,7 @@
 #pragma once
 
+#include "include/cef_client.h"
+
 #include <SDL3/SDL.h>
 #include <vulkan/vulkan.h>
 #include <string>
@@ -13,6 +15,7 @@ class VKContext;
 class VulkanPipeline;
 class App_Border;
 class Enable_UI_Debug_Tools;
+class CEF_Drawer;
 
 enum class WindowRenderState
 {
@@ -61,7 +64,10 @@ public:
 	bool isVisible() const;
 	bool isValid() const { return window_ != nullptr; }
 	SDL_Window* getHandle() const { return window_; }
-	
+
+	// === Cef_Drawer creations ===
+
+
 	// === Component Registration ===
 	void Set_UIHandler(void* handler);
 	void setThreeDScreen(ThreeDScreen* screen);
@@ -69,6 +75,7 @@ public:
 	void setVulkanPipelines(VulkanPipeline* pipelines);
 	void setUIManager(SIMILI::Frontend::UIManager* manager) { ui_manager_ = manager; }
 	void updateFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas);
+	void setCEFDrawer(CEF_Drawer* drawer);
 	
 	// === Component Access ===
 	VulkanPipeline* getVulkanPipelines() const { return vulkan_pipelines_; }
@@ -88,6 +95,7 @@ public:
 	void drawCEF();
 	void startSplitter();
 	void activateDebugRender();
+	void SetHTMLAdressToDraw(CefRefPtr<CefClient> client, const std::string& url, int width, int height);
 	void setCurrentImageIndex(uint32_t index) { current_image_index_ = index; }
 	
 	// === Vulkan Lifecycle ===
@@ -131,6 +139,7 @@ private:
 	// === Graphics Components ===
 	VKContext* vk_context_;
 	VulkanPipeline* vulkan_pipelines_;
+	CEF_Drawer* cef_drawer_;
 	
 	// === Vulkan Surface & Swapchain ===
 	VkSurfaceKHR vk_surface_;

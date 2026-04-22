@@ -9,6 +9,7 @@
 #include "Frontend_Debug_Tools/Enable_UI_Debug_Tools.hpp"
 #include "../../Engine/VulkanScene/VKcontext.hpp"
 #include <SDL3/SDL_vulkan.h>
+#include "include/cef_browser.h"
 #include <set>
 
 // Static member definition
@@ -46,6 +47,7 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, prepared_drawable_height_(0)
 	, prepared_skip_texture_rebuild_(false)
 	, borders_set_for_init_(false)
+	, cef_drawer_(nullptr)
 {
 }
 SDL_ApplicationWindow::~SDL_ApplicationWindow()
@@ -389,6 +391,41 @@ void SDL_ApplicationWindow::updateFrameDatas(SIMILI::Frontend::FrameDatas* frame
 	frame_datas_ = frameDatas;
 }
 
+void SDL_ApplicationWindow::setCEFDrawer(CEF_Drawer* drawer)
+{
+	cef_drawer_ = drawer;
+}
+
+void SDL_ApplicationWindow::SetHTMLAdressToDraw(CefRefPtr<CefClient> client, const std::string& url, int width, int height)
+{
+	if (!cef_drawer_ || !cef_drawer_->isInitialized())
+	{
+		std::cerr << "[SDL_ApplicationWindow] SetHTMLAdressToDraw: CEF_Drawer non initialisé" << std::endl;
+		return;
+	}
+
+	CefBrowserSettings browser_settings;
+	browser_settings.windowless_frame_rate = 60;
+	browser_settings.javascript = STATE_ENABLED;
+	browser_settings.javascript_close_windows = STATE_ENABLED;
+	browser_settings.javascript_access_clipboard = STATE_ENABLED;
+	browser_settings.javascript_dom_paste = STATE_ENABLED;
+
+	CefWindowInfo window_info;
+	window_info.SetAsWindowless(0);
+
+	CefRefPtr<CefBrowser> browser = CefBrowserHost::CreateBrowserSync(window_info, client, url, browser_settings, nullptr, nullptr);
+	if (!browser)
+	{
+		std::cerr << "[SDL_ApplicationWindow] SetHTMLAdressToDraw: échec création browser CEF" << std::endl;
+		return;
+	}
+
+	std::cout << "[SDL_ApplicationWindow] Browser CEF créé : " << url << " (" << width << "x" << height << ")" << std::endl;
+
+	cef_drawer_->setBrowser(browser, url, width, height);
+}
+
 
 // ====== Event Handling ====== //
 
@@ -613,7 +650,8 @@ void SDL_ApplicationWindow::renderFrame()
 	{
 		activateDebugRender();
 
-		drawCEF();
+		// has become useless
+		// drawCEF();
 		drawThreeDScreen();
 		
 		preparePanels();
@@ -660,7 +698,7 @@ void SDL_ApplicationWindow::renderFrame()
 	{
 		activateDebugRender();
 
-		drawCEF();
+		// drawCEF();
 		drawThreeDScreen();
 
 		preparePanels();

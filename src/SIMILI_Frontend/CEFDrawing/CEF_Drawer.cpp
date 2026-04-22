@@ -225,60 +225,30 @@ void CEF_Drawer::setRenderPass(VkRenderPass renderPass)
 	}
 }
 
-bool CEF_Drawer::createBrowser(CefRefPtr<CefClient> client, const std::string& url, int width, int height)
+void CEF_Drawer::setBrowser(CefRefPtr<CefBrowser> browser, const std::string& url, int width, int height)
 {
 	if (browser_)
 	{
 		browser_->GetHost()->CloseBrowser(true);
 		browser_ = nullptr;
 	}
-	
-	if (!initialized_)
-	{
-		std::cerr << "[CEF_Drawer] Cannot create browser: not initialized" << std::endl;
-		return false;
-	}
-	
-	if (browser_)
-	{
-		std::cerr << "[CEF_Drawer] Browser already created" << std::endl;
-		return false;
-	}
-	
+
 	url_ = url;
 	width_ = width;
 	height_ = height;
 	updateWindowProperties();
-	
-	CefBrowserSettings browser_settings;
-	browser_settings.windowless_frame_rate = 60;
-	browser_settings.javascript = STATE_ENABLED;
-	browser_settings.javascript_close_windows = STATE_ENABLED;
-	browser_settings.javascript_access_clipboard = STATE_ENABLED;
-	browser_settings.javascript_dom_paste = STATE_ENABLED;
-	
-	CefWindowInfo window_info;
-	window_info.SetAsWindowless(0);
-	
-	browser_ = CefBrowserHost::CreateBrowserSync(window_info, client, url_, browser_settings, nullptr, nullptr);
-	
-	if (!browser_)
-	{
-		std::cerr << "[CEF_Drawer] Failed to create CEF browser" << std::endl;
-		return false;
-	}
-	
-	std::cout << "[CEF_Drawer] Browser created with URL: " << url_ << " (logical pixels): " << width_ << "x" << height_ << std::endl;
-	
+
+	browser_ = browser;
+
+	std::cout << "[CEF_Drawer] Browser reçu : " << url_ << " (" << width_ << "x" << height_ << ")" << std::endl;
+
 	CefRefPtr<CefBrowserHost> host = browser_->GetHost();
 	if (host)
 	{
 		host->WasResized();
 		host->Invalidate(PET_VIEW);
-		std::cout << "[CEF_Drawer] Browser invalidated to trigger initial render" << std::endl;
+		std::cout << "[CEF_Drawer] Browser invalidé pour le premier rendu" << std::endl;
 	}
-	
-	return true;
 }
 
 void CEF_Drawer::shutdown()

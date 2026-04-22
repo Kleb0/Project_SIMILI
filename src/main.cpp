@@ -371,16 +371,8 @@ int main(int argc, char* argv[])
 	std::cout << "[Main] Resolved UI layout path: " << uiPath.string() << std::endl;
 	
 	std::string url = "http://localhost:8080/ui/main_layout.html";
-	std::cout << "[Main] Creating CEF browser with URL: " << url << std::endl;
-	if (!cefDrawer->createBrowser(handler, url, windowWidth, windowHeight))
-	{
-		std::cerr << "[Main] Failed to create CEF browser" << std::endl;
-		CefShutdown();
-		mainWindow.cleanupVulkan();
-		mainWindow.destroy();
-		SDL_Quit();
-		return -1;
-	}
+	mainWindow.setCEFDrawer(cefDrawer.get());
+	mainWindow.SetHTMLAdressToDraw(handler, url, windowWidth, windowHeight);
 	std::cout << "[Main] CEF browser created successfully" << std::endl;
 	
 	std::cout << "[Main] Waiting for CEF and JavaScript initialization..." << std::endl;

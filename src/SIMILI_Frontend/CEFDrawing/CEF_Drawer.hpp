@@ -58,8 +58,8 @@ public:
 	void setRenderPass(VkRenderPass renderPass);
 	bool hasPipeline() const { return shared_pipeline_ && shared_pipeline_->pipeline != VK_NULL_HANDLE; }
 	
-	// Create CEF browser with specified URL
-	bool createBrowser(CefRefPtr<CefClient> client, const std::string& url, int width, int height);
+	// Receive CEF browser created externally and configure internal state
+	void setBrowser(CefRefPtr<CefBrowser> browser, const std::string& url, int width, int height);
 	
 	void draw(VkCommandBuffer commandBuffer);
 	
