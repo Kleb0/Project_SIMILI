@@ -187,6 +187,19 @@ namespace SIMILI {
 							  << " clientX=" << data.clientX << " clientY=" << data.clientY << std::endl;
 				}
 			}
+
+			if (!ui_panel_frame_data_map_.empty())
+			{
+				int currentW = 0, currentH = 0;
+				SDL_GetWindowSize(sdlWindow, &currentW, &currentH);
+				panel_map_builder_.syncSplittersAndPanels(
+					ui_panel_frame_data_map_,
+					currentW, currentH,
+					panel_state_map_,
+					splitter_list_,
+					last_window_width_, last_window_height_,
+					sdlWindow);
+			}
 		}
 
 		void UIManager::setBorders(int borderLeft, int borderTop, int borderWidth, int borderHeight)

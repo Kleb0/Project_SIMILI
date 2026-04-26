@@ -110,7 +110,6 @@ class SDL_ApplicationWindow
 		void renderThreeDScreen(const std::map<std::string, IFrameData>& frameDataMap);
 		void drawThreeDScreen();
 		void preparePanels();
-		void drawCEF();
 		void startSplitter();
 		void activateDebugRender();
 		void SetHTMLAdressToDraw(CefRefPtr<CefClient> client, const std::string& url, int width, int height);

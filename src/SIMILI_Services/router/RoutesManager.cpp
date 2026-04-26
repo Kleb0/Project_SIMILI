@@ -538,6 +538,7 @@ namespace SIMILI {
 							data.height = height;
 							data.clientX = clientX;
 							data.clientY = clientY;
+							data.layoutIndex = iframe.contains("layoutIndex") ? iframe["layoutIndex"].get<int>() : 0;
 							tempIFrameMap[name] = data;
 						}
 					}
@@ -637,6 +638,10 @@ namespace SIMILI {
 							data.height = height;
 							data.clientX = iframe.contains("clientX") ? iframe["clientX"].get<int>() : data.x;
 							data.clientY = iframe.contains("clientY") ? iframe["clientY"].get<int>() : data.y;
+							data.layoutIndex = iframe.contains("layoutIndex") ? iframe["layoutIndex"].get<int>() : 0;
+
+							std::cout << "[RoutesManager] Panel '" << name << "' layoutIndex=" << data.layoutIndex << std::endl;
+
 							uiPanelIFrames[name] = data;
 							
 							handler->iframe_data_map_[name] = data;
@@ -644,6 +649,8 @@ namespace SIMILI {
 					}
 
 					std::cout << "[RoutesManager] Created " << uiPanelIFrames.size() << " UI panels" << std::endl;
+
+					handler->captureIFramePositions();
 
 					resp.statusCode = 200;
 					resp.statusMessage = "OK";

@@ -29,6 +29,29 @@ namespace SIMILI
 			bool isVertical;
 		};
 
+		enum class PanelLayoutType
+		{
+			Row,
+			Column
+		};
+
+		struct PanelMapEntry
+		{
+			std::string name;
+			int index;
+			PanelLayoutType layoutType;
+			int column;
+			int row;
+		};
+
+		struct MapData
+		{
+			std::map<std::string, PanelMapEntry> panels;
+			std::vector<SplitterDefinition>      splitters;
+
+			void clear();
+		};
+
 		class PanelMapBuilder
 		{
 			public:
@@ -42,11 +65,11 @@ namespace SIMILI
 					int& lastWindowWidth,int& lastWindowHeight,
 					SDL_Window* window = nullptr);
 
-				void rebuildFromSource(
-					const std::map<std::string, IFrameScreenData>& frameDataMap,
-					int currentWindowWidth,int currentWindowHeight,
-					std::map<std::string, PanelState>& panelStateMap,
-					int& lastWindowWidth, int& lastWindowHeight	);
+				//void rebuildFromSource(
+				//	const std::map<std::string, IFrameScreenData>& frameDataMap,
+				//	int currentWindowWidth,int currentWindowHeight,
+				//	std::map<std::string, PanelState>& panelStateMap,
+				//	int& lastWindowWidth, int& lastWindowHeight	);
 
 				void scaleLayoutToWindow(
 					int newWindowWidth,int newWindowHeight,
@@ -67,13 +90,22 @@ namespace SIMILI
 
 				void clearUIPanels(std::map<std::string, std::unique_ptr<class UIPanel>>& uiPanels);
 
+				void buildMapData(
+					const std::map<std::string, IFrameScreenData>& frameDataMap,
+					const std::vector<SplitterDefinition>& splitterList,
+					int currentWindowWidth);
+
+				const MapData& getMapData() const;
+
 			private:
 
 				void createViewportPanel(std::map<std::string, PanelState>& panelStateMap,
 				int currentWindowWidth, int currentWindowHeight);
 
-				void buildSplitters(const std::map<std::string, PanelState>& panelStateMap,
-					std::vector<SplitterDefinition>& splitterList);
+				//void buildSplitters(const std::map<std::string, PanelState>& panelStateMap,
+				//	std::vector<SplitterDefinition>& splitterList);
+
+				MapData map_data_;
 		};
 	}
 }

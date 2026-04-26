@@ -102,6 +102,51 @@ function getUIPanelName(iframe) {
     return null;
 }
 
+function computeLayoutIndices(panels) {
+   
+    const container = document.querySelector('.main-container');
+   
+    if (!container || panels.length === 0) {
+        return;
+    }
+
+    const containerWidth = container.getBoundingClientRect().width;
+    
+    if (containerWidth <= 0) {
+        return;
+    }
+
+    const fullWidthThreshold = 0.85;
+    const rowPanels = [];
+    const columnPanels = [];
+
+    panels.forEach(panel => {
+        if (panel.width <= 0 || panel.height <= 0) {
+            return;
+        }
+        const widthRatio = panel.width / containerWidth;
+        if (widthRatio >= fullWidthThreshold) {
+            rowPanels.push(panel);
+        } else {
+            columnPanels.push(panel);
+        }
+    });
+
+    rowPanels.sort((a, b) => b.y - a.y);
+
+    columnPanels.sort((a, b) => {
+        const xDiff = a.x - b.x;
+        if (Math.abs(xDiff) > 10) {
+            return xDiff;
+        }
+        return a.y - b.y;
+    });
+
+    let index = 1;
+    rowPanels.forEach(panel => { panel.layoutIndex = index++; });
+    columnPanels.forEach(panel => { panel.layoutIndex = index++; });
+}
+
 function collectUIPanelIFrames() {
     const iframes = document.querySelectorAll('.main-container iframe');
     const iframeData = [];
@@ -129,6 +174,8 @@ function collectUIPanelIFrames() {
             clientY: Math.round(iframeRect.top)
         });
     });
+
+    computeLayoutIndices(iframeData);
 
     return iframeData;
 }

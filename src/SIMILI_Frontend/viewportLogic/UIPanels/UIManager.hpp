@@ -95,6 +95,11 @@ namespace SIMILI {
 			bool ui_panels_initialized_;
 			mutable std::mutex ui_panel_mutex_;
 			
+			std::map<std::string, PanelState> panel_state_map_;
+			std::vector<SplitterDefinition> splitter_list_;
+			int last_window_width_  = 0;
+			int last_window_height_ = 0;
+
 			PanelMapBuilder panel_map_builder_;
 		};
 	}

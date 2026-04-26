@@ -477,31 +477,31 @@ void SDL_ApplicationWindow::setRenderPass(VkRenderPass renderPass)
 bool SDL_ApplicationWindow::createCEFPipeline()
 {
 	const std::string vertexShaderGLSL = R"(
-#version 450
+	#version 450
 
-layout(location = 0) in vec2 aPosition;
-layout(location = 1) in vec2 aTexCoord;
+	layout(location = 0) in vec2 aPosition;
+	layout(location = 1) in vec2 aTexCoord;
 
-layout(location = 0) out vec2 vTexCoord;
+	layout(location = 0) out vec2 vTexCoord;
 
-void main() {
-    gl_Position = vec4(aPosition, 0.0, 1.0);
-    vTexCoord = aTexCoord;
-}
-)";
+	void main() {
+		gl_Position = vec4(aPosition, 0.0, 1.0);
+		vTexCoord = aTexCoord;
+	}
+	)";
 
-	const std::string fragmentShaderGLSL = R"(
-#version 450
+		const std::string fragmentShaderGLSL = R"(
+	#version 450
 
-layout(location = 0) in vec2 vTexCoord;
-layout(location = 0) out vec4 outColor;
+	layout(location = 0) in vec2 vTexCoord;
+	layout(location = 0) out vec4 outColor;
 
-layout(binding = 0) uniform sampler2D texSampler;
+	layout(binding = 0) uniform sampler2D texSampler;
 
-void main() {
-    outColor = texture(texSampler, vTexCoord);
-}
-)";
+	void main() {
+		outColor = texture(texSampler, vTexCoord);
+	}
+	)";
 
 	std::vector<uint32_t> vertexSPIRV = GLSLCompiler::compileGLSL(vertexShaderGLSL, GLSLCompiler::ShaderType::Vertex);
 	if (vertexSPIRV.empty())
@@ -1114,10 +1114,6 @@ void SDL_ApplicationWindow::preparePanels()
 
 	if (vk_context_)
 		uploadCEFPaintBuffer();
-}
-
-void SDL_ApplicationWindow::drawCEF()
-{
 }
 
 void SDL_ApplicationWindow::startSplitter()

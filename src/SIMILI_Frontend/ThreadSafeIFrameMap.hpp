@@ -13,6 +13,7 @@ struct IFrameData
 	int height;
 	int clientX;
 	int clientY;
+	int layoutIndex;
 };
 
 class ThreadSafeIFrameMap

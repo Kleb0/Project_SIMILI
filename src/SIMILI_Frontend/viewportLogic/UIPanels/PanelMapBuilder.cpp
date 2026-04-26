@@ -16,270 +16,6 @@ namespace SIMILI {
 		{
 		}
 
-		void PanelMapBuilder::rebuildFromSource(
-		const std::map<std::string, IFrameScreenData>& frameDataMap,
-		int currentWindowWidth, int currentWindowHeight,
-		std::map<std::string, PanelState>& panelStateMap,
-		int& lastWindowWidth, int& lastWindowHeight)
-		{
-			std::cout << "[PanelMapBuilder::rebuildFromSource] Called with " << frameDataMap.size() << " panels for window " 
-			          << currentWindowWidth << "x" << currentWindowHeight << std::endl;
-			
-			std::map<std::string, PanelState> previousPanelState = panelStateMap;
-			int previousPanelCount = static_cast<int>(previousPanelState.size());
-			
-			panelStateMap.clear();
-
-			int receivedWindowWidth = 0;
-			int receivedWindowHeight = 0;
-			int maxPanelRight = 0;
-			int maxPanelBottom = 0;
-
-			for (const auto& pair : frameDataMap)
-			{
-				PanelState state;
-				state.frame = pair.second;
-				state.client_offset_x = pair.second.clientX - pair.second.relativeX;
-				state.client_offset_y = pair.second.clientY - pair.second.relativeY;
-				panelStateMap[pair.first] = state;
-
-				if (receivedWindowWidth == 0 && receivedWindowHeight == 0)
-				{
-					receivedWindowWidth = pair.second.windowWidth;
-					receivedWindowHeight = pair.second.windowHeight;
-				}
-
-				if (pair.second.width > 0 && pair.second.height > 0)
-				{
-					int panelRight = pair.second.relativeX + pair.second.width;
-					int panelBottom = pair.second.relativeY + pair.second.height;
-					maxPanelRight = (std::max)(maxPanelRight, panelRight);
-					maxPanelBottom = (std::max)(maxPanelBottom, panelBottom);
-				}
-			}
-
-			bool needsImmediateScaling = false;
-			int scalingSourceWidth = 0;
-			int scalingSourceHeight = 0;
-
-			if (receivedWindowWidth > 0 && receivedWindowHeight > 0 && maxPanelRight > 0 && maxPanelBottom > 0)
-			{
-				float panelUsageRatioX = static_cast<float>(maxPanelRight) / static_cast<float>(receivedWindowWidth);
-				float panelUsageRatioY = static_cast<float>(maxPanelBottom) / static_cast<float>(receivedWindowHeight);
-				
-				std::cout << "[PanelMapBuilder::rebuildFromSource] Panel coverage: "
-				          << maxPanelRight << "x" << maxPanelBottom 
-				          << " vs window " << receivedWindowWidth << "x" << receivedWindowHeight
-				          << " (ratios: " << panelUsageRatioX << " x " << panelUsageRatioY << ")" << std::endl;
-
-				const float CRITICAL_MIN_THRESHOLD = 0.50f;
-				const float CRITICAL_MAX_THRESHOLD = 2.00f;
-				
-				if (panelUsageRatioX < CRITICAL_MIN_THRESHOLD || panelUsageRatioY < CRITICAL_MIN_THRESHOLD)
-				{
-					std::cout << "[PanelMapBuilder::rebuildFromSource] CRITICAL: Panels cover only " 
-					          << (panelUsageRatioX * 100.0f) << "% x " << (panelUsageRatioY * 100.0f) << "% of window" << std::endl;
-					std::cout << "[PanelMapBuilder::rebuildFromSource] Coordinates too stale - rejecting and keeping previous state" << std::endl;
-					
-					if (!previousPanelState.empty() && lastWindowWidth > 0 && lastWindowHeight > 0)
-					{
-						std::cout << "[PanelMapBuilder::rebuildFromSource] Restoring previous valid state with " << previousPanelCount << " panels" << std::endl;
-						panelStateMap = previousPanelState;
-						
-						if (currentWindowWidth > 0 && currentWindowHeight > 0 && 
-						    (currentWindowWidth != lastWindowWidth || currentWindowHeight != lastWindowHeight))
-						{
-							std::cout << "[PanelMapBuilder::rebuildFromSource] Scaling restored panels from " 
-							          << lastWindowWidth << "x" << lastWindowHeight 
-							          << " to " << currentWindowWidth << "x" << currentWindowHeight << std::endl;
-							
-							const float scaleX = static_cast<float>(currentWindowWidth) / static_cast<float>(lastWindowWidth);
-							const float scaleY = static_cast<float>(currentWindowHeight) / static_cast<float>(lastWindowHeight);
-							
-							for (auto& pair : panelStateMap)
-							{
-								IFrameScreenData& frame = pair.second.frame;
-								frame.relativeX = static_cast<int>(std::lround(static_cast<float>(frame.relativeX) * scaleX));
-								frame.relativeY = static_cast<int>(std::lround(static_cast<float>(frame.relativeY) * scaleY));
-								frame.width = (std::max)(1, static_cast<int>(std::lround(static_cast<float>(frame.width) * scaleX)));
-								frame.height = (std::max)(1, static_cast<int>(std::lround(static_cast<float>(frame.height) * scaleY)));
-							
-								if (frame.relativeX >= currentWindowWidth) frame.relativeX = (std::max)(0, currentWindowWidth - frame.width);
-								if (frame.relativeY >= currentWindowHeight) frame.relativeY = (std::max)(0, currentWindowHeight - frame.height);
-								if (frame.relativeX + frame.width > currentWindowWidth) frame.width = (std::max)(1, currentWindowWidth - frame.relativeX);
-								if (frame.relativeY + frame.height > currentWindowHeight) frame.height = (std::max)(1, currentWindowHeight - frame.relativeY);
-								
-								frame.windowWidth = currentWindowWidth;
-								frame.windowHeight = currentWindowHeight;
-							}
-							
-							lastWindowWidth = currentWindowWidth;
-							lastWindowHeight = currentWindowHeight;
-						}
-						
-						std::cout << "[PanelMapBuilder::rebuildFromSource] Restoration complete - keeping " << panelStateMap.size() << " panels" << std::endl;
-						return;
-					}
-					else
-					{
-						std::cout << "[PanelMapBuilder::rebuildFromSource] WARNING: No previous state available, accepting potentially stale coordinates" << std::endl;
-					}
-				}
-
-				if (panelUsageRatioX > CRITICAL_MAX_THRESHOLD || panelUsageRatioY > CRITICAL_MAX_THRESHOLD)
-				{
-					std::cout << "[PanelMapBuilder::rebuildFromSource] CRITICAL: Panels exceed window bounds " 
-					          << (panelUsageRatioX * 100.0f) << "% x " << (panelUsageRatioY * 100.0f) << "%" << std::endl;
-					std::cout << "[PanelMapBuilder::rebuildFromSource] Coordinates too stale - rejecting and keeping previous state" << std::endl;
-					
-					if (!previousPanelState.empty() && lastWindowWidth > 0 && lastWindowHeight > 0)
-					{
-						std::cout << "[PanelMapBuilder::rebuildFromSource] Restoring previous valid state with " << previousPanelCount << " panels" << std::endl;
-						panelStateMap = previousPanelState;
-						
-						if (currentWindowWidth > 0 && currentWindowHeight > 0 && 
-						    (currentWindowWidth != lastWindowWidth || currentWindowHeight != lastWindowHeight))
-						{
-							std::cout << "[PanelMapBuilder::rebuildFromSource] Scaling restored panels from " 
-							          << lastWindowWidth << "x" << lastWindowHeight 
-							          << " to " << currentWindowWidth << "x" << currentWindowHeight << std::endl;
-							
-							const float scaleX = static_cast<float>(currentWindowWidth) / static_cast<float>(lastWindowWidth);
-							const float scaleY = static_cast<float>(currentWindowHeight) / static_cast<float>(lastWindowHeight);
-							
-							for (auto& pair : panelStateMap)
-							{
-								IFrameScreenData& frame = pair.second.frame;
-								frame.relativeX = static_cast<int>(std::lround(static_cast<float>(frame.relativeX) * scaleX));
-								frame.relativeY = static_cast<int>(std::lround(static_cast<float>(frame.relativeY) * scaleY));
-								frame.width = (std::max)(1, static_cast<int>(std::lround(static_cast<float>(frame.width) * scaleX)));
-								frame.height = (std::max)(1, static_cast<int>(std::lround(static_cast<float>(frame.height) * scaleY)));
-							
-								if (frame.relativeX >= currentWindowWidth) frame.relativeX = (std::max)(0, currentWindowWidth - frame.width);
-								if (frame.relativeY >= currentWindowHeight) frame.relativeY = (std::max)(0, currentWindowHeight - frame.height);
-								if (frame.relativeX + frame.width > currentWindowWidth) frame.width = (std::max)(1, currentWindowWidth - frame.relativeX);
-								if (frame.relativeY + frame.height > currentWindowHeight) frame.height = (std::max)(1, currentWindowHeight - frame.relativeY);
-							}
-							
-							lastWindowWidth = currentWindowWidth;
-							lastWindowHeight = currentWindowHeight;
-						}
-						
-						std::cout << "[PanelMapBuilder::rebuildFromSource] Restoration complete - keeping " << panelStateMap.size() << " panels" << std::endl;
-						return;
-					}
-					else
-					{
-						std::cout << "[PanelMapBuilder::rebuildFromSource] WARNING: No previous state available, accepting potentially stale coordinates" << std::endl;
-					}
-				}
-
-				const float MIN_RATIO = 0.70f;
-				const float MAX_RATIO = 1.50f;
-				
-				if (panelUsageRatioX < MIN_RATIO || panelUsageRatioY < MIN_RATIO || 
-				    panelUsageRatioX > MAX_RATIO || panelUsageRatioY > MAX_RATIO)
-				{
-					needsImmediateScaling = true;
-					
-					const float TYPICAL_PANEL_COVERAGE = 0.998f;
-					int inferredSourceWidth = static_cast<int>(std::lround(static_cast<float>(maxPanelRight) / TYPICAL_PANEL_COVERAGE));
-					int inferredSourceHeight = static_cast<int>(std::lround(static_cast<float>(maxPanelBottom) / TYPICAL_PANEL_COVERAGE));
-					
-					scalingSourceWidth = inferredSourceWidth;
-					scalingSourceHeight = inferredSourceHeight;
-					
-					std::cout << "[PanelMapBuilder::rebuildFromSource] Detected mismatched panel coordinates!" << std::endl;
-					std::cout << "  Panel coverage ratios: " << (panelUsageRatioX * 100.0f) << "% x " 
-					          << (panelUsageRatioY * 100.0f) << "%" << std::endl;
-					std::cout << "  Panel bounds: " << maxPanelRight << "x" << maxPanelBottom << std::endl;
-					std::cout << "  Inferred source window size: " << scalingSourceWidth 
-					          << "x" << scalingSourceHeight << std::endl;
-					std::cout << "  JavaScript reported size: " << receivedWindowWidth << "x" << receivedWindowHeight << std::endl;
-					std::cout << "  Actual window size: " << currentWindowWidth << "x" << currentWindowHeight << std::endl;
-				}
-			}
-
-			if (currentWindowWidth > 0 && currentWindowHeight > 0)
-			{
-				if (needsImmediateScaling && scalingSourceWidth > 0 && scalingSourceHeight > 0)
-				{
-					std::cout << "[PanelMapBuilder::rebuildFromSource] Applying immediate scale from "
-					          << scalingSourceWidth << "x" << scalingSourceHeight
-					          << " to " << currentWindowWidth << "x" << currentWindowHeight << std::endl;
-					
-					const float scaleX = static_cast<float>(currentWindowWidth) / static_cast<float>(scalingSourceWidth);
-					const float scaleY = static_cast<float>(currentWindowHeight) / static_cast<float>(scalingSourceHeight);
-					
-					for (auto& pair : panelStateMap)
-					{
-						IFrameScreenData& frame = pair.second.frame;
-						
-						int oldX = frame.relativeX;
-						int oldY = frame.relativeY;
-						int oldW = frame.width;
-						int oldH = frame.height;
-						
-						frame.relativeX = static_cast<int>(std::lround(static_cast<float>(frame.relativeX) * scaleX));
-						frame.relativeY = static_cast<int>(std::lround(static_cast<float>(frame.relativeY) * scaleY));
-						frame.width = (std::max)(1, static_cast<int>(std::lround(static_cast<float>(frame.width) * scaleX)));
-						frame.height = (std::max)(1, static_cast<int>(std::lround(static_cast<float>(frame.height) * scaleY)));
-						
-						if (frame.relativeX >= currentWindowWidth)
-						{
-							frame.relativeX = (std::max)(0, currentWindowWidth - frame.width);
-							std::cout << "[PanelMapBuilder::rebuildFromSource] CLAMPED " << pair.first 
-							          << " - was off-screen horizontally, moved to x=" << frame.relativeX << std::endl;
-						}
-						
-						if (frame.relativeY >= currentWindowHeight)
-						{
-							frame.relativeY = (std::max)(0, currentWindowHeight - frame.height);
-							std::cout << "[PanelMapBuilder::rebuildFromSource] CLAMPED " << pair.first 
-							          << " - was off-screen vertically, moved to y=" << frame.relativeY << std::endl;
-						}
-						
-						if (frame.relativeX + frame.width > currentWindowWidth)
-						{
-							frame.width = (std::max)(1, currentWindowWidth - frame.relativeX);
-							std::cout << "[PanelMapBuilder::rebuildFromSource] CLAMPED " << pair.first 
-							          << " width from " << oldW << " to " << frame.width << std::endl;
-						}
-						
-						if (frame.relativeY + frame.height > currentWindowHeight)
-						{
-							frame.height = (std::max)(1, currentWindowHeight - frame.relativeY);
-							std::cout << "[PanelMapBuilder::rebuildFromSource] CLAMPED " << pair.first 
-							          << " height from " << oldH << " to " << frame.height << std::endl;
-						}
-						
-						frame.windowWidth = currentWindowWidth;
-						frame.windowHeight = currentWindowHeight;
-						
-						std::cout << "[PanelMapBuilder::rebuildFromSource] Scaled " << pair.first 
-						          << ": (" << oldX << "," << oldY << " " << oldW << "x" << oldH << ")"
-						          << " -> (" << frame.relativeX << "," << frame.relativeY << " " 
-						          << frame.width << "x" << frame.height << ")" << std::endl;
-					}
-					
-					lastWindowWidth = currentWindowWidth;
-					lastWindowHeight = currentWindowHeight;
-				}
-				else
-				{
-					lastWindowWidth = currentWindowWidth;
-					lastWindowHeight = currentWindowHeight;
-					std::cout << "[PanelMapBuilder::rebuildFromSource] Updated last_window_ to: " 
-					          << lastWindowWidth << "x" << lastWindowHeight << std::endl;
-				}
-			}
-
-			createViewportPanel(panelStateMap, currentWindowWidth, currentWindowHeight);
-			
-			std::cout << "[PanelMapBuilder::rebuildFromSource] Completed - now tracking " << panelStateMap.size() 
-			          << " panels (previous: " << previousPanelCount << ")" << std::endl;
-		}
-
 		void PanelMapBuilder::scaleLayoutToWindow(
 		int newWindowWidth,int newWindowHeight,
 		std::map<std::string, PanelState>& panelStateMap,
@@ -396,7 +132,6 @@ namespace SIMILI {
 			std::cout << "[PanelMapBuilder::syncSplittersAndPanes] Called with " << frameDataMap.size() 
 			          << " panels for window " << currentWindowWidth << "x" << currentWindowHeight << std::endl;
 
-			rebuildFromSource(frameDataMap, currentWindowWidth, currentWindowHeight, panelStateMap, lastWindowWidth, lastWindowHeight);
 
 			if (currentWindowWidth > 0 && currentWindowHeight > 0 && window)
 			{
@@ -414,9 +149,9 @@ namespace SIMILI {
 
 			updateClientCoordinates(panelStateMap);
 
-			buildSplitters(panelStateMap, splitterList);
+			buildMapData(frameDataMap, splitterList, currentWindowWidth);
 
-			std::cout << "[PanelMapBuilder::syncSplittersAndPanes] Completed - " << panelStateMap.size() 
+			std::cout << "[PanelMapBuilder::syncSplittersAndPanes] Completed - " << frameDataMap.size() 
 			          << " panels, " << splitterList.size() << " splitters" << std::endl;
 		}
 
@@ -513,92 +248,15 @@ namespace SIMILI {
 			}
 		}
 
-	void PanelMapBuilder::buildSplitters(
-	const std::map<std::string, PanelState>& panelStateMap,
-	std::vector<SplitterDefinition>& splitterList)
-	{
-		splitterList.clear();
-
-		const int splitterThickness = 5;
-
-		std::vector<const PanelState*> panels;
-		for (const auto& pair : panelStateMap)
-		{
-			panels.push_back(&pair.second);
-		}
-
-		for (size_t i = 0; i < panels.size(); ++i)
-		{
-			const auto& panel1 = *panels[i];
-			
-			for (size_t j = i + 1; j < panels.size(); ++j)
-			{
-				const auto& panel2 = *panels[j];
-				
-				int panel1Right = panel1.frame.relativeX + panel1.frame.width;
-				int panel2Right = panel2.frame.relativeX + panel2.frame.width;
-				int panel1Bottom = panel1.frame.relativeY + panel1.frame.height;
-				int panel2Bottom = panel2.frame.relativeY + panel2.frame.height;
-				
-				if (abs(panel1Right - panel2.frame.relativeX) < 20 || 
-				    abs(panel2Right - panel1.frame.relativeX) < 20)
-				{
-					int overlapTop = (std::max)(panel1.frame.relativeY, panel2.frame.relativeY);
-					int overlapBottom = (std::min)(panel1Bottom, panel2Bottom);
-					
-					if (overlapBottom > overlapTop + 50)
-					{
-						int splitterX = (panel1Right <= panel2.frame.relativeX) ? panel1Right : panel2Right;
-						
-						SplitterDefinition splitter;
-						splitter.x = splitterX;
-						splitter.y = overlapTop;
-						splitter.width = splitterThickness;
-						splitter.height = overlapBottom - overlapTop;
-						splitter.isVertical = true;
-						
-						splitterList.push_back(splitter);
-					}
-				}
-				
-				if (abs(panel1Bottom - panel2.frame.relativeY) < 20 || 
-				    abs(panel2Bottom - panel1.frame.relativeY) < 20)
-				{
-					int overlapLeft = (std::max)(panel1.frame.relativeX, panel2.frame.relativeX);
-					int overlapRight = (std::min)(panel1Right, panel2Right);
-					
-					if (overlapRight > overlapLeft + 50)
-					{
-						int splitterY = (panel1Bottom <= panel2.frame.relativeY) ? panel1Bottom : panel2Bottom;
-						
-						SplitterDefinition splitter;
-						splitter.x = overlapLeft;
-						splitter.y = splitterY;
-						splitter.width = overlapRight - overlapLeft;
-						splitter.height = splitterThickness;
-						splitter.isVertical = false;
-						
-						splitterList.push_back(splitter);
-					}
-				}
-			}
-		}
-
-		std::cout << "[PanelMapBuilder::buildSplitters] Created " << splitterList.size() 
-		          << " splitters (thickness=" << splitterThickness << "px)" << std::endl;
-	}
-
 		void PanelMapBuilder::drawInsideAppBorders(
 		VkCommandBuffer commandBuffer,
 		int drawableWidth, int drawableHeight,
 		const std::map<std::string, IFrameScreenData>& panelFrameDataMap,
-		bool skipTextureRebuild, VKContext* vkContext,
-		VulkanPipeline* vulkanPipelines,
-		VkRenderPass renderPass,
+		bool skipTextureRebuild, 
+		VKContext* vkContext, VulkanPipeline* vulkanPipelines, VkRenderPass renderPass,
 		std::map<std::string, std::unique_ptr<UIPanel>>& uiPanels,
 		SDL_Window* window,
-		int appBorderLeft, int appBorderTop,
-		int appBorderWidth, int appBorderHeight)
+		int appBorderLeft, int appBorderTop, int appBorderWidth, int appBorderHeight)
 		{
 	
 			if (panelFrameDataMap.empty())
@@ -609,6 +267,7 @@ namespace SIMILI {
 
 			// Viewport offset = App_Border origin: NDC(-1,-1) maps to (borderLeft, borderTop) on screen.
 			// This translates the entire group of panels by the border offset, without any clipping.
+
 			VkViewport viewport = {};
 			viewport.x = static_cast<float>(appBorderLeft);
 			viewport.y = static_cast<float>(appBorderTop);
@@ -670,6 +329,151 @@ namespace SIMILI {
 			}
 			uiPanels.clear();
 			std::cout << "[PanelMapBuilder] clearUIPanels: All UI panels cleared" << std::endl;
+		}
+
+		void MapData::clear()
+		{
+			panels.clear();
+			splitters.clear();
+		}
+
+		void PanelMapBuilder::buildMapData(
+			const std::map<std::string, IFrameScreenData>& frameDataMap,
+			const std::vector<SplitterDefinition>& splitterList,
+			int currentWindowWidth)
+		{
+			map_data_.clear();
+
+			map_data_.splitters = splitterList;
+
+			if (frameDataMap.empty() || currentWindowWidth <= 0)
+			{
+				return;
+			}
+
+			const float fullWidthThreshold = 0.85f;
+
+			struct SortEntry
+			{
+				std::string key;
+				const IFrameScreenData* data;
+			};
+
+			std::vector<SortEntry> rowPanels;
+			std::vector<SortEntry> columnPanels;
+
+			for (const auto& pair : frameDataMap)
+			{
+				if (pair.first == "viewport_panel")
+				{
+					continue;
+				}
+
+				const IFrameScreenData& fd = pair.second;
+				float widthRatio = static_cast<float>(fd.width) / static_cast<float>(currentWindowWidth);
+
+				SortEntry entry;
+				entry.key  = pair.first;
+				entry.data = &fd;
+
+				if (widthRatio >= fullWidthThreshold)
+				{
+					rowPanels.push_back(entry);
+				}
+				else
+				{
+					columnPanels.push_back(entry);
+				}
+			}
+
+			std::sort(rowPanels.begin(), rowPanels.end(),
+				[](const SortEntry& a, const SortEntry& b)
+				{
+					return a.data->relativeY < b.data->relativeY;
+				});
+
+			std::sort(columnPanels.begin(), columnPanels.end(),
+				[](const SortEntry& a, const SortEntry& b)
+				{
+					if (a.data->relativeX != b.data->relativeX)
+					{
+						return a.data->relativeX < b.data->relativeX;
+					}
+					return a.data->relativeY < b.data->relativeY;
+				});
+
+			int nextIndex = 1;
+
+			for (const auto& entry : rowPanels)
+			{
+				PanelMapEntry mapEntry;
+				mapEntry.name       = entry.key;
+				mapEntry.index      = nextIndex;
+				mapEntry.layoutType = PanelLayoutType::Row;
+				mapEntry.column     = 0;
+				mapEntry.row        = nextIndex;
+				map_data_.panels[entry.key] = mapEntry;
+				++nextIndex;
+			}
+
+			int currentColumn = 0;
+			int prevX         = -1;
+			int rowInColumn   = 0;
+
+			for (const auto& entry : columnPanels)
+			{
+				if (entry.data->relativeX != prevX)
+				{
+					++currentColumn;
+					rowInColumn = 1;
+					prevX = entry.data->relativeX;
+				}
+				else
+				{
+					++rowInColumn;
+				}
+
+				PanelMapEntry mapEntry;
+				mapEntry.name       = entry.key;
+				mapEntry.index      = nextIndex;
+				mapEntry.layoutType = PanelLayoutType::Column;
+				mapEntry.column     = currentColumn;
+				mapEntry.row        = rowInColumn;
+				map_data_.panels[entry.key] = mapEntry;
+				++nextIndex;
+			}
+
+			std::cout << "\n -------------- [Panel Map Building ] --------------" << std::endl;
+			std::cout << "[PanelMapBuilder::buildMapData] Layout map:" << std::endl;
+
+			std::vector<const PanelMapEntry*> ordered;
+
+			for (const auto& pair : map_data_.panels)
+			{
+				ordered.push_back(&pair.second);
+			}
+
+			std::sort(ordered.begin(), ordered.end(),
+				[](const PanelMapEntry* a, const PanelMapEntry* b)
+				{
+					return a->index < b->index;
+				});
+
+			for (const PanelMapEntry* e : ordered)
+			{
+				std::cout << "  " << e->name << " = " << e->index << std::endl;
+			}
+
+			std::cout << "[PanelMapBuilder::buildMapData] "
+			          << map_data_.panels.size() << " panels, "
+			          << map_data_.splitters.size() << " splitters" << std::endl;
+
+			std::cout << " ------------------ [End of Panel Map Building ] -----------------------------\n" << std::endl;
+		}
+
+		const MapData& PanelMapBuilder::getMapData() const
+		{
+			return map_data_;
 		}
 
 	}
