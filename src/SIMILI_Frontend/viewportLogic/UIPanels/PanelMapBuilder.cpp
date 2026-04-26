@@ -335,6 +335,7 @@ namespace SIMILI {
 		{
 			panels.clear();
 			splitters.clear();
+			splitterCandidates.clear();
 		}
 
 		void PanelMapBuilder::buildMapData(
@@ -464,9 +465,26 @@ namespace SIMILI {
 				std::cout << "  " << e->name << " = " << e->index << std::endl;
 			}
 
+			buildSplittersFromRays(frameDataMap);
+
 			std::cout << "[PanelMapBuilder::buildMapData] "
 			          << map_data_.panels.size() << " panels, "
-			          << map_data_.splitters.size() << " splitters" << std::endl;
+			          << map_data_.splitterCandidates.size() << " splitters" << std::endl;
+
+			int splitterIdx = 1;
+			for (const auto& sc : map_data_.splitterCandidates)
+			{
+				std::cout << "  Splitter " << splitterIdx++ << " ("
+				          << (sc.isVertical ? "V" : "H") << ") at ("
+				          << sc.x << "," << sc.y << ") "
+				          << sc.width << "x" << sc.height << " -> panels: ";
+				for (std::size_t i = 0; i < sc.assignedPanels.size(); ++i)
+				{
+					if (i > 0) std::cout << ", ";
+					std::cout << sc.assignedPanels[i];
+				}
+				std::cout << std::endl;
+			}
 
 			std::cout << " ------------------ [End of Panel Map Building ] -----------------------------\n" << std::endl;
 		}
@@ -474,6 +492,283 @@ namespace SIMILI {
 		const MapData& PanelMapBuilder::getMapData() const
 		{
 			return map_data_;
+		}
+
+		RayCastResult PanelMapBuilder::castRay(
+			const std::string& sourceName,
+			const IFrameScreenData& source,
+			RayDirection direction,
+			const std::map<std::string, IFrameScreenData>& frameDataMap,
+			int borderLeft, int borderTop, int borderRight, int borderBottom) const
+		{
+			RayCastResult result;
+			result.direction = direction;
+			result.hitType   = RayHitType::Nothing;
+
+			const int TOLERANCE = 6;
+
+			int px = source.relativeX;
+			int py = source.relativeY;
+			int pRight = px + source.width;
+			int pBottom = py + source.height;
+
+			if (direction == RayDirection::Left && px <= borderLeft + TOLERANCE)
+			{
+				result.hitType = RayHitType::AppBorder;
+				return result;
+			}
+			if (direction == RayDirection::Up && py <= borderTop + TOLERANCE)
+			{
+				result.hitType = RayHitType::AppBorder;
+				return result;
+			}
+			if (direction == RayDirection::Right && pRight >= borderRight - TOLERANCE)
+			{
+				result.hitType = RayHitType::AppBorder;
+				return result;
+			}
+			if (direction == RayDirection::Down && pBottom >= borderBottom - TOLERANCE)
+			{
+				result.hitType = RayHitType::AppBorder;
+				return result;
+			}
+
+			std::string neighborName;
+			int bestDist = INT_MAX;
+
+			for (const auto& otherPair : frameDataMap)
+			{
+				if (otherPair.first == sourceName) continue;
+				if (otherPair.first == "viewport_panel") continue;
+
+				const IFrameScreenData& other = otherPair.second;
+				int ox = other.relativeX;
+				int oy = other.relativeY;
+				int oRight = ox + other.width;
+				int oBottom = oy + other.height;
+
+				int dist = INT_MAX;
+				bool valid = false;
+
+				if (direction == RayDirection::Right)
+				{
+					if (ox >= pRight - TOLERANCE && ox <= pRight + 60)
+					{
+						if (oBottom > py && oy < pBottom)
+						{
+							dist  = ox - pRight;
+							valid = true;
+						}
+					}
+				}
+				else if (direction == RayDirection::Left)
+				{
+					if (oRight <= px + TOLERANCE && oRight >= px - 60)
+					{
+						if (oBottom > py && oy < pBottom)
+						{
+							dist  = px - oRight;
+							valid = true;
+						}
+					}
+				}
+				else if (direction == RayDirection::Down)
+				{
+					if (oy >= pBottom - TOLERANCE && oy <= pBottom + 60)
+					{
+						if (oRight > px && ox < pRight)
+						{
+							dist  = oy - pBottom;
+							valid = true;
+						}
+					}
+				}
+				else if (direction == RayDirection::Up)
+				{
+					if (oBottom <= py + TOLERANCE && oBottom >= py - 60)
+					{
+						if (oRight > px && ox < pRight)
+						{
+							dist  = py - oBottom;
+							valid = true;
+						}
+					}
+				}
+
+				if (valid && dist < bestDist)
+				{
+					bestDist = dist;
+					neighborName = otherPair.first;
+				}
+			}
+
+			if (!neighborName.empty())
+			{
+				result.hitType = RayHitType::Panel;
+				result.hitPanelName = neighborName;
+			}
+
+			return result;
+		}
+
+		void PanelMapBuilder::buildSplittersFromRays(
+			const std::map<std::string, IFrameScreenData>& frameDataMap)
+		{
+			map_data_.splitterCandidates.clear();
+
+			if (frameDataMap.empty())
+			{
+				return;
+			}
+
+			const int BORDER_OFFSET    = 3;
+			const int SPLITTER_THICKNESS = 3;
+
+			int windowWidth  = 0;
+			int windowHeight = 0;
+
+			for (const auto& p : frameDataMap)
+			{
+				if (p.second.windowWidth  > 0) windowWidth  = p.second.windowWidth;
+				if (p.second.windowHeight > 0) windowHeight = p.second.windowHeight;
+				if (windowWidth > 0 && windowHeight > 0) break;
+			}
+
+			if (windowWidth <= 0 || windowHeight <= 0)
+			{
+				return;
+			}
+
+			const int borderLeft   = BORDER_OFFSET;
+			const int borderTop    = BORDER_OFFSET;
+			const int borderRight  = windowWidth  - BORDER_OFFSET;
+			const int borderBottom = windowHeight - BORDER_OFFSET;
+
+			std::map<std::string, SplitterCandidate> candidateMap;
+
+			const RayDirection directions[4] =
+			{
+				RayDirection::Left,
+				RayDirection::Right,
+				RayDirection::Up,
+				RayDirection::Down
+			};
+
+			for (const auto& panelPair : frameDataMap)
+			{
+				const std::string& panelName = panelPair.first;
+				if (panelName == "viewport_panel") continue;
+				if (map_data_.panels.find(panelName) == map_data_.panels.end()) continue;
+
+				const IFrameScreenData& src = panelPair.second;
+				const int px      = src.relativeX;
+				const int py      = src.relativeY;
+				const int pRight  = px + src.width;
+				const int pBottom = py + src.height;
+
+				for (RayDirection dir : directions)
+				{
+					RayCastResult hit = castRay(panelName, src, dir, frameDataMap,
+						borderLeft, borderTop, borderRight, borderBottom);
+
+					if (hit.hitType == RayHitType::AppBorder)
+					{
+						continue;
+					}
+
+					const bool isVertical = (dir == RayDirection::Left || dir == RayDirection::Right);
+
+					// Compute the axis position used as dedup key.
+					// Panel hit  -> midpoint between the two adjacent edges.
+					// Nothing hit -> edge of the source panel.
+					int axisPos = 0;
+					if (hit.hitType == RayHitType::Panel)
+					{
+						auto nit = frameDataMap.find(hit.hitPanelName);
+						if (nit != frameDataMap.end())
+						{
+							const IFrameScreenData& nb = nit->second;
+							if      (dir == RayDirection::Right) axisPos = (pRight  + nb.relativeX) / 2;
+							else if (dir == RayDirection::Left)  axisPos = (nb.relativeX + nb.width + px) / 2;
+							else if (dir == RayDirection::Down)  axisPos = (pBottom + nb.relativeY) / 2;
+							else                                 axisPos = (nb.relativeY + nb.height + py) / 2;
+						}
+					}
+					else
+					{
+						if      (dir == RayDirection::Right) axisPos = pRight;
+						else if (dir == RayDirection::Left)  axisPos = px - SPLITTER_THICKNESS;
+						else if (dir == RayDirection::Down)  axisPos = pBottom;
+						else                                 axisPos = py - SPLITTER_THICKNESS;
+					}
+
+					const std::string dedupKey = (isVertical ? "V|" : "H|") + std::to_string(axisPos);
+
+					// Geometry of the splitter from this panel's perspective.
+					const int sx = isVertical ? axisPos : px;
+					const int sy = isVertical ? py      : axisPos;
+					const int sw = isVertical ? SPLITTER_THICKNESS : src.width;
+					const int sh = isVertical ? src.height : SPLITTER_THICKNESS;
+
+					auto it = candidateMap.find(dedupKey);
+					if (it == candidateMap.end())
+					{
+						SplitterCandidate candidate;
+						candidate.x          = sx;
+						candidate.y          = sy;
+						candidate.width      = sw;
+						candidate.height     = sh;
+						candidate.isVertical = isVertical;
+						candidate.assignedPanels.push_back(panelName);
+						if (hit.hitType == RayHitType::Panel && !hit.hitPanelName.empty())
+						{
+							candidate.assignedPanels.push_back(hit.hitPanelName);
+						}
+						candidateMap[dedupKey] = candidate;
+					}
+					else
+					{
+						SplitterCandidate& existing = it->second;
+
+						if (isVertical)
+						{
+							const int minY = (std::min)(existing.y, sy);
+							const int maxY = (std::max)(existing.y + existing.height, sy + sh);
+							existing.y      = minY;
+							existing.height = maxY - minY;
+						}
+						else
+						{
+							const int minX = (std::min)(existing.x, sx);
+							const int maxX = (std::max)(existing.x + existing.width, sx + sw);
+							existing.x     = minX;
+							existing.width = maxX - minX;
+						}
+
+						auto addIfMissing = [&existing](const std::string& name)
+						{
+							if (!name.empty() &&
+								std::find(existing.assignedPanels.begin(),
+								          existing.assignedPanels.end(), name)
+								== existing.assignedPanels.end())
+							{
+								existing.assignedPanels.push_back(name);
+							}
+						};
+
+						addIfMissing(panelName);
+						if (hit.hitType == RayHitType::Panel)
+						{
+							addIfMissing(hit.hitPanelName);
+						}
+					}
+				}
+			}
+
+			for (auto& kv : candidateMap)
+			{
+				map_data_.splitterCandidates.push_back(kv.second);
+			}
 		}
 
 	}

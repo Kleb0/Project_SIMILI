@@ -5,6 +5,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <climits>
 
 class VKContext;
 
@@ -35,6 +36,38 @@ namespace SIMILI
 			Column
 		};
 
+		enum class RayDirection
+		{
+			Up,
+			Down,
+			Left,
+			Right
+		};
+
+		enum class RayHitType
+		{
+			AppBorder,
+			Panel,
+			Nothing
+		};
+
+		struct RayCastResult
+		{
+			RayDirection direction;
+			RayHitType   hitType;
+			std::string  hitPanelName;
+		};
+
+		struct SplitterCandidate
+		{
+			int x;
+			int y;
+			int width;
+			int height;
+			bool isVertical;
+			std::vector<std::string> assignedPanels;
+		};
+
 		struct PanelMapEntry
 		{
 			std::string name;
@@ -46,8 +79,9 @@ namespace SIMILI
 
 		struct MapData
 		{
-			std::map<std::string, PanelMapEntry> panels;
-			std::vector<SplitterDefinition>      splitters;
+			std::map<std::string, PanelMapEntry>  panels;
+			std::vector<SplitterDefinition>       splitters;
+			std::vector<SplitterCandidate>        splitterCandidates;
 
 			void clear();
 		};
@@ -104,6 +138,16 @@ namespace SIMILI
 
 				//void buildSplitters(const std::map<std::string, PanelState>& panelStateMap,
 				//	std::vector<SplitterDefinition>& splitterList);
+
+				void buildSplittersFromRays(
+					const std::map<std::string, IFrameScreenData>& frameDataMap);
+
+				RayCastResult castRay(
+					const std::string& sourceName,
+					const IFrameScreenData& source,
+					RayDirection direction,
+					const std::map<std::string, IFrameScreenData>& frameDataMap,
+					int borderLeft, int borderTop, int borderRight, int borderBottom) const;
 
 				MapData map_data_;
 		};
