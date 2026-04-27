@@ -253,6 +253,37 @@ namespace SIMILI {
 				app_border_left_, app_border_top_, app_border_width_, app_border_height_);
 		}
 
+		void UIManager::drawSplitters(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight)
+		{
+			if (splitter_list_.empty() || !vk_context_ || !vulkan_pipelines_ || vk_render_pass_ == VK_NULL_HANDLE)
+			{
+				return;
+			}
+
+			if (!splitter_renderer_)
+			{
+				splitter_renderer_ = std::make_unique<Splitter>();
+				splitter_renderer_->setVulkanPipelines(vulkan_pipelines_);
+				splitter_renderer_->initialize(vk_context_, vk_render_pass_);
+			}
+
+			std::vector<Splitter::SplitterData> splitterData;
+			splitterData.reserve(splitter_list_.size());
+			for (const auto& def : splitter_list_)
+			{
+				Splitter::SplitterData sd;
+				sd.x = def.x;
+				sd.y = def.y;
+				sd.width = def.width;
+				sd.height = def.height;
+				sd.isVertical = def.isVertical;
+				splitterData.push_back(sd);
+			}
+
+			splitter_renderer_->setSplitters(splitterData);
+			splitter_renderer_->draw(commandBuffer, drawableWidth, drawableHeight);
+		}
+
 		void UIManager::drawFullScreenUIPanelsInsideBorders(
 			VkCommandBuffer commandBuffer,
 			int drawableWidth, int drawableHeight,
@@ -290,17 +321,17 @@ namespace SIMILI {
 				IFrameScreenData scaled = pair.second;
 				scaled.relativeX = static_cast<int>(std::round(pair.second.relativeX * scaleX));
 				scaled.relativeY = static_cast<int>(std::round(pair.second.relativeY * scaleY));
-				scaled.width     = static_cast<int>(std::round(pair.second.width     * scaleX));
-				scaled.height    = static_cast<int>(std::round(pair.second.height    * scaleY));
-				scaled.clientX   = static_cast<int>(std::round(pair.second.clientX   * scaleX));
-				scaled.clientY   = static_cast<int>(std::round(pair.second.clientY   * scaleY));
+				scaled.width = static_cast<int>(std::round(pair.second.width * scaleX));
+				scaled.height = static_cast<int>(std::round(pair.second.height * scaleY));
+				scaled.clientX = static_cast<int>(std::round(pair.second.clientX * scaleX));
+				scaled.clientY = static_cast<int>(std::round(pair.second.clientY * scaleY));
 				scaledFrameDataMap[pair.first] = scaled;
 			}
 
 			static constexpr int BORDER = 3;
-			int borderLeft   = BORDER;
-			int borderTop    = BORDER;
-			int borderWidth  = drawableWidth  - 2 * BORDER;
+			int borderLeft = BORDER;
+			int borderTop = BORDER;
+			int borderWidth = drawableWidth - 2 * BORDER;
 			int borderHeight = drawableHeight - 2 * BORDER;
 
 			panel_map_builder_.drawInsideAppBorders(

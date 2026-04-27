@@ -340,7 +340,7 @@ namespace SIMILI {
 
 		void PanelMapBuilder::buildMapData(
 			const std::map<std::string, IFrameScreenData>& frameDataMap,
-			const std::vector<SplitterDefinition>& splitterList,
+			std::vector<SplitterDefinition>& splitterList,
 			int currentWindowWidth)
 		{
 			map_data_.clear();
@@ -467,6 +467,18 @@ namespace SIMILI {
 
 			buildSplittersFromRays(frameDataMap);
 
+			splitterList.clear();
+			for (const auto& sc : map_data_.splitterCandidates)
+			{
+				SplitterDefinition def;
+				def.x = sc.x;
+				def.y = sc.y;
+				def.width = sc.width;
+				def.height = sc.height;
+				def.isVertical = sc.isVertical;
+				splitterList.push_back(def);
+			}
+
 			std::cout << "[PanelMapBuilder::buildMapData] "
 			          << map_data_.panels.size() << " panels, "
 			          << map_data_.splitterCandidates.size() << " splitters" << std::endl;
@@ -503,7 +515,7 @@ namespace SIMILI {
 		{
 			RayCastResult result;
 			result.direction = direction;
-			result.hitType   = RayHitType::Nothing;
+			result.hitType = RayHitType::Nothing;
 
 			const int TOLERANCE = 6;
 
@@ -621,15 +633,15 @@ namespace SIMILI {
 				return;
 			}
 
-			const int BORDER_OFFSET    = 3;
-			const int SPLITTER_THICKNESS = 3;
+			const int BORDER_OFFSET = 3;
+			const int SPLITTER_THICKNESS = 10;
 
-			int windowWidth  = 0;
+			int windowWidth = 0;
 			int windowHeight = 0;
 
 			for (const auto& p : frameDataMap)
 			{
-				if (p.second.windowWidth  > 0) windowWidth  = p.second.windowWidth;
+				if (p.second.windowWidth  > 0) windowWidth = p.second.windowWidth;
 				if (p.second.windowHeight > 0) windowHeight = p.second.windowHeight;
 				if (windowWidth > 0 && windowHeight > 0) break;
 			}
@@ -639,9 +651,9 @@ namespace SIMILI {
 				return;
 			}
 
-			const int borderLeft   = BORDER_OFFSET;
-			const int borderTop    = BORDER_OFFSET;
-			const int borderRight  = windowWidth  - BORDER_OFFSET;
+			const int borderLeft = BORDER_OFFSET;
+			const int borderTop = BORDER_OFFSET;
+			const int borderRight = windowWidth - BORDER_OFFSET;
 			const int borderBottom = windowHeight - BORDER_OFFSET;
 
 			std::map<std::string, SplitterCandidate> candidateMap;
@@ -661,8 +673,8 @@ namespace SIMILI {
 				if (map_data_.panels.find(panelName) == map_data_.panels.end()) continue;
 
 				const IFrameScreenData& src = panelPair.second;
-				const int px      = src.relativeX;
-				const int py      = src.relativeY;
+				const int px  = src.relativeX;
+				const int py  = src.relativeY;
 				const int pRight  = px + src.width;
 				const int pBottom = py + src.height;
 
@@ -688,25 +700,25 @@ namespace SIMILI {
 						if (nit != frameDataMap.end())
 						{
 							const IFrameScreenData& nb = nit->second;
-							if      (dir == RayDirection::Right) axisPos = (pRight  + nb.relativeX) / 2;
-							else if (dir == RayDirection::Left)  axisPos = (nb.relativeX + nb.width + px) / 2;
-							else if (dir == RayDirection::Down)  axisPos = (pBottom + nb.relativeY) / 2;
-							else                                 axisPos = (nb.relativeY + nb.height + py) / 2;
+							if (dir == RayDirection::Right) axisPos = (pRight  + nb.relativeX) / 2;
+							else if (dir == RayDirection::Left) axisPos = (nb.relativeX + nb.width + px) / 2;
+							else if (dir == RayDirection::Down) axisPos = (pBottom + nb.relativeY) / 2;
+							else axisPos = (nb.relativeY + nb.height + py) / 2;
 						}
 					}
 					else
 					{
-						if      (dir == RayDirection::Right) axisPos = pRight;
-						else if (dir == RayDirection::Left)  axisPos = px - SPLITTER_THICKNESS;
-						else if (dir == RayDirection::Down)  axisPos = pBottom;
-						else                                 axisPos = py - SPLITTER_THICKNESS;
+						if (dir == RayDirection::Right) axisPos = pRight;
+						else if (dir == RayDirection::Left) axisPos = px - SPLITTER_THICKNESS;
+						else if (dir == RayDirection::Down) axisPos = pBottom;
+						else axisPos = py - SPLITTER_THICKNESS;
 					}
 
 					const std::string dedupKey = (isVertical ? "V|" : "H|") + std::to_string(axisPos);
 
 					// Geometry of the splitter from this panel's perspective.
 					const int sx = isVertical ? axisPos : px;
-					const int sy = isVertical ? py      : axisPos;
+					const int sy = isVertical ? py : axisPos;
 					const int sw = isVertical ? SPLITTER_THICKNESS : src.width;
 					const int sh = isVertical ? src.height : SPLITTER_THICKNESS;
 
@@ -714,10 +726,10 @@ namespace SIMILI {
 					if (it == candidateMap.end())
 					{
 						SplitterCandidate candidate;
-						candidate.x          = sx;
-						candidate.y          = sy;
-						candidate.width      = sw;
-						candidate.height     = sh;
+						candidate.x = sx;
+						candidate.y = sy;
+						candidate.width = sw;
+						candidate.height = sh;
 						candidate.isVertical = isVertical;
 						candidate.assignedPanels.push_back(panelName);
 						if (hit.hitType == RayHitType::Panel && !hit.hitPanelName.empty())
@@ -734,14 +746,14 @@ namespace SIMILI {
 						{
 							const int minY = (std::min)(existing.y, sy);
 							const int maxY = (std::max)(existing.y + existing.height, sy + sh);
-							existing.y      = minY;
+							existing.y = minY;
 							existing.height = maxY - minY;
 						}
 						else
 						{
 							const int minX = (std::min)(existing.x, sx);
 							const int maxX = (std::max)(existing.x + existing.width, sx + sw);
-							existing.x     = minX;
+							existing.x = minX;
 							existing.width = maxX - minX;
 						}
 

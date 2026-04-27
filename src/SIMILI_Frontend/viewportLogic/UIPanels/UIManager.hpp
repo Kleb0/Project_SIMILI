@@ -4,6 +4,7 @@
 #include <vulkan/vulkan.h>
 #include "UIPanel.hpp"
 #include "PanelMapBuilder.hpp"
+#include "Splitter.hpp"
 #include "FrameDatas/FrameDatas.hpp"
 #include <map>
 #include <string>
@@ -55,6 +56,7 @@ namespace SIMILI {
 			
 			void drawUIPanelsInsideBorders(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild, SDL_Window* window);
 			void drawFullScreenUIPanelsInsideBorders(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild, SDL_Window* window, int referenceWindowWidth, int referenceWindowHeight);
+			void drawSplitters(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight);
 			void setBorders(int borderLeft, int borderTop, int borderWidth, int borderHeight);
 			void setCEFTextureForAllPanels(VkImageView view, VkSampler sampler, int cefWidth, int cefHeight);
 		
@@ -101,6 +103,7 @@ namespace SIMILI {
 			int last_window_height_ = 0;
 
 			PanelMapBuilder panel_map_builder_;
+			std::unique_ptr<Splitter> splitter_renderer_;
 		};
 	}
 }

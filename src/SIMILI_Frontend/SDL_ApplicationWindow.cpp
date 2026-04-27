@@ -1012,6 +1012,8 @@ void SDL_ApplicationWindow::renderFrame()
 			}
 			ui_manager_->drawUIPanelsInsideBorders(commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
 			prepared_panel_frame_data_map_, prepared_skip_texture_rebuild_, window_);
+
+			ui_manager_->drawSplitters(commandBuffer, prepared_drawable_width_, prepared_drawable_height_);
 		}
 
 		if (debug_tools_)

@@ -105,9 +105,39 @@ void Splitter::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawab
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shared_pipeline_->pipeline);
 	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shared_pipeline_->layout, 0, 1, &vk_descriptor_set_, 0, nullptr);
 
+	const uint32_t count = static_cast<uint32_t>(splitters_.size());
+	std::vector<float> allVertices;
+	allVertices.reserve(count * 12);
+
 	for (const auto& splitter : splitters_)
 	{
-		drawSplitter(commandBuffer, splitter, drawableWidth, drawableHeight);
+		const float ndcX1 = (2.0f * static_cast<float>(splitter.x) / static_cast<float>(drawableWidth)) - 1.0f;
+		const float ndcY1 = (2.0f * static_cast<float>(splitter.y) / static_cast<float>(drawableHeight)) - 1.0f;
+		const float ndcX2 = (2.0f * static_cast<float>(splitter.x + splitter.width) / static_cast<float>(drawableWidth)) - 1.0f;
+		const float ndcY2 = (2.0f * static_cast<float>(splitter.y + splitter.height) / static_cast<float>(drawableHeight)) - 1.0f;
+
+		allVertices.insert(allVertices.end(), {
+			ndcX1, ndcY1,
+			ndcX2, ndcY1,
+			ndcX1, ndcY2,
+			ndcX2, ndcY1,
+			ndcX2, ndcY2,
+			ndcX1, ndcY2
+		});
+	}
+
+	VkDevice device = vk_context_->getDevice();
+	void* data = nullptr;
+	vkMapMemory(device, vk_vertex_buffer_memory_, 0, sizeof(float) * allVertices.size(), 0, &data);
+	std::memcpy(data, allVertices.data(), sizeof(float) * allVertices.size());
+	vkUnmapMemory(device, vk_vertex_buffer_memory_);
+
+	VkDeviceSize offsets[] = {0};
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vk_vertex_buffer_, offsets);
+
+	for (uint32_t i = 0; i < count; ++i)
+	{
+		vkCmdDraw(commandBuffer, 6, 1, i * 6, 0);
 	}
 }
 
@@ -177,7 +207,7 @@ bool Splitter::createGraphicsResources()
 	layout(location = 0) out vec4 outColor;
 
 	void main() {
-		outColor = vec4(1.0, 0.0, 0.0, 1.0);
+		outColor = vec4(0.0, 1.0, 0.0, 1.0);
 	}
 	)";
 
@@ -198,9 +228,11 @@ bool Splitter::createGraphicsResources()
 	std::vector<char> vertShaderBytes = GLSLCompiler::spirvToBytes(vertexSPIRV);
 	std::vector<char> fragShaderBytes = GLSLCompiler::spirvToBytes(fragmentSPIRV);
 
+	static constexpr uint32_t MAX_SPLITTERS = 32;
+
 	VkBufferCreateInfo bufferInfo{};
 	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	bufferInfo.size = sizeof(float) * 12;
+	bufferInfo.size = sizeof(float) * 12 * MAX_SPLITTERS;
 	bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 

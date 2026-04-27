@@ -126,7 +126,7 @@ namespace SIMILI
 
 				void buildMapData(
 					const std::map<std::string, IFrameScreenData>& frameDataMap,
-					const std::vector<SplitterDefinition>& splitterList,
+					std::vector<SplitterDefinition>& splitterList,
 					int currentWindowWidth);
 
 				const MapData& getMapData() const;
