@@ -777,10 +777,63 @@ namespace SIMILI {
 				}
 			}
 
+			std::vector<SplitterCandidate> allCandidates;
+			allCandidates.reserve(candidateMap.size());
 			for (auto& kv : candidateMap)
+				allCandidates.push_back(kv.second);
+
+			const int GAP_TOLERANCE = SPLITTER_THICKNESS * 2;
+
+			for (auto& cand : allCandidates)
 			{
-				map_data_.splitterCandidates.push_back(kv.second);
+				for (const auto& other : allCandidates)
+				{
+					if (cand.isVertical == other.isVertical)
+						continue;
+
+					if (cand.isVertical)
+					{
+						const bool xCross = other.x < cand.x + cand.width + GAP_TOLERANCE &&
+						                    other.x + other.width > cand.x - GAP_TOLERANCE;
+						if (!xCross)
+							continue;
+
+						const int candBottom = cand.y + cand.height;
+						const int otherBottom = other.y + other.height;
+
+						if (other.y >= candBottom && other.y <= candBottom + GAP_TOLERANCE)
+							cand.height = otherBottom - cand.y;
+
+						if (otherBottom <= cand.y && otherBottom >= cand.y - GAP_TOLERANCE)
+						{
+							cand.height += cand.y - other.y;
+							cand.y = other.y;
+						}
+					}
+					else
+					{
+						const bool yCross = other.y < cand.y + cand.height + GAP_TOLERANCE &&
+						                    other.y + other.height > cand.y - GAP_TOLERANCE;
+						if (!yCross)
+							continue;
+
+						const int candRight = cand.x + cand.width;
+						const int otherRight = other.x + other.width;
+
+						if (other.x >= candRight && other.x <= candRight + GAP_TOLERANCE)
+							cand.width = otherRight - cand.x;
+
+						if (otherRight <= cand.x && otherRight >= cand.x - GAP_TOLERANCE)
+						{
+							cand.width += cand.x - other.x;
+							cand.x = other.x;
+						}
+					}
+				}
 			}
+
+			for (auto& cand : allCandidates)
+				map_data_.splitterCandidates.push_back(cand);
 		}
 
 	}
