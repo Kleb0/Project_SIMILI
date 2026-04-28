@@ -25,3 +25,13 @@ int SplitterMouseMecanic::getHoveredIndex() const
 {
 	return hovered_index_;
 }
+
+SplitterMouseMecanic::Color SplitterMouseMecanic::getHoverColor() const
+{
+	return { 0.0f, 0.4f, 1.0f, 1.0f };
+}
+
+SplitterMouseMecanic::Color SplitterMouseMecanic::getDefaultColor() const
+{
+	return { 0.0f, 1.0f, 0.0f, 1.0f };
+}

@@ -265,6 +265,7 @@ namespace SIMILI {
 			{
 				splitter_renderer_ = std::make_unique<Splitter>();
 				splitter_renderer_->setVulkanPipelines(vulkan_pipelines_);
+				splitter_renderer_->setSplitterMouseMecanic(&splitter_mouse_mecanic_);
 				splitter_renderer_->initialize(vk_context_, vk_render_pass_);
 			}
 

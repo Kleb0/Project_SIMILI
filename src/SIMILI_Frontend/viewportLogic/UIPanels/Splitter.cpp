@@ -1,4 +1,5 @@
 #include "Splitter.hpp"
+#include "SplitterMouseMecanic.hpp"
 #include "../../../Engine/VulkanScene/VKcontext.hpp"
 #include "../../../Engine/VulkanPipeline/VulkanPipeline.hpp"
 #include "../../../Engine/GLSL_Compiler/GLSLCompiler.hpp"
@@ -29,6 +30,7 @@ Splitter::Splitter()
 	, dummy_texture_sampler_(VK_NULL_HANDLE)
 	, shared_pipeline_(nullptr)
 	, hovered_index_(-1)
+	, splitter_mouse_mecanic_(nullptr)
 {
 }
 
@@ -75,6 +77,11 @@ void Splitter::setVulkanPipelines(VulkanPipeline* pipelines)
 void Splitter::setHoveredIndex(int index)
 {
 	hovered_index_ = index;
+}
+
+void Splitter::setSplitterMouseMecanic(SplitterMouseMecanic* mecanic)
+{
+	splitter_mouse_mecanic_ = mecanic;
 }
 
 void Splitter::setSplitters(const std::vector<SplitterData>& splitters)
@@ -144,9 +151,15 @@ void Splitter::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawab
 	for (uint32_t i = 0; i < count; ++i)
 	{
 		float color[4];
-		if (static_cast<int>(i) == hovered_index_)
+		if (splitter_mouse_mecanic_ && static_cast<int>(i) == hovered_index_)
 		{
-			color[0] = 0.0f; color[1] = 0.4f; color[2] = 1.0f; color[3] = 1.0f;
+			SplitterMouseMecanic::Color c = splitter_mouse_mecanic_->getHoverColor();
+			color[0] = c.r; color[1] = c.g; color[2] = c.b; color[3] = c.a;
+		}
+		else if (splitter_mouse_mecanic_)
+		{
+			SplitterMouseMecanic::Color c = splitter_mouse_mecanic_->getDefaultColor();
+			color[0] = c.r; color[1] = c.g; color[2] = c.b; color[3] = c.a;
 		}
 		else
 		{

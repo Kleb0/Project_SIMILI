@@ -6,6 +6,8 @@
 #include <memory>
 #include "../../../Engine/VulkanPipeline/VulkanPipeline.hpp"
 
+class SplitterMouseMecanic;
+
 class VKContext;
 
 class Splitter
@@ -30,6 +32,7 @@ public:
 	void setSplitters(const std::vector<SplitterData>& splitters);
 	void setVulkanPipelines(VulkanPipeline* pipelines);
 	void setHoveredIndex(int index);
+	void setSplitterMouseMecanic(SplitterMouseMecanic* mecanic);
 
 private:
 	VKContext* vk_context_;
@@ -48,6 +51,7 @@ private:
 	std::shared_ptr<VulkanPipeline::Pipeline> shared_pipeline_;
 	std::vector<SplitterData> splitters_;
 	int hovered_index_;
+	SplitterMouseMecanic* splitter_mouse_mecanic_;
 
 	bool createGraphicsResources();
 	void destroyGraphicsResources();
