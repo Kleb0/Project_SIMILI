@@ -29,6 +29,7 @@ public:
 
 	void setSplitters(const std::vector<SplitterData>& splitters);
 	void setVulkanPipelines(VulkanPipeline* pipelines);
+	void setHoveredIndex(int index);
 
 private:
 	VKContext* vk_context_;
@@ -46,6 +47,7 @@ private:
 	VkSampler dummy_texture_sampler_;
 	std::shared_ptr<VulkanPipeline::Pipeline> shared_pipeline_;
 	std::vector<SplitterData> splitters_;
+	int hovered_index_;
 
 	bool createGraphicsResources();
 	void destroyGraphicsResources();

@@ -1,4 +1,5 @@
 #include "UIManager.hpp"
+#include "SplitterMouseMecanic.hpp"
 #include "../../ThreadSafeIFrameMap.hpp"
 #include "../../../Engine/VulkanScene/VKcontext.hpp"
 #include <iostream>
@@ -282,6 +283,30 @@ namespace SIMILI {
 
 			splitter_renderer_->setSplitters(splitterData);
 			splitter_renderer_->draw(commandBuffer, drawableWidth, drawableHeight);
+		}
+
+		void UIManager::enableSplitterMouseInteractions(int mouseX, int mouseY)
+		{
+			if (!splitter_renderer_ || splitter_list_.empty())
+			{
+				return;
+			}
+
+			std::vector<Splitter::SplitterData> splitterData;
+			splitterData.reserve(splitter_list_.size());
+			for (const auto& def : splitter_list_)
+			{
+				Splitter::SplitterData sd;
+				sd.x = def.x;
+				sd.y = def.y;
+				sd.width = def.width;
+				sd.height = def.height;
+				sd.isVertical = def.isVertical;
+				splitterData.push_back(sd);
+			}
+
+			splitter_mouse_mecanic_.update(splitterData, mouseX, mouseY);
+			splitter_renderer_->setHoveredIndex(splitter_mouse_mecanic_.getHoveredIndex());
 		}
 
 		void UIManager::drawFullScreenUIPanelsInsideBorders(

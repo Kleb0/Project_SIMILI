@@ -5,6 +5,7 @@
 #include "UIPanel.hpp"
 #include "PanelMapBuilder.hpp"
 #include "Splitter.hpp"
+#include "SplitterMouseMecanic.hpp"
 #include "FrameDatas/FrameDatas.hpp"
 #include <map>
 #include <string>
@@ -57,6 +58,7 @@ namespace SIMILI {
 			void drawUIPanelsInsideBorders(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild, SDL_Window* window);
 			void drawFullScreenUIPanelsInsideBorders(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild, SDL_Window* window, int referenceWindowWidth, int referenceWindowHeight);
 			void drawSplitters(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight);
+			void enableSplitterMouseInteractions(int mouseX, int mouseY);
 			void setBorders(int borderLeft, int borderTop, int borderWidth, int borderHeight);
 			void setCEFTextureForAllPanels(VkImageView view, VkSampler sampler, int cefWidth, int cefHeight);
 		
@@ -104,6 +106,7 @@ namespace SIMILI {
 
 			PanelMapBuilder panel_map_builder_;
 			std::unique_ptr<Splitter> splitter_renderer_;
+			SplitterMouseMecanic splitter_mouse_mecanic_;
 		};
 	}
 }

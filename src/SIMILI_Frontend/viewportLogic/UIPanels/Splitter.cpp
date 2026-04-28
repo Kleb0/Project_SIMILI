@@ -28,6 +28,7 @@ Splitter::Splitter()
 	, dummy_texture_view_(VK_NULL_HANDLE)
 	, dummy_texture_sampler_(VK_NULL_HANDLE)
 	, shared_pipeline_(nullptr)
+	, hovered_index_(-1)
 {
 }
 
@@ -69,6 +70,11 @@ void Splitter::shutdown()
 void Splitter::setVulkanPipelines(VulkanPipeline* pipelines)
 {
 	vulkan_pipelines_ = pipelines;
+}
+
+void Splitter::setHoveredIndex(int index)
+{
+	hovered_index_ = index;
 }
 
 void Splitter::setSplitters(const std::vector<SplitterData>& splitters)
@@ -137,6 +143,16 @@ void Splitter::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawab
 
 	for (uint32_t i = 0; i < count; ++i)
 	{
+		float color[4];
+		if (static_cast<int>(i) == hovered_index_)
+		{
+			color[0] = 0.0f; color[1] = 0.4f; color[2] = 1.0f; color[3] = 1.0f;
+		}
+		else
+		{
+			color[0] = 0.0f; color[1] = 1.0f; color[2] = 0.0f; color[3] = 1.0f;
+		}
+		vkCmdPushConstants(commandBuffer, shared_pipeline_->layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(color), color);
 		vkCmdDraw(commandBuffer, 6, 1, i * 6, 0);
 	}
 }
@@ -204,10 +220,14 @@ bool Splitter::createGraphicsResources()
 	const std::string fragmentShaderGLSL = R"(
 	#version 450
 
+	layout(push_constant) uniform PushConstants {
+		vec4 color;
+	} pc;
+
 	layout(location = 0) out vec4 outColor;
 
 	void main() {
-		outColor = vec4(0.0, 1.0, 0.0, 1.0);
+		outColor = pc.color;
 	}
 	)";
 
@@ -440,7 +460,7 @@ bool Splitter::createGraphicsResources()
 	vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
 
 	VulkanPipeline::PipelineConfig config;
-	config.name = "splitter_visual";
+	config.name = "splitter_color";
 	config.vertexShaderCode = vertShaderBytes;
 	config.fragmentShaderCode = fragShaderBytes;
 	config.renderPass = vk_render_pass_;
@@ -449,6 +469,12 @@ bool Splitter::createGraphicsResources()
 	config.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	config.vertexBindingStride = 2 * sizeof(float);
 	config.vertexAttributes = vertexAttributes;
+
+	VkPushConstantRange pushRange{};
+	pushRange.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	pushRange.offset = 0;
+	pushRange.size = sizeof(float) * 4;
+	config.pushConstantRanges = { pushRange };
 
 	shared_pipeline_ = vulkan_pipelines_->getOrCreatePipeline(config);
 	
