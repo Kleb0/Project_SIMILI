@@ -286,6 +286,53 @@ namespace SIMILI {
 			splitter_renderer_->draw(commandBuffer, drawableWidth, drawableHeight);
 		}
 
+		void UIManager::drawSplittersFullScreen(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, SDL_Window* window, int referenceWindowWidth, int referenceWindowHeight)
+		{
+			if (splitter_list_.empty() || !vk_context_ || !vulkan_pipelines_ || vk_render_pass_ == VK_NULL_HANDLE)
+			{
+				return;
+			}
+
+			if (referenceWindowWidth <= 0 || referenceWindowHeight <= 0 || !window)
+			{
+				return;
+			}
+
+			int currentLogicalW = 0, currentLogicalH = 0;
+			SDL_GetWindowSize(window, &currentLogicalW, &currentLogicalH);
+			if (currentLogicalW <= 0 || currentLogicalH <= 0)
+			{
+				return;
+			}
+
+			float scaleX = static_cast<float>(currentLogicalW) / static_cast<float>(referenceWindowWidth);
+			float scaleY = static_cast<float>(currentLogicalH) / static_cast<float>(referenceWindowHeight);
+
+			if (!splitter_renderer_)
+			{
+				splitter_renderer_ = std::make_unique<Splitter>();
+				splitter_renderer_->setVulkanPipelines(vulkan_pipelines_);
+				splitter_renderer_->setSplitterMouseMecanic(&splitter_mouse_mecanic_);
+				splitter_renderer_->initialize(vk_context_, vk_render_pass_);
+			}
+
+			std::vector<Splitter::SplitterData> splitterData;
+			splitterData.reserve(splitter_list_.size());
+			for (const auto& def : splitter_list_)
+			{
+				Splitter::SplitterData sd;
+				sd.x      = static_cast<int>(std::round(def.x      * scaleX));
+				sd.y      = static_cast<int>(std::round(def.y      * scaleY));
+				sd.width  = static_cast<int>(std::round(def.width  * scaleX));
+				sd.height = static_cast<int>(std::round(def.height * scaleY));
+				sd.isVertical = def.isVertical;
+				splitterData.push_back(sd);
+			}
+
+			splitter_renderer_->setSplitters(splitterData);
+			splitter_renderer_->draw(commandBuffer, drawableWidth, drawableHeight);
+		}
+
 		void UIManager::enableSplitterMouseInteractions(int mouseX, int mouseY)
 		{
 			if (!splitter_renderer_ || splitter_list_.empty())

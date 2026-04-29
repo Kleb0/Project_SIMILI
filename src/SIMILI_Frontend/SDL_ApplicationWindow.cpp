@@ -1013,20 +1013,14 @@ void SDL_ApplicationWindow::renderFrame()
 			ui_manager_->drawUIPanelsInsideBorders(commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
 			prepared_panel_frame_data_map_, prepared_skip_texture_rebuild_, window_);
 
-			if (ui_manager_)
-			{
-				float mouseXf = 0.0f, mouseYf = 0.0f;
-				SDL_GetMouseState(&mouseXf, &mouseYf);
-				ui_manager_->enableSplitterMouseInteractions(static_cast<int>(mouseXf), static_cast<int>(mouseYf));
-			}
 
 			ui_manager_->drawSplitters(commandBuffer, prepared_drawable_width_, prepared_drawable_height_);
 		}
 
-		if (debug_tools_)
-		{
-			debug_tools_->drawDebugTools(commandBuffer, width, height);
-		}
+		// if (debug_tools_)
+		// {
+		// 	debug_tools_->drawDebugTools(commandBuffer, width, height);
+		// }
 	}
 
 	// ------ when state is Maximized for SDL3 window
@@ -1041,18 +1035,44 @@ void SDL_ApplicationWindow::renderFrame()
 
 		if (ui_manager_ && app_border_)
 		{
-			ui_manager_->drawFullScreenUIPanelsInsideBorders(
-				commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
+			ui_manager_->drawFullScreenUIPanelsInsideBorders(commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
 				prepared_panel_frame_data_map_, prepared_skip_texture_rebuild_, window_,
 				app_border_->getReferenceWindowWidth(), app_border_->getReferenceWindowHeight());
+
+			ui_manager_->drawSplittersFullScreen(commandBuffer,prepared_drawable_width_, prepared_drawable_height_,
+				window_, app_border_->getReferenceWindowWidth(), app_border_->getReferenceWindowHeight());
 		}
 
-		if (debug_tools_)
-		{
-			debug_tools_->drawDebugTools(commandBuffer, width, height);
-		}
 	}
 	// For Reduced and Updating states, we just cleared to black in renderPassViewportAndScissorSetup()
+
+
+	// functionnalities that dosn't depend on window_state 
+	if (debug_tools_)
+	{
+		debug_tools_->drawDebugTools(commandBuffer, width, height);
+	}
+
+	if (ui_manager_)
+	{
+		float mouseXf = 0.0f, mouseYf = 0.0f;
+		SDL_GetMouseState(&mouseXf, &mouseYf);
+
+		if (window_state_ == WindowRenderState::Maximized && app_border_)
+		{
+			int currentW = 0, currentH = 0;
+			SDL_GetWindowSize(window_, &currentW, &currentH);
+			int refW = app_border_->getReferenceWindowWidth();
+			int refH = app_border_->getReferenceWindowHeight();
+			if (currentW > 0 && currentH > 0 && refW > 0 && refH > 0)
+			{
+				mouseXf = mouseXf * static_cast<float>(refW) / static_cast<float>(currentW);
+				mouseYf = mouseYf * static_cast<float>(refH) / static_cast<float>(currentH);
+			}
+		}
+
+		ui_manager_->enableSplitterMouseInteractions(static_cast<int>(mouseXf), static_cast<int>(mouseYf));
+	}
 
 	finalizeAndSubmitCommandBuffer(commandBuffer); 
 
