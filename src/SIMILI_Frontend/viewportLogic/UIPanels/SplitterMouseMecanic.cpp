@@ -77,18 +77,67 @@ void SplitterMouseMecanic::dragSplitter(std::vector<Splitter::SplitterData>& spl
 	const int dx = mouseX - prev_mouse_x_;
 	const int dy = mouseY - prev_mouse_y_;
 
+	const int STOP_MARGIN = 5;
+	int clampedDx = dx;
+	int clampedDy = dy;
+
+	const auto& s_ref = splitters[dragged_index_];
+	for (int i = 0; i < static_cast<int>(splitters.size()); ++i)
+	{
+		if (i == dragged_index_) continue;
+		const auto& other = splitters[i];
+		if (s_ref.isVertical != other.isVertical) continue;
+
+		if (s_ref.isVertical)
+		{
+			const bool yOverlap = (s_ref.y < other.y + other.height) && (s_ref.y + s_ref.height > other.y);
+			if (!yOverlap) continue;
+
+			if (clampedDx > 0)
+			{
+				const int gap = other.x - (s_ref.x + s_ref.width);
+				if (gap >= 0 && gap - clampedDx < STOP_MARGIN)
+					clampedDx = std::max(0, gap - STOP_MARGIN);
+			}
+			else if (clampedDx < 0)
+			{
+				const int gap = s_ref.x - (other.x + other.width);
+				if (gap >= 0 && gap + clampedDx < STOP_MARGIN)
+					clampedDx = std::min(0, -(gap - STOP_MARGIN));
+			}
+		}
+		else
+		{
+			const bool xOverlap = (s_ref.x < other.x + other.width) && (s_ref.x + s_ref.width > other.x);
+			if (!xOverlap) continue;
+
+			if (clampedDy > 0)
+			{
+				const int gap = other.y - (s_ref.y + s_ref.height);
+				if (gap >= 0 && gap - clampedDy < STOP_MARGIN)
+					clampedDy = std::max(0, gap - STOP_MARGIN);
+			}
+			else if (clampedDy < 0)
+			{
+				const int gap = s_ref.y - (other.y + other.height);
+				if (gap >= 0 && gap + clampedDy < STOP_MARGIN)
+					clampedDy = std::min(0, -(gap - STOP_MARGIN));
+			}
+		}
+	}
+
 	auto& s = splitters[dragged_index_];
 
 	if (s.isVertical)
 	{
-		s.x += dx;
+		s.x += clampedDx;
 	}
 	else if (s.isHorizontal)
 	{
-		s.y += dy;
+		s.y += clampedDy;
 	}
 
-	dragBindedSplitters(splitters, dragged_index_, dx, dy);
+	dragBindedSplitters(splitters, dragged_index_, clampedDx, clampedDy);
 
 	prev_mouse_x_ = mouseX;
 	prev_mouse_y_ = mouseY;

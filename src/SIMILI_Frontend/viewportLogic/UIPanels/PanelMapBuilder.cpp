@@ -872,13 +872,16 @@ namespace SIMILI {
 
 					const bool xOverlap = (V.x <= H.x + H.width + ATTACH_TOLERANCE) &&
 					                      (V.x + V.width >= H.x - ATTACH_TOLERANCE);
-					if (!xOverlap)
-						continue;
 
-					const bool atVTop    = std::abs(H.y - V.y) <= ATTACH_TOLERANCE;
-					const bool atVBottom = std::abs(H.y - (V.y + V.height)) <= ATTACH_TOLERANCE;
+					const bool atVTop    = xOverlap && std::abs(H.y - V.y) <= ATTACH_TOLERANCE;
+					const bool atVBottom = xOverlap && std::abs(H.y - (V.y + V.height)) <= ATTACH_TOLERANCE;
 
-					if (atVTop || atVBottom)
+					const bool vInHYRange = (V.y <= H.y + ATTACH_TOLERANCE) &&
+					                        (V.y + V.height >= H.y - ATTACH_TOLERANCE);
+					const bool atHLeft  = vInHYRange && std::abs(V.x - H.x) <= ATTACH_TOLERANCE;
+					const bool atHRight = vInHYRange && std::abs(V.x - (H.x + H.width)) <= ATTACH_TOLERANCE;
+
+					if (atVTop || atVBottom || atHLeft || atHRight)
 					{
 						map_data_.splitterAttachments[vi].push_back(hi);
 						map_data_.splitterAttachments[hi].push_back(vi);
