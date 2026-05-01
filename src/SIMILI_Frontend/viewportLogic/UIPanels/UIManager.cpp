@@ -279,6 +279,7 @@ namespace SIMILI {
 				sd.width = def.width;
 				sd.height = def.height;
 				sd.isVertical = def.isVertical;
+				sd.isHorizontal = def.isHorizontal;
 				splitterData.push_back(sd);
 			}
 
@@ -326,6 +327,7 @@ namespace SIMILI {
 				sd.width  = static_cast<int>(std::round(def.width  * scaleX));
 				sd.height = static_cast<int>(std::round(def.height * scaleY));
 				sd.isVertical = def.isVertical;
+				sd.isHorizontal = def.isHorizontal;
 				splitterData.push_back(sd);
 			}
 
@@ -333,8 +335,10 @@ namespace SIMILI {
 			splitter_renderer_->draw(commandBuffer, drawableWidth, drawableHeight);
 		}
 
-		void UIManager::enableSplitterMouseInteractions(int mouseX, int mouseY)
+		void UIManager::enableSplitterMouseInteractions(int mouseX, int mouseY, bool isLeftButtonDown)
 		{
+			// ------------ push color based on mouse postion for splitters
+
 			if (!splitter_renderer_ || splitter_list_.empty())
 			{
 				return;
@@ -342,6 +346,7 @@ namespace SIMILI {
 
 			std::vector<Splitter::SplitterData> splitterData;
 			splitterData.reserve(splitter_list_.size());
+
 			for (const auto& def : splitter_list_)
 			{
 				Splitter::SplitterData sd;
@@ -350,11 +355,45 @@ namespace SIMILI {
 				sd.width = def.width;
 				sd.height = def.height;
 				sd.isVertical = def.isVertical;
+				sd.isHorizontal = def.isHorizontal;
 				splitterData.push_back(sd);
 			}
 
 			splitter_mouse_mecanic_.update(splitterData, mouseX, mouseY);
 			splitter_renderer_->setHoveredIndex(splitter_mouse_mecanic_.getHoveredIndex());
+
+			dragSplitter(mouseX, mouseY, isLeftButtonDown);
+		}
+
+		void UIManager::dragSplitter(int mouseX, int mouseY, bool isLeftButtonDown)
+		{
+			if (!splitter_renderer_ || splitter_list_.empty())
+			{
+				return;
+			}
+
+			std::vector<Splitter::SplitterData> splitterData;
+			splitterData.reserve(splitter_list_.size());
+
+			for (const auto& def : splitter_list_)
+			{
+				Splitter::SplitterData sd;
+				sd.x = def.x;
+				sd.y = def.y;
+				sd.width = def.width;
+				sd.height = def.height;
+				sd.isVertical = def.isVertical;
+				sd.isHorizontal = def.isHorizontal;
+				splitterData.push_back(sd);
+			}
+
+			splitter_mouse_mecanic_.dragSplitter(splitterData, mouseX, mouseY, isLeftButtonDown);
+
+			for (std::size_t i = 0; i < splitter_list_.size() && i < splitterData.size(); ++i)
+			{
+				splitter_list_[i].x = splitterData[i].x;
+				splitter_list_[i].y = splitterData[i].y;
+			}
 		}
 
 		void UIManager::drawFullScreenUIPanelsInsideBorders(
@@ -364,6 +403,7 @@ namespace SIMILI {
 			bool skipTextureRebuild, SDL_Window* window,
 			int referenceWindowWidth, int referenceWindowHeight)
 		{
+
 			if (referenceWindowWidth <= 0 || referenceWindowHeight <= 0 || !window)
 			{
 				return;
@@ -371,6 +411,7 @@ namespace SIMILI {
 
 			int currentLogicalW = 0, currentLogicalH = 0;
 			SDL_GetWindowSize(window, &currentLogicalW, &currentLogicalH);
+
 			if (currentLogicalW <= 0 || currentLogicalH <= 0)
 			{
 				return;
@@ -381,6 +422,7 @@ namespace SIMILI {
 
 			const std::map<std::string, IFrameScreenData>* sourceMap = &panelFrameDataMap;
 			std::map<std::string, IFrameScreenData> fallbackSource;
+
 			if (panelFrameDataMap.empty())
 			{
 				std::lock_guard<std::mutex> lock(ui_panel_mutex_);
@@ -389,6 +431,7 @@ namespace SIMILI {
 			}
 
 			std::map<std::string, IFrameScreenData> scaledFrameDataMap;
+
 			for (const auto& pair : *sourceMap)
 			{
 				IFrameScreenData scaled = pair.second;

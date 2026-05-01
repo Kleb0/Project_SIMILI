@@ -476,6 +476,7 @@ namespace SIMILI {
 				def.width = sc.width;
 				def.height = sc.height;
 				def.isVertical = sc.isVertical;
+				def.isHorizontal = sc.isHorizontal;
 				splitterList.push_back(def);
 			}
 
@@ -722,6 +723,13 @@ namespace SIMILI {
 					const int sw = isVertical ? SPLITTER_THICKNESS : src.width;
 					const int sh = isVertical ? src.height : SPLITTER_THICKNESS;
 
+					// Double check : geometry must agree with ray direction
+					// A vertical splitter has height > width, horizontal has width > height
+					if (isVertical != (sh > sw))
+					{
+						continue;
+					}
+
 					auto it = candidateMap.find(dedupKey);
 					if (it == candidateMap.end())
 					{
@@ -731,6 +739,7 @@ namespace SIMILI {
 						candidate.width = sw;
 						candidate.height = sh;
 						candidate.isVertical = isVertical;
+						candidate.isHorizontal = !isVertical;
 						candidate.assignedPanels.push_back(panelName);
 						if (hit.hitType == RayHitType::Panel && !hit.hitPanelName.empty())
 						{

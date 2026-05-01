@@ -28,6 +28,7 @@ namespace SIMILI
 			int width;
 			int height;
 			bool isVertical;
+			bool isHorizontal;
 		};
 
 		enum class PanelLayoutType
@@ -65,6 +66,7 @@ namespace SIMILI
 			int width;
 			int height;
 			bool isVertical;
+			bool isHorizontal;
 			std::vector<std::string> assignedPanels;
 		};
 

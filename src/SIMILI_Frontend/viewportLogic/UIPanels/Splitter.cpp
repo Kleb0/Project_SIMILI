@@ -148,10 +148,13 @@ void Splitter::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawab
 	VkDeviceSize offsets[] = {0};
 	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vk_vertex_buffer_, offsets);
 
+	// ----------------------- here we change the color for hovered splitter
 	for (uint32_t i = 0; i < count; ++i)
 	{
 		float color[4];
-		if (splitter_mouse_mecanic_ && static_cast<int>(i) == hovered_index_)
+		const bool isActive = splitter_mouse_mecanic_ &&
+			(static_cast<int>(i) == hovered_index_ || static_cast<int>(i) == splitter_mouse_mecanic_->getDraggedIndex());
+		if (isActive)
 		{
 			SplitterMouseMecanic::Color c = splitter_mouse_mecanic_->getHoverColor();
 			color[0] = c.r; color[1] = c.g; color[2] = c.b; color[3] = c.a;

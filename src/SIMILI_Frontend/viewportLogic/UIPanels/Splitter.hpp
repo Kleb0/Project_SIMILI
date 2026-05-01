@@ -20,6 +20,7 @@ public:
 		int width;
 		int height;
 		bool isVertical;
+		bool isHorizontal;
 	};
 
 	Splitter();

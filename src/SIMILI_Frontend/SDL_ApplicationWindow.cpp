@@ -1056,7 +1056,9 @@ void SDL_ApplicationWindow::renderFrame()
 	if (ui_manager_)
 	{
 		float mouseXf = 0.0f, mouseYf = 0.0f;
-		SDL_GetMouseState(&mouseXf, &mouseYf);
+
+		SDL_MouseButtonFlags mouseButtons = SDL_GetMouseState(&mouseXf, &mouseYf);
+		const bool isLeftButtonDown = (mouseButtons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
 
 		if (window_state_ == WindowRenderState::Maximized && app_border_)
 		{
@@ -1071,7 +1073,7 @@ void SDL_ApplicationWindow::renderFrame()
 			}
 		}
 
-		ui_manager_->enableSplitterMouseInteractions(static_cast<int>(mouseXf), static_cast<int>(mouseYf));
+		ui_manager_->enableSplitterMouseInteractions(static_cast<int>(mouseXf), static_cast<int>(mouseYf), isLeftButtonDown);
 	}
 
 	finalizeAndSubmitCommandBuffer(commandBuffer); 
