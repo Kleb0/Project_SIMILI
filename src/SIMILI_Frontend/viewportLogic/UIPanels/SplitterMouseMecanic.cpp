@@ -1,4 +1,5 @@
 #include "SplitterMouseMecanic.hpp"
+#include <cmath>
 
 SplitterMouseMecanic::SplitterMouseMecanic()
 	: hovered_index_(-1)
@@ -87,6 +88,61 @@ void SplitterMouseMecanic::dragSplitter(std::vector<Splitter::SplitterData>& spl
 		s.y += dy;
 	}
 
+	dragBindedSplitters(splitters, dragged_index_, dx, dy);
+
 	prev_mouse_x_ = mouseX;
 	prev_mouse_y_ = mouseY;
+}
+
+void SplitterMouseMecanic::setAttachments(const std::vector<std::vector<int>>& attachments)
+{
+	attachments_ = attachments;
+}
+
+void SplitterMouseMecanic::dragBindedSplitters(std::vector<Splitter::SplitterData>& splitters, int draggedIndex, int dx, int dy)
+{
+	if (draggedIndex < 0 || draggedIndex >= static_cast<int>(attachments_.size()))
+	{
+		return;
+	}
+
+	const int ATTACH_TOLERANCE = 15;
+	const auto& dragged = splitters[draggedIndex];
+	const int originalY = dragged.y - dy;
+	const int originalX = dragged.x - dx;
+
+	for (int attachedIdx : attachments_[draggedIndex])
+	{
+		if (attachedIdx < 0 || attachedIdx >= static_cast<int>(splitters.size()))
+		{
+			continue;
+		}
+
+		auto& attached = splitters[attachedIdx];
+
+		if (dragged.isHorizontal && attached.isVertical)
+		{
+			if (std::abs(attached.y - originalY) <= ATTACH_TOLERANCE)
+			{
+				attached.y += dy;
+				attached.height -= dy;
+			}
+			else if (std::abs((attached.y + attached.height) - originalY) <= ATTACH_TOLERANCE)
+			{
+				attached.height += dy;
+			}
+		}
+		else if (dragged.isVertical && attached.isHorizontal)
+		{
+			if (std::abs(attached.x - originalX) <= ATTACH_TOLERANCE)
+			{
+				attached.x += dx;
+				attached.width -= dx;
+			}
+			else if (std::abs((attached.x + attached.width) - originalX) <= ATTACH_TOLERANCE)
+			{
+				attached.width += dx;
+			}
+		}
+	}
 }

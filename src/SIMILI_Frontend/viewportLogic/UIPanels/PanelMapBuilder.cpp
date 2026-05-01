@@ -336,6 +336,7 @@ namespace SIMILI {
 			panels.clear();
 			splitters.clear();
 			splitterCandidates.clear();
+			splitterAttachments.clear();
 		}
 
 		void PanelMapBuilder::buildMapData(
@@ -466,6 +467,7 @@ namespace SIMILI {
 			}
 
 			buildSplittersFromRays(frameDataMap);
+			attachedSplittersAtCreation();
 
 			splitterList.clear();
 			for (const auto& sc : map_data_.splitterCandidates)
@@ -843,6 +845,46 @@ namespace SIMILI {
 
 			for (auto& cand : allCandidates)
 				map_data_.splitterCandidates.push_back(cand);
+		}
+
+		void PanelMapBuilder::attachedSplittersAtCreation()
+		{
+			const int ATTACH_TOLERANCE = 15;
+			const auto& candidates = map_data_.splitterCandidates;
+			const int n = static_cast<int>(candidates.size());
+
+			map_data_.splitterAttachments.assign(n, std::vector<int>());
+
+			for (int i = 0; i < n; ++i)
+			{
+				for (int j = i + 1; j < n; ++j)
+				{
+					const auto& a = candidates[i];
+					const auto& b = candidates[j];
+
+					if (a.isVertical == b.isVertical)
+						continue;
+
+					const SplitterCandidate& V = a.isVertical ? a : b;
+					const SplitterCandidate& H = a.isVertical ? b : a;
+					const int vi = a.isVertical ? i : j;
+					const int hi = a.isVertical ? j : i;
+
+					const bool xOverlap = (V.x <= H.x + H.width + ATTACH_TOLERANCE) &&
+					                      (V.x + V.width >= H.x - ATTACH_TOLERANCE);
+					if (!xOverlap)
+						continue;
+
+					const bool atVTop    = std::abs(H.y - V.y) <= ATTACH_TOLERANCE;
+					const bool atVBottom = std::abs(H.y - (V.y + V.height)) <= ATTACH_TOLERANCE;
+
+					if (atVTop || atVBottom)
+					{
+						map_data_.splitterAttachments[vi].push_back(hi);
+						map_data_.splitterAttachments[hi].push_back(vi);
+					}
+				}
+			}
 		}
 
 	}

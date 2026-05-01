@@ -200,7 +200,7 @@ namespace SIMILI {
 					splitter_list_,
 					last_window_width_, last_window_height_,
 					sdlWindow);
-			}
+				splitter_mouse_mecanic_.setAttachments(panel_map_builder_.getMapData().splitterAttachments);			}
 		}
 
 		void UIManager::setBorders(int borderLeft, int borderTop, int borderWidth, int borderHeight)
@@ -393,6 +393,8 @@ namespace SIMILI {
 			{
 				splitter_list_[i].x = splitterData[i].x;
 				splitter_list_[i].y = splitterData[i].y;
+				splitter_list_[i].width = splitterData[i].width;
+				splitter_list_[i].height = splitterData[i].height;
 			}
 		}
 

@@ -55,8 +55,8 @@ namespace SIMILI
 		struct RayCastResult
 		{
 			RayDirection direction;
-			RayHitType   hitType;
-			std::string  hitPanelName;
+			RayHitType hitType;
+			std::string hitPanelName;
 		};
 
 		struct SplitterCandidate
@@ -82,8 +82,9 @@ namespace SIMILI
 		struct MapData
 		{
 			std::map<std::string, PanelMapEntry>  panels;
-			std::vector<SplitterDefinition>       splitters;
-			std::vector<SplitterCandidate>        splitterCandidates;
+			std::vector<SplitterDefinition> splitters;
+			std::vector<SplitterCandidate> splitterCandidates;
+			std::vector<std::vector<int>> splitterAttachments;
 
 			void clear();
 		};
@@ -134,6 +135,8 @@ namespace SIMILI
 				const MapData& getMapData() const;
 
 			private:
+
+				void attachedSplittersAtCreation();
 
 				void createViewportPanel(std::map<std::string, PanelState>& panelStateMap,
 				int currentWindowWidth, int currentWindowHeight);
