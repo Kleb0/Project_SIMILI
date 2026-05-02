@@ -460,6 +460,11 @@ namespace SIMILI {
 				borderLeft, borderTop, borderWidth, borderHeight);
 		}
 
+		const WorkSpace& UIManager::getWorkSpace() const
+		{
+			return panel_map_builder_.getWorkSpace();
+		}
+
 		void UIManager::clearUIPanels()
 		{
 			std::lock_guard<std::mutex> lock(ui_panel_mutex_);

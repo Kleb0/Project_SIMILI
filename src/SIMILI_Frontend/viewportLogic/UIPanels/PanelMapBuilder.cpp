@@ -375,7 +375,7 @@ namespace SIMILI {
 				float widthRatio = static_cast<float>(fd.width) / static_cast<float>(currentWindowWidth);
 
 				SortEntry entry;
-				entry.key  = pair.first;
+				entry.key = pair.first;
 				entry.data = &fd;
 
 				if (widthRatio >= fullWidthThreshold)
@@ -409,18 +409,18 @@ namespace SIMILI {
 			for (const auto& entry : rowPanels)
 			{
 				PanelMapEntry mapEntry;
-				mapEntry.name       = entry.key;
-				mapEntry.index      = nextIndex;
+				mapEntry.name = entry.key;
+				mapEntry.index = nextIndex;
 				mapEntry.layoutType = PanelLayoutType::Row;
-				mapEntry.column     = 0;
-				mapEntry.row        = nextIndex;
+				mapEntry.column = 0;
+				mapEntry.row = nextIndex;
 				map_data_.panels[entry.key] = mapEntry;
 				++nextIndex;
 			}
 
 			int currentColumn = 0;
-			int prevX         = -1;
-			int rowInColumn   = 0;
+			int prevX = -1;
+			int rowInColumn  = 0;
 
 			for (const auto& entry : columnPanels)
 			{
@@ -468,6 +468,7 @@ namespace SIMILI {
 
 			buildSplittersFromRays(frameDataMap);
 			attachedSplittersAtCreation();
+			buildWorkSpace(frameDataMap);
 
 			splitterList.clear();
 			for (const auto& sc : map_data_.splitterCandidates)
@@ -845,6 +846,41 @@ namespace SIMILI {
 
 			for (auto& cand : allCandidates)
 				map_data_.splitterCandidates.push_back(cand);
+		}
+
+		void PanelMapBuilder::buildWorkSpace(
+			const std::map<std::string, IFrameScreenData>& frameDataMap)
+		{
+			const int BORDER_OFFSET = 3;
+			const int SPLITTER_THICKNESS = 10;
+
+			int windowWidth = 0;
+			int windowHeight = 0;
+			for (const auto& p : frameDataMap)
+			{
+				if (p.second.windowWidth  > 0) windowWidth  = p.second.windowWidth;
+				if (p.second.windowHeight > 0) windowHeight = p.second.windowHeight;
+				if (windowWidth > 0 && windowHeight > 0) break;
+			}
+
+			if (windowWidth <= 0 || windowHeight <= 0)
+				return;
+
+			const int borderLeft   = BORDER_OFFSET;
+			const int borderTop    = BORDER_OFFSET;
+			const int borderRight  = windowWidth  - BORDER_OFFSET;
+			const int borderBottom = windowHeight - BORDER_OFFSET;
+
+			workspace_.computeFromPanels(
+				frameDataMap,
+				borderLeft, borderTop,
+				borderRight - borderLeft, borderBottom - borderTop,
+				SPLITTER_THICKNESS);
+		}
+
+		const WorkSpace& PanelMapBuilder::getWorkSpace() const
+		{
+			return workspace_;
 		}
 
 		void PanelMapBuilder::attachedSplittersAtCreation()

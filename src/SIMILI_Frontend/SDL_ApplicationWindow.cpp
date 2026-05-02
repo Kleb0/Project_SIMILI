@@ -1017,10 +1017,10 @@ void SDL_ApplicationWindow::renderFrame()
 			ui_manager_->drawSplitters(commandBuffer, prepared_drawable_width_, prepared_drawable_height_);
 		}
 
-		// if (debug_tools_)
-		// {
-		// 	debug_tools_->drawDebugTools(commandBuffer, width, height);
-		// }
+		if (debug_tools_ && ui_manager_)
+		{
+			debug_tools_->drawDebugTools(commandBuffer, width, height, &ui_manager_->getWorkSpace());
+		}
 	}
 
 	// ------ when state is Maximized for SDL3 window
@@ -1048,9 +1048,9 @@ void SDL_ApplicationWindow::renderFrame()
 
 
 	// functionnalities that dosn't depend on window_state 
-	if (debug_tools_)
+	if (debug_tools_ && ui_manager_)
 	{
-		debug_tools_->drawDebugTools(commandBuffer, width, height);
+		debug_tools_->drawDebugTools(commandBuffer, width, height, &ui_manager_->getWorkSpace());
 	}
 
 	if (ui_manager_)

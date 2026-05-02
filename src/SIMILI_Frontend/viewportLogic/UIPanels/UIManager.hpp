@@ -68,6 +68,7 @@ namespace SIMILI {
 
 			std::map<std::string, IFrameData> getUIPanelIFrames() const;
 			std::map<std::string, IFrameScreenData> getUIPanelFrameDatas() const;
+			const WorkSpace& getWorkSpace() const;
 		
 		private:
 			UIState current_state_;

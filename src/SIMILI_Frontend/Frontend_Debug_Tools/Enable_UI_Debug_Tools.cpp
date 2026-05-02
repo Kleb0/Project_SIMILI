@@ -1,6 +1,8 @@
 #include "Enable_UI_Debug_Tools.hpp"
 #include "Border_DebugRectangle.hpp"
+#include "Border_DebugWorkSpace.hpp"
 #include "../App_Border.hpp"
+#include "../viewportLogic/UIPanels/WorkSpace.hpp"
 #include "../../Engine/VulkanScene/VKcontext.hpp"
 #include "../../Engine/VulkanPipeline/VulkanPipeline.hpp"
 #include <iostream>
@@ -11,6 +13,7 @@ Enable_UI_Debug_Tools::Enable_UI_Debug_Tools()
 	, vulkan_pipelines_(nullptr)
 	, app_border_(nullptr)
 	, border_debug_rectangle_(nullptr)
+	, border_debug_workspace_(nullptr)
 	, debug_enabled_(true)
 	, initialized_(false)
 {
@@ -69,6 +72,12 @@ void Enable_UI_Debug_Tools::shutdown()
 		border_debug_rectangle_ = nullptr;
 	}
 
+	if (border_debug_workspace_)
+	{
+		delete border_debug_workspace_;
+		border_debug_workspace_ = nullptr;
+	}
+
 	initialized_ = false;
 }
 
@@ -98,6 +107,23 @@ void Enable_UI_Debug_Tools::activateDebugRender()
 		}
 	}
 
+	if (!border_debug_workspace_ && vk_context_ && vk_render_pass_ != VK_NULL_HANDLE && vulkan_pipelines_)
+	{
+		border_debug_workspace_ = new Border_DebugWorkSpace();
+		border_debug_workspace_->setVulkanPipelines(vulkan_pipelines_);
+
+		if (border_debug_workspace_->initialize(vk_context_, vk_render_pass_))
+		{
+			std::cout << "[Enable_UI_Debug_Tools] Border_DebugWorkSpace initialized in activateDebugRender()" << std::endl;
+		}
+		else
+		{
+			std::cerr << "[Enable_UI_Debug_Tools] Failed to initialize Border_DebugWorkSpace in activateDebugRender()" << std::endl;
+			delete border_debug_workspace_;
+			border_debug_workspace_ = nullptr;
+		}
+	}
+
 	if (app_border_ && !app_border_->isDebugLineEnabled())
 	{
 		app_border_->enableDebugLine(true);
@@ -105,7 +131,7 @@ void Enable_UI_Debug_Tools::activateDebugRender()
 	}
 }
 
-void Enable_UI_Debug_Tools::drawDebugTools(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight)
+void Enable_UI_Debug_Tools::drawDebugTools(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const SIMILI::Frontend::WorkSpace* workspace)
 {
 	if (!initialized_ || !debug_enabled_)
 	{
@@ -115,6 +141,11 @@ void Enable_UI_Debug_Tools::drawDebugTools(VkCommandBuffer commandBuffer, int dr
 	if (border_debug_rectangle_ && app_border_)
 	{
 		border_debug_rectangle_->draw(commandBuffer, drawableWidth, drawableHeight, app_border_);
+	}
+
+	if (border_debug_workspace_ && workspace && workspace->isValid())
+	{
+		border_debug_workspace_->draw(commandBuffer, drawableWidth, drawableHeight, workspace);
 	}
 }
 

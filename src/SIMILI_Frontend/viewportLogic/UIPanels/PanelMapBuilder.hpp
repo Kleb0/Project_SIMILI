@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../FrameDatas/FrameDatas.hpp"
+#include "WorkSpace.hpp"
 #include <SDL3/SDL.h>
 #include <map>
 #include <string>
@@ -102,12 +103,6 @@ namespace SIMILI
 					int& lastWindowWidth,int& lastWindowHeight,
 					SDL_Window* window = nullptr);
 
-				//void rebuildFromSource(
-				//	const std::map<std::string, IFrameScreenData>& frameDataMap,
-				//	int currentWindowWidth,int currentWindowHeight,
-				//	std::map<std::string, PanelState>& panelStateMap,
-				//	int& lastWindowWidth, int& lastWindowHeight	);
-
 				void scaleLayoutToWindow(
 					int newWindowWidth,int newWindowHeight,
 					std::map<std::string, PanelState>& panelStateMap,
@@ -134,6 +129,8 @@ namespace SIMILI
 
 				const MapData& getMapData() const;
 
+				const WorkSpace& getWorkSpace() const;
+
 			private:
 
 				void attachedSplittersAtCreation();
@@ -147,6 +144,9 @@ namespace SIMILI
 				void buildSplittersFromRays(
 					const std::map<std::string, IFrameScreenData>& frameDataMap);
 
+				void buildWorkSpace(
+					const std::map<std::string, IFrameScreenData>& frameDataMap);
+
 				RayCastResult castRay(
 					const std::string& sourceName,
 					const IFrameScreenData& source,
@@ -155,6 +155,7 @@ namespace SIMILI
 					int borderLeft, int borderTop, int borderRight, int borderBottom) const;
 
 				MapData map_data_;
+			WorkSpace workspace_;
 		};
 	}
 }
