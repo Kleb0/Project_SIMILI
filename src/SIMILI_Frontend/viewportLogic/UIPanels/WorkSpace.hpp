@@ -19,6 +19,8 @@ namespace SIMILI {
 				int workSpaceBorderWidth, int workSpaceBorderHeight,
 				int splitterThickness = 0);
 
+			void set(int x, int y, int width, int height);
+
 			int getX() const;
 			int getY() const;
 			int getWidth() const;

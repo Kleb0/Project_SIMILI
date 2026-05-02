@@ -1028,7 +1028,6 @@ void SDL_ApplicationWindow::renderFrame()
 	{
 		activateDebugRender();
 
-		// drawCEF();
 		drawThreeDScreen();
 
 		preparePanels();
@@ -1074,6 +1073,7 @@ void SDL_ApplicationWindow::renderFrame()
 		}
 
 		ui_manager_->enableSplitterMouseInteractions(static_cast<int>(mouseXf), static_cast<int>(mouseYf), isLeftButtonDown);
+		ui_manager_->bindWorkSpaceSizeToSplitterInteractions();
 	}
 
 	finalizeAndSubmitCommandBuffer(commandBuffer); 

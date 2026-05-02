@@ -61,6 +61,7 @@ namespace SIMILI {
 			void drawSplittersFullScreen(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, SDL_Window* window, int referenceWindowWidth, int referenceWindowHeight);
 			void enableSplitterMouseInteractions(int mouseX, int mouseY, bool isLeftButtonDown = false);
 			void dragSplitter(int mouseX, int mouseY, bool isLeftButtonDown);
+			void bindWorkSpaceSizeToSplitterInteractions();
 			void setBorders(int borderLeft, int borderTop, int borderWidth, int borderHeight);
 			void setCEFTextureForAllPanels(VkImageView view, VkSampler sampler, int cefWidth, int cefHeight);
 		

@@ -80,12 +80,22 @@ namespace SIMILI
 			int row;
 		};
 
+		enum class SplitterBoundaryRole
+		{
+			None,
+			WorkspaceLeft,
+			WorkspaceRight,
+			WorkspaceTop,
+			WorkspaceBottom
+		};
+
 		struct MapData
 		{
 			std::map<std::string, PanelMapEntry>  panels;
 			std::vector<SplitterDefinition> splitters;
 			std::vector<SplitterCandidate> splitterCandidates;
 			std::vector<std::vector<int>> splitterAttachments;
+			std::vector<SplitterBoundaryRole> splitterBoundaryRoles;
 
 			void clear();
 		};
@@ -131,6 +141,8 @@ namespace SIMILI
 
 				const WorkSpace& getWorkSpace() const;
 
+				void updateWorkSpaceFromSplitters(const std::vector<SplitterDefinition>& splitterList, int windowWidth, int windowHeight);
+
 			private:
 
 				void attachedSplittersAtCreation();
@@ -155,7 +167,7 @@ namespace SIMILI
 					int borderLeft, int borderTop, int borderRight, int borderBottom) const;
 
 				MapData map_data_;
-			WorkSpace workspace_;
+				WorkSpace workspace_;
 		};
 	}
 }

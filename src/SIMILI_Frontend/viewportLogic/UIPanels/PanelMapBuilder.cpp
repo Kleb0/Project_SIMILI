@@ -337,6 +337,7 @@ namespace SIMILI {
 			splitters.clear();
 			splitterCandidates.clear();
 			splitterAttachments.clear();
+			splitterBoundaryRoles.clear();
 		}
 
 		void PanelMapBuilder::buildMapData(
@@ -436,11 +437,11 @@ namespace SIMILI {
 				}
 
 				PanelMapEntry mapEntry;
-				mapEntry.name       = entry.key;
-				mapEntry.index      = nextIndex;
+				mapEntry.name = entry.key;
+				mapEntry.index = nextIndex;
 				mapEntry.layoutType = PanelLayoutType::Column;
-				mapEntry.column     = currentColumn;
-				mapEntry.row        = rowInColumn;
+				mapEntry.column = currentColumn;
+				mapEntry.row = rowInColumn;
 				map_data_.panels[entry.key] = mapEntry;
 				++nextIndex;
 			}
@@ -848,6 +849,49 @@ namespace SIMILI {
 				map_data_.splitterCandidates.push_back(cand);
 		}
 
+		void PanelMapBuilder::updateWorkSpaceFromSplitters(
+			const std::vector<SplitterDefinition>& splitterList,
+			int windowWidth, int windowHeight)
+		{
+			if (splitterList.empty() || windowWidth <= 0 || windowHeight <= 0)
+				return;
+
+			if (map_data_.splitterBoundaryRoles.size() != splitterList.size())
+				return;
+
+			const int BORDER_OFFSET = 3;
+			int leftBound = BORDER_OFFSET;
+			int rightBound = windowWidth  - BORDER_OFFSET;
+			int topBound = BORDER_OFFSET;
+			int bottomBound = windowHeight - BORDER_OFFSET;
+
+			for (std::size_t i = 0; i < splitterList.size(); ++i)
+			{
+				const SplitterDefinition& def = splitterList[i];
+				const SplitterBoundaryRole role = map_data_.splitterBoundaryRoles[i];
+
+				switch (role)
+				{
+					case SplitterBoundaryRole::WorkspaceLeft:
+						leftBound = std::max(leftBound, def.x + def.width);
+						break;
+					case SplitterBoundaryRole::WorkspaceRight:
+						rightBound = std::min(rightBound, def.x);
+						break;
+					case SplitterBoundaryRole::WorkspaceTop:
+						topBound = std::max(topBound, def.y + def.height);
+						break;
+					case SplitterBoundaryRole::WorkspaceBottom:
+						bottomBound = std::min(bottomBound, def.y);
+						break;
+					default:
+						break;
+				}
+			}
+
+			workspace_.set(leftBound, topBound, rightBound - leftBound, bottomBound - topBound);
+		}
+
 		void PanelMapBuilder::buildWorkSpace(
 			const std::map<std::string, IFrameScreenData>& frameDataMap)
 		{
@@ -858,7 +902,7 @@ namespace SIMILI {
 			int windowHeight = 0;
 			for (const auto& p : frameDataMap)
 			{
-				if (p.second.windowWidth  > 0) windowWidth  = p.second.windowWidth;
+				if (p.second.windowWidth  > 0) windowWidth = p.second.windowWidth;
 				if (p.second.windowHeight > 0) windowHeight = p.second.windowHeight;
 				if (windowWidth > 0 && windowHeight > 0) break;
 			}
@@ -866,9 +910,9 @@ namespace SIMILI {
 			if (windowWidth <= 0 || windowHeight <= 0)
 				return;
 
-			const int borderLeft   = BORDER_OFFSET;
-			const int borderTop    = BORDER_OFFSET;
-			const int borderRight  = windowWidth  - BORDER_OFFSET;
+			const int borderLeft = BORDER_OFFSET;
+			const int borderTop = BORDER_OFFSET;
+			const int borderRight = windowWidth - BORDER_OFFSET;
 			const int borderBottom = windowHeight - BORDER_OFFSET;
 
 			workspace_.computeFromPanels(
@@ -876,6 +920,27 @@ namespace SIMILI {
 				borderLeft, borderTop,
 				borderRight - borderLeft, borderBottom - borderTop,
 				SPLITTER_THICKNESS);
+
+			const int MATCH_TOLERANCE = 15;
+			map_data_.splitterBoundaryRoles.assign(map_data_.splitterCandidates.size(), SplitterBoundaryRole::None);
+			for (int i = 0; i < static_cast<int>(map_data_.splitterCandidates.size()); ++i)
+			{
+				const auto& cand = map_data_.splitterCandidates[i];
+				if (cand.isVertical)
+				{
+					if (std::abs((cand.x + cand.width) - workspace_.getX()) <= MATCH_TOLERANCE)
+						map_data_.splitterBoundaryRoles[i] = SplitterBoundaryRole::WorkspaceLeft;
+					else if (std::abs(cand.x - (workspace_.getX() + workspace_.getWidth())) <= MATCH_TOLERANCE)
+						map_data_.splitterBoundaryRoles[i] = SplitterBoundaryRole::WorkspaceRight;
+				}
+				else
+				{
+					if (std::abs((cand.y + cand.height) - workspace_.getY()) <= MATCH_TOLERANCE)
+						map_data_.splitterBoundaryRoles[i] = SplitterBoundaryRole::WorkspaceTop;
+					else if (std::abs(cand.y - (workspace_.getY() + workspace_.getHeight())) <= MATCH_TOLERANCE)
+						map_data_.splitterBoundaryRoles[i] = SplitterBoundaryRole::WorkspaceBottom;
+				}
+			}
 		}
 
 		const WorkSpace& PanelMapBuilder::getWorkSpace() const
@@ -909,12 +974,12 @@ namespace SIMILI {
 					const bool xOverlap = (V.x <= H.x + H.width + ATTACH_TOLERANCE) &&
 					                      (V.x + V.width >= H.x - ATTACH_TOLERANCE);
 
-					const bool atVTop    = xOverlap && std::abs(H.y - V.y) <= ATTACH_TOLERANCE;
+					const bool atVTop = xOverlap && std::abs(H.y - V.y) <= ATTACH_TOLERANCE;
 					const bool atVBottom = xOverlap && std::abs(H.y - (V.y + V.height)) <= ATTACH_TOLERANCE;
 
 					const bool vInHYRange = (V.y <= H.y + ATTACH_TOLERANCE) &&
 					                        (V.y + V.height >= H.y - ATTACH_TOLERANCE);
-					const bool atHLeft  = vInHYRange && std::abs(V.x - H.x) <= ATTACH_TOLERANCE;
+					const bool atHLeft = vInHYRange && std::abs(V.x - H.x) <= ATTACH_TOLERANCE;
 					const bool atHRight = vInHYRange && std::abs(V.x - (H.x + H.width)) <= ATTACH_TOLERANCE;
 
 					if (atVTop || atVBottom || atHLeft || atHRight)

@@ -398,6 +398,14 @@ namespace SIMILI {
 			}
 		}
 
+		void UIManager::bindWorkSpaceSizeToSplitterInteractions()
+		{
+			if (splitter_list_.empty())
+				return;
+
+			panel_map_builder_.updateWorkSpaceFromSplitters(splitter_list_, last_window_width_, last_window_height_);
+		}
+
 		void UIManager::drawFullScreenUIPanelsInsideBorders(
 			VkCommandBuffer commandBuffer,
 			int drawableWidth, int drawableHeight,

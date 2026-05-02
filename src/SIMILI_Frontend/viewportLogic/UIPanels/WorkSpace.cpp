@@ -113,5 +113,13 @@ namespace SIMILI {
 			return width_ > 0 && height_ > 0;
 		}
 
+		void WorkSpace::set(int x, int y, int width, int height)
+		{
+			x_ = x;
+			y_ = y;
+			width_ = width;
+			height_ = height;
+		}
+
 	}
 }
