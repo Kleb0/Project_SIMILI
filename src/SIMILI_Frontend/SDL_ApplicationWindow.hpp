@@ -113,6 +113,7 @@ class SDL_ApplicationWindow
 		void startSplitter();
 		void activateDebugRender();
 		void SetHTMLAdressToDraw(CefRefPtr<CefClient> client, const std::string& url, int width, int height);
+		void requestBrowserRepaint();
 		void setCurrentImageIndex(uint32_t index) { current_image_index_ = index; }
 		
 		// === Vulkan Lifecycle ===

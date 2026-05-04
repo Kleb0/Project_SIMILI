@@ -65,6 +65,7 @@ namespace SIMILI {
 			void bindPanelsToSplitters();
 			void setBorders(int borderLeft, int borderTop, int borderWidth, int borderHeight);
 			void setCEFTextureForAllPanels(VkImageView view, VkSampler sampler, int cefWidth, int cefHeight);
+			bool consumePendingCEFRepaintRequest();
 		
 			void clearUIPanels();
 
@@ -73,7 +74,8 @@ namespace SIMILI {
 			const WorkSpace& getWorkSpace() const;
 		
 		private:
-			void refreshPanelUVs();
+			void applyPanelTextureLayout();
+
 			UIState current_state_;
 			UIState previous_state_;
 			bool state_changed_;
@@ -112,6 +114,9 @@ namespace SIMILI {
 			int last_window_width_ = 0;
 			int last_window_height_ = 0;
 			bool panel_frames_overridden_by_splitters_ = false;
+			bool was_splitter_operating_ = false;
+			bool pending_cef_repaint_request_ = false;
+			bool pending_geometry_texture_layout_ = false;
 
 			PanelMapBuilder panel_map_builder_;
 			std::unique_ptr<Splitter> splitter_renderer_;

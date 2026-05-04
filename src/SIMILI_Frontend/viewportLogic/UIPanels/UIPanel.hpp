@@ -32,6 +32,7 @@ class UIPanel
 		void setRenderPass(VkRenderPass renderPass);
 		void setVulkanPipelines(VulkanPipeline* pipelines);
 		void setCEFTexture(VkImageView view, VkSampler sampler, float u0, float v0, float u1, float v1);
+		void refreshCEFTextureBinding(VkImageView view, VkSampler sampler);
 
 		const std::string& getName() const { return name_; }
 		DrawingState getDrawingState() const { return drawing_state_; }

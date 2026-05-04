@@ -7,6 +7,7 @@ SplitterMouseMecanic::SplitterMouseMecanic()
 	, prev_mouse_x_(0)
 	, prev_mouse_y_(0)
 	, is_dragging_(false)
+	, is_operating_(false)
 {
 }
 
@@ -36,6 +37,11 @@ int SplitterMouseMecanic::getDraggedIndex() const
 	return dragged_index_;
 }
 
+bool SplitterMouseMecanic::isOperating() const
+{
+	return is_operating_;
+}
+
 SplitterMouseMecanic::Color SplitterMouseMecanic::getHoverColor() const
 {
 	return { 0.0f, 0.4f, 1.0f, 1.0f };
@@ -51,6 +57,7 @@ void SplitterMouseMecanic::dragSplitter(std::vector<Splitter::SplitterData>& spl
 	if (!isLeftButtonDown)
 	{
 		is_dragging_ = false;
+		is_operating_ = false;
 		dragged_index_ = -1;
 		prev_mouse_x_ = mouseX;
 		prev_mouse_y_ = mouseY;
@@ -62,7 +69,12 @@ void SplitterMouseMecanic::dragSplitter(std::vector<Splitter::SplitterData>& spl
 		if (hovered_index_ >= 0)
 		{
 			is_dragging_ = true;
+			is_operating_ = true;
 			dragged_index_ = hovered_index_;
+		}
+		else
+		{
+			is_operating_ = false;
 		}
 		prev_mouse_x_ = mouseX;
 		prev_mouse_y_ = mouseY;
@@ -71,6 +83,7 @@ void SplitterMouseMecanic::dragSplitter(std::vector<Splitter::SplitterData>& spl
 
 	if (dragged_index_ < 0 || dragged_index_ >= static_cast<int>(splitters.size()))
 	{
+		is_operating_ = false;
 		return;
 	}
 
@@ -138,6 +151,7 @@ void SplitterMouseMecanic::dragSplitter(std::vector<Splitter::SplitterData>& spl
 	}
 
 	dragBindedSplitters(splitters, dragged_index_, clampedDx, clampedDy);
+	is_operating_ = true;
 
 	prev_mouse_x_ = mouseX;
 	prev_mouse_y_ = mouseY;

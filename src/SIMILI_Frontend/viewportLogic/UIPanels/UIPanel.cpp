@@ -622,6 +622,19 @@ void UIPanel::setCEFTexture(VkImageView view, VkSampler sampler, float u0, float
 		drawing_state_ = DrawingState::IsReadyToBeDrawn;
 }
 
+void UIPanel::refreshCEFTextureBinding(VkImageView view, VkSampler sampler)
+{
+	external_texture_view_ = view;
+	external_sampler_ = sampler;
+	bound_texture_view_ = VK_NULL_HANDLE;
+	bound_sampler_ = VK_NULL_HANDLE;
+	needs_redraw_ = true;
+	if (view != VK_NULL_HANDLE && sampler != VK_NULL_HANDLE && has_valid_bounds_ && drawing_state_ == DrawingState::IsNotReadyToBeDrawn)
+		drawing_state_ = DrawingState::IsReadyToBeDrawn;
+
+	std::cout << "[UIPanel::refreshCEFTextureBinding] " << name_ << " - Updated external texture binding, needs redraw" << std::endl;
+}
+
 bool UIPanel::createVulkanResources()
 {
 	if (!vk_context_)

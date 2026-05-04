@@ -117,8 +117,10 @@ namespace SIMILI {
 			{
 				std::lock_guard<std::mutex> lock(ui_panel_mutex_);
 				ui_panel_frame_data_map_ = splitterFrameDataMap;
-				ui_panel_geometry_frame_data_map_ = splitterFrameDataMap;
-				panel_frames_overridden_by_splitters_ = false;
+				if (!panel_frames_overridden_by_splitters_)
+				{
+					ui_panel_geometry_frame_data_map_ = splitterFrameDataMap;
+				}
 				return;
 			}
 
@@ -129,8 +131,12 @@ namespace SIMILI {
 
 			const auto& frameDataMap = frameDatas->getFrameData();
 			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+			std::map<std::string, IFrameScreenData> preservedGeometry = ui_panel_geometry_frame_data_map_;
 			ui_panel_frame_data_map_.clear();
-			ui_panel_geometry_frame_data_map_.clear();
+			if (!panel_frames_overridden_by_splitters_)
+			{
+				ui_panel_geometry_frame_data_map_.clear();
+			}
 
 			if (ui_panel_iframe_map_.empty())
 			{
@@ -143,7 +149,22 @@ namespace SIMILI {
 				if (frameIt != frameDataMap.end())
 				{
 					ui_panel_frame_data_map_[pair.first] = frameIt->second;
-					ui_panel_geometry_frame_data_map_[pair.first] = frameIt->second;
+					if (panel_frames_overridden_by_splitters_)
+					{
+						auto preservedIt = preservedGeometry.find(pair.first);
+						if (preservedIt != preservedGeometry.end())
+						{
+							ui_panel_geometry_frame_data_map_[pair.first] = preservedIt->second;
+						}
+						else
+						{
+							ui_panel_geometry_frame_data_map_[pair.first] = frameIt->second;
+						}
+					}
+					else
+					{
+						ui_panel_geometry_frame_data_map_[pair.first] = frameIt->second;
+					}
 				}
 			}
 		}
@@ -169,9 +190,12 @@ namespace SIMILI {
 
 			{
 				std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+				std::map<std::string, IFrameScreenData> preservedGeometry = ui_panel_geometry_frame_data_map_;
 				ui_panel_frame_data_map_.clear();
-				ui_panel_geometry_frame_data_map_.clear();
-				panel_frames_overridden_by_splitters_ = false;
+				if (!panel_frames_overridden_by_splitters_)
+				{
+					ui_panel_geometry_frame_data_map_.clear();
+				}
 
 				for (const auto& pair : frameDataMap)
 				{
@@ -181,7 +205,22 @@ namespace SIMILI {
 					}
 
 					ui_panel_frame_data_map_[pair.first] = pair.second;
-					ui_panel_geometry_frame_data_map_[pair.first] = pair.second;
+					if (panel_frames_overridden_by_splitters_)
+					{
+						auto preservedIt = preservedGeometry.find(pair.first);
+						if (preservedIt != preservedGeometry.end())
+						{
+							ui_panel_geometry_frame_data_map_[pair.first] = preservedIt->second;
+						}
+						else
+						{
+							ui_panel_geometry_frame_data_map_[pair.first] = pair.second;
+						}
+					}
+					else
+					{
+						ui_panel_geometry_frame_data_map_[pair.first] = pair.second;
+					}
 				}
 
 				std::cout << "[UIManager] syncFrameDatas: Captured " << ui_panel_frame_data_map_.size() 
@@ -230,20 +269,58 @@ namespace SIMILI {
 			stored_cef_sampler_ = sampler;
 			stored_cef_width_ = cefWidth;
 			stored_cef_height_ = cefHeight;
-			refreshPanelUVs();
+
+			if (pending_geometry_texture_layout_)
+			{
+				applyPanelTextureLayout();
+				pending_geometry_texture_layout_ = false;
+			}
+			else if (!panel_frames_overridden_by_splitters_ || splitter_mouse_mecanic_.isOperating())
+			{
+				applyPanelTextureLayout();
+			}
 		}
 
-		void UIManager::refreshPanelUVs()
+		bool UIManager::consumePendingCEFRepaintRequest()
 		{
-			if (stored_cef_width_ <= 0 || stored_cef_height_ <= 0)
+			const bool hadPendingRequest = pending_cef_repaint_request_;
+			pending_cef_repaint_request_ = false;
+			return hadPendingRequest;
+		}
+
+		void UIManager::applyPanelTextureLayout()
+		{
+			if (stored_cef_view_ == VK_NULL_HANDLE || stored_cef_sampler_ == VK_NULL_HANDLE)
+			{
 				return;
+			}
+
+			if (!stored_window_)
+			{
+				return;
+			}
+
+			if (stored_cef_width_ <= 0 || stored_cef_height_ <= 0)
+			{
+				return;
+			}
+
+			const int MIN_PANEL_DIMENSION = 5;
 			const float fw = static_cast<float>(stored_cef_width_);
 			const float fh = static_cast<float>(stored_cef_height_);
+
 			for (auto& pair : ui_panels_)
 			{
 				if (!pair.second)
+				{
 					continue;
-				float u0 = 0.0f, v0 = 0.0f, u1 = 1.0f, v1 = 1.0f;
+				}
+
+				float u0 = 0.0f;
+				float v0 = 0.0f;
+				float u1 = 1.0f;
+				float v1 = 1.0f;
+
 				auto uvIt = ui_panel_frame_data_map_.find(pair.first);
 				if (uvIt != ui_panel_frame_data_map_.end())
 				{
@@ -256,8 +333,13 @@ namespace SIMILI {
 				auto geometryIt = ui_panel_geometry_frame_data_map_.find(pair.first);
 				if (geometryIt != ui_panel_geometry_frame_data_map_.end())
 				{
-					pair.second->updateFromFrameData(geometryIt->second, stored_window_, /*skipTextureRebuild=*/true);
+					if (geometryIt->second.width < MIN_PANEL_DIMENSION || geometryIt->second.height < MIN_PANEL_DIMENSION)
+					{
+						continue;
+					}
+					pair.second->updateFromFrameData(geometryIt->second, stored_window_, true);
 				}
+
 				pair.second->setCEFTexture(stored_cef_view_, stored_cef_sampler_, u0, v0, u1, v1);
 			}
 		}
@@ -268,7 +350,7 @@ namespace SIMILI {
 			std::map<std::string, IFrameScreenData> effectivePanelFrameDataMap;
 			{
 				std::lock_guard<std::mutex> lock(ui_panel_mutex_);
-				if (panel_frames_overridden_by_splitters_ && !ui_panel_geometry_frame_data_map_.empty())
+				if ((panel_frames_overridden_by_splitters_ || splitter_mouse_mecanic_.isOperating()) && !ui_panel_geometry_frame_data_map_.empty())
 				{
 					effectivePanelFrameDataMap = ui_panel_geometry_frame_data_map_;
 				}
@@ -450,9 +532,22 @@ namespace SIMILI {
 			if (splitter_list_.empty())
 				return;
 
+			const bool isOperating = splitter_mouse_mecanic_.isOperating();
+			const bool hasJustStoppedOperating = was_splitter_operating_ && !isOperating;
+
+			if (isOperating)
+			{
+				std::cout << "[UIManager] Splitter operating: " << (isOperating ? "true" : "false") << std::endl;
+			}
+			else if (isOperating != was_splitter_operating_)
+			{
+				std::cout << "[UIManager] Splitter operating: false" << std::endl;
+			}
+
 			if (prev_splitter_list_.size() != splitter_list_.size())
 			{
 				prev_splitter_list_ = splitter_list_;
+				was_splitter_operating_ = isOperating;
 				return;
 			}
 
@@ -538,8 +633,23 @@ namespace SIMILI {
 			}
 
 			prev_splitter_list_ = splitter_list_;
-			panel_frames_overridden_by_splitters_ = panelGeometryChanged;
-			refreshPanelUVs();
+			if (panelGeometryChanged)
+			{
+				panel_frames_overridden_by_splitters_ = true;
+				if (isOperating)
+				{
+					applyPanelTextureLayout();
+				}
+			}
+
+			if (hasJustStoppedOperating)
+			{
+				pending_cef_repaint_request_ = true;
+				pending_geometry_texture_layout_ = true;
+				applyPanelTextureLayout();
+			}
+
+			was_splitter_operating_ = isOperating;
 		}
 
 		void UIManager::drawFullScreenUIPanelsInsideBorders(
@@ -569,7 +679,7 @@ namespace SIMILI {
 			std::map<std::string, IFrameScreenData> sourceFrameDataMap;
 			{
 				std::lock_guard<std::mutex> lock(ui_panel_mutex_);
-				if (panel_frames_overridden_by_splitters_ && !ui_panel_geometry_frame_data_map_.empty())
+				if ((panel_frames_overridden_by_splitters_ || splitter_mouse_mecanic_.isOperating()) && !ui_panel_geometry_frame_data_map_.empty())
 				{
 					sourceFrameDataMap = ui_panel_geometry_frame_data_map_;
 				}

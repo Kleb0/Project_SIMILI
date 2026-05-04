@@ -727,8 +727,8 @@ void SDL_ApplicationWindow::uploadCEFPaintBuffer()
 		ui_manager_->setCEFTextureForAllPanels(cef_texture_view_, cef_texture_sampler_, cef_texture_uploaded_width_, cef_texture_uploaded_height_);
 }
 
-	bool SDL_ApplicationWindow::createCEFTextureSampler(VkDevice device)
-	{
+bool SDL_ApplicationWindow::createCEFTextureSampler(VkDevice device)
+{
 		if (device == VK_NULL_HANDLE)
 		{
 			return false;
@@ -782,6 +782,20 @@ void SDL_ApplicationWindow::SetHTMLAdressToDraw(CefRefPtr<CefClient> client, con
 	std::cout << "[SDL_ApplicationWindow] Browser CEF créé : " << url << " (" << width << "x" << height << ")" << std::endl;
 
 	browser_ = browser;
+}
+
+void SDL_ApplicationWindow::requestBrowserRepaint()
+{
+	if (!browser_ || !browser_->GetHost())
+	{
+		return;
+	}
+
+	browser_->GetHost()->WasHidden(false);
+	browser_->GetHost()->NotifyScreenInfoChanged();
+	browser_->GetHost()->WasResized();
+	browser_->GetHost()->Invalidate(PET_VIEW);
+	std::cout << "[SDL_ApplicationWindow] Requested CEF resize/repaint after splitter release" << std::endl;
 }
 
 
@@ -1025,6 +1039,10 @@ void SDL_ApplicationWindow::renderFrame()
 		ui_manager_->enableSplitterMouseInteractions(static_cast<int>(mouseXf), static_cast<int>(mouseYf), isLeftButtonDown);
 		ui_manager_->bindWorkSpaceSizeToSplitterInteractions();
 		ui_manager_->bindPanelsToSplitters();
+		if (ui_manager_->consumePendingCEFRepaintRequest())
+		{
+			requestBrowserRepaint();
+		}
 	}
 
 	// ------- Main rendering logic ------- //
@@ -1112,6 +1130,9 @@ void SDL_ApplicationWindow::renderFrame()
 
 	presentToScreen();
 }
+
+
+
 
 void SDL_ApplicationWindow::renderThreeDScreen(const std::map<std::string, IFrameData>&)
 {

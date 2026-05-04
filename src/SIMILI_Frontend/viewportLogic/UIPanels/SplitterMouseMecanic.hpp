@@ -20,6 +20,7 @@ public:
 	void setAttachments(const std::vector<std::vector<int>>& attachments);
 	int getHoveredIndex() const;
 	int getDraggedIndex() const;
+	bool isOperating() const;
 
 	Color getHoverColor() const;
 	Color getDefaultColor() const;
@@ -30,5 +31,6 @@ private:
 	int prev_mouse_x_;
 	int prev_mouse_y_;
 	bool is_dragging_;
+	bool is_operating_;
 	std::vector<std::vector<int>> attachments_;
 };

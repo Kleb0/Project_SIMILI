@@ -1096,9 +1096,6 @@ void UIHandler::updateWindowSize(int width, int height)
 	std::cout << "[UIHandler] Window size updated to: " << width << "x" << height << std::endl;
 }
 
-
-
-
 void UIHandler::cacheUIPanelFrameDatas()
 {
 	if (!isOwnerThread())
