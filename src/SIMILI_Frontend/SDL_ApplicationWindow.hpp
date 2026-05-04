@@ -211,6 +211,7 @@ class SDL_ApplicationWindow
 		void updateMaximizedState();
 		void captureFrameData();
 		bool createCEFPipeline();
+		bool createCEFTextureSampler(VkDevice device);
 		void uploadCEFPaintBuffer();
 
 		// ===== Vulkan Resource Management ===== //

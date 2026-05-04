@@ -117,6 +117,8 @@ namespace SIMILI {
 			{
 				std::lock_guard<std::mutex> lock(ui_panel_mutex_);
 				ui_panel_frame_data_map_ = splitterFrameDataMap;
+				ui_panel_geometry_frame_data_map_ = splitterFrameDataMap;
+				panel_frames_overridden_by_splitters_ = false;
 				return;
 			}
 
@@ -128,6 +130,7 @@ namespace SIMILI {
 			const auto& frameDataMap = frameDatas->getFrameData();
 			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
 			ui_panel_frame_data_map_.clear();
+			ui_panel_geometry_frame_data_map_.clear();
 
 			if (ui_panel_iframe_map_.empty())
 			{
@@ -140,12 +143,14 @@ namespace SIMILI {
 				if (frameIt != frameDataMap.end())
 				{
 					ui_panel_frame_data_map_[pair.first] = frameIt->second;
+					ui_panel_geometry_frame_data_map_[pair.first] = frameIt->second;
 				}
 			}
 		}
 
 		void UIManager::syncFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas, SDL_Window* sdlWindow)
 		{
+			stored_window_ = sdlWindow;
 			if (!frameDatas)
 			{
 				std::cout << "[UIManager] syncFrameDatas: frameDatas is null" << std::endl;
@@ -165,6 +170,8 @@ namespace SIMILI {
 			{
 				std::lock_guard<std::mutex> lock(ui_panel_mutex_);
 				ui_panel_frame_data_map_.clear();
+				ui_panel_geometry_frame_data_map_.clear();
+				panel_frames_overridden_by_splitters_ = false;
 
 				for (const auto& pair : frameDataMap)
 				{
@@ -174,6 +181,7 @@ namespace SIMILI {
 					}
 
 					ui_panel_frame_data_map_[pair.first] = pair.second;
+					ui_panel_geometry_frame_data_map_[pair.first] = pair.second;
 				}
 
 				std::cout << "[UIManager] syncFrameDatas: Captured " << ui_panel_frame_data_map_.size() 
@@ -200,7 +208,9 @@ namespace SIMILI {
 					splitter_list_,
 					last_window_width_, last_window_height_,
 					sdlWindow);
-				splitter_mouse_mecanic_.setAttachments(panel_map_builder_.getMapData().splitterAttachments);			}
+				splitter_mouse_mecanic_.setAttachments(panel_map_builder_.getMapData().splitterAttachments);
+				prev_splitter_list_ = splitter_list_;
+			}
 		}
 
 		void UIManager::setBorders(int borderLeft, int borderTop, int borderWidth, int borderHeight)
@@ -215,37 +225,66 @@ namespace SIMILI {
 		{
 			if (cefWidth <= 0 || cefHeight <= 0)
 				return;
-			const float fw = static_cast<float>(cefWidth);
-			const float fh = static_cast<float>(cefHeight);
 			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+			stored_cef_view_ = view;
+			stored_cef_sampler_ = sampler;
+			stored_cef_width_ = cefWidth;
+			stored_cef_height_ = cefHeight;
+			refreshPanelUVs();
+		}
+
+		void UIManager::refreshPanelUVs()
+		{
+			if (stored_cef_width_ <= 0 || stored_cef_height_ <= 0)
+				return;
+			const float fw = static_cast<float>(stored_cef_width_);
+			const float fh = static_cast<float>(stored_cef_height_);
 			for (auto& pair : ui_panels_)
 			{
 				if (!pair.second)
 					continue;
 				float u0 = 0.0f, v0 = 0.0f, u1 = 1.0f, v1 = 1.0f;
-				auto it = ui_panel_frame_data_map_.find(pair.first);
-				if (it != ui_panel_frame_data_map_.end())
+				auto uvIt = ui_panel_frame_data_map_.find(pair.first);
+				if (uvIt != ui_panel_frame_data_map_.end())
 				{
-					u0 = static_cast<float>(it->second.relativeX) / fw;
-					v0 = static_cast<float>(it->second.relativeY) / fh;
-					u1 = static_cast<float>(it->second.relativeX + it->second.width) / fw;
-					v1 = static_cast<float>(it->second.relativeY + it->second.height) / fh;
+					u0 = static_cast<float>(uvIt->second.relativeX) / fw;
+					v0 = static_cast<float>(uvIt->second.relativeY) / fh;
+					u1 = static_cast<float>(uvIt->second.relativeX + uvIt->second.width) / fw;
+					v1 = static_cast<float>(uvIt->second.relativeY + uvIt->second.height) / fh;
 				}
-				pair.second->setCEFTexture(view, sampler, u0, v0, u1, v1);
+
+				auto geometryIt = ui_panel_geometry_frame_data_map_.find(pair.first);
+				if (geometryIt != ui_panel_geometry_frame_data_map_.end())
+				{
+					pair.second->updateFromFrameData(geometryIt->second, stored_window_, /*skipTextureRebuild=*/true);
+				}
+				pair.second->setCEFTexture(stored_cef_view_, stored_cef_sampler_, u0, v0, u1, v1);
 			}
 		}
 
 		void UIManager::drawUIPanelsInsideBorders(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild, SDL_Window* window)
 		{
+			if (window) stored_window_ = window;
 			std::map<std::string, IFrameScreenData> effectivePanelFrameDataMap;
-			if (!panelFrameDataMap.empty())
-			{
-				effectivePanelFrameDataMap = panelFrameDataMap;
-			}
-			else
 			{
 				std::lock_guard<std::mutex> lock(ui_panel_mutex_);
-				effectivePanelFrameDataMap = ui_panel_frame_data_map_;
+				if (panel_frames_overridden_by_splitters_ && !ui_panel_geometry_frame_data_map_.empty())
+				{
+					effectivePanelFrameDataMap = ui_panel_geometry_frame_data_map_;
+				}
+				else if (!panelFrameDataMap.empty())
+				{
+					effectivePanelFrameDataMap = panelFrameDataMap;
+				}
+				else
+				{
+					effectivePanelFrameDataMap = ui_panel_geometry_frame_data_map_;
+				}
+			}
+
+			if (effectivePanelFrameDataMap.empty())
+			{
+				return;
 			}
 
 			panel_map_builder_.drawInsideAppBorders(commandBuffer, drawableWidth, drawableHeight,
@@ -322,9 +361,9 @@ namespace SIMILI {
 			for (const auto& def : splitter_list_)
 			{
 				Splitter::SplitterData sd;
-				sd.x      = static_cast<int>(std::round(def.x      * scaleX));
-				sd.y      = static_cast<int>(std::round(def.y      * scaleY));
-				sd.width  = static_cast<int>(std::round(def.width  * scaleX));
+				sd.x = static_cast<int>(std::round(def.x * scaleX));
+				sd.y = static_cast<int>(std::round(def.y * scaleY));
+				sd.width = static_cast<int>(std::round(def.width  * scaleX));
 				sd.height = static_cast<int>(std::round(def.height * scaleY));
 				sd.isVertical = def.isVertical;
 				sd.isHorizontal = def.isHorizontal;
@@ -406,6 +445,103 @@ namespace SIMILI {
 			panel_map_builder_.updateWorkSpaceFromSplitters(splitter_list_, last_window_width_, last_window_height_);
 		}
 
+		void UIManager::bindPanelsToSplitters()
+		{
+			if (splitter_list_.empty())
+				return;
+
+			if (prev_splitter_list_.size() != splitter_list_.size())
+			{
+				prev_splitter_list_ = splitter_list_;
+				return;
+			}
+
+			const int SIDE_TOLERANCE = 20;
+			const int MIN_PANEL_SIZE = 10;
+			bool panelGeometryChanged = false;
+
+			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+
+			for (std::size_t i = 0; i < splitter_list_.size(); ++i)
+			{
+				const SplitterDefinition& current = splitter_list_[i];
+				const SplitterDefinition& previous = prev_splitter_list_[i];
+
+				const int dx = current.x - previous.x;
+				const int dy = current.y - previous.y;
+
+				if (dx == 0 && dy == 0)
+					continue;
+
+				const int previousSplitterLeft = previous.x;
+				const int previousSplitterRight = previous.x + previous.width;
+				const int currentSplitterLeft = current.x;
+				const int currentSplitterRight = current.x + current.width;
+				const int previousSplitterTop = previous.y;
+				const int previousSplitterBottom = previous.y + previous.height;
+				const int currentSplitterTop = current.y;
+				const int currentSplitterBottom = current.y + current.height;
+
+				for (auto& panelPair : ui_panel_geometry_frame_data_map_)
+				{
+					IFrameScreenData& fd = panelPair.second;
+					const int originalLeft = fd.relativeX;
+					const int originalTop = fd.relativeY;
+					const int originalRight = fd.relativeX + fd.width;
+					const int originalBottom = fd.relativeY + fd.height;
+
+					if (current.isVertical && dx != 0)
+					{
+						if (std::abs(originalRight - previousSplitterLeft) <= SIDE_TOLERANCE)
+						{
+							const int newWidth = std::max(MIN_PANEL_SIZE, currentSplitterLeft - fd.relativeX);
+							panelGeometryChanged = panelGeometryChanged || (newWidth != fd.width);
+							fd.width = newWidth;
+						}
+						else if (std::abs(originalLeft - previousSplitterRight) <= SIDE_TOLERANCE)
+						{
+							const int newRelativeX = currentSplitterRight;
+							const int newClientX = fd.clientX + (newRelativeX - fd.relativeX);
+							const int newWidth = std::max(MIN_PANEL_SIZE, originalRight - newRelativeX);
+							panelGeometryChanged = panelGeometryChanged ||
+								(newRelativeX != fd.relativeX) ||
+								(newClientX != fd.clientX) ||
+								(newWidth != fd.width);
+							fd.relativeX = newRelativeX;
+							fd.clientX = newClientX;
+							fd.width = newWidth;
+						}
+					}
+					else if (current.isHorizontal && dy != 0)
+					{
+						if (std::abs(originalBottom - previousSplitterTop) <= SIDE_TOLERANCE)
+						{
+							const int newHeight = std::max(MIN_PANEL_SIZE, currentSplitterTop - fd.relativeY);
+							panelGeometryChanged = panelGeometryChanged || (newHeight != fd.height);
+							fd.height = newHeight;
+						}
+						else if (std::abs(originalTop - previousSplitterBottom) <= SIDE_TOLERANCE)
+						{
+							const int newRelativeY = currentSplitterBottom;
+							const int newClientY = fd.clientY + (newRelativeY - fd.relativeY);
+							const int newHeight = std::max(MIN_PANEL_SIZE, originalBottom - newRelativeY);
+							panelGeometryChanged = panelGeometryChanged ||
+								(newRelativeY != fd.relativeY) ||
+								(newClientY != fd.clientY) ||
+								(newHeight != fd.height);
+							fd.relativeY = newRelativeY;
+							fd.clientY   = newClientY;
+							fd.height = newHeight;
+						}
+					}
+				}
+			}
+
+			prev_splitter_list_ = splitter_list_;
+			panel_frames_overridden_by_splitters_ = panelGeometryChanged;
+			refreshPanelUVs();
+		}
+
 		void UIManager::drawFullScreenUIPanelsInsideBorders(
 			VkCommandBuffer commandBuffer,
 			int drawableWidth, int drawableHeight,
@@ -430,19 +566,31 @@ namespace SIMILI {
 			float scaleX = static_cast<float>(currentLogicalW) / static_cast<float>(referenceWindowWidth);
 			float scaleY = static_cast<float>(currentLogicalH) / static_cast<float>(referenceWindowHeight);
 
-			const std::map<std::string, IFrameScreenData>* sourceMap = &panelFrameDataMap;
-			std::map<std::string, IFrameScreenData> fallbackSource;
-
-			if (panelFrameDataMap.empty())
+			std::map<std::string, IFrameScreenData> sourceFrameDataMap;
 			{
 				std::lock_guard<std::mutex> lock(ui_panel_mutex_);
-				fallbackSource = ui_panel_frame_data_map_;
-				sourceMap = &fallbackSource;
+				if (panel_frames_overridden_by_splitters_ && !ui_panel_geometry_frame_data_map_.empty())
+				{
+					sourceFrameDataMap = ui_panel_geometry_frame_data_map_;
+				}
+				else if (!panelFrameDataMap.empty())
+				{
+					sourceFrameDataMap = panelFrameDataMap;
+				}
+				else
+				{
+					sourceFrameDataMap = ui_panel_geometry_frame_data_map_;
+				}
+			}
+
+			if (sourceFrameDataMap.empty())
+			{
+				return;
 			}
 
 			std::map<std::string, IFrameScreenData> scaledFrameDataMap;
 
-			for (const auto& pair : *sourceMap)
+			for (const auto& pair : sourceFrameDataMap)
 			{
 				IFrameScreenData scaled = pair.second;
 				scaled.relativeX = static_cast<int>(std::round(pair.second.relativeX * scaleX));
@@ -479,6 +627,7 @@ namespace SIMILI {
 			panel_map_builder_.clearUIPanels(ui_panels_);
 			ui_panel_iframe_map_.clear();
 			ui_panel_frame_data_map_.clear();
+			ui_panel_geometry_frame_data_map_.clear();
 			ui_panels_initialized_ = false;
 		}
 
@@ -491,7 +640,7 @@ namespace SIMILI {
 		std::map<std::string, IFrameScreenData> UIManager::getUIPanelFrameDatas() const
 		{
 			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
-			return ui_panel_frame_data_map_;
+			return ui_panel_geometry_frame_data_map_;
 		}
     }
 }

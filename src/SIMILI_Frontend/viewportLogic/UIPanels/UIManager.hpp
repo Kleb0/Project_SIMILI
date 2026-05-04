@@ -62,6 +62,7 @@ namespace SIMILI {
 			void enableSplitterMouseInteractions(int mouseX, int mouseY, bool isLeftButtonDown = false);
 			void dragSplitter(int mouseX, int mouseY, bool isLeftButtonDown);
 			void bindWorkSpaceSizeToSplitterInteractions();
+			void bindPanelsToSplitters();
 			void setBorders(int borderLeft, int borderTop, int borderWidth, int borderHeight);
 			void setCEFTextureForAllPanels(VkImageView view, VkSampler sampler, int cefWidth, int cefHeight);
 		
@@ -72,6 +73,7 @@ namespace SIMILI {
 			const WorkSpace& getWorkSpace() const;
 		
 		private:
+			void refreshPanelUVs();
 			UIState current_state_;
 			UIState previous_state_;
 			bool state_changed_;
@@ -99,18 +101,27 @@ namespace SIMILI {
 
 			std::map<std::string, IFrameData> ui_panel_iframe_map_;
 			std::map<std::string, IFrameScreenData> ui_panel_frame_data_map_;
+			std::map<std::string, IFrameScreenData> ui_panel_geometry_frame_data_map_;
 			std::map<std::string, std::unique_ptr<UIPanel>> ui_panels_;
 			bool ui_panels_initialized_;
 			mutable std::mutex ui_panel_mutex_;
 			
 			std::map<std::string, PanelState> panel_state_map_;
 			std::vector<SplitterDefinition> splitter_list_;
-			int last_window_width_  = 0;
+			std::vector<SplitterDefinition> prev_splitter_list_;
+			int last_window_width_ = 0;
 			int last_window_height_ = 0;
+			bool panel_frames_overridden_by_splitters_ = false;
 
 			PanelMapBuilder panel_map_builder_;
 			std::unique_ptr<Splitter> splitter_renderer_;
 			SplitterMouseMecanic splitter_mouse_mecanic_;
+
+			VkImageView stored_cef_view_ = VK_NULL_HANDLE;
+			VkSampler stored_cef_sampler_ = VK_NULL_HANDLE;
+			int stored_cef_width_   = 0;
+			int stored_cef_height_  = 0;
+			SDL_Window* stored_window_ = nullptr;
 		};
 	}
 }

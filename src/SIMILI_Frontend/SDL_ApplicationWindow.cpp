@@ -639,11 +639,7 @@ void SDL_ApplicationWindow::uploadCEFPaintBuffer()
 		viewInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
 		if (vkCreateImageView(device, &viewInfo, nullptr, &cef_texture_view_) != VK_SUCCESS) return;
 
-		VkSamplerCreateInfo samplerInfo{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
-		samplerInfo.magFilter = VK_FILTER_LINEAR; samplerInfo.minFilter = VK_FILTER_LINEAR;
-		samplerInfo.addressModeU = samplerInfo.addressModeV = samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-		if (vkCreateSampler(device, &samplerInfo, nullptr, &cef_texture_sampler_) != VK_SUCCESS) return;
+		if (!createCEFTextureSampler(device)) return;
 
 		cef_texture_uploaded_width_ = 0;
 		cef_texture_uploaded_height_ = 0;
@@ -660,11 +656,13 @@ void SDL_ApplicationWindow::uploadCEFPaintBuffer()
 	VkPhysicalDeviceMemoryProperties memProps2;
 	vkGetPhysicalDeviceMemoryProperties(vk_context_->getPhysicalDevice(), &memProps2);
 	uint32_t stagingIdx = 0;
+
 	for (uint32_t i = 0; i < memProps2.memoryTypeCount; i++)
 	{
 		if ((stagingReq.memoryTypeBits & (1 << i)) && (memProps2.memoryTypes[i].propertyFlags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)))
 		{ stagingIdx = i; break; }
 	}
+
 	VkMemoryAllocateInfo stagingAlloc{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
 	stagingAlloc.allocationSize = stagingReq.size; stagingAlloc.memoryTypeIndex = stagingIdx;
 	VkDeviceMemory stagingMem = VK_NULL_HANDLE;
@@ -728,6 +726,39 @@ void SDL_ApplicationWindow::uploadCEFPaintBuffer()
 	if (ui_manager_)
 		ui_manager_->setCEFTextureForAllPanels(cef_texture_view_, cef_texture_sampler_, cef_texture_uploaded_width_, cef_texture_uploaded_height_);
 }
+
+	bool SDL_ApplicationWindow::createCEFTextureSampler(VkDevice device)
+	{
+		if (device == VK_NULL_HANDLE)
+		{
+			return false;
+		}
+
+		if (cef_texture_sampler_ != VK_NULL_HANDLE)
+		{
+			vkDestroySampler(device, cef_texture_sampler_, nullptr);
+			cef_texture_sampler_ = VK_NULL_HANDLE;
+		}
+
+		VkSamplerCreateInfo samplerInfo{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+		samplerInfo.magFilter = VK_FILTER_NEAREST;
+		samplerInfo.minFilter = VK_FILTER_NEAREST;
+		samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		samplerInfo.anisotropyEnable = VK_FALSE;
+		samplerInfo.maxAnisotropy = 1.0f;
+		samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+		samplerInfo.unnormalizedCoordinates = VK_FALSE;
+		samplerInfo.compareEnable = VK_FALSE;
+		samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+		samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+		samplerInfo.mipLodBias = 0.0f;
+		samplerInfo.minLod = 0.0f;
+		samplerInfo.maxLod = 0.0f;
+
+		return vkCreateSampler(device, &samplerInfo, nullptr, &cef_texture_sampler_) == VK_SUCCESS;
+	}
 
 void SDL_ApplicationWindow::SetHTMLAdressToDraw(CefRefPtr<CefClient> client, const std::string& url, int width, int height)
 {
@@ -971,6 +1002,31 @@ void SDL_ApplicationWindow::renderFrame()
 	int width, height;
 	SDL_GetWindowSizeInPixels(window_, &width, &height);
 
+	// ------- Splitter interactions (before preparePanels so same-frame data is used) ------- //
+	if (ui_manager_)
+	{
+		float mouseXf = 0.0f, mouseYf = 0.0f;
+		SDL_MouseButtonFlags mouseButtons = SDL_GetMouseState(&mouseXf, &mouseYf);
+		const bool isLeftButtonDown = (mouseButtons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
+
+		if (window_state_ == WindowRenderState::Maximized && app_border_)
+		{
+			int currentW = 0, currentH = 0;
+			SDL_GetWindowSize(window_, &currentW, &currentH);
+			int refW = app_border_->getReferenceWindowWidth();
+			int refH = app_border_->getReferenceWindowHeight();
+			if (currentW > 0 && currentH > 0 && refW > 0 && refH > 0)
+			{
+				mouseXf = mouseXf * static_cast<float>(refW) / static_cast<float>(currentW);
+				mouseYf = mouseYf * static_cast<float>(refH) / static_cast<float>(currentH);
+			}
+		}
+
+		ui_manager_->enableSplitterMouseInteractions(static_cast<int>(mouseXf), static_cast<int>(mouseYf), isLeftButtonDown);
+		ui_manager_->bindWorkSpaceSizeToSplitterInteractions();
+		ui_manager_->bindPanelsToSplitters();
+	}
+
 	// ------- Main rendering logic ------- //
 	// ONLY render content when in Init state - otherwise just clear to black
 	if (window_state_ == WindowRenderState::Init)
@@ -1050,30 +1106,6 @@ void SDL_ApplicationWindow::renderFrame()
 	if (debug_tools_ && ui_manager_)
 	{
 		debug_tools_->drawDebugTools(commandBuffer, width, height, &ui_manager_->getWorkSpace());
-	}
-
-	if (ui_manager_)
-	{
-		float mouseXf = 0.0f, mouseYf = 0.0f;
-
-		SDL_MouseButtonFlags mouseButtons = SDL_GetMouseState(&mouseXf, &mouseYf);
-		const bool isLeftButtonDown = (mouseButtons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
-
-		if (window_state_ == WindowRenderState::Maximized && app_border_)
-		{
-			int currentW = 0, currentH = 0;
-			SDL_GetWindowSize(window_, &currentW, &currentH);
-			int refW = app_border_->getReferenceWindowWidth();
-			int refH = app_border_->getReferenceWindowHeight();
-			if (currentW > 0 && currentH > 0 && refW > 0 && refH > 0)
-			{
-				mouseXf = mouseXf * static_cast<float>(refW) / static_cast<float>(currentW);
-				mouseYf = mouseYf * static_cast<float>(refH) / static_cast<float>(currentH);
-			}
-		}
-
-		ui_manager_->enableSplitterMouseInteractions(static_cast<int>(mouseXf), static_cast<int>(mouseYf), isLeftButtonDown);
-		ui_manager_->bindWorkSpaceSizeToSplitterInteractions();
 	}
 
 	finalizeAndSubmitCommandBuffer(commandBuffer); 
