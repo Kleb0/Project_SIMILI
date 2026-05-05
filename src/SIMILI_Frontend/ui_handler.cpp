@@ -50,6 +50,7 @@ UIHandler::UIHandler() : parent_sdl_window_(nullptr), parent_window_(nullptr), w
 	owner_thread_id_(std::this_thread::get_id()),
 	pending_iframe_capture_(false),
 	pending_ui_panel_cache_(false),
+	pending_deferred_layout_refresh_(false),
 	resource_request_handler_(nullptr)
 {
 	mouse_controller_ = new SIMILI::Input::MouseController();
@@ -704,6 +705,21 @@ void UIHandler::processPendingFrameUpdates()
 		return;
 	}
 
+	if (pending_deferred_layout_refresh_.exchange(false))
+	{
+		forceCaptureIFramePositions();
+		if (ui_manager_)
+		{
+			ui_manager_->refreshPanelTextureLayout(false);
+		}
+		if (parent_sdl_window_)
+		{
+			parent_sdl_window_->requestBrowserRepaint();
+		}
+		pending_ui_panel_cache_.store(false);
+		return;
+	}
+
 	if (pending_ui_panel_cache_.exchange(false))
 	{
 		cacheUIPanelFrameDatas();
@@ -816,6 +832,16 @@ std::map<std::string, SIMILI::Frontend::IFrameScreenData> UIHandler::getRuntimeF
 	}
 
 	return frame_datas_->getFrameData();
+}
+
+void UIHandler::finalizeDeferredLayoutRefresh(CefRefPtr<CefBrowser> delayedBrowser)
+{
+	pending_deferred_layout_refresh_.store(true);
+
+	if (delayedBrowser && delayedBrowser->GetHost())
+	{
+		delayedBrowser->GetHost()->Invalidate(PET_VIEW);
+	}
 }
 
 
@@ -1104,13 +1130,248 @@ void UIHandler::cacheUIPanelFrameDatas()
 		return;
 	}
 
-	if (ui_manager_ && frame_datas_)
+	if (ui_manager_)
 	{
-		auto frameDataMap = ui_manager_->getUIPanelFrameDatas();
-		std::cout << "[UIHandler] cacheUIPanelFrameDatas: Retrieved " << frameDataMap.size() 
-				  << " panel frame data from UIManager" << std::endl;
+		auto iframeDataMap = ui_manager_->getResolvedUIPanelIFrames();
+		if (iframeDataMap.empty())
+		{
+			std::cout << "[UIHandler] cacheUIPanelFrameDatas: No panel frame data available from UIManager" << std::endl;
+			return;
+		}
+
+		const auto currentIFrames = getAllIFrames();
+		bool hasPanelLayoutChange = false;
+
+		for (const auto& pair : iframeDataMap)
+		{
+			auto currentIt = currentIFrames.find(pair.first);
+			if (currentIt == currentIFrames.end() ||
+				currentIt->second.x != pair.second.x ||
+				currentIt->second.y != pair.second.y ||
+				currentIt->second.width != pair.second.width ||
+				currentIt->second.height != pair.second.height ||
+				currentIt->second.clientX != pair.second.clientX ||
+				currentIt->second.clientY != pair.second.clientY)
+			{
+				hasPanelLayoutChange = true;
+				iframe_data_map_[pair.first] = pair.second;
+			}
+		}
+
+		ui_manager_->updateUIPanelIFrames(iframeDataMap);
+
+		if (hasPanelLayoutChange && frame_datas_ && parent_window_)
+		{
+			frame_datas_->catchFrameData(parent_window_);
+			ui_manager_->cacheUIPanelFrameDatas(frame_datas_, {});
+			std::cout << "[UIHandler] cacheUIPanelFrameDatas: Refreshed FrameDatas with " << iframeDataMap.size()
+				      << " splitter-adjusted UI panels" << std::endl;
+		}
+		else
+		{
+			std::cout << "[UIHandler] cacheUIPanelFrameDatas: UI panel layout already up to date (" << iframeDataMap.size()
+				      << " panels)" << std::endl;
+		}
 	}
 }
+
+void UIHandler::syncBrowserPanelLayoutFromCurrentFrames()
+{
+	if (!ui_manager_)
+	{
+		std::cout << "[UIHandler] syncBrowserPanelLayoutFromCurrentFrames: skipped, ui_manager_ is null" << std::endl;
+		return;
+	}
+
+	const auto iframeDataMap = ui_manager_->getResolvedUIPanelIFrames();
+	if (iframeDataMap.empty())
+	{
+		std::cout << "[UIHandler] syncBrowserPanelLayoutFromCurrentFrames: skipped, no resolved UI panel frames" << std::endl;
+		return;
+	}
+
+	if (!CefCurrentlyOn(TID_UI))
+	{
+		CefPostTask(TID_UI, base::BindOnce(&UIHandler::syncBrowserPanelLayoutFromCurrentFrames, base::Unretained(this)));
+		return;
+	}
+
+	if (!parent_sdl_window_)
+	{
+		std::cout << "[UIHandler] syncBrowserPanelLayoutFromCurrentFrames: skipped, SDL parent window is null" << std::endl;
+		return;
+	}
+
+	CefRefPtr<CefBrowser> browser = parent_sdl_window_->getBrowser();
+	if (!browser)
+	{
+		std::cout << "[UIHandler] syncBrowserPanelLayoutFromCurrentFrames: skipped, SDL browser is null" << std::endl;
+		return;
+	}
+
+	CefRefPtr<CefFrame> mainFrame = browser->GetMainFrame();
+	if (!mainFrame || !mainFrame->IsValid())
+	{
+		std::cout << "[UIHandler] syncBrowserPanelLayoutFromCurrentFrames: skipped, main frame is invalid" << std::endl;
+		return;
+	}
+
+	const auto leftColumnIt = std::min_element(
+		iframeDataMap.begin(), iframeDataMap.end(),
+		[](const auto& lhs, const auto& rhs)
+		{
+			if (lhs.second.x != rhs.second.x)
+			{
+				return lhs.second.x < rhs.second.x;
+			}
+			return lhs.second.y < rhs.second.y;
+		});
+
+	const auto rightColumnIt = std::min_element(
+		iframeDataMap.begin(), iframeDataMap.end(),
+		[](const auto& lhs, const auto& rhs)
+		{
+			if (lhs.second.x != rhs.second.x)
+			{
+				return lhs.second.x > rhs.second.x;
+			}
+			return lhs.second.y < rhs.second.y;
+		});
+
+	const auto bottomPanelIt = std::max_element(
+		iframeDataMap.begin(), iframeDataMap.end(),
+		[](const auto& lhs, const auto& rhs)
+		{
+			if (lhs.second.width != rhs.second.width)
+			{
+				return lhs.second.width < rhs.second.width;
+			}
+			return lhs.second.y < rhs.second.y;
+		});
+
+	if (leftColumnIt == iframeDataMap.end() || rightColumnIt == iframeDataMap.end() || bottomPanelIt == iframeDataMap.end())
+	{
+		std::cout << "[UIHandler] syncBrowserPanelLayoutFromCurrentFrames: skipped, unable to derive layout anchors" << std::endl;
+		return;
+	}
+
+	int topRowHeight = 0;
+	for (const auto& pair : iframeDataMap)
+	{
+		if (pair.first == bottomPanelIt->first)
+		{
+			continue;
+		}
+
+		topRowHeight = (std::max)(topRowHeight, pair.second.height);
+	}
+
+	if (topRowHeight <= 0)
+	{
+		topRowHeight = leftColumnIt->second.height;
+	}
+
+	auto rightTopPanelIt = iframeDataMap.end();
+	auto rightBottomPanelIt = iframeDataMap.end();
+	for (auto it = iframeDataMap.begin(); it != iframeDataMap.end(); ++it)
+	{
+		if (it->first == bottomPanelIt->first)
+		{
+			continue;
+		}
+
+		if (it->second.x != rightColumnIt->second.x)
+		{
+			continue;
+		}
+
+		if (rightTopPanelIt == iframeDataMap.end() || it->second.y < rightTopPanelIt->second.y)
+		{
+			rightTopPanelIt = it;
+		}
+
+		if (rightBottomPanelIt == iframeDataMap.end() || it->second.y > rightBottomPanelIt->second.y)
+		{
+			rightBottomPanelIt = it;
+		}
+	}
+
+	auto selectorForPanel = [](const std::string& panelName)
+	{
+		std::string selector = panelName;
+		std::replace(selector.begin(), selector.end(), '_', '-');
+		return selector;
+	};
+
+	const std::string leftPanelSelector = selectorForPanel(leftColumnIt->first);
+	const std::string bottomPanelSelector = selectorForPanel(bottomPanelIt->first);
+	const std::string rightTopPanelSelector =
+		(rightTopPanelIt != iframeDataMap.end()) ? selectorForPanel(rightTopPanelIt->first) : std::string();
+	const std::string rightBottomPanelSelector =
+		(rightBottomPanelIt != iframeDataMap.end()) ? selectorForPanel(rightBottomPanelIt->first) : std::string();
+
+	std::ostringstream script;
+	script
+		<< "(function(){"
+		<< "const findPanelElement=function(selector){"
+		<< "return document.querySelector('.'+selector) || document.querySelector('.'+selector.replace(/-UI/g,'_UI'));"
+		<< "};"
+		<< "const resetBox=function(element){"
+		<< "if(!element){return null;}"
+		<< "element.style.width='';"
+		<< "element.style.height='';"
+		<< "element.style.flex='';"
+		<< "element.style.minWidth='';"
+		<< "element.style.minHeight='';"
+		<< "element.style.maxWidth='';"
+		<< "element.style.maxHeight='';"
+		<< "element.style.alignSelf='';"
+		<< "return element;"
+		<< "};"
+		<< "const clampPanel=function(selector){"
+		<< "const element=resetBox(findPanelElement(selector));"
+		<< "if(!element){return null;}"
+		<< "element.style.overflow='hidden';"
+		<< "element.style.margin='0';"
+		<< "element.style.boxSizing='border-box';"
+		<< "return element;"
+		<< "};"
+		<< "const left=resetBox(document.querySelector('.left-section'));"
+		<< "const center=resetBox(document.querySelector('.center-section'));"
+		<< "const right=resetBox(document.querySelector('.right-section'));"
+		<< "const topRow=resetBox(document.querySelector('.top-row'));"
+		<< "const leftPanel=clampPanel('" << leftPanelSelector << "');"
+		<< "const rightTopPanel=" << (rightTopPanelSelector.empty() ? "null" : "clampPanel('" + rightTopPanelSelector + "')") << ";"
+		<< "const rightBottomPanel=" << (rightBottomPanelSelector.empty() ? "null" : "clampPanel('" + rightBottomPanelSelector + "')") << ";"
+		<< "const project=clampPanel('" << bottomPanelSelector << "');"
+		<< "if(left){left.style.width='" << leftColumnIt->second.width << "px';left.style.minWidth='" << leftColumnIt->second.width << "px';left.style.maxWidth='" << leftColumnIt->second.width << "px';left.style.flex='0 0 " << leftColumnIt->second.width << "px';left.style.overflow='hidden';}"
+		<< "if(center){center.style.flex='1 1 auto';center.style.minWidth='0';center.style.overflow='hidden';}"
+		<< "if(right){right.style.width='" << rightColumnIt->second.width << "px';right.style.minWidth='" << rightColumnIt->second.width << "px';right.style.maxWidth='" << rightColumnIt->second.width << "px';right.style.flex='0 0 " << rightColumnIt->second.width << "px';right.style.overflow='hidden';}"
+		<< "if(topRow){topRow.style.height='" << topRowHeight << "px';topRow.style.minHeight='" << topRowHeight << "px';topRow.style.maxHeight='" << topRowHeight << "px';topRow.style.flex='0 0 " << topRowHeight << "px';topRow.style.overflow='hidden';}"
+		<< "if(leftPanel){leftPanel.style.width='" << leftColumnIt->second.width << "px';leftPanel.style.height='" << leftColumnIt->second.height << "px';leftPanel.style.minWidth='" << leftColumnIt->second.width << "px';leftPanel.style.minHeight='" << leftColumnIt->second.height << "px';leftPanel.style.maxWidth='" << leftColumnIt->second.width << "px';leftPanel.style.maxHeight='" << leftColumnIt->second.height << "px';leftPanel.style.flex='0 0 auto';}"
+		<< "if(rightTopPanel){rightTopPanel.style.width='" << rightColumnIt->second.width << "px';rightTopPanel.style.height='" << ((rightTopPanelIt != iframeDataMap.end()) ? rightTopPanelIt->second.height : 0) << "px';rightTopPanel.style.minWidth='" << rightColumnIt->second.width << "px';rightTopPanel.style.minHeight='" << ((rightTopPanelIt != iframeDataMap.end()) ? rightTopPanelIt->second.height : 0) << "px';rightTopPanel.style.maxWidth='" << rightColumnIt->second.width << "px';rightTopPanel.style.maxHeight='" << ((rightTopPanelIt != iframeDataMap.end()) ? rightTopPanelIt->second.height : 0) << "px';rightTopPanel.style.flex='0 0 auto';}"
+		<< "if(rightBottomPanel){rightBottomPanel.style.width='" << rightColumnIt->second.width << "px';rightBottomPanel.style.height='" << ((rightBottomPanelIt != iframeDataMap.end()) ? rightBottomPanelIt->second.height : 0) << "px';rightBottomPanel.style.minWidth='" << rightColumnIt->second.width << "px';rightBottomPanel.style.minHeight='" << ((rightBottomPanelIt != iframeDataMap.end()) ? rightBottomPanelIt->second.height : 0) << "px';rightBottomPanel.style.maxWidth='" << rightColumnIt->second.width << "px';rightBottomPanel.style.maxHeight='" << ((rightBottomPanelIt != iframeDataMap.end()) ? rightBottomPanelIt->second.height : 0) << "px';rightBottomPanel.style.flex='0 0 auto';}"
+		<< "if(project){project.style.height='" << bottomPanelIt->second.height << "px';project.style.minHeight='" << bottomPanelIt->second.height << "px';project.style.maxHeight='" << bottomPanelIt->second.height << "px';project.style.flex='0 0 " << bottomPanelIt->second.height << "px';}"
+		<< "document.body.offsetHeight;"
+		<< "window.requestAnimationFrame(function(){"
+		<< "if(window.notifyViewportResize){window.notifyViewportResize();}"
+		<< "if(window.sendUIPanelIFramesToServer){window.sendUIPanelIFramesToServer();}"
+		<< "if(window.sendIFrameSizesToServer){window.sendIFrameSizesToServer();}"
+		<< "document.body.offsetHeight;"
+		<< "});"
+		<< "})();";
+
+	mainFrame->ExecuteJavaScript(script.str(), mainFrame->GetURL(), 0);
+	browser->GetHost()->Invalidate(PET_VIEW);
+	CefRefPtr<UIHandler> self(this);
+	CefPostDelayedTask(
+		TID_UI,
+		base::BindOnce(&UIHandler::finalizeDeferredLayoutRefresh, self, browser),
+		32);
+
+	std::cout << "[UIHandler] syncBrowserPanelLayoutFromCurrentFrames: Applied splitter-adjusted layout to CEF DOM for "
+		      << iframeDataMap.size() << " panels" << std::endl;
+	}
 
 void UIHandler::clearUIPanels()
 {
@@ -1119,6 +1380,7 @@ void UIHandler::clearUIPanels()
 	iframe_data_map_.clear();
 	pending_iframe_capture_.store(false);
 	pending_ui_panel_cache_.store(false);
+	pending_deferred_layout_refresh_.store(false);
 }
 
 void UIHandler::CallTestFromServer()

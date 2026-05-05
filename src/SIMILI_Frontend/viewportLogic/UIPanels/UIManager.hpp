@@ -66,15 +66,17 @@ namespace SIMILI {
 			void setBorders(int borderLeft, int borderTop, int borderWidth, int borderHeight);
 			void setCEFTextureForAllPanels(VkImageView view, VkSampler sampler, int cefWidth, int cefHeight);
 			bool consumePendingCEFRepaintRequest();
+			void refreshPanelTextureLayout(bool requestCEFRepaint = false);
 		
 			void clearUIPanels();
 
 			std::map<std::string, IFrameData> getUIPanelIFrames() const;
+			std::map<std::string, IFrameData> getResolvedUIPanelIFrames() const;
 			std::map<std::string, IFrameScreenData> getUIPanelFrameDatas() const;
 			const WorkSpace& getWorkSpace() const;
 		
 		private:
-			void applyPanelTextureLayout();
+			void applyPanelTextureLayout(bool requestCEFRepaint = false);
 
 			UIState current_state_;
 			UIState previous_state_;
@@ -124,8 +126,8 @@ namespace SIMILI {
 
 			VkImageView stored_cef_view_ = VK_NULL_HANDLE;
 			VkSampler stored_cef_sampler_ = VK_NULL_HANDLE;
-			int stored_cef_width_   = 0;
-			int stored_cef_height_  = 0;
+			int stored_cef_width_ = 0;
+			int stored_cef_height_ = 0;
 			SDL_Window* stored_window_ = nullptr;
 		};
 	}

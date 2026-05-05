@@ -635,6 +635,23 @@ void UIPanel::refreshCEFTextureBinding(VkImageView view, VkSampler sampler)
 	std::cout << "[UIPanel::refreshCEFTextureBinding] " << name_ << " - Updated external texture binding, needs redraw" << std::endl;
 }
 
+void UIPanel::RedrawSelfTextureAtCorrectResolution(int width, int height)
+{
+	if (width <= 0 || height <= 0)
+	{
+		return;
+	}
+
+	needs_redraw_ = true;
+	if (external_texture_view_ != VK_NULL_HANDLE && external_sampler_ != VK_NULL_HANDLE)
+	{
+		drawing_state_ = DrawingState::IsReadyToBeDrawn;
+	}
+
+	std::cout << "[UIPanel::RedrawSelfTextureAtCorrectResolution] " << name_ 
+	          << " - Preserving current CEF texture while waiting for repaint at " << width << "x" << height << std::endl;
+}
+
 bool UIPanel::createVulkanResources()
 {
 	if (!vk_context_)

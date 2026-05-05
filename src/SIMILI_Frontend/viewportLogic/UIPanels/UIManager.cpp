@@ -270,14 +270,9 @@ namespace SIMILI {
 			stored_cef_width_ = cefWidth;
 			stored_cef_height_ = cefHeight;
 
-			if (pending_geometry_texture_layout_)
+			if (pending_geometry_texture_layout_ || !panel_frames_overridden_by_splitters_ || splitter_mouse_mecanic_.isOperating())
 			{
-				applyPanelTextureLayout();
-				pending_geometry_texture_layout_ = false;
-			}
-			else if (!panel_frames_overridden_by_splitters_ || splitter_mouse_mecanic_.isOperating())
-			{
-				applyPanelTextureLayout();
+				pending_geometry_texture_layout_ = true;
 			}
 		}
 
@@ -288,7 +283,13 @@ namespace SIMILI {
 			return hadPendingRequest;
 		}
 
-		void UIManager::applyPanelTextureLayout()
+		void UIManager::refreshPanelTextureLayout(bool requestCEFRepaint)
+		{
+			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+			applyPanelTextureLayout(requestCEFRepaint);
+		}
+
+		void UIManager::applyPanelTextureLayout(bool requestCEFRepaint)
 		{
 			if (stored_cef_view_ == VK_NULL_HANDLE || stored_cef_sampler_ == VK_NULL_HANDLE)
 			{
@@ -316,6 +317,7 @@ namespace SIMILI {
 					continue;
 				}
 
+				// ------------------------- This section is necessary to keep the texture properly aligned the new panel geometry.
 				float u0 = 0.0f;
 				float v0 = 0.0f;
 				float u1 = 1.0f;
@@ -341,6 +343,29 @@ namespace SIMILI {
 				}
 
 				pair.second->setCEFTexture(stored_cef_view_, stored_cef_sampler_, u0, v0, u1, v1);
+			}
+
+			if (requestCEFRepaint)
+			{
+				std::cout << "[UIManager] applyPanelTextureLayout: Requesting CEF repaint for all panels due to geometry change" << std::endl;
+				for (auto& pair : ui_panels_)
+				{
+					if (!pair.second)
+					{
+						continue;
+					}
+
+					auto geometryIt = ui_panel_geometry_frame_data_map_.find(pair.first);
+					if (geometryIt != ui_panel_geometry_frame_data_map_.end())
+					{
+						if (geometryIt->second.width >= MIN_PANEL_DIMENSION && geometryIt->second.height >= MIN_PANEL_DIMENSION)
+						{
+							pair.second->RedrawSelfTextureAtCorrectResolution(geometryIt->second.width, geometryIt->second.height);
+						}
+					}
+				}
+
+				pending_cef_repaint_request_ = true;
 			}
 		}
 
@@ -638,15 +663,19 @@ namespace SIMILI {
 				panel_frames_overridden_by_splitters_ = true;
 				if (isOperating)
 				{
-					applyPanelTextureLayout();
+					pending_geometry_texture_layout_ = true;
 				}
 			}
 
 			if (hasJustStoppedOperating)
 			{
-				pending_cef_repaint_request_ = true;
 				pending_geometry_texture_layout_ = true;
-				applyPanelTextureLayout();
+			}
+
+			if (pending_geometry_texture_layout_)
+			{
+				applyPanelTextureLayout(hasJustStoppedOperating);
+				pending_geometry_texture_layout_ = false;
 			}
 
 			was_splitter_operating_ = isOperating;
@@ -745,6 +774,17 @@ namespace SIMILI {
 		{
 			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
 			return ui_panel_iframe_map_;
+		}
+
+		std::map<std::string, IFrameData> UIManager::getResolvedUIPanelIFrames() const
+		{
+			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+
+			const auto& effectiveFrameDataMap = ui_panel_geometry_frame_data_map_.empty()
+				? ui_panel_frame_data_map_
+				: ui_panel_geometry_frame_data_map_;
+
+			return panel_map_builder_.buildIFrameDataMap(effectiveFrameDataMap);
 		}
 
 		std::map<std::string, IFrameScreenData> UIManager::getUIPanelFrameDatas() const

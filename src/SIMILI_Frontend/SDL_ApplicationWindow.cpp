@@ -1041,6 +1041,12 @@ void SDL_ApplicationWindow::renderFrame()
 		ui_manager_->bindPanelsToSplitters();
 		if (ui_manager_->consumePendingCEFRepaintRequest())
 		{
+			if (ui_handler_)
+			{
+				UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+				handler->cacheUIPanelFrameDatas();
+				handler->syncBrowserPanelLayoutFromCurrentFrames();
+			}
 			requestBrowserRepaint();
 		}
 	}
@@ -1091,10 +1097,10 @@ void SDL_ApplicationWindow::renderFrame()
 			ui_manager_->drawSplitters(commandBuffer, prepared_drawable_width_, prepared_drawable_height_);
 		}
 
-		if (debug_tools_ && ui_manager_)
-		{
-			debug_tools_->drawDebugTools(commandBuffer, width, height, &ui_manager_->getWorkSpace());
-		}
+		// if (debug_tools_ && ui_manager_)
+		// {
+		// 	debug_tools_->drawDebugTools(commandBuffer, width, height, &ui_manager_->getWorkSpace());
+		// }
 	}
 
 	// ------ when state is Maximized for SDL3 window

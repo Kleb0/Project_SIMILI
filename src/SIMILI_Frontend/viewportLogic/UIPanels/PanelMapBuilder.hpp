@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../FrameDatas/FrameDatas.hpp"
+#include "../../ThreadSafeIFrameMap.hpp"
 #include "WorkSpace.hpp"
 #include <SDL3/SDL.h>
 #include <map>
@@ -138,6 +139,9 @@ namespace SIMILI
 					int currentWindowWidth);
 
 				const MapData& getMapData() const;
+
+				std::map<std::string, IFrameData> buildIFrameDataMap(
+					const std::map<std::string, IFrameScreenData>& frameDataMap) const;
 
 				const WorkSpace& getWorkSpace() const;
 

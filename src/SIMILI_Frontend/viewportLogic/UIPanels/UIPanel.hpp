@@ -33,12 +33,11 @@ class UIPanel
 		void setVulkanPipelines(VulkanPipeline* pipelines);
 		void setCEFTexture(VkImageView view, VkSampler sampler, float u0, float v0, float u1, float v1);
 		void refreshCEFTextureBinding(VkImageView view, VkSampler sampler);
-
+		void RedrawSelfTextureAtCorrectResolution(int width, int height);
 		const std::string& getName() const { return name_; }
 		DrawingState getDrawingState() const { return drawing_state_; }
 
 	private:
-
 		bool createTexture();
 		bool createShaderProgram();
 		void updateGeometry(int drawableWidth, int drawableHeight);

@@ -511,6 +511,31 @@ namespace SIMILI {
 			return map_data_;
 		}
 
+		std::map<std::string, IFrameData> PanelMapBuilder::buildIFrameDataMap(
+			const std::map<std::string, IFrameScreenData>& frameDataMap) const
+		{
+			std::map<std::string, IFrameData> iframeDataMap;
+
+			for (const auto& pair : frameDataMap)
+			{
+				IFrameData data{};
+				data.name = pair.second.name.empty() ? pair.first : pair.second.name;
+				data.x = pair.second.relativeX;
+				data.y = pair.second.relativeY;
+				data.width = pair.second.width;
+				data.height = pair.second.height;
+				data.clientX = pair.second.clientX;
+				data.clientY = pair.second.clientY;
+
+				auto panelIt = map_data_.panels.find(pair.first);
+				data.layoutIndex = (panelIt != map_data_.panels.end()) ? panelIt->second.index : 0;
+
+				iframeDataMap[pair.first] = data;
+			}
+
+			return iframeDataMap;
+		}
+
 		RayCastResult PanelMapBuilder::castRay(
 			const std::string& sourceName,
 			const IFrameScreenData& source,

@@ -120,6 +120,7 @@ public:
 
 	void initializeDefaultUIPanels();
 	void cacheUIPanelFrameDatas();
+		void syncBrowserPanelLayoutFromCurrentFrames();
 	void clearUIPanels();
 
 	void setUIManager(SIMILI::Frontend::UIManager* manager) { ui_manager_ = manager; }
@@ -161,6 +162,7 @@ private:
 	bool isOwnerThread() const;
 	bool hasRuntimeLayoutChanged(const std::map<std::string, SIMILI::Frontend::IFrameScreenData>& beforeMap, const std::map<std::string, SIMILI::Frontend::IFrameScreenData>& afterMap) const;
 	std::map<std::string, SIMILI::Frontend::IFrameScreenData> getRuntimeFrameDataMap() const;
+	void finalizeDeferredLayoutRefresh(CefRefPtr<CefBrowser> delayedBrowser);
 
 	// ================================= SINGLETON ===============
 
@@ -226,6 +228,7 @@ private:
 	std::thread::id owner_thread_id_;
 	std::atomic_bool pending_iframe_capture_;
 	std::atomic_bool pending_ui_panel_cache_;
+	std::atomic_bool pending_deferred_layout_refresh_;
 	
 	IMPLEMENT_REFCOUNTING(UIHandler);
 };
