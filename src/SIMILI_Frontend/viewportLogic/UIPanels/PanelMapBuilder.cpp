@@ -516,6 +516,9 @@ namespace SIMILI {
 		{
 			std::map<std::string, IFrameData> iframeDataMap;
 
+			// ------ Redraw Texture at Splitter action ------ //
+			// Convert splitter-adjusted screen data into the iframe payload that UIHandler
+			// feeds back into FrameDatas before the next texture layout refresh.
 			for (const auto& pair : frameDataMap)
 			{
 				IFrameData data{};

@@ -707,6 +707,9 @@ void UIHandler::processPendingFrameUpdates()
 
 	if (pending_deferred_layout_refresh_.exchange(false))
 	{
+		// ------ Redraw Texture at Splitter action ------ //
+		// The injected DOM layout has settled; recapture the browser bounds, rebuild
+		// FrameDatas, then refresh panel UV/layout before the follow-up repaint.
 		forceCaptureIFramePositions();
 		if (ui_manager_)
 		{
@@ -836,6 +839,7 @@ std::map<std::string, SIMILI::Frontend::IFrameScreenData> UIHandler::getRuntimeF
 
 void UIHandler::finalizeDeferredLayoutRefresh(CefRefPtr<CefBrowser> delayedBrowser)
 {
+	// ------ Redraw Texture at Splitter action ------ //
 	pending_deferred_layout_refresh_.store(true);
 
 	if (delayedBrowser && delayedBrowser->GetHost())
@@ -1132,6 +1136,9 @@ void UIHandler::cacheUIPanelFrameDatas()
 
 	if (ui_manager_)
 	{
+		// ------ Redraw Texture at Splitter action ------ //
+		// Pull the splitter-resolved iframe map produced by PanelMapBuilder so the
+		// next FrameDatas capture uses the same geometry as the incoming CEF redraw.
 		auto iframeDataMap = ui_manager_->getResolvedUIPanelIFrames();
 		if (iframeDataMap.empty())
 		{
@@ -1162,6 +1169,9 @@ void UIHandler::cacheUIPanelFrameDatas()
 
 		if (hasPanelLayoutChange && frame_datas_ && parent_window_)
 		{
+			// ------ Redraw Texture at Splitter action ------ //
+			// Rebuild FrameDatas from the updated iframe map, then push the captured
+			// bounds back into UIManager so UVs and geometry stay in sync.
 			frame_datas_->catchFrameData(parent_window_);
 			ui_manager_->cacheUIPanelFrameDatas(frame_datas_, {});
 			std::cout << "[UIHandler] cacheUIPanelFrameDatas: Refreshed FrameDatas with " << iframeDataMap.size()

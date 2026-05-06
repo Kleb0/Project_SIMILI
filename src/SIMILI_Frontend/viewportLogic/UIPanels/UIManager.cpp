@@ -784,6 +784,7 @@ namespace SIMILI {
 				? ui_panel_frame_data_map_
 				: ui_panel_geometry_frame_data_map_;
 
+			// ------ Redraw Texture at Splitter action ------ //
 			return panel_map_builder_.buildIFrameDataMap(effectiveFrameDataMap);
 		}
 
