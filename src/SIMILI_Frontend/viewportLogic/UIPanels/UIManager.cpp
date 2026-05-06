@@ -481,6 +481,127 @@ namespace SIMILI {
 			splitter_renderer_->draw(commandBuffer, drawableWidth, drawableHeight);
 		}
 
+		void UIManager::drawSplittersReducedScreenSize(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, SDL_Window* window, int referenceWindowWidth, int referenceWindowHeight)
+		{
+			if (splitter_list_.empty() || !vk_context_ || !vulkan_pipelines_ || vk_render_pass_ == VK_NULL_HANDLE)
+			{
+				return;
+			}
+
+			if (referenceWindowWidth <= 0 || referenceWindowHeight <= 0 || !window)
+			{
+				return;
+			}
+
+			int currentLogicalW = 0, currentLogicalH = 0;
+			SDL_GetWindowSize(window, &currentLogicalW, &currentLogicalH);
+			if (currentLogicalW <= 0 || currentLogicalH <= 0)
+			{
+				return;
+			}
+
+			float scaleX = static_cast<float>(currentLogicalW) / static_cast<float>(referenceWindowWidth);
+			float scaleY = static_cast<float>(currentLogicalH) / static_cast<float>(referenceWindowHeight);
+
+			if (!splitter_renderer_)
+			{
+				splitter_renderer_ = std::make_unique<Splitter>();
+				splitter_renderer_->setVulkanPipelines(vulkan_pipelines_);
+				splitter_renderer_->setSplitterMouseMecanic(&splitter_mouse_mecanic_);
+				splitter_renderer_->initialize(vk_context_, vk_render_pass_);
+			}
+
+			std::vector<Splitter::SplitterData> splitterData;
+			splitterData.reserve(splitter_list_.size());
+			for (const auto& def : splitter_list_)
+			{
+				Splitter::SplitterData sd;
+				sd.x = static_cast<int>(std::round(def.x * scaleX));
+				sd.y = static_cast<int>(std::round(def.y * scaleY));
+				sd.width = static_cast<int>(std::round(def.width * scaleX));
+				sd.height = static_cast<int>(std::round(def.height * scaleY));
+				sd.isVertical = def.isVertical;
+				sd.isHorizontal = def.isHorizontal;
+				splitterData.push_back(sd);
+			}
+
+			splitter_renderer_->setSplitters(splitterData);
+			splitter_renderer_->draw(commandBuffer, drawableWidth, drawableHeight);
+		}
+
+		void UIManager::drawReduceScreenUIpanelsInsideBorders(
+			VkCommandBuffer commandBuffer,
+			int drawableWidth, int drawableHeight,
+			const std::map<std::string, IFrameScreenData>& panelFrameDataMap,
+			bool skipTextureRebuild, SDL_Window* window,
+			int referenceWindowWidth, int referenceWindowHeight)
+		{
+			if (referenceWindowWidth <= 0 || referenceWindowHeight <= 0 || !window)
+			{
+				return;
+			}
+
+			int currentLogicalW = 0, currentLogicalH = 0;
+			SDL_GetWindowSize(window, &currentLogicalW, &currentLogicalH);
+
+			if (currentLogicalW <= 0 || currentLogicalH <= 0)
+			{
+				return;
+			}
+
+			float scaleX = static_cast<float>(currentLogicalW) / static_cast<float>(referenceWindowWidth);
+			float scaleY = static_cast<float>(currentLogicalH) / static_cast<float>(referenceWindowHeight);
+
+			std::map<std::string, IFrameScreenData> sourceFrameDataMap;
+			{
+				std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+				if ((panel_frames_overridden_by_splitters_ || splitter_mouse_mecanic_.isOperating()) && !ui_panel_geometry_frame_data_map_.empty())
+				{
+					sourceFrameDataMap = ui_panel_geometry_frame_data_map_;
+				}
+				else if (!panelFrameDataMap.empty())
+				{
+					sourceFrameDataMap = panelFrameDataMap;
+				}
+				else
+				{
+					sourceFrameDataMap = ui_panel_geometry_frame_data_map_;
+				}
+			}
+
+			if (sourceFrameDataMap.empty())
+			{
+				return;
+			}
+
+			std::map<std::string, IFrameScreenData> scaledFrameDataMap;
+
+			for (const auto& pair : sourceFrameDataMap)
+			{
+				IFrameScreenData scaled = pair.second;
+				scaled.relativeX = static_cast<int>(std::round(pair.second.relativeX * scaleX));
+				scaled.relativeY = static_cast<int>(std::round(pair.second.relativeY * scaleY));
+				scaled.width = static_cast<int>(std::round(pair.second.width * scaleX));
+				scaled.height = static_cast<int>(std::round(pair.second.height * scaleY));
+				scaled.clientX = static_cast<int>(std::round(pair.second.clientX * scaleX));
+				scaled.clientY = static_cast<int>(std::round(pair.second.clientY * scaleY));
+				scaledFrameDataMap[pair.first] = scaled;
+			}
+
+			static constexpr int BORDER = 3;
+			int borderLeft = BORDER;
+			int borderTop = BORDER;
+			int borderWidth = drawableWidth - 2 * BORDER;
+			int borderHeight = drawableHeight - 2 * BORDER;
+
+			panel_map_builder_.drawInsideAppBorders(
+				commandBuffer, drawableWidth, drawableHeight,
+				scaledFrameDataMap, skipTextureRebuild,
+				vk_context_, vulkan_pipelines_, vk_render_pass_,
+				ui_panels_, window,
+				borderLeft, borderTop, borderWidth, borderHeight);
+		}
+
 		void UIManager::enableSplitterMouseInteractions(int mouseX, int mouseY, bool isLeftButtonDown)
 		{
 			// ------------ push color based on mouse postion for splitters

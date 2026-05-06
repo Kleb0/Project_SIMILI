@@ -69,6 +69,13 @@ void App_Border::updateDimensions(int windowWidth, int windowHeight)
 
 	if (windowWidth < reference_window_width_ || windowHeight < reference_window_height_)
 	{
+		left_ = BORDER_OFFSET;
+		top_ = BORDER_OFFSET;
+		right_ = windowWidth - BORDER_OFFSET;
+		bottom_ = windowHeight - BORDER_OFFSET;
+		width_ = right_ - left_;
+		height_ = bottom_ - top_;
+
 		if (current_state_ != BorderState::Reduced)
 		{
 			std::cout << "[App_Border] Switching to REDUCED state (window: " << windowWidth << "x" << windowHeight 

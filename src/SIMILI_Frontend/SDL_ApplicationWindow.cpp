@@ -1023,7 +1023,7 @@ void SDL_ApplicationWindow::renderFrame()
 		SDL_MouseButtonFlags mouseButtons = SDL_GetMouseState(&mouseXf, &mouseYf);
 		const bool isLeftButtonDown = (mouseButtons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
 
-		if (window_state_ == WindowRenderState::Maximized && app_border_)
+		if ((window_state_ == WindowRenderState::Maximized || window_state_ == WindowRenderState::Reduced) && app_border_)
 		{
 			int currentW = 0, currentH = 0;
 			SDL_GetWindowSize(window_, &currentW, &currentH);
@@ -1125,6 +1125,24 @@ void SDL_ApplicationWindow::renderFrame()
 	}
 	// For Reduced and Updating states, we just cleared to black in renderPassViewportAndScissorSetup()
 
+	else if (window_state_ == WindowRenderState::Reduced)
+	{
+		activateDebugRender();
+
+		drawThreeDScreen();
+
+		preparePanels();
+
+		if (ui_manager_ && app_border_)
+		{
+			ui_manager_->drawReduceScreenUIpanelsInsideBorders(commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
+				prepared_panel_frame_data_map_, prepared_skip_texture_rebuild_, window_,
+				app_border_->getReferenceWindowWidth(), app_border_->getReferenceWindowHeight());
+
+			ui_manager_->drawSplittersReducedScreenSize(commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
+				window_, app_border_->getReferenceWindowWidth(), app_border_->getReferenceWindowHeight());
+		}
+	}
 
 	// functionnalities that dosn't depend on window_state 
 	if (debug_tools_ && ui_manager_)

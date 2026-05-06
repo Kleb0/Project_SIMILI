@@ -57,13 +57,20 @@ namespace SIMILI {
 			
 			void drawUIPanelsInsideBorders(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild, SDL_Window* window);
 			void drawFullScreenUIPanelsInsideBorders(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild, SDL_Window* window, int referenceWindowWidth, int referenceWindowHeight);
+			void drawReduceScreenUIpanelsInsideBorders(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild, SDL_Window* window, int referenceWindowWidth, int referenceWindowHeight);
+			
 			void drawSplitters(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight);
 			void drawSplittersFullScreen(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, SDL_Window* window, int referenceWindowWidth, int referenceWindowHeight);
+			void drawSplittersReducedScreenSize(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, SDL_Window* window, int referenceWindowWidth, int referenceWindowHeight);
+			
 			void enableSplitterMouseInteractions(int mouseX, int mouseY, bool isLeftButtonDown = false);
 			void dragSplitter(int mouseX, int mouseY, bool isLeftButtonDown);
+			
 			void bindWorkSpaceSizeToSplitterInteractions();
 			void bindPanelsToSplitters();
+			
 			void setBorders(int borderLeft, int borderTop, int borderWidth, int borderHeight);
+			
 			void setCEFTextureForAllPanels(VkImageView view, VkSampler sampler, int cefWidth, int cefHeight);
 			bool consumePendingCEFRepaintRequest();
 			void refreshPanelTextureLayout(bool requestCEFRepaint = false);
