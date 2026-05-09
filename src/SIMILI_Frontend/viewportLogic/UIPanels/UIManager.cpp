@@ -1,5 +1,6 @@
 #include "UIManager.hpp"
 #include "SplitterMouseMecanic.hpp"
+#include "../../SDL_ApplicationWindow.hpp"
 #include "../../ThreadSafeIFrameMap.hpp"
 #include "../../../Engine/VulkanScene/VKcontext.hpp"
 #include <iostream>
@@ -9,6 +10,23 @@
 
 namespace SIMILI {
 	namespace Frontend {
+
+		namespace 
+		{
+			bool frameMapMatchesWindowSize(const std::map<std::string, IFrameScreenData>& frameDataMap, int windowWidth, int windowHeight)
+			{
+				for (const auto& pair : frameDataMap)
+				{
+					const IFrameScreenData& frame = pair.second;
+					if (frame.windowWidth > 0 && frame.windowHeight > 0)
+					{
+						return frame.windowWidth == windowWidth && frame.windowHeight == windowHeight;
+					}
+				}
+
+				return false;
+			}
+		}
 
 		UIManager::UIManager()
 			: current_state_(UIState::Normal)
@@ -31,6 +49,7 @@ namespace SIMILI {
 			, app_border_top_(0)
 			, app_border_width_(0)
 			, app_border_height_(0)
+			, current_window_render_state_(WindowRenderState::Init)
 			, ui_panels_initialized_(false)
 		{
 
@@ -270,9 +289,23 @@ namespace SIMILI {
 			stored_cef_width_ = cefWidth;
 			stored_cef_height_ = cefHeight;
 
-			if (pending_geometry_texture_layout_ || !panel_frames_overridden_by_splitters_ || splitter_mouse_mecanic_.isOperating())
+			pending_geometry_texture_layout_ = true;
+		}
+
+		void UIManager::invalidateCEFTexture()
+		{
+			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+			stored_cef_view_ = VK_NULL_HANDLE;
+			stored_cef_sampler_ = VK_NULL_HANDLE;
+			stored_cef_width_ = 0;
+			stored_cef_height_ = 0;
+			
+			for (auto& pair : ui_panels_)
 			{
-				pending_geometry_texture_layout_ = true;
+				if (pair.second)
+				{
+					pair.second->invalidateExternalTexture();
+				}
 			}
 		}
 
@@ -317,6 +350,8 @@ namespace SIMILI {
 					continue;
 				}
 
+				pair.second->PreventClippingForReducedandMaxizimizedWindows(current_window_render_state_);
+
 				// ------------------------- This section is necessary to keep the texture properly aligned the new panel geometry.
 				float u0 = 0.0f;
 				float v0 = 0.0f;
@@ -339,11 +374,18 @@ namespace SIMILI {
 					{
 						continue;
 					}
-					pair.second->updateFromFrameData(geometryIt->second, stored_window_, true);
 				}
 
 				pair.second->setCEFTexture(stored_cef_view_, stored_cef_sampler_, u0, v0, u1, v1);
 			}
+
+			const auto& effectiveFrameDataMap = ui_panel_geometry_frame_data_map_.empty()
+				? ui_panel_frame_data_map_
+				: ui_panel_geometry_frame_data_map_;
+
+			panel_map_builder_.attachedUpdatedMap (effectiveFrameDataMap, splitter_list_, current_window_render_state_);
+
+			splitter_mouse_mecanic_.setAttachments(panel_map_builder_.getMapData().splitterAttachments);
 
 			if (requestCEFRepaint)
 			{
@@ -454,6 +496,7 @@ namespace SIMILI {
 
 			float scaleX = static_cast<float>(currentLogicalW) / static_cast<float>(referenceWindowWidth);
 			float scaleY = static_cast<float>(currentLogicalH) / static_cast<float>(referenceWindowHeight);
+			const bool splittersAlreadyMatchWindow = last_window_width_ == currentLogicalW && last_window_height_ == currentLogicalH;
 
 			if (!splitter_renderer_)
 			{
@@ -468,10 +511,20 @@ namespace SIMILI {
 			for (const auto& def : splitter_list_)
 			{
 				Splitter::SplitterData sd;
-				sd.x = static_cast<int>(std::round(def.x * scaleX));
-				sd.y = static_cast<int>(std::round(def.y * scaleY));
-				sd.width = static_cast<int>(std::round(def.width  * scaleX));
-				sd.height = static_cast<int>(std::round(def.height * scaleY));
+				if (splittersAlreadyMatchWindow)
+				{
+					sd.x = def.x;
+					sd.y = def.y;
+					sd.width = def.width;
+					sd.height = def.height;
+				}
+				else
+				{
+					sd.x = static_cast<int>(std::round(def.x * scaleX));
+					sd.y = static_cast<int>(std::round(def.y * scaleY));
+					sd.width = static_cast<int>(std::round(def.width  * scaleX));
+					sd.height = static_cast<int>(std::round(def.height * scaleY));
+				}
 				sd.isVertical = def.isVertical;
 				sd.isHorizontal = def.isHorizontal;
 				splitterData.push_back(sd);
@@ -502,6 +555,7 @@ namespace SIMILI {
 
 			float scaleX = static_cast<float>(currentLogicalW) / static_cast<float>(referenceWindowWidth);
 			float scaleY = static_cast<float>(currentLogicalH) / static_cast<float>(referenceWindowHeight);
+			const bool splittersAlreadyMatchWindow = last_window_width_ == currentLogicalW && last_window_height_ == currentLogicalH;
 
 			if (!splitter_renderer_)
 			{
@@ -516,10 +570,20 @@ namespace SIMILI {
 			for (const auto& def : splitter_list_)
 			{
 				Splitter::SplitterData sd;
-				sd.x = static_cast<int>(std::round(def.x * scaleX));
-				sd.y = static_cast<int>(std::round(def.y * scaleY));
-				sd.width = static_cast<int>(std::round(def.width * scaleX));
-				sd.height = static_cast<int>(std::round(def.height * scaleY));
+				if (splittersAlreadyMatchWindow)
+				{
+					sd.x = def.x;
+					sd.y = def.y;
+					sd.width = def.width;
+					sd.height = def.height;
+				}
+				else
+				{
+					sd.x = static_cast<int>(std::round(def.x * scaleX));
+					sd.y = static_cast<int>(std::round(def.y * scaleY));
+					sd.width = static_cast<int>(std::round(def.width * scaleX));
+					sd.height = static_cast<int>(std::round(def.height * scaleY));
+				}
 				sd.isVertical = def.isVertical;
 				sd.isHorizontal = def.isHorizontal;
 				splitterData.push_back(sd);
@@ -571,6 +635,23 @@ namespace SIMILI {
 
 			if (sourceFrameDataMap.empty())
 			{
+				return;
+			}
+
+			if (frameMapMatchesWindowSize(sourceFrameDataMap, currentLogicalW, currentLogicalH))
+			{
+				static constexpr int BORDER = 3;
+				int borderLeft = BORDER;
+				int borderTop = BORDER;
+				int borderWidth = drawableWidth - 2 * BORDER;
+				int borderHeight = drawableHeight - 2 * BORDER;
+
+				panel_map_builder_.drawInsideAppBorders(
+					commandBuffer, drawableWidth, drawableHeight,
+					sourceFrameDataMap, skipTextureRebuild,
+					vk_context_, vulkan_pipelines_, vk_render_pass_,
+					ui_panels_, window,
+					borderLeft, borderTop, borderWidth, borderHeight);
 				return;
 			}
 
@@ -673,14 +754,22 @@ namespace SIMILI {
 			panel_map_builder_.updateWorkSpaceFromSplitters(splitter_list_, last_window_width_, last_window_height_);
 		}
 
-		void UIManager::bindPanelsToSplitters()
+		void UIManager::bindPanelsToSplitters(WindowRenderState currentWindowState)
 		{
+			current_window_render_state_ = currentWindowState;
+
 			if (splitter_list_.empty())
+			{
+				if (pending_geometry_texture_layout_)
+				{
+					std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+					applyPanelTextureLayout(false);
+					pending_geometry_texture_layout_ = false;
+				}
 				return;
+			}
 
 			const bool isOperating = splitter_mouse_mecanic_.isOperating();
-			const bool hasJustStoppedOperating = was_splitter_operating_ && !isOperating;
-
 			if (isOperating)
 			{
 				std::cout << "[UIManager] Splitter operating: " << (isOperating ? "true" : "false") << std::endl;
@@ -694,14 +783,121 @@ namespace SIMILI {
 			{
 				prev_splitter_list_ = splitter_list_;
 				was_splitter_operating_ = isOperating;
-				return;
 			}
 
+			const bool hasJustStoppedOperating = was_splitter_operating_ && !isOperating;
 			const int SIDE_TOLERANCE = 20;
 			const int MIN_PANEL_SIZE = 10;
 			bool panelGeometryChanged = false;
+			int currentLogicalW = 0;
+			int currentLogicalH = 0;
+			float currentDpiScale = 1.0f;
+
+			if (stored_window_)
+			{
+				SDL_GetWindowSize(stored_window_, &currentLogicalW, &currentLogicalH);
+				int currentDrawableW = 0;
+				int currentDrawableH = 0;
+				SDL_GetWindowSizeInPixels(stored_window_, &currentDrawableW, &currentDrawableH);
+				if (currentLogicalW > 0 && currentDrawableW > 0)
+				{
+					currentDpiScale = static_cast<float>(currentDrawableW) / static_cast<float>(currentLogicalW);
+				}
+			}
 
 			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+
+			// tried this stuff to normalize the splitter geometry
+			if (isOperating && currentLogicalW > 0 && currentLogicalH > 0 && !ui_panel_geometry_frame_data_map_.empty())
+			{
+				int sourceWindowWidth = 0;
+				int sourceWindowHeight = 0;
+
+				for (const auto& panelPair : ui_panel_geometry_frame_data_map_)
+				{
+					const IFrameScreenData& frame = panelPair.second;
+					if (frame.windowWidth > 0 && frame.windowHeight > 0)
+					{
+						sourceWindowWidth = frame.windowWidth;
+						sourceWindowHeight = frame.windowHeight;
+						break;
+					}
+				}
+
+				if (sourceWindowWidth > 0 && sourceWindowHeight > 0 &&
+					(sourceWindowWidth != currentLogicalW || sourceWindowHeight != currentLogicalH))
+				{
+					const float normalizeScaleX = static_cast<float>(currentLogicalW) / static_cast<float>(sourceWindowWidth);
+					const float normalizeScaleY = static_cast<float>(currentLogicalH) / static_cast<float>(sourceWindowHeight);
+					int currentWindowX = 0;
+					int currentWindowY = 0;
+
+					if (stored_window_)
+					{
+						SDL_GetWindowPosition(stored_window_, &currentWindowX, &currentWindowY);
+					}
+
+					std::cout << "[UIManager] Normalizing splitter geometry from "
+						      << sourceWindowWidth << "x" << sourceWindowHeight
+						      << " to " << currentLogicalW << "x" << currentLogicalH
+						      << " before live drag" << std::endl;
+
+					for (auto& panelPair : ui_panel_geometry_frame_data_map_)
+					{
+						IFrameScreenData& frame = panelPair.second;
+						const int clientOffsetX = frame.clientX - frame.relativeX;
+						const int clientOffsetY = frame.clientY - frame.relativeY;
+						frame.relativeX = static_cast<int>(std::round(static_cast<float>(frame.relativeX) * normalizeScaleX));
+						frame.relativeY = static_cast<int>(std::round(static_cast<float>(frame.relativeY) * normalizeScaleY));
+						frame.width = static_cast<int>(std::round(static_cast<float>(frame.width) * normalizeScaleX));
+						frame.height = static_cast<int>(std::round(static_cast<float>(frame.height) * normalizeScaleY));
+						frame.clientX = frame.relativeX + clientOffsetX;
+						frame.clientY = frame.relativeY + clientOffsetY;
+						frame.windowX = currentWindowX;
+						frame.windowY = currentWindowY;
+						frame.screenX = currentWindowX + frame.clientX;
+						frame.screenY = currentWindowY + frame.clientY;
+						frame.windowWidth = currentLogicalW;
+						frame.windowHeight = currentLogicalH;
+						frame.dpiScale = currentDpiScale;
+					}
+				}
+			}
+
+			if (currentLogicalW > 0 && currentLogicalH > 0 &&
+				(last_window_width_ != currentLogicalW || last_window_height_ != currentLogicalH))
+			{
+				const std::map<std::string, IFrameScreenData>* rebuildFrameDataMap = nullptr;
+
+				if (frameMapMatchesWindowSize(ui_panel_geometry_frame_data_map_, currentLogicalW, currentLogicalH))
+				{
+					rebuildFrameDataMap = &ui_panel_geometry_frame_data_map_;
+				}
+				else if (frameMapMatchesWindowSize(ui_panel_frame_data_map_, currentLogicalW, currentLogicalH))
+				{
+					rebuildFrameDataMap = &ui_panel_frame_data_map_;
+				}
+
+				if (rebuildFrameDataMap)
+				{
+					std::cout << "[UIManager] Rebuilding splitter map for current SDL window size "
+						      << currentLogicalW << "x" << currentLogicalH
+						      << " before continuing splitter interaction" << std::endl;
+
+					panel_map_builder_.syncSplittersAndPanels(
+						*rebuildFrameDataMap,
+						currentLogicalW,
+						currentLogicalH,
+						panel_state_map_,
+						splitter_list_,
+						last_window_width_,
+						last_window_height_,
+						stored_window_);
+
+					splitter_mouse_mecanic_.setAttachments(panel_map_builder_.getMapData().splitterAttachments);
+					prev_splitter_list_ = splitter_list_;
+				}
+			}
 
 			for (std::size_t i = 0; i < splitter_list_.size(); ++i)
 			{
@@ -735,7 +931,7 @@ namespace SIMILI {
 					{
 						if (std::abs(originalRight - previousSplitterLeft) <= SIDE_TOLERANCE)
 						{
-							const int newWidth = std::max(MIN_PANEL_SIZE, currentSplitterLeft - fd.relativeX);
+							const int newWidth = (std::max)(MIN_PANEL_SIZE, currentSplitterLeft - fd.relativeX);
 							panelGeometryChanged = panelGeometryChanged || (newWidth != fd.width);
 							fd.width = newWidth;
 						}
@@ -743,7 +939,7 @@ namespace SIMILI {
 						{
 							const int newRelativeX = currentSplitterRight;
 							const int newClientX = fd.clientX + (newRelativeX - fd.relativeX);
-							const int newWidth = std::max(MIN_PANEL_SIZE, originalRight - newRelativeX);
+							const int newWidth = (std::max)(MIN_PANEL_SIZE, originalRight - newRelativeX);
 							panelGeometryChanged = panelGeometryChanged ||
 								(newRelativeX != fd.relativeX) ||
 								(newClientX != fd.clientX) ||
@@ -757,7 +953,7 @@ namespace SIMILI {
 					{
 						if (std::abs(originalBottom - previousSplitterTop) <= SIDE_TOLERANCE)
 						{
-							const int newHeight = std::max(MIN_PANEL_SIZE, currentSplitterTop - fd.relativeY);
+							const int newHeight = (std::max)(MIN_PANEL_SIZE, currentSplitterTop - fd.relativeY);
 							panelGeometryChanged = panelGeometryChanged || (newHeight != fd.height);
 							fd.height = newHeight;
 						}
@@ -765,7 +961,7 @@ namespace SIMILI {
 						{
 							const int newRelativeY = currentSplitterBottom;
 							const int newClientY = fd.clientY + (newRelativeY - fd.relativeY);
-							const int newHeight = std::max(MIN_PANEL_SIZE, originalBottom - newRelativeY);
+							const int newHeight = (std::max)(MIN_PANEL_SIZE, originalBottom - newRelativeY);
 							panelGeometryChanged = panelGeometryChanged ||
 								(newRelativeY != fd.relativeY) ||
 								(newClientY != fd.clientY) ||
@@ -779,6 +975,273 @@ namespace SIMILI {
 			}
 
 			prev_splitter_list_ = splitter_list_;
+			if (panelGeometryChanged)
+			{
+				if (currentLogicalW > 0 && currentLogicalH > 0)
+				{
+					for (auto& panelPair : ui_panel_geometry_frame_data_map_)
+					{
+						panelPair.second.windowWidth = currentLogicalW;
+						panelPair.second.windowHeight = currentLogicalH;
+						panelPair.second.dpiScale = currentDpiScale;
+					}
+				}
+
+				panel_frames_overridden_by_splitters_ = true;
+				if (isOperating)
+				{
+					pending_geometry_texture_layout_ = true;
+				}
+			}
+
+			if (hasJustStoppedOperating)
+			{
+				pending_geometry_texture_layout_ = true;
+			}
+
+			if (pending_geometry_texture_layout_)
+			{
+				applyPanelTextureLayout(hasJustStoppedOperating);
+				pending_geometry_texture_layout_ = false;
+			}
+
+			was_splitter_operating_ = isOperating;
+		}
+
+		void UIManager::applyFullScreenPanelTextureLayout(bool requestCEFRepaint, int fullscreenWidth, int fullscreenHeight)
+		{
+			if (stored_cef_view_ == VK_NULL_HANDLE || stored_cef_sampler_ == VK_NULL_HANDLE)
+			{
+				return;
+			}
+
+			if (!stored_window_)
+			{
+				return;
+			}
+
+			if (stored_cef_width_ <= 0 || stored_cef_height_ <= 0)
+			{
+				return;
+			}
+
+			if (fullscreenWidth <= 0 || fullscreenHeight <= 0)
+			{
+				return;
+			}
+
+			const int refW = stored_cef_width_;
+			const int refH = stored_cef_height_;
+			const float scaleX = static_cast<float>(fullscreenWidth) / static_cast<float>(refW);
+			const float scaleY = static_cast<float>(fullscreenHeight) / static_cast<float>(refH);
+
+			const int MIN_PANEL_DIMENSION = 5;
+			const float fw = static_cast<float>(stored_cef_width_);
+			const float fh = static_cast<float>(stored_cef_height_);
+
+			for (auto& pair : ui_panels_)
+			{
+				if (!pair.second)
+				{
+					continue;
+				}
+
+				pair.second->PreventClippingForReducedandMaxizimizedWindows(current_window_render_state_);
+
+				float u0 = 0.0f;
+				float v0 = 0.0f;
+				float u1 = 1.0f;
+				float v1 = 1.0f;
+
+				auto uvIt = ui_panel_frame_data_map_.find(pair.first);
+				if (uvIt != ui_panel_frame_data_map_.end())
+				{
+					u0 = static_cast<float>(uvIt->second.relativeX) / fw;
+					v0 = static_cast<float>(uvIt->second.relativeY) / fh;
+					u1 = static_cast<float>(uvIt->second.relativeX + uvIt->second.width) / fw;
+					v1 = static_cast<float>(uvIt->second.relativeY + uvIt->second.height) / fh;
+				}
+
+				auto geometryIt = ui_panel_geometry_frame_data_map_.find(pair.first);
+				if (geometryIt != ui_panel_geometry_frame_data_map_.end())
+				{
+					if (geometryIt->second.width < MIN_PANEL_DIMENSION || geometryIt->second.height < MIN_PANEL_DIMENSION)
+					{
+						continue;
+					}
+				}
+
+				pair.second->setCEFTexture(stored_cef_view_, stored_cef_sampler_, u0, v0, u1, v1);
+			}
+
+			const auto& effectiveFrameDataMap = ui_panel_geometry_frame_data_map_.empty()
+				? ui_panel_frame_data_map_
+				: ui_panel_geometry_frame_data_map_;
+
+			std::map<std::string, IFrameScreenData> scaledFrameDataMap;
+			for (const auto& p : effectiveFrameDataMap)
+			{
+				IFrameScreenData scaled = p.second;
+				scaled.relativeX = static_cast<int>(std::round(p.second.relativeX * scaleX));
+				scaled.relativeY = static_cast<int>(std::round(p.second.relativeY * scaleY));
+				scaled.width     = static_cast<int>(std::round(p.second.width     * scaleX));
+				scaled.height    = static_cast<int>(std::round(p.second.height    * scaleY));
+				scaled.clientX   = static_cast<int>(std::round(p.second.clientX   * scaleX));
+				scaled.clientY   = static_cast<int>(std::round(p.second.clientY   * scaleY));
+				scaledFrameDataMap[p.first] = scaled;
+			}
+
+			panel_map_builder_.attachedUpdatedMap(scaledFrameDataMap, splitter_list_, current_window_render_state_);
+
+			splitter_mouse_mecanic_.setAttachments(panel_map_builder_.getMapData().splitterAttachments);
+
+			if (requestCEFRepaint)
+			{
+				for (auto& pair : ui_panels_)
+				{
+					if (!pair.second)
+					{
+						continue;
+					}
+
+					auto geometryIt = ui_panel_geometry_frame_data_map_.find(pair.first);
+					if (geometryIt != ui_panel_geometry_frame_data_map_.end())
+					{
+						const int scaledW = static_cast<int>(std::round(geometryIt->second.width * scaleX));
+						const int scaledH = static_cast<int>(std::round(geometryIt->second.height * scaleY));
+						if (scaledW >= MIN_PANEL_DIMENSION && scaledH >= MIN_PANEL_DIMENSION)
+						{
+							pair.second->RedrawSelfTextureAtCorrectResolution(scaledW, scaledH);
+						}
+					}
+				}
+
+				pending_cef_repaint_request_ = true;
+			}
+		}
+
+		void UIManager::bindFullScreenPanelsToSplitters(WindowRenderState currentWindowState)
+		{
+			current_window_render_state_ = currentWindowState;
+
+			if (!stored_window_)
+			{
+				return;
+			}
+
+			int fullscreenW = 0, fullscreenH = 0;
+			SDL_GetWindowSize(stored_window_, &fullscreenW, &fullscreenH);
+
+			if (fullscreenW <= 0 || fullscreenH <= 0)
+			{
+				return;
+			}
+
+			if (splitter_list_.empty())
+			{
+				if (pending_geometry_texture_layout_)
+				{
+					std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+					applyFullScreenPanelTextureLayout(false, fullscreenW, fullscreenH);
+					pending_geometry_texture_layout_ = false;
+				}
+				return;
+			}
+
+			const bool isOperating = splitter_mouse_mecanic_.isOperating();
+
+			if (prev_splitter_list_.size() != splitter_list_.size())
+			{
+				prev_splitter_list_ = splitter_list_;
+				was_splitter_operating_ = isOperating;
+			}
+
+			const bool hasJustStoppedOperating = was_splitter_operating_ && !isOperating;
+
+			const int refW = (stored_cef_width_ > 0) ? stored_cef_width_ : fullscreenW;
+			const int refH = (stored_cef_height_ > 0) ? stored_cef_height_ : fullscreenH;
+			const float scaleX = static_cast<float>(fullscreenW) / static_cast<float>(refW);
+			const float scaleY = static_cast<float>(fullscreenH) / static_cast<float>(refH);
+
+			const int SIDE_TOLERANCE = 20;
+			const int MIN_PANEL_SIZE = 10;
+			bool panelGeometryChanged = false;
+
+			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+
+			for (std::size_t i = 0; i < splitter_list_.size(); ++i)
+			{
+				const SplitterDefinition& current = splitter_list_[i];
+				const SplitterDefinition& previous = prev_splitter_list_[i];
+
+				const int dx = current.x - previous.x;
+				const int dy = current.y - previous.y;
+
+				if (dx == 0 && dy == 0)
+					continue;
+
+				const int prevSplitterLeft   = static_cast<int>(std::round(previous.x * scaleX));
+				const int prevSplitterRight  = static_cast<int>(std::round((previous.x + previous.width) * scaleX));
+				const int currSplitterLeft   = static_cast<int>(std::round(current.x * scaleX));
+				const int currSplitterRight  = static_cast<int>(std::round((current.x + current.width) * scaleX));
+				const int prevSplitterTop    = static_cast<int>(std::round(previous.y * scaleY));
+				const int prevSplitterBottom = static_cast<int>(std::round((previous.y + previous.height) * scaleY));
+				const int currSplitterTop    = static_cast<int>(std::round(current.y * scaleY));
+				const int currSplitterBottom = static_cast<int>(std::round((current.y + current.height) * scaleY));
+
+				for (auto& panelPair : ui_panel_geometry_frame_data_map_)
+				{
+					IFrameScreenData& fd = panelPair.second;
+					const int originalLeft   = fd.relativeX;
+					const int originalTop    = fd.relativeY;
+					const int originalRight  = fd.relativeX + fd.width;
+					const int originalBottom = fd.relativeY + fd.height;
+
+					if (current.isVertical && dx != 0)
+					{
+						if (std::abs(originalRight - prevSplitterLeft) <= SIDE_TOLERANCE)
+						{
+							const int newWidth = (std::max)(MIN_PANEL_SIZE, currSplitterLeft - fd.relativeX);
+							panelGeometryChanged = panelGeometryChanged || (newWidth != fd.width);
+							fd.width = newWidth;
+						}
+						else if (std::abs(originalLeft - prevSplitterRight) <= SIDE_TOLERANCE)
+						{
+							const int newRelativeX = currSplitterRight;
+							const int newClientX   = fd.clientX + (newRelativeX - fd.relativeX);
+							const int newWidth     = (std::max)(MIN_PANEL_SIZE, originalRight - newRelativeX);
+							panelGeometryChanged = panelGeometryChanged ||
+								(newRelativeX != fd.relativeX) || (newClientX != fd.clientX) || (newWidth != fd.width);
+							fd.relativeX = newRelativeX;
+							fd.clientX   = newClientX;
+							fd.width     = newWidth;
+						}
+					}
+					else if (current.isHorizontal && dy != 0)
+					{
+						if (std::abs(originalBottom - prevSplitterTop) <= SIDE_TOLERANCE)
+						{
+							const int newHeight = (std::max)(MIN_PANEL_SIZE, currSplitterTop - fd.relativeY);
+							panelGeometryChanged = panelGeometryChanged || (newHeight != fd.height);
+							fd.height = newHeight;
+						}
+						else if (std::abs(originalTop - prevSplitterBottom) <= SIDE_TOLERANCE)
+						{
+							const int newRelativeY = currSplitterBottom;
+							const int newClientY   = fd.clientY + (newRelativeY - fd.relativeY);
+							const int newHeight    = (std::max)(MIN_PANEL_SIZE, originalBottom - newRelativeY);
+							panelGeometryChanged = panelGeometryChanged ||
+								(newRelativeY != fd.relativeY) || (newClientY != fd.clientY) || (newHeight != fd.height);
+							fd.relativeY = newRelativeY;
+							fd.clientY   = newClientY;
+							fd.height    = newHeight;
+						}
+					}
+				}
+			}
+
+			prev_splitter_list_ = splitter_list_;
+
 			if (panelGeometryChanged)
 			{
 				panel_frames_overridden_by_splitters_ = true;
@@ -795,7 +1258,7 @@ namespace SIMILI {
 
 			if (pending_geometry_texture_layout_)
 			{
-				applyPanelTextureLayout(hasJustStoppedOperating);
+				applyFullScreenPanelTextureLayout(hasJustStoppedOperating, fullscreenW, fullscreenH);
 				pending_geometry_texture_layout_ = false;
 			}
 
@@ -845,6 +1308,23 @@ namespace SIMILI {
 
 			if (sourceFrameDataMap.empty())
 			{
+				return;
+			}
+
+			if (frameMapMatchesWindowSize(sourceFrameDataMap, currentLogicalW, currentLogicalH))
+			{
+				static constexpr int BORDER = 3;
+				int borderLeft = BORDER;
+				int borderTop = BORDER;
+				int borderWidth = drawableWidth - 2 * BORDER;
+				int borderHeight = drawableHeight - 2 * BORDER;
+
+				panel_map_builder_.drawInsideAppBorders(
+					commandBuffer, drawableWidth, drawableHeight,
+					sourceFrameDataMap, skipTextureRebuild,
+					vk_context_, vulkan_pipelines_, vk_render_pass_,
+					ui_panels_, window,
+					borderLeft, borderTop, borderWidth, borderHeight);
 				return;
 			}
 

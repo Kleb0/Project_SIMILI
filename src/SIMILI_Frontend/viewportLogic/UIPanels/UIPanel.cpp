@@ -1,6 +1,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 
 #include "UIPanel.hpp"
+#include "../../SDL_ApplicationWindow.hpp"
 #include "../../../Engine/VulkanScene/VKcontext.hpp"
 #include "../../../Engine/GLSL_Compiler/GLSLCompiler.hpp"
 #include <algorithm>
@@ -47,6 +48,7 @@ UIPanel::UIPanel()
 	, external_sampler_(VK_NULL_HANDLE)
 	, bound_texture_view_(VK_NULL_HANDLE)
 	, bound_sampler_(VK_NULL_HANDLE)
+	, prevent_window_clipping_(false)
 {
 }
 
@@ -86,6 +88,7 @@ void UIPanel::shutdown()
 	external_sampler_ = VK_NULL_HANDLE;
 	bound_texture_view_ = VK_NULL_HANDLE;
 	bound_sampler_ = VK_NULL_HANDLE;
+	prevent_window_clipping_ = false;
 	last_frame_x_ = 0;
 	last_frame_y_ = 0;
 	last_frame_width_ = 0;
@@ -154,12 +157,12 @@ void UIPanel::updateFromFrameData(const SIMILI::Frontend::IFrameScreenData& fram
 		}
 	}
 
-	if (x_ + width_ > drawableWidth)
+	if (!prevent_window_clipping_ && x_ + width_ > drawableWidth)
 	{
 		width_ = (std::max)(1, drawableWidth - x_);
 	}
 
-	if (y_ + height_ > drawableHeight)
+	if (!prevent_window_clipping_ && y_ + height_ > drawableHeight)
 	{
 		height_ = (std::max)(1, drawableHeight - y_);
 	}
@@ -201,6 +204,44 @@ void UIPanel::updateFromFrameData(const SIMILI::Frontend::IFrameScreenData& fram
 			needs_redraw_ = true;
 		}
 	}
+}
+
+void UIPanel::PreventClippingForReducedandMaxizimizedWindows(WindowRenderState windowState)
+{
+	const bool preventClipping =
+		windowState == WindowRenderState::Maximized ||
+		windowState == WindowRenderState::Reduced;
+
+	const bool stateChanged = prevent_window_clipping_ != preventClipping;
+	prevent_window_clipping_ = preventClipping;
+
+	if (!prevent_window_clipping_)
+	{
+		if (stateChanged)
+		{
+			needs_redraw_ = true;
+			if (has_valid_bounds_)
+			{
+				drawing_state_ = DrawingState::IsReadyToBeDrawn;
+			}
+		}
+		return;
+	}
+
+	has_valid_bounds_ = width_ > 0 && height_ > 0;
+	needs_redraw_ = true;
+
+	if (has_valid_bounds_)
+	{
+		drawing_state_ = DrawingState::IsReadyToBeDrawn;
+	}
+	else
+	{
+		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
+	}
+
+	bound_texture_view_ = VK_NULL_HANDLE;
+	bound_sampler_ = VK_NULL_HANDLE;
 }
 
 void UIPanel::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight)
@@ -286,6 +327,8 @@ void UIPanel::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawabl
 	{
 		if (bound_texture_view_ != textureForBinding || bound_sampler_ != samplerForBinding)
 		{
+			vkDeviceWaitIdle(vk_context_->getDevice());
+
 			VkDescriptorImageInfo imageInfo{};
 			imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 			imageInfo.imageView = textureForBinding;
@@ -367,6 +410,8 @@ bool UIPanel::updateDescriptorTextureBinding()
 	{
 		return true;
 	}
+
+	vkDeviceWaitIdle(vk_context_->getDevice());
 
 	VkDescriptorImageInfo imageInfo{};
 	imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -541,24 +586,74 @@ void UIPanel::updateGeometry(int drawableWidth, int drawableHeight)
 		return;
 	}
 
+	int geometryLeft = x_;
+	int geometryTop = y_;
+	int geometryRight = x_ + width_;
+	int geometryBottom = y_ + height_;
+	float uvLeft = texcoord_left_;
+	float uvTop = texcoord_top_;
+	float uvRight = texcoord_right_;
+	float uvBottom = texcoord_bottom_;
+
+	const int clippedLeft = (std::max)(0, geometryLeft);
+	const int clippedTop = (std::max)(0, geometryTop);
+	const int clippedRight = (std::min)(drawableWidth, geometryRight);
+	const int clippedBottom = (std::min)(drawableHeight, geometryBottom);
+
+	if (clippedRight <= clippedLeft || clippedBottom <= clippedTop || width_ <= 0 || height_ <= 0)
+	{
+		float vertices[] = {
+			-2.0f, -2.0f, texcoord_left_, texcoord_top_,
+			-2.0f, -2.0f, texcoord_right_, texcoord_bottom_,
+			-2.0f, -2.0f, texcoord_left_, texcoord_bottom_,
+			-2.0f, -2.0f, texcoord_left_, texcoord_top_,
+			-2.0f, -2.0f, texcoord_right_, texcoord_top_,
+			-2.0f, -2.0f, texcoord_right_, texcoord_bottom_
+		};
+
+		VkDevice device = vk_context_->getDevice();
+		void* data = nullptr;
+		if (vkMapMemory(device, vk_vertex_buffer_memory_, 0, sizeof(vertices), 0, &data) == VK_SUCCESS)
+		{
+			std::memcpy(data, vertices, sizeof(vertices));
+			vkUnmapMemory(device, vk_vertex_buffer_memory_);
+		}
+		return;
+	}
+
+	const float panelWidth = static_cast<float>(width_);
+	const float panelHeight = static_cast<float>(height_);
+	const float uSpan = texcoord_right_ - texcoord_left_;
+	const float vSpan = texcoord_bottom_ - texcoord_top_;
+
+	uvLeft = texcoord_left_ + (static_cast<float>(clippedLeft - geometryLeft) / panelWidth) * uSpan;
+	uvRight = texcoord_left_ + (static_cast<float>(clippedRight - geometryLeft) / panelWidth) * uSpan;
+	uvTop = texcoord_top_ + (static_cast<float>(clippedTop - geometryTop) / panelHeight) * vSpan;
+	uvBottom = texcoord_top_ + (static_cast<float>(clippedBottom - geometryTop) / panelHeight) * vSpan;
+
+	geometryLeft = clippedLeft;
+	geometryTop = clippedTop;
+	geometryRight = clippedRight;
+	geometryBottom = clippedBottom;
+
 	// X: SDL coords [0, width] -> NDC [-1, +1]
-	float left = (static_cast<float>(x_) / static_cast<float>(drawableWidth)) * 2.0f - 1.0f;
-	float right = (static_cast<float>(x_ + width_) / static_cast<float>(drawableWidth)) * 2.0f - 1.0f;
+	float left = (static_cast<float>(geometryLeft) / static_cast<float>(drawableWidth)) * 2.0f - 1.0f;
+	float right = (static_cast<float>(geometryRight) / static_cast<float>(drawableWidth)) * 2.0f - 1.0f;
 	
 	// Y: With positive viewport, NDC Y=-1 is top, Y=+1 is bottom
 	// SDL has Y=0 at top, so we map: pixel_y=0 -> NDC=-1, pixel_y=height -> NDC=+1
-	float top = (static_cast<float>(y_) / static_cast<float>(drawableHeight)) * 2.0f - 1.0f;
-	float bottom = (static_cast<float>(y_ + height_) / static_cast<float>(drawableHeight)) * 2.0f - 1.0f;
+	float top = (static_cast<float>(geometryTop) / static_cast<float>(drawableHeight)) * 2.0f - 1.0f;
+	float bottom = (static_cast<float>(geometryBottom) / static_cast<float>(drawableHeight)) * 2.0f - 1.0f;
 	
 	first_draw_done_ = true;
 
 	float vertices[] = {
-		left, top, texcoord_left_, texcoord_top_,
-		right, bottom, texcoord_right_, texcoord_bottom_,
-		left, bottom, texcoord_left_, texcoord_bottom_,
-		left, top, texcoord_left_, texcoord_top_,
-		right, top, texcoord_right_, texcoord_top_,
-		right, bottom, texcoord_right_, texcoord_bottom_
+		left, top, uvLeft, uvTop,
+		right, bottom, uvRight, uvBottom,
+		left, bottom, uvLeft, uvBottom,
+		left, top, uvLeft, uvTop,
+		right, top, uvRight, uvTop,
+		right, bottom, uvRight, uvBottom
 	};
 
 	VkDevice device = vk_context_->getDevice();
@@ -633,6 +728,19 @@ void UIPanel::refreshCEFTextureBinding(VkImageView view, VkSampler sampler)
 		drawing_state_ = DrawingState::IsReadyToBeDrawn;
 
 	std::cout << "[UIPanel::refreshCEFTextureBinding] " << name_ << " - Updated external texture binding, needs redraw" << std::endl;
+}
+
+void UIPanel::invalidateExternalTexture()
+{
+	external_texture_view_ = VK_NULL_HANDLE;
+	external_sampler_ = VK_NULL_HANDLE;
+	bound_texture_view_ = VK_NULL_HANDLE;
+	bound_sampler_ = VK_NULL_HANDLE;
+	needs_redraw_ = true;
+	if (drawing_state_ == DrawingState::IsReadyToBeDrawn || drawing_state_ == DrawingState::HasBeenDrawn)
+	{
+		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
+	}
 }
 
 void UIPanel::RedrawSelfTextureAtCorrectResolution(int width, int height)

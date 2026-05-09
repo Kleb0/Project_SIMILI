@@ -15,6 +15,7 @@
 class VKContext;
 class VulkanPipeline;
 struct IFrameData;
+enum class WindowRenderState : int;
 
 namespace SIMILI {
 	namespace Frontend {
@@ -67,11 +68,13 @@ namespace SIMILI {
 			void dragSplitter(int mouseX, int mouseY, bool isLeftButtonDown);
 			
 			void bindWorkSpaceSizeToSplitterInteractions();
-			void bindPanelsToSplitters();
+			void bindPanelsToSplitters(WindowRenderState currentWindowState);
+			void bindFullScreenPanelsToSplitters(WindowRenderState currentWindowState);
 			
 			void setBorders(int borderLeft, int borderTop, int borderWidth, int borderHeight);
 			
 			void setCEFTextureForAllPanels(VkImageView view, VkSampler sampler, int cefWidth, int cefHeight);
+			void invalidateCEFTexture();
 			bool consumePendingCEFRepaintRequest();
 			void refreshPanelTextureLayout(bool requestCEFRepaint = false);
 		
@@ -84,6 +87,7 @@ namespace SIMILI {
 		
 		private:
 			void applyPanelTextureLayout(bool requestCEFRepaint = false);
+			void applyFullScreenPanelTextureLayout(bool requestCEFRepaint, int fullscreenWidth, int fullscreenHeight);
 
 			UIState current_state_;
 			UIState previous_state_;
@@ -126,6 +130,7 @@ namespace SIMILI {
 			bool was_splitter_operating_ = false;
 			bool pending_cef_repaint_request_ = false;
 			bool pending_geometry_texture_layout_ = false;
+			WindowRenderState current_window_render_state_;
 
 			PanelMapBuilder panel_map_builder_;
 			std::unique_ptr<Splitter> splitter_renderer_;

@@ -69,7 +69,6 @@ namespace SIMILI {
 					frameDataMap_[frameData.name] = screenData;
 				}
 
-				printAllFrameData();
 			}
 
 			bool FrameDatas::getFrameData(const std::string& name, IFrameScreenData& outData) const

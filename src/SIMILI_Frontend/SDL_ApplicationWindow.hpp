@@ -33,12 +33,11 @@ class AppRenderHandler : public CefRenderHandler
 		IMPLEMENT_REFCOUNTING(AppRenderHandler);
 };
 
-enum class WindowRenderState
+enum class WindowRenderState : int
 {
 	Init,
 	Maximized,
 	Reduced,
-	Updating
 };
 
 struct IFrameData;
@@ -78,6 +77,7 @@ class SDL_ApplicationWindow
 		float getDpiScale() const;
 		bool isMaximized() const;
 		bool isVisible() const;
+		WindowRenderState getWindowRenderState() const { return window_state_; }
 		bool isValid() const { return window_ != nullptr; }
 		SDL_Window* getHandle() const { return window_; }
 
@@ -99,6 +99,11 @@ class SDL_ApplicationWindow
 
 		SIMILI::Frontend::UIManager* getUIManager() const { return ui_manager_; }
 		App_Border* getAppBorder() const { return app_border_; }
+		
+		// === SDL Window Reference Size ===
+		void setSDLReferenceWindowSize(int width, int height) { reference_window_width_ = width; reference_window_height_ = height; }
+		int getSDLReferenceWindowWidth() const { return reference_window_width_; }
+		int getSDLReferenceWindowHeight() const { return reference_window_height_; }
 		
 		// === Event Handling ===
 		void processEvents();
@@ -145,6 +150,8 @@ class SDL_ApplicationWindow
 		int last_height_;
 		float dpi_scale_;
 		WindowRenderState window_state_;
+		int reference_window_width_;
+		int reference_window_height_;
 		
 		// === UI Components ===
 		void* ui_handler_;
@@ -162,6 +169,7 @@ class SDL_ApplicationWindow
 		std::shared_ptr<VulkanPipeline::Pipeline> cef_shared_pipeline_;
 		VkDescriptorSetLayout cef_descriptor_set_layout_;
 		std::mutex render_mutex_;
+		std::mutex queue_mutex_;
 		std::vector<unsigned char> cef_paint_buffer_;
 		int cef_paint_width_;
 		int cef_paint_height_;

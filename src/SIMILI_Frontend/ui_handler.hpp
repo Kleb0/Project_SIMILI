@@ -120,7 +120,10 @@ public:
 
 	void initializeDefaultUIPanels();
 	void cacheUIPanelFrameDatas();
-		void syncBrowserPanelLayoutFromCurrentFrames();
+	// Utilisé pour l'état Init de la fenêtre
+	void syncBrowserPanelLayoutFromCurrentFrames(WindowRenderState windowState, int currentWidth, int currentHeight, int referenceWidth, int referenceHeight);
+	// Utilisé pour l'état Fullscreen (Maximized) de la fenêtre
+	void syncBrowserFullScreenPanelLayout(WindowRenderState windowState, int currentWidth, int currentHeight, int referenceWidth, int referenceHeight);
 	void clearUIPanels();
 
 	void setUIManager(SIMILI::Frontend::UIManager* manager) { ui_manager_ = manager; }

@@ -10,6 +10,7 @@
 #include <climits>
 
 class VKContext;
+enum class WindowRenderState : int;
 
 namespace SIMILI 
 {
@@ -143,11 +144,28 @@ namespace SIMILI
 				std::map<std::string, IFrameData> buildIFrameDataMap(
 					const std::map<std::string, IFrameScreenData>& frameDataMap) const;
 
+				void attachedUpdatedMap(
+					const std::map<std::string, IFrameScreenData>& frameDataMap,
+					const std::vector<SplitterDefinition>& splitterList,
+					WindowRenderState currentWindowState);
+
 				const WorkSpace& getWorkSpace() const;
 
 				void updateWorkSpaceFromSplitters(const std::vector<SplitterDefinition>& splitterList, int windowWidth, int windowHeight);
 
 			private:
+				bool frameMapMatchesWindowSize(
+					const std::map<std::string, IFrameScreenData>& frameDataMap,
+					int windowWidth,
+					int windowHeight) const;
+
+				void syncPanelStateMapFromFrameData(
+					const std::map<std::string, IFrameScreenData>& frameDataMap,
+					std::map<std::string, PanelState>& panelStateMap);
+
+				std::map<std::string, IFrameScreenData> buildFrameDataMapFromPanelState(
+				const std::map<std::string, PanelState>& panelStateMap,
+				const std::map<std::string, IFrameScreenData>& fallbackFrameDataMap) const;
 
 				void attachedSplittersAtCreation();
 

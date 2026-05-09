@@ -47,6 +47,8 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, last_height_(600)
 	, dpi_scale_(1.0f)
 	, window_state_(WindowRenderState::Init)
+	, reference_window_width_(1920)
+	, reference_window_height_(1080)
 	, ui_handler_(nullptr)
 	, threed_screen_(nullptr)
 	, frame_datas_(nullptr)
@@ -194,6 +196,11 @@ bool SDL_ApplicationWindow::create(const std::string& title, int width, int heig
 	
 	last_width_ = width;
 	last_height_ = height;
+	
+	// Set SDL reference window size (used for JavaScript scaling)
+	reference_window_width_ = width;
+	reference_window_height_ = height;
+	std::cout << "[SDL_ApplicationWindow] Reference window size set to: " << reference_window_width_ << "x" << reference_window_height_ << std::endl;
 	
 	std::cout << "[SDL_ApplicationWindow] Getting initial position..." << std::endl;
 	// Get initial position
@@ -596,11 +603,19 @@ void SDL_ApplicationWindow::uploadCEFPaintBuffer()
 
 	if (cef_texture_image_ != VK_NULL_HANDLE && (w != cef_texture_uploaded_width_ || h != cef_texture_uploaded_height_))
 	{
-		vkQueueWaitIdle(vk_context_->getGraphicsQueue());
+		{
+			std::lock_guard<std::mutex> qlock(queue_mutex_);
+			vkQueueWaitIdle(vk_context_->getGraphicsQueue());
+		}
 		if (cef_texture_view_ != VK_NULL_HANDLE) { vkDestroyImageView(device, cef_texture_view_, nullptr); cef_texture_view_ = VK_NULL_HANDLE; }
 		if (cef_texture_sampler_ != VK_NULL_HANDLE) { vkDestroySampler(device, cef_texture_sampler_, nullptr); cef_texture_sampler_ = VK_NULL_HANDLE; }
 		if (cef_texture_image_ != VK_NULL_HANDLE) { vkDestroyImage(device, cef_texture_image_, nullptr); cef_texture_image_ = VK_NULL_HANDLE; }
 		if (cef_texture_memory_ != VK_NULL_HANDLE) { vkFreeMemory(device, cef_texture_memory_, nullptr); cef_texture_memory_ = VK_NULL_HANDLE; }
+		
+		if (ui_manager_)
+		{
+			ui_manager_->invalidateCEFTexture();
+		}
 	}
 
 	if (cef_texture_image_ == VK_NULL_HANDLE)
@@ -714,8 +729,11 @@ void SDL_ApplicationWindow::uploadCEFPaintBuffer()
 	vkEndCommandBuffer(cmd);
 	VkSubmitInfo submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
 	submit.commandBufferCount = 1; submit.pCommandBuffers = &cmd;
-	vkQueueSubmit(vk_context_->getGraphicsQueue(), 1, &submit, VK_NULL_HANDLE);
-	vkQueueWaitIdle(vk_context_->getGraphicsQueue());
+	{
+		std::lock_guard<std::mutex> qlock(queue_mutex_);
+		vkQueueSubmit(vk_context_->getGraphicsQueue(), 1, &submit, VK_NULL_HANDLE);
+		vkQueueWaitIdle(vk_context_->getGraphicsQueue());
+	}
 	vkDestroyCommandPool(device, pool, nullptr);
 	vkFreeMemory(device, stagingMem, nullptr);
 	vkDestroyBuffer(device, staging, nullptr);
@@ -895,11 +913,7 @@ void SDL_ApplicationWindow::processEvents()
 			case BorderState::Reduced:
 				window_state_ = WindowRenderState::Reduced;
 				borders_set_for_init_ = false;
-				break;
-			case BorderState::Updating:
-				window_state_ = WindowRenderState::Updating;
-				borders_set_for_init_ = false;
-				break;
+				break;	
 		}
 	}
 
@@ -959,9 +973,7 @@ void SDL_ApplicationWindow::renderFrame()
 			case BorderState::Reduced:
 				window_state_ = WindowRenderState::Reduced;
 				break;
-			case BorderState::Updating:
-				window_state_ = WindowRenderState::Updating;
-				break;
+
 		}
 	}
 	else
@@ -973,34 +985,6 @@ void SDL_ApplicationWindow::renderFrame()
 			logged_null_border = true;
 		}
 	}
-
-	// ===== State-Based Early Exit =====
-	static int state_log_counter = 0;
-	if (state_log_counter % 60 == 0)
-	{
-		std::string stateName;
-		switch (window_state_)
-		{
-			case WindowRenderState::Init: stateName = "Init"; break;
-			case WindowRenderState::Maximized: stateName = "Maximized"; break;
-			case WindowRenderState::Reduced: stateName = "Reduced"; break;
-			case WindowRenderState::Updating: stateName = "Updating"; break;
-		}
-		std::cout << "[SDL_ApplicationWindow] window_state_ = " << stateName << std::endl;
-	}
-	state_log_counter++;
-
-	// ===== State-Based Rendering Control =====
-	if (window_state_ != WindowRenderState::Init)
-	{
-		static int skip_log_counter = 0;
-		if (skip_log_counter % 60 == 0)
-		{
-			std::cout << "[SDL_ApplicationWindow] Rendering BLACK SCREEN - window not in Init state" << std::endl;
-		}
-		skip_log_counter++;
-	}
-
 	// ===== Swapchain Setup & Image Acquisition =====
 	swapchainSetup(render_frame_count);
 	if (!frame_acquisition_succeeded_)
@@ -1023,7 +1007,7 @@ void SDL_ApplicationWindow::renderFrame()
 		SDL_MouseButtonFlags mouseButtons = SDL_GetMouseState(&mouseXf, &mouseYf);
 		const bool isLeftButtonDown = (mouseButtons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
 
-		if ((window_state_ == WindowRenderState::Maximized || window_state_ == WindowRenderState::Reduced) && app_border_)
+		if (window_state_ == WindowRenderState::Maximized && app_border_)
 		{
 			int currentW = 0, currentH = 0;
 			SDL_GetWindowSize(window_, &currentW, &currentH);
@@ -1037,24 +1021,35 @@ void SDL_ApplicationWindow::renderFrame()
 		}
 
 		ui_manager_->enableSplitterMouseInteractions(static_cast<int>(mouseXf), static_cast<int>(mouseYf), isLeftButtonDown);
-		ui_manager_->bindWorkSpaceSizeToSplitterInteractions();
-		ui_manager_->bindPanelsToSplitters();
-		if (ui_manager_->consumePendingCEFRepaintRequest())
-		{
-			if (ui_handler_)
-			{
-				UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-				handler->cacheUIPanelFrameDatas();
-				handler->syncBrowserPanelLayoutFromCurrentFrames();
-			}
-			requestBrowserRepaint();
-		}
 	}
 
 	// ------- Main rendering logic ------- //
 	// ONLY render content when in Init state - otherwise just clear to black
 	if (window_state_ == WindowRenderState::Init)
 	{
+		if (ui_manager_)
+		{
+			ui_manager_->bindWorkSpaceSizeToSplitterInteractions();
+			ui_manager_->bindPanelsToSplitters(window_state_);
+
+			if (ui_manager_->consumePendingCEFRepaintRequest())
+			{
+				if (ui_handler_)
+				{
+					UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+					handler->cacheUIPanelFrameDatas();
+					int currentW = 0, currentH = 0;
+					SDL_GetWindowSize(window_, &currentW, &currentH);
+					// Use SDL reference window size instead of hardcoded values
+					handler->syncBrowserPanelLayoutFromCurrentFrames(
+						window_state_,
+						currentW, currentH,
+						reference_window_width_, reference_window_height_);
+				}
+				requestBrowserRepaint();
+			}
+		}
+
 		activateDebugRender();
 
 		// has become useless
@@ -1063,9 +1058,7 @@ void SDL_ApplicationWindow::renderFrame()
 		
 		preparePanels();
 
-		if (ui_manager_)
-		{
-			if (app_border_ && !borders_set_for_init_)
+			if (app_border_)
 			{
 
 				// ------------------ architectural explanation ---------------------
@@ -1095,7 +1088,8 @@ void SDL_ApplicationWindow::renderFrame()
 
 
 			ui_manager_->drawSplitters(commandBuffer, prepared_drawable_width_, prepared_drawable_height_);
-		}
+
+
 
 		// if (debug_tools_ && ui_manager_)
 		// {
@@ -1106,6 +1100,27 @@ void SDL_ApplicationWindow::renderFrame()
 	// ------ when state is Maximized for SDL3 window
 	else if (window_state_ == WindowRenderState::Maximized)
 	{
+		if (ui_manager_)
+		{
+			ui_manager_->bindFullScreenPanelsToSplitters(window_state_);
+
+			if (ui_manager_->consumePendingCEFRepaintRequest())
+			{
+				if (ui_handler_)
+				{
+					UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+					handler->cacheUIPanelFrameDatas();
+					int currentW = 0, currentH = 0;
+					SDL_GetWindowSize(window_, &currentW, &currentH);
+					handler->syncBrowserFullScreenPanelLayout(
+						window_state_,
+						currentW, currentH,
+						reference_window_width_, reference_window_height_);
+				}
+				requestBrowserRepaint();
+			}
+		}
+
 		activateDebugRender();
 
 		drawThreeDScreen();
@@ -1114,6 +1129,10 @@ void SDL_ApplicationWindow::renderFrame()
 
 		if (ui_manager_ && app_border_)
 		{
+			ui_manager_->setBorders(
+				app_border_->getLeft(), app_border_->getTop(),
+				app_border_->getWidth(), app_border_->getHeight());
+
 			ui_manager_->drawFullScreenUIPanelsInsideBorders(commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
 				prepared_panel_frame_data_map_, prepared_skip_texture_rebuild_, window_,
 				app_border_->getReferenceWindowWidth(), app_border_->getReferenceWindowHeight());
@@ -1135,6 +1154,10 @@ void SDL_ApplicationWindow::renderFrame()
 
 		if (ui_manager_ && app_border_)
 		{
+			ui_manager_->setBorders(
+				app_border_->getLeft(), app_border_->getTop(),
+				app_border_->getWidth(), app_border_->getHeight());
+
 			ui_manager_->drawReduceScreenUIpanelsInsideBorders(commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
 				prepared_panel_frame_data_map_, prepared_skip_texture_rebuild_, window_,
 				app_border_->getReferenceWindowWidth(), app_border_->getReferenceWindowHeight());
@@ -1647,10 +1670,13 @@ void SDL_ApplicationWindow::finalizeAndSubmitCommandBuffer(VkCommandBuffer comma
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = signalSemaphores;
 
-	if (vkQueueSubmit(vk_context_->getGraphicsQueue(), 1, &submitInfo, vk_in_flight_fences_[current_frame_]) != VK_SUCCESS)
 	{
-		std::cerr << "[SDL_ApplicationWindow] Failed to submit draw command buffer" << std::endl;
-		return;
+		std::lock_guard<std::mutex> qlock(queue_mutex_);
+		if (vkQueueSubmit(vk_context_->getGraphicsQueue(), 1, &submitInfo, vk_in_flight_fences_[current_frame_]) != VK_SUCCESS)
+		{
+			std::cerr << "[SDL_ApplicationWindow] Failed to submit draw command buffer" << std::endl;
+			return;
+		}
 	}
 
 	vk_image_fences_[current_image_index_] = vk_in_flight_fences_[current_frame_];
