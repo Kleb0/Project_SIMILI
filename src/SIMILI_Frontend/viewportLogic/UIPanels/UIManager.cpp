@@ -143,6 +143,14 @@ namespace SIMILI {
 				return;
 			}
 
+			const bool isNonInitState = (current_window_render_state_ == WindowRenderState::Maximized ||
+			current_window_render_state_ == WindowRenderState::Reduced);
+
+			if (isNonInitState && panel_frames_overridden_by_splitters_)
+			{
+				return;
+			}
+
 			if (!frameDatas)
 			{
 				return;
@@ -1180,20 +1188,20 @@ namespace SIMILI {
 				if (dx == 0 && dy == 0)
 					continue;
 
-				const int prevSplitterLeft   = static_cast<int>(std::round(previous.x * scaleX));
-				const int prevSplitterRight  = static_cast<int>(std::round((previous.x + previous.width) * scaleX));
-				const int currSplitterLeft   = static_cast<int>(std::round(current.x * scaleX));
-				const int currSplitterRight  = static_cast<int>(std::round((current.x + current.width) * scaleX));
-				const int prevSplitterTop    = static_cast<int>(std::round(previous.y * scaleY));
-				const int prevSplitterBottom = static_cast<int>(std::round((previous.y + previous.height) * scaleY));
-				const int currSplitterTop    = static_cast<int>(std::round(current.y * scaleY));
-				const int currSplitterBottom = static_cast<int>(std::round((current.y + current.height) * scaleY));
+				const int prevSplitterLeft = previous.x;
+				const int prevSplitterRight  = previous.x + previous.width;
+				const int currSplitterLeft = current.x;
+				const int currSplitterRight = current.x + current.width;
+				const int prevSplitterTop  = previous.y;
+				const int prevSplitterBottom = previous.y + previous.height;
+				const int currSplitterTop  = current.y;
+				const int currSplitterBottom = current.y + current.height;
 
 				for (auto& panelPair : ui_panel_geometry_frame_data_map_)
 				{
 					IFrameScreenData& fd = panelPair.second;
-					const int originalLeft   = fd.relativeX;
-					const int originalTop    = fd.relativeY;
+					const int originalLeft = fd.relativeX;
+					const int originalTop  = fd.relativeY;
 					const int originalRight  = fd.relativeX + fd.width;
 					const int originalBottom = fd.relativeY + fd.height;
 

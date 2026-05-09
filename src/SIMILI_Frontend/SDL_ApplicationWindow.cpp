@@ -1112,6 +1112,7 @@ void SDL_ApplicationWindow::renderFrame()
 					handler->cacheUIPanelFrameDatas();
 					int currentW = 0, currentH = 0;
 					SDL_GetWindowSize(window_, &currentW, &currentH);
+
 					handler->syncBrowserFullScreenPanelLayout(
 						window_state_,
 						currentW, currentH,
