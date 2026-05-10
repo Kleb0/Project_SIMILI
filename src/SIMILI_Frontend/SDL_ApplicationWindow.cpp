@@ -905,6 +905,7 @@ void SDL_ApplicationWindow::processEvents()
 		{
 			case BorderState::Init:
 				window_state_ = WindowRenderState::Init;
+				if (ui_manager_) ui_manager_->ResetFullscreenFreeze();
 				break;
 			case BorderState::Maximized:
 				window_state_ = WindowRenderState::Maximized;
@@ -966,6 +967,7 @@ void SDL_ApplicationWindow::renderFrame()
 		{
 			case BorderState::Init:
 				window_state_ = WindowRenderState::Init;
+				if (ui_manager_) ui_manager_->ResetFullscreenFreeze();
 				break;
 			case BorderState::Maximized:
 				window_state_ = WindowRenderState::Maximized;
@@ -1102,6 +1104,10 @@ void SDL_ApplicationWindow::renderFrame()
 	{
 		if (ui_manager_)
 		{
+			int fullscreenW = 0, fullscreenH = 0;
+			SDL_GetWindowSize(window_, &fullscreenW, &fullscreenH);
+			ui_manager_->FreezeCoordinatesForFullscreen(fullscreenW, fullscreenH);
+
 			ui_manager_->bindFullScreenPanelsToSplitters(window_state_);
 
 			if (ui_manager_->consumePendingCEFRepaintRequest())

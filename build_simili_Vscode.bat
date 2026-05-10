@@ -147,9 +147,12 @@ for /f %%A in ('powershell -NoProfile -Command "(Get-Date).ToString('o')"') do s
 for /f "usebackq" %%A in (`powershell -NoProfile -Command ^
   "$s=[datetime]::ParseExact('%START_ISO%','o',$null); $e=[datetime]::ParseExact('%END_ISO%','o',$null); (New-TimeSpan -Start $s -End $e).TotalSeconds.ToString('0.00')"`) do set "DURATION=%%A"
 
+for /f "usebackq tokens=*" %%A in (`powershell -NoProfile -Command "(Get-Date).ToString('yyyy-MM-dd HH:mm:ss')"`) do set "BUILD_DATETIME=%%A"
+
 echo.
 echo ========================================
-echo    BUILD COMPLETE!
+echo    BUILD COMPLETE! 
+echo    Date/Time:  %BUILD_DATETIME%
 echo    Total time: %DURATION%s
 echo ========================================
 echo.

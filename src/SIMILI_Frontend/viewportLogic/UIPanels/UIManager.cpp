@@ -51,6 +51,9 @@ namespace SIMILI {
 			, app_border_height_(0)
 			, current_window_render_state_(WindowRenderState::Init)
 			, ui_panels_initialized_(false)
+			, coordinates_frozen_for_fullscreen_(false)
+			, frozen_fullscreen_width_(0)
+			, frozen_fullscreen_height_(0)
 		{
 
 		}
@@ -136,7 +139,8 @@ namespace SIMILI {
 			{
 				std::lock_guard<std::mutex> lock(ui_panel_mutex_);
 				ui_panel_frame_data_map_ = splitterFrameDataMap;
-				if (!panel_frames_overridden_by_splitters_)
+				// Protect frozen geometry: do not overwrite with stale JS data while in fullscreen freeze.
+				if (!panel_frames_overridden_by_splitters_ && !coordinates_frozen_for_fullscreen_)
 				{
 					ui_panel_geometry_frame_data_map_ = splitterFrameDataMap;
 				}
@@ -145,11 +149,6 @@ namespace SIMILI {
 
 			const bool isNonInitState = (current_window_render_state_ == WindowRenderState::Maximized ||
 			current_window_render_state_ == WindowRenderState::Reduced);
-
-			if (isNonInitState && panel_frames_overridden_by_splitters_)
-			{
-				return;
-			}
 
 			if (!frameDatas)
 			{
@@ -160,7 +159,8 @@ namespace SIMILI {
 			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
 			std::map<std::string, IFrameScreenData> preservedGeometry = ui_panel_geometry_frame_data_map_;
 			ui_panel_frame_data_map_.clear();
-			if (!panel_frames_overridden_by_splitters_)
+			// Protect frozen geometry: do not clear or overwrite when in fullscreen freeze.
+			if (!panel_frames_overridden_by_splitters_ && !coordinates_frozen_for_fullscreen_)
 			{
 				ui_panel_geometry_frame_data_map_.clear();
 			}
@@ -176,8 +176,9 @@ namespace SIMILI {
 				if (frameIt != frameDataMap.end())
 				{
 					ui_panel_frame_data_map_[pair.first] = frameIt->second;
-					if (panel_frames_overridden_by_splitters_)
+					if (panel_frames_overridden_by_splitters_ || coordinates_frozen_for_fullscreen_)
 					{
+						// Preserve existing geometry (scaled by splitters or frozen for fullscreen).
 						auto preservedIt = preservedGeometry.find(pair.first);
 						if (preservedIt != preservedGeometry.end())
 						{
@@ -219,7 +220,8 @@ namespace SIMILI {
 				std::lock_guard<std::mutex> lock(ui_panel_mutex_);
 				std::map<std::string, IFrameScreenData> preservedGeometry = ui_panel_geometry_frame_data_map_;
 				ui_panel_frame_data_map_.clear();
-				if (!panel_frames_overridden_by_splitters_)
+				// Protect frozen geometry: do not clear or overwrite when in fullscreen freeze.
+				if (!panel_frames_overridden_by_splitters_ && !coordinates_frozen_for_fullscreen_)
 				{
 					ui_panel_geometry_frame_data_map_.clear();
 				}
@@ -232,8 +234,9 @@ namespace SIMILI {
 					}
 
 					ui_panel_frame_data_map_[pair.first] = pair.second;
-					if (panel_frames_overridden_by_splitters_)
+					if (panel_frames_overridden_by_splitters_ || coordinates_frozen_for_fullscreen_)
 					{
+						// Preserve existing geometry (scaled by splitters or frozen for fullscreen).
 						auto preservedIt = preservedGeometry.find(pair.first);
 						if (preservedIt != preservedGeometry.end())
 						{
@@ -263,7 +266,8 @@ namespace SIMILI {
 				}
 			}
 
-			if (!ui_panel_frame_data_map_.empty())
+			// Do not rebuild splitter_list_ from stale JS data while geometry is frozen for fullscreen.
+			if (!ui_panel_frame_data_map_.empty() && !coordinates_frozen_for_fullscreen_)
 			{
 				int currentW = 0, currentH = 0;
 				SDL_GetWindowSize(sdlWindow, &currentW, &currentH);
@@ -294,8 +298,18 @@ namespace SIMILI {
 			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
 			stored_cef_view_ = view;
 			stored_cef_sampler_ = sampler;
-			stored_cef_width_ = cefWidth;
-			stored_cef_height_ = cefHeight;
+
+			// Always track the actual GPU texture dimensions for UV calculation.
+			actual_cef_texture_width_  = cefWidth;
+			actual_cef_texture_height_ = cefHeight;
+
+			if (!coordinates_frozen_for_fullscreen_ ||
+				(cefWidth == frozen_fullscreen_width_ && cefHeight == frozen_fullscreen_height_))
+			{
+				stored_cef_width_  = cefWidth;
+				stored_cef_height_ = cefHeight;
+				coordinates_frozen_for_fullscreen_ = false;
+			}
 
 			pending_geometry_texture_layout_ = true;
 		}
@@ -599,6 +613,40 @@ namespace SIMILI {
 
 			splitter_renderer_->setSplitters(splitterData);
 			splitter_renderer_->draw(commandBuffer, drawableWidth, drawableHeight);
+		}
+
+		std::vector<SplitterDefinition> UIManager::scaleSplittersToWindow(int targetWindowWidth, int targetWindowHeight, int referenceWindowWidth, int referenceWindowHeight) const
+		{
+			std::vector<SplitterDefinition> scaledSplitters;
+			scaledSplitters.reserve(splitter_list_.size());
+
+			if (targetWindowWidth <= 0 || targetWindowHeight <= 0)
+			{
+				return scaledSplitters;
+			}
+
+			const bool splittersAlreadyMatchWindow = last_window_width_ == targetWindowWidth && last_window_height_ == targetWindowHeight;
+			const float scaleX = referenceWindowWidth > 0
+				? static_cast<float>(targetWindowWidth) / static_cast<float>(referenceWindowWidth)
+				: 1.0f;
+			const float scaleY = referenceWindowHeight > 0
+				? static_cast<float>(targetWindowHeight) / static_cast<float>(referenceWindowHeight)
+				: 1.0f;
+
+			for (const auto& splitter : splitter_list_)
+			{
+				SplitterDefinition scaled = splitter;
+				if (!splittersAlreadyMatchWindow)
+				{
+					scaled.x = static_cast<int>(std::round(splitter.x * scaleX));
+					scaled.y = static_cast<int>(std::round(splitter.y * scaleY));
+					scaled.width = static_cast<int>(std::round(splitter.width * scaleX));
+					scaled.height = static_cast<int>(std::round(splitter.height * scaleY));
+				}
+				scaledSplitters.push_back(scaled);
+			}
+
+			return scaledSplitters;
 		}
 
 		void UIManager::drawReduceScreenUIpanelsInsideBorders(
@@ -1044,8 +1092,10 @@ namespace SIMILI {
 			const float scaleY = static_cast<float>(fullscreenHeight) / static_cast<float>(refH);
 
 			const int MIN_PANEL_DIMENSION = 5;
-			const float fw = static_cast<float>(stored_cef_width_);
-			const float fh = static_cast<float>(stored_cef_height_);
+			// Use actual GPU texture dimensions for UV calculation, not the frozen logical size.
+			// When freeze is active, stored_cef_width_ may be 2560 while the texture is still 1920.
+			const float fw = static_cast<float>(actual_cef_texture_width_ > 0 ? actual_cef_texture_width_ : stored_cef_width_);
+			const float fh = static_cast<float>(actual_cef_texture_height_ > 0 ? actual_cef_texture_height_ : stored_cef_height_);
 
 			for (auto& pair : ui_panels_)
 			{
@@ -1092,14 +1142,18 @@ namespace SIMILI {
 				IFrameScreenData scaled = p.second;
 				scaled.relativeX = static_cast<int>(std::round(p.second.relativeX * scaleX));
 				scaled.relativeY = static_cast<int>(std::round(p.second.relativeY * scaleY));
-				scaled.width     = static_cast<int>(std::round(p.second.width     * scaleX));
-				scaled.height    = static_cast<int>(std::round(p.second.height    * scaleY));
-				scaled.clientX   = static_cast<int>(std::round(p.second.clientX   * scaleX));
-				scaled.clientY   = static_cast<int>(std::round(p.second.clientY   * scaleY));
+				scaled.width  = static_cast<int>(std::round(p.second.width * scaleX));
+				scaled.height  = static_cast<int>(std::round(p.second.height * scaleY));
+				scaled.clientX = static_cast<int>(std::round(p.second.clientX * scaleX));
+				scaled.clientY = static_cast<int>(std::round(p.second.clientY * scaleY));
+				scaled.windowWidth = fullscreenWidth;
+				scaled.windowHeight = fullscreenHeight;
 				scaledFrameDataMap[p.first] = scaled;
 			}
 
-			panel_map_builder_.attachedUpdatedMap(scaledFrameDataMap, splitter_list_, current_window_render_state_);
+			const std::vector<SplitterDefinition> scaledSplitters = scaleSplittersToWindow(fullscreenWidth, fullscreenHeight, refW, refH);
+
+			panel_map_builder_.attachedUpdatedMap(scaledFrameDataMap, scaledSplitters, current_window_render_state_);
 
 			splitter_mouse_mecanic_.setAttachments(panel_map_builder_.getMapData().splitterAttachments);
 
@@ -1126,6 +1180,121 @@ namespace SIMILI {
 
 				pending_cef_repaint_request_ = true;
 			}
+		}
+
+		void UIManager::ResetFullscreenFreeze()
+		{
+			if (!coordinates_frozen_for_fullscreen_)
+				return;
+
+			std::map<std::string, IFrameScreenData> localFrameDataMap;
+
+			{
+				std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+
+				coordinates_frozen_for_fullscreen_ = false;
+				frozen_fullscreen_width_ = 0;
+				frozen_fullscreen_height_ = 0;
+				panel_frames_overridden_by_splitters_ = false;
+
+				// Restore geometry map to the original JS 1920-space data.
+				ui_panel_geometry_frame_data_map_ = ui_panel_frame_data_map_;
+
+				// Extract JS window size so syncSplittersAndPanels sees lastW == currentW.
+				for (const auto& pair : ui_panel_frame_data_map_)
+				{
+					if (pair.second.windowWidth > 0 && pair.second.windowHeight > 0)
+					{
+						last_window_width_ = pair.second.windowWidth;
+						last_window_height_ = pair.second.windowHeight;
+						break;
+					}
+				}
+
+				panel_state_map_.clear();
+				splitter_list_.clear();
+				prev_splitter_list_.clear();
+				pending_geometry_texture_layout_ = true;
+
+				localFrameDataMap = ui_panel_frame_data_map_;
+			}
+
+			// Immediately rebuild splitters from 1920-space JS data so they appear
+			// on the very next frame without waiting for a new syncFrameDatas call.
+			// (JS won't resend unchanged data, so splitter_list_ would stay empty.)
+			if (!localFrameDataMap.empty() && stored_window_)
+			{
+				panel_map_builder_.syncSplittersAndPanels(
+					localFrameDataMap,
+					last_window_width_, last_window_height_,
+					panel_state_map_,
+					splitter_list_,
+					last_window_width_, last_window_height_,
+					stored_window_);
+				splitter_mouse_mecanic_.setAttachments(panel_map_builder_.getMapData().splitterAttachments);
+				prev_splitter_list_ = splitter_list_;
+			}
+		}
+
+		void UIManager::FreezeCoordinatesForFullscreen(int fullscreenWidth, int fullscreenHeight)
+		{
+			if (coordinates_frozen_for_fullscreen_)
+				return;
+
+			if (stored_cef_width_ <= 0 || stored_cef_height_ <= 0)
+				return;
+
+			if (fullscreenWidth <= 0 || fullscreenHeight <= 0)
+				return;
+
+			if (stored_cef_width_ == fullscreenWidth && stored_cef_height_ == fullscreenHeight)
+			{
+				coordinates_frozen_for_fullscreen_ = true;
+				frozen_fullscreen_width_ = fullscreenWidth;
+				frozen_fullscreen_height_ = fullscreenHeight;
+				return;
+			}
+
+			const float scaleX = static_cast<float>(fullscreenWidth)  / static_cast<float>(stored_cef_width_);
+			const float scaleY = static_cast<float>(fullscreenHeight) / static_cast<float>(stored_cef_height_);
+
+			{
+				std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+
+				for (auto& pair : ui_panel_geometry_frame_data_map_)
+				{
+					IFrameScreenData& fd = pair.second;
+					fd.relativeX  = static_cast<int>(std::round(fd.relativeX * scaleX));
+					fd.relativeY = static_cast<int>(std::round(fd.relativeY * scaleY));
+					fd.width = static_cast<int>(std::round(fd.width     * scaleX));
+					fd.height = static_cast<int>(std::round(fd.height    * scaleY));
+					fd.clientX  = static_cast<int>(std::round(fd.clientX   * scaleX));
+					fd.clientY = static_cast<int>(std::round(fd.clientY   * scaleY));
+					fd.windowWidth  = fullscreenWidth;
+					fd.windowHeight = fullscreenHeight;
+				}
+
+				for (auto& splitter : splitter_list_)
+				{
+					splitter.x = static_cast<int>(std::round(splitter.x * scaleX));
+					splitter.y = static_cast<int>(std::round(splitter.y * scaleY));
+					splitter.width  = static_cast<int>(std::round(splitter.width  * scaleX));
+					splitter.height = static_cast<int>(std::round(splitter.height * scaleY));
+				}
+				prev_splitter_list_ = splitter_list_;
+
+				stored_cef_width_ = fullscreenWidth;
+				stored_cef_height_ = fullscreenHeight;
+
+				// Inform drawSplittersFullScreen that splitter_list_ is now in fullscreen space.
+
+				last_window_width_ = fullscreenWidth;
+				last_window_height_ = fullscreenHeight;
+			}
+
+			coordinates_frozen_for_fullscreen_ = true;
+			frozen_fullscreen_width_ = fullscreenWidth;
+			frozen_fullscreen_height_ = fullscreenHeight;
 		}
 
 		void UIManager::bindFullScreenPanelsToSplitters(WindowRenderState currentWindowState)

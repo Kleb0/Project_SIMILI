@@ -72,6 +72,9 @@ namespace SIMILI {
 			void bindFullScreenPanelsToSplitters(WindowRenderState currentWindowState);
 			
 			void setBorders(int borderLeft, int borderTop, int borderWidth, int borderHeight);
+
+			void FreezeCoordinatesForFullscreen(int fullscreenWidth, int fullscreenHeight);
+			void ResetFullscreenFreeze();
 			
 			void setCEFTextureForAllPanels(VkImageView view, VkSampler sampler, int cefWidth, int cefHeight);
 			void invalidateCEFTexture();
@@ -88,6 +91,8 @@ namespace SIMILI {
 		private:
 			void applyPanelTextureLayout(bool requestCEFRepaint = false);
 			void applyFullScreenPanelTextureLayout(bool requestCEFRepaint, int fullscreenWidth, int fullscreenHeight);
+
+			std::vector<SplitterDefinition> scaleSplittersToWindow(int targetWindowWidth, int targetWindowHeight, int referenceWindowWidth, int referenceWindowHeight) const;
 
 			UIState current_state_;
 			UIState previous_state_;
@@ -130,6 +135,9 @@ namespace SIMILI {
 			bool was_splitter_operating_ = false;
 			bool pending_cef_repaint_request_ = false;
 			bool pending_geometry_texture_layout_ = false;
+			bool coordinates_frozen_for_fullscreen_ = false;
+			int frozen_fullscreen_width_ = 0;
+			int frozen_fullscreen_height_ = 0;
 			WindowRenderState current_window_render_state_;
 
 			PanelMapBuilder panel_map_builder_;
@@ -140,6 +148,11 @@ namespace SIMILI {
 			VkSampler stored_cef_sampler_ = VK_NULL_HANDLE;
 			int stored_cef_width_ = 0;
 			int stored_cef_height_ = 0;
+			// Actual dimensions of the CEF Vulkan texture currently uploaded to GPU.
+			// Distinct from stored_cef_width_/height_ which may be frozen to the fullscreen logical size.
+			// Used for correct UV coordinate calculation in applyFullScreenPanelTextureLayout.
+			int actual_cef_texture_width_ = 0;
+			int actual_cef_texture_height_ = 0;
 			SDL_Window* stored_window_ = nullptr;
 		};
 	}

@@ -660,6 +660,7 @@ namespace SIMILI {
 			{
 				std::vector<SplitterDefinition> rebuiltSplitters;
 				buildMapData(frameDataMap, rebuiltSplitters, currentWindowWidth);
+				map_data_.splitters = rebuiltSplitters;
 				return;
 			}
 
