@@ -1009,18 +1009,9 @@ void SDL_ApplicationWindow::renderFrame()
 		SDL_MouseButtonFlags mouseButtons = SDL_GetMouseState(&mouseXf, &mouseYf);
 		const bool isLeftButtonDown = (mouseButtons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
 
-		if (window_state_ == WindowRenderState::Maximized && app_border_)
-		{
-			int currentW = 0, currentH = 0;
-			SDL_GetWindowSize(window_, &currentW, &currentH);
-			int refW = app_border_->getReferenceWindowWidth();
-			int refH = app_border_->getReferenceWindowHeight();
-			if (currentW > 0 && currentH > 0 && refW > 0 && refH > 0)
-			{
-				mouseXf = mouseXf * static_cast<float>(refW) / static_cast<float>(currentW);
-				mouseYf = mouseYf * static_cast<float>(refH) / static_cast<float>(currentH);
-			}
-		}
+		// In Maximized mode, splitter_list_ is frozen in 2560-space (actual logical window coords).
+		// SDL_GetMouseState already returns logical coordinates → no scaling needed.
+		// (The old scaling from 2560→1920 broke hit detection once splitters were frozen in 2560-space.)
 
 		ui_manager_->enableSplitterMouseInteractions(static_cast<int>(mouseXf), static_cast<int>(mouseYf), isLeftButtonDown);
 	}
