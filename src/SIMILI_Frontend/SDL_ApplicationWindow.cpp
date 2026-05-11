@@ -1113,7 +1113,7 @@ void SDL_ApplicationWindow::renderFrame()
 					handler->syncBrowserFullScreenPanelLayout(
 						window_state_,
 						currentW, currentH,
-						reference_window_width_, reference_window_height_);
+						currentW, currentH);
 				}
 				requestBrowserRepaint();
 			}

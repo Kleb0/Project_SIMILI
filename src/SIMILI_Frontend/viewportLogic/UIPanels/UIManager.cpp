@@ -303,12 +303,14 @@ namespace SIMILI {
 			actual_cef_texture_width_  = cefWidth;
 			actual_cef_texture_height_ = cefHeight;
 
-			if (!coordinates_frozen_for_fullscreen_ ||
-				(cefWidth == frozen_fullscreen_width_ && cefHeight == frozen_fullscreen_height_))
+			// Only update stored dims when NOT frozen. While frozen, stored_cef_width_/height_
+			// are set to the fullscreen target size by FreezeCoordinatesForFullscreen and must
+			// not be overwritten. The freeze is ONLY lifted by ResetFullscreenFreeze() on
+			// state transition, never by a CEF paint arriving at any particular size.
+			if (!coordinates_frozen_for_fullscreen_)
 			{
 				stored_cef_width_  = cefWidth;
 				stored_cef_height_ = cefHeight;
-				coordinates_frozen_for_fullscreen_ = false;
 			}
 
 			pending_geometry_texture_layout_ = true;
@@ -319,8 +321,12 @@ namespace SIMILI {
 			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
 			stored_cef_view_ = VK_NULL_HANDLE;
 			stored_cef_sampler_ = VK_NULL_HANDLE;
-			stored_cef_width_ = 0;
-			stored_cef_height_ = 0;
+
+			if (!coordinates_frozen_for_fullscreen_)
+			{
+				stored_cef_width_ = 0;
+				stored_cef_height_ = 0;
+			}
 			
 			for (auto& pair : ui_panels_)
 			{
