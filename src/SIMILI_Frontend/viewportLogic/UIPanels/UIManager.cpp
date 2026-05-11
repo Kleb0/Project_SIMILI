@@ -260,9 +260,9 @@ namespace SIMILI {
 				{
 					const auto& data = pair.second;
 					std::cout << "[UIManager] Panel '" << data.name << "': "
-							  << "x=" << data.relativeX << " y=" << data.relativeY
-							  << " w=" << data.width << " h=" << data.height
-							  << " clientX=" << data.clientX << " clientY=" << data.clientY << std::endl;
+					<< "x=" << data.relativeX << " y=" << data.relativeY
+					<< " w=" << data.width << " h=" << data.height
+					<< " clientX=" << data.clientX << " clientY=" << data.clientY << std::endl;
 				}
 			}
 
@@ -300,7 +300,7 @@ namespace SIMILI {
 			stored_cef_sampler_ = sampler;
 
 			// Always track the actual GPU texture dimensions for UV calculation.
-			actual_cef_texture_width_  = cefWidth;
+			actual_cef_texture_width_ = cefWidth;
 			actual_cef_texture_height_ = cefHeight;
 
 			// Only update stored dims when NOT frozen. While frozen, stored_cef_width_/height_
@@ -309,7 +309,7 @@ namespace SIMILI {
 			// state transition, never by a CEF paint arriving at any particular size.
 			if (!coordinates_frozen_for_fullscreen_)
 			{
-				stored_cef_width_  = cefWidth;
+				stored_cef_width_ = cefWidth;
 				stored_cef_height_ = cefHeight;
 			}
 
@@ -370,6 +370,7 @@ namespace SIMILI {
 			const int MIN_PANEL_DIMENSION = 5;
 			const float fw = static_cast<float>(stored_cef_width_);
 			const float fh = static_cast<float>(stored_cef_height_);
+			const float UV_EPSILON = 0.0001f;
 
 			for (auto& pair : ui_panels_)
 			{
@@ -403,6 +404,24 @@ namespace SIMILI {
 						continue;
 					}
 				}
+
+				const float uvWidth = u1 - u0;
+				const float uvHeight = v1 - v0;
+				auto previousUvSizeIt = last_fullscreen_uv_size_map_.find(pair.first);
+				if (previousUvSizeIt == last_fullscreen_uv_size_map_.end() ||
+					std::abs(previousUvSizeIt->second.first - uvWidth) > UV_EPSILON ||
+					std::abs(previousUvSizeIt->second.second - uvHeight) > UV_EPSILON)
+				{
+					std::cout << "[UIManager][Fullscreen][UV] Panel " << pair.first
+						      << " span changed to " << uvWidth << "x" << uvHeight;
+					if (previousUvSizeIt != last_fullscreen_uv_size_map_.end())
+					{
+						std::cout << " (previous " << previousUvSizeIt->second.first
+						          << "x" << previousUvSizeIt->second.second << ")";
+					}
+					std::cout << std::endl;
+				}
+				last_fullscreen_uv_size_map_[pair.first] = {uvWidth, uvHeight};
 
 				pair.second->setCEFTexture(stored_cef_view_, stored_cef_sampler_, u0, v0, u1, v1);
 			}
@@ -1039,6 +1058,11 @@ namespace SIMILI {
 			prev_splitter_list_ = splitter_list_;
 			if (panelGeometryChanged)
 			{
+				if (currentWindowState == WindowRenderState::Init)
+				{
+					had_init_splitter_panel_modification_before_maximized_ = true;
+				}
+
 				if (currentLogicalW > 0 && currentLogicalH > 0)
 				{
 					for (auto& panelPair : ui_panel_geometry_frame_data_map_)
@@ -1092,16 +1116,9 @@ namespace SIMILI {
 				return;
 			}
 
-			const int refW = stored_cef_width_;
-			const int refH = stored_cef_height_;
-			const float scaleX = static_cast<float>(fullscreenWidth) / static_cast<float>(refW);
-			const float scaleY = static_cast<float>(fullscreenHeight) / static_cast<float>(refH);
-
 			const int MIN_PANEL_DIMENSION = 5;
-			// Use actual GPU texture dimensions for UV calculation, not the frozen logical size.
-			// When freeze is active, stored_cef_width_ may be 2560 while the texture is still 1920.
-			const float fw = static_cast<float>(actual_cef_texture_width_ > 0 ? actual_cef_texture_width_ : stored_cef_width_);
-			const float fh = static_cast<float>(actual_cef_texture_height_ > 0 ? actual_cef_texture_height_ : stored_cef_height_);
+			const float fw = static_cast<float>(stored_cef_width_);
+			const float fh = static_cast<float>(stored_cef_height_);
 
 			for (auto& pair : ui_panels_)
 			{
@@ -1117,8 +1134,8 @@ namespace SIMILI {
 				float u1 = 1.0f;
 				float v1 = 1.0f;
 
-				auto uvIt = ui_panel_frame_data_map_.find(pair.first);
-				if (uvIt != ui_panel_frame_data_map_.end())
+				auto uvIt = ui_panel_geometry_frame_data_map_.find(pair.first);
+				if (uvIt != ui_panel_geometry_frame_data_map_.end())
 				{
 					u0 = static_cast<float>(uvIt->second.relativeX) / fw;
 					v0 = static_cast<float>(uvIt->second.relativeY) / fh;
@@ -1142,24 +1159,7 @@ namespace SIMILI {
 				? ui_panel_frame_data_map_
 				: ui_panel_geometry_frame_data_map_;
 
-			std::map<std::string, IFrameScreenData> scaledFrameDataMap;
-			for (const auto& p : effectiveFrameDataMap)
-			{
-				IFrameScreenData scaled = p.second;
-				scaled.relativeX = static_cast<int>(std::round(p.second.relativeX * scaleX));
-				scaled.relativeY = static_cast<int>(std::round(p.second.relativeY * scaleY));
-				scaled.width  = static_cast<int>(std::round(p.second.width * scaleX));
-				scaled.height  = static_cast<int>(std::round(p.second.height * scaleY));
-				scaled.clientX = static_cast<int>(std::round(p.second.clientX * scaleX));
-				scaled.clientY = static_cast<int>(std::round(p.second.clientY * scaleY));
-				scaled.windowWidth = fullscreenWidth;
-				scaled.windowHeight = fullscreenHeight;
-				scaledFrameDataMap[p.first] = scaled;
-			}
-
-			const std::vector<SplitterDefinition> scaledSplitters = scaleSplittersToWindow(fullscreenWidth, fullscreenHeight, refW, refH);
-
-			panel_map_builder_.attachedUpdatedMap(scaledFrameDataMap, scaledSplitters, current_window_render_state_);
+			panel_map_builder_.attachedUpdatedMap(effectiveFrameDataMap, splitter_list_, current_window_render_state_);
 
 			splitter_mouse_mecanic_.setAttachments(panel_map_builder_.getMapData().splitterAttachments);
 
@@ -1175,11 +1175,9 @@ namespace SIMILI {
 					auto geometryIt = ui_panel_geometry_frame_data_map_.find(pair.first);
 					if (geometryIt != ui_panel_geometry_frame_data_map_.end())
 					{
-						const int scaledW = static_cast<int>(std::round(geometryIt->second.width * scaleX));
-						const int scaledH = static_cast<int>(std::round(geometryIt->second.height * scaleY));
-						if (scaledW >= MIN_PANEL_DIMENSION && scaledH >= MIN_PANEL_DIMENSION)
+						if (geometryIt->second.width >= MIN_PANEL_DIMENSION && geometryIt->second.height >= MIN_PANEL_DIMENSION)
 						{
-							pair.second->RedrawSelfTextureAtCorrectResolution(scaledW, scaledH);
+							pair.second->RedrawSelfTextureAtCorrectResolution(geometryIt->second.width, geometryIt->second.height);
 						}
 					}
 				}
@@ -1199,8 +1197,13 @@ namespace SIMILI {
 				std::lock_guard<std::mutex> lock(ui_panel_mutex_);
 
 				coordinates_frozen_for_fullscreen_ = false;
+				had_init_splitter_panel_modification_before_maximized_ = false;
 				frozen_fullscreen_width_ = 0;
 				frozen_fullscreen_height_ = 0;
+				last_fullscreen_uv_size_map_.clear();
+				pending_fullscreen_modified_panels_by_splitter_.clear();
+				pending_fullscreen_tracked_panels_by_splitter_.clear();
+				pending_fullscreen_panel_frames_by_splitter_.clear();
 				panel_frames_overridden_by_splitters_ = false;
 
 				// Restore geometry map to the original JS 1920-space data.
@@ -1340,6 +1343,7 @@ namespace SIMILI {
 			}
 
 			const bool hasJustStoppedOperating = was_splitter_operating_ && !isOperating;
+			const auto& fullscreenMapData = panel_map_builder_.getMapData();
 
 			const int refW = (stored_cef_width_ > 0) ? stored_cef_width_ : fullscreenW;
 			const int refH = (stored_cef_height_ > 0) ? stored_cef_height_ : fullscreenH;
@@ -1356,6 +1360,13 @@ namespace SIMILI {
 			{
 				const SplitterDefinition& current = splitter_list_[i];
 				const SplitterDefinition& previous = prev_splitter_list_[i];
+				const std::vector<std::string>* assignedPanels = nullptr;
+				std::vector<std::string> modifiedPanels;
+				std::vector<std::string> trackedPanels;
+				if (i < fullscreenMapData.splitterCandidates.size())
+				{
+					assignedPanels = &fullscreenMapData.splitterCandidates[i].assignedPanels;
+				}
 
 				const int dx = current.x - previous.x;
 				const int dy = current.y - previous.y;
@@ -1364,21 +1375,41 @@ namespace SIMILI {
 					continue;
 
 				const int prevSplitterLeft = previous.x;
-				const int prevSplitterRight  = previous.x + previous.width;
+				const int prevSplitterRight = previous.x + previous.width;
 				const int currSplitterLeft = current.x;
 				const int currSplitterRight = current.x + current.width;
-				const int prevSplitterTop  = previous.y;
+				const int prevSplitterTop = previous.y;
 				const int prevSplitterBottom = previous.y + previous.height;
-				const int currSplitterTop  = current.y;
+				const int currSplitterTop = current.y;
 				const int currSplitterBottom = current.y + current.height;
+
+				if (assignedPanels && !assignedPanels->empty())
+				{
+					trackedPanels = *assignedPanels;
+				}
+				else
+				{
+					trackedPanels.reserve(ui_panel_geometry_frame_data_map_.size());
+					for (const auto& panelPair : ui_panel_geometry_frame_data_map_)
+					{
+						trackedPanels.push_back(panelPair.first);
+					}
+				}
 
 				for (auto& panelPair : ui_panel_geometry_frame_data_map_)
 				{
+					if (assignedPanels && !assignedPanels->empty() &&
+						std::find(assignedPanels->begin(), assignedPanels->end(), panelPair.first) == assignedPanels->end())
+					{
+						continue;
+					}
+
 					IFrameScreenData& fd = panelPair.second;
 					const int originalLeft = fd.relativeX;
 					const int originalTop  = fd.relativeY;
 					const int originalRight  = fd.relativeX + fd.width;
 					const int originalBottom = fd.relativeY + fd.height;
+					bool panelChanged = false;
 
 					if (current.isVertical && dx != 0)
 					{
@@ -1386,18 +1417,21 @@ namespace SIMILI {
 						{
 							const int newWidth = (std::max)(MIN_PANEL_SIZE, currSplitterLeft - fd.relativeX);
 							panelGeometryChanged = panelGeometryChanged || (newWidth != fd.width);
+							panelChanged = panelChanged || (newWidth != fd.width);
 							fd.width = newWidth;
 						}
 						else if (std::abs(originalLeft - prevSplitterRight) <= SIDE_TOLERANCE)
 						{
 							const int newRelativeX = currSplitterRight;
-							const int newClientX   = fd.clientX + (newRelativeX - fd.relativeX);
-							const int newWidth     = (std::max)(MIN_PANEL_SIZE, originalRight - newRelativeX);
+							const int newClientX  = fd.clientX + (newRelativeX - fd.relativeX);
+							const int newWidth = (std::max)(MIN_PANEL_SIZE, originalRight - newRelativeX);
 							panelGeometryChanged = panelGeometryChanged ||
 								(newRelativeX != fd.relativeX) || (newClientX != fd.clientX) || (newWidth != fd.width);
+							panelChanged = panelChanged ||
+								(newRelativeX != fd.relativeX) || (newClientX != fd.clientX) || (newWidth != fd.width);
 							fd.relativeX = newRelativeX;
-							fd.clientX   = newClientX;
-							fd.width     = newWidth;
+							fd.clientX = newClientX;
+							fd.width = newWidth;
 						}
 					}
 					else if (current.isHorizontal && dy != 0)
@@ -1406,6 +1440,7 @@ namespace SIMILI {
 						{
 							const int newHeight = (std::max)(MIN_PANEL_SIZE, currSplitterTop - fd.relativeY);
 							panelGeometryChanged = panelGeometryChanged || (newHeight != fd.height);
+							panelChanged = panelChanged || (newHeight != fd.height);
 							fd.height = newHeight;
 						}
 						else if (std::abs(originalTop - prevSplitterBottom) <= SIDE_TOLERANCE)
@@ -1415,12 +1450,114 @@ namespace SIMILI {
 							const int newHeight    = (std::max)(MIN_PANEL_SIZE, originalBottom - newRelativeY);
 							panelGeometryChanged = panelGeometryChanged ||
 								(newRelativeY != fd.relativeY) || (newClientY != fd.clientY) || (newHeight != fd.height);
+							panelChanged = panelChanged ||
+								(newRelativeY != fd.relativeY) || (newClientY != fd.clientY) || (newHeight != fd.height);
 							fd.relativeY = newRelativeY;
 							fd.clientY   = newClientY;
 							fd.height    = newHeight;
 						}
 					}
+
+					if (panelChanged)
+					{
+						modifiedPanels.push_back(panelPair.first);
+						pending_fullscreen_panel_frames_by_splitter_[static_cast<int>(i)][panelPair.first] = fd;
+					}
 				}
+
+				if (!trackedPanels.empty())
+				{
+					pending_fullscreen_tracked_panels_by_splitter_[static_cast<int>(i)] = trackedPanels;
+				}
+
+				if (!modifiedPanels.empty())
+				{
+					pending_fullscreen_modified_panels_by_splitter_[static_cast<int>(i)] = modifiedPanels;
+				}
+			}
+
+			if (hasJustStoppedOperating)
+			{
+				auto logPanelList = [](const char* label, const std::vector<std::string>& panelNames)
+				{
+					std::cout << label;
+					if (panelNames.empty())
+					{
+						std::cout << " <none>";
+					}
+					else
+					{
+						for (std::size_t panelIndex = 0; panelIndex < panelNames.size(); ++panelIndex)
+						{
+							if (panelIndex == 0)
+							{
+								std::cout << ' ';
+							}
+							else
+							{
+								std::cout << ", ";
+							}
+							std::cout << panelNames[panelIndex];
+						}
+					}
+					std::cout << std::endl;
+				};
+
+				for (const auto& splitterEntry : pending_fullscreen_tracked_panels_by_splitter_)
+				{
+					const int splitterIndex = splitterEntry.first;
+					const auto& trackedPanels = splitterEntry.second;
+					const auto modifiedPanelsIt = pending_fullscreen_modified_panels_by_splitter_.find(splitterIndex);
+					const std::vector<std::string> modifiedPanels =
+						(modifiedPanelsIt != pending_fullscreen_modified_panels_by_splitter_.end())
+							? modifiedPanelsIt->second
+							: std::vector<std::string>();
+
+					std::vector<std::string> unmodifiedPanels;
+					for (const auto& panelName : trackedPanels)
+					{
+						if (std::find(modifiedPanels.begin(), modifiedPanels.end(), panelName) == modifiedPanels.end())
+						{
+							unmodifiedPanels.push_back(panelName);
+						}
+					}
+
+					const SplitterDefinition& splitter = splitter_list_[splitterIndex];
+					std::cout << "\n ==============================\n";
+					std::cout << "[UIManager][Fullscreen][Splitter "
+					          << (splitter.isVertical ? 'V' : 'H') << (splitterIndex + 1)
+					          << "] resize summary after release" << std::endl;
+					std::cout << "[UIManager][Fullscreen] Init splitter modified before maximized: "
+					          << (had_init_splitter_panel_modification_before_maximized_ ? "true" : "false")
+					          << std::endl;
+					logPanelList("[UIManager][Fullscreen] Panels modified:", modifiedPanels);
+					logPanelList("[UIManager][Fullscreen] Panels unmodified:", unmodifiedPanels);
+
+					const auto frameMapIt = pending_fullscreen_panel_frames_by_splitter_.find(splitterIndex);
+					if (frameMapIt != pending_fullscreen_panel_frames_by_splitter_.end())
+					{
+						for (const auto& panelName : modifiedPanels)
+						{
+							auto frameIt = frameMapIt->second.find(panelName);
+							if (frameIt == frameMapIt->second.end())
+							{
+								continue;
+							}
+
+							const IFrameScreenData& frame = frameIt->second;
+							std::cout << "[UIManager][Fullscreen] Resized panel " << panelName
+							          << " -> x=" << frame.relativeX
+							          << " y=" << frame.relativeY
+							          << " w=" << frame.width
+							          << " h=" << frame.height
+							          << std::endl;
+						}
+					}
+				}
+
+				pending_fullscreen_modified_panels_by_splitter_.clear();
+				pending_fullscreen_tracked_panels_by_splitter_.clear();
+				pending_fullscreen_panel_frames_by_splitter_.clear();
 			}
 
 			prev_splitter_list_ = splitter_list_;
@@ -1439,7 +1576,9 @@ namespace SIMILI {
 				pending_geometry_texture_layout_ = true;
 			}
 
-			if (pending_geometry_texture_layout_)
+			const bool shouldApplyTextureLayout = pending_geometry_texture_layout_ && !isOperating;
+
+			if (shouldApplyTextureLayout)
 			{
 				applyFullScreenPanelTextureLayout(hasJustStoppedOperating, fullscreenW, fullscreenH);
 				pending_geometry_texture_layout_ = false;

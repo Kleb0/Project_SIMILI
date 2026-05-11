@@ -136,6 +136,7 @@ namespace SIMILI {
 			bool pending_cef_repaint_request_ = false;
 			bool pending_geometry_texture_layout_ = false;
 			bool coordinates_frozen_for_fullscreen_ = false;
+			bool had_init_splitter_panel_modification_before_maximized_ = false;
 			int frozen_fullscreen_width_ = 0;
 			int frozen_fullscreen_height_ = 0;
 			WindowRenderState current_window_render_state_;
@@ -153,6 +154,10 @@ namespace SIMILI {
 			// Used for correct UV coordinate calculation in applyFullScreenPanelTextureLayout.
 			int actual_cef_texture_width_ = 0;
 			int actual_cef_texture_height_ = 0;
+			std::map<std::string, std::pair<float, float>> last_fullscreen_uv_size_map_;
+			std::map<int, std::vector<std::string>> pending_fullscreen_modified_panels_by_splitter_;
+			std::map<int, std::vector<std::string>> pending_fullscreen_tracked_panels_by_splitter_;
+			std::map<int, std::map<std::string, IFrameScreenData>> pending_fullscreen_panel_frames_by_splitter_;
 			SDL_Window* stored_window_ = nullptr;
 		};
 	}

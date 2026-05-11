@@ -165,8 +165,8 @@ namespace
 			<< " | size " << logicalW << "x" << logicalH
 			<< " ==========" << std::endl;
 
-		logFrameMapComparison(beforeCapturedFrames, afterCapturedFrames, "FrameDatas - Captured Frame Data Comparison");
-		logFrameMapComparison(beforeGeometryFrames, afterGeometryFrames, "UIManager - Geometry Frame Data Comparison");
+		// logFrameMapComparison(beforeCapturedFrames, afterCapturedFrames, "FrameDatas - Captured Frame Data Comparison");
+		// logFrameMapComparison(beforeGeometryFrames, afterGeometryFrames, "UIManager - Geometry Frame Data Comparison");
 	}
 }
 
@@ -1355,7 +1355,6 @@ void UIHandler::cacheUIPanelFrameDatas()
 }
 
 
-//sync panels for Fullscrren state 
 void UIHandler::syncBrowserPanelLayoutFromCurrentFrames(WindowRenderState windowState, int currentWidth, int currentHeight, int referenceWidth, int referenceHeight)
 {
 	if (!ui_manager_)
@@ -1503,6 +1502,50 @@ void UIHandler::syncBrowserPanelLayoutFromCurrentFrames(WindowRenderState window
 		(rightTopPanelIt != iframeDataMap.end()) ? selectorForPanel(rightTopPanelIt->first) : std::string();
 	const std::string rightBottomPanelSelector =
 		(rightBottomPanelIt != iframeDataMap.end()) ? selectorForPanel(rightBottomPanelIt->first) : std::string();
+	const int leftWidth = leftColumnIt->second.width;
+	const int leftHeight = leftColumnIt->second.height;
+	const int rightWidth = rightColumnIt->second.width;
+	const int rightTopHeight = (rightTopPanelIt != iframeDataMap.end()) ? rightTopPanelIt->second.height : 0;
+	const int rightBottomHeight = (rightBottomPanelIt != iframeDataMap.end()) ? rightBottomPanelIt->second.height : 0;
+	const int bottomHeight = bottomPanelIt->second.height;
+
+	auto buildFixedWidthBlock = [](const char* elementName, int width)
+	{
+		std::ostringstream block;
+		block << "if(" << elementName << "){"
+			<< elementName << ".style.width='" << width << "px';"
+			<< elementName << ".style.minWidth='" << width << "px';"
+			<< elementName << ".style.maxWidth='" << width << "px';"
+			<< elementName << ".style.flex='0 0 " << width << "px';"
+			<< elementName << ".style.overflow='hidden';}";
+		return block.str();
+	};
+
+	auto buildFixedHeightBlock = [](const char* elementName, int height)
+	{
+		std::ostringstream block;
+		block << "if(" << elementName << "){"
+			<< elementName << ".style.height='" << height << "px';"
+			<< elementName << ".style.minHeight='" << height << "px';"
+			<< elementName << ".style.maxHeight='" << height << "px';"
+			<< elementName << ".style.flex='0 0 " << height << "px';"
+			<< elementName << ".style.overflow='hidden';}";
+		return block.str();
+	};
+
+	auto buildFixedPanelBlock = [](const char* elementName, int width, int height)
+	{
+		std::ostringstream block;
+		block << "if(" << elementName << "){"
+			<< elementName << ".style.width='" << width << "px';"
+			<< elementName << ".style.height='" << height << "px';"
+			<< elementName << ".style.minWidth='" << width << "px';"
+			<< elementName << ".style.minHeight='" << height << "px';"
+			<< elementName << ".style.maxWidth='" << width << "px';"
+			<< elementName << ".style.maxHeight='" << height << "px';"
+			<< elementName << ".style.flex='0 0 auto';}";
+		return block.str();
+	};
 
 	std::ostringstream script;
 	script
@@ -1513,6 +1556,7 @@ void UIHandler::syncBrowserPanelLayoutFromCurrentFrames(WindowRenderState window
 		<< "const referenceHeight=" << referenceHeight << ";"
 		<< "const layoutScaleX=" << scaleX << ";"
 		<< "const layoutScaleY=" << scaleY << ";"
+		<< "const isInitState=" << (windowState == WindowRenderState::Init ? "true" : "false") << ";"
 		<< "const findPanelElement=function(selector){"
 		<< "return document.querySelector('.'+selector) || document.querySelector('.'+selector.replace(/-UI/g,'_UI'));"
 		<< "};"
@@ -1550,19 +1594,21 @@ void UIHandler::syncBrowserPanelLayoutFromCurrentFrames(WindowRenderState window
 		<< "const rightTopPanel=" << (rightTopPanelSelector.empty() ? "null" : "clampPanel('" + rightTopPanelSelector + "')") << ";"
 		<< "const rightBottomPanel=" << (rightBottomPanelSelector.empty() ? "null" : "clampPanel('" + rightBottomPanelSelector + "')") << ";"
 		<< "const project=clampPanel('" << bottomPanelSelector << "');"
-		<< "if(left){left.style.width='" << static_cast<int>(std::round(leftColumnIt->second.width * scaleX)) << "px';left.style.minWidth='" << static_cast<int>(std::round(leftColumnIt->second.width * scaleX)) << "px';left.style.maxWidth='" << static_cast<int>(std::round(leftColumnIt->second.width * scaleX)) << "px';left.style.flex='0 0 " << static_cast<int>(std::round(leftColumnIt->second.width * scaleX)) << "px';left.style.overflow='hidden';}"
+		<< buildFixedWidthBlock("left", leftWidth)
 		<< "if(center){center.style.flex='1 1 auto';center.style.minWidth='0';center.style.overflow='hidden';}"
-		<< "if(right){right.style.width='" << static_cast<int>(std::round(rightColumnIt->second.width * scaleX)) << "px';right.style.minWidth='" << static_cast<int>(std::round(rightColumnIt->second.width * scaleX)) << "px';right.style.maxWidth='" << static_cast<int>(std::round(rightColumnIt->second.width * scaleX)) << "px';right.style.flex='0 0 " << static_cast<int>(std::round(rightColumnIt->second.width * scaleX)) << "px';right.style.overflow='hidden';}"
-		<< "if(topRow){topRow.style.height='" << static_cast<int>(std::round(topRowHeight * scaleY)) << "px';topRow.style.minHeight='" << static_cast<int>(std::round(topRowHeight * scaleY)) << "px';topRow.style.maxHeight='" << static_cast<int>(std::round(topRowHeight * scaleY)) << "px';topRow.style.flex='0 0 " << static_cast<int>(std::round(topRowHeight * scaleY)) << "px';topRow.style.overflow='hidden';}"
-		<< "if(leftPanel){leftPanel.style.width='" << static_cast<int>(std::round(leftColumnIt->second.width * scaleX)) << "px';leftPanel.style.height='" << static_cast<int>(std::round(leftColumnIt->second.height * scaleY)) << "px';leftPanel.style.minWidth='" << static_cast<int>(std::round(leftColumnIt->second.width * scaleX)) << "px';leftPanel.style.minHeight='" << static_cast<int>(std::round(leftColumnIt->second.height * scaleY)) << "px';leftPanel.style.maxWidth='" << static_cast<int>(std::round(leftColumnIt->second.width * scaleX)) << "px';leftPanel.style.maxHeight='" << static_cast<int>(std::round(leftColumnIt->second.height * scaleY)) << "px';leftPanel.style.flex='0 0 auto';}"
-		<< "if(rightTopPanel){rightTopPanel.style.width='" << static_cast<int>(std::round(rightColumnIt->second.width * scaleX)) << "px';rightTopPanel.style.height='" << static_cast<int>(std::round(((rightTopPanelIt != iframeDataMap.end()) ? rightTopPanelIt->second.height : 0) * scaleY)) << "px';rightTopPanel.style.minWidth='" << static_cast<int>(std::round(rightColumnIt->second.width * scaleX)) << "px';rightTopPanel.style.minHeight='" << static_cast<int>(std::round(((rightTopPanelIt != iframeDataMap.end()) ? rightTopPanelIt->second.height : 0) * scaleY)) << "px';rightTopPanel.style.maxWidth='" << static_cast<int>(std::round(rightColumnIt->second.width * scaleX)) << "px';rightTopPanel.style.maxHeight='" << static_cast<int>(std::round(((rightTopPanelIt != iframeDataMap.end()) ? rightTopPanelIt->second.height : 0) * scaleY)) << "px';rightTopPanel.style.flex='0 0 auto';}"
-		<< "if(rightBottomPanel){rightBottomPanel.style.width='" << static_cast<int>(std::round(rightColumnIt->second.width * scaleX)) << "px';rightBottomPanel.style.height='" << static_cast<int>(std::round(((rightBottomPanelIt != iframeDataMap.end()) ? rightBottomPanelIt->second.height : 0) * scaleY)) << "px';rightBottomPanel.style.minWidth='" << static_cast<int>(std::round(rightColumnIt->second.width * scaleX)) << "px';rightBottomPanel.style.minHeight='" << static_cast<int>(std::round(((rightBottomPanelIt != iframeDataMap.end()) ? rightBottomPanelIt->second.height : 0) * scaleY)) << "px';rightBottomPanel.style.maxWidth='" << static_cast<int>(std::round(rightColumnIt->second.width * scaleX)) << "px';rightBottomPanel.style.maxHeight='" << static_cast<int>(std::round(((rightBottomPanelIt != iframeDataMap.end()) ? rightBottomPanelIt->second.height : 0) * scaleY)) << "px';rightBottomPanel.style.flex='0 0 auto';}"
-		<< "if(project){project.style.height='" << static_cast<int>(std::round(bottomPanelIt->second.height * scaleY)) << "px';project.style.minHeight='" << static_cast<int>(std::round(bottomPanelIt->second.height * scaleY)) << "px';project.style.maxHeight='" << static_cast<int>(std::round(bottomPanelIt->second.height * scaleY)) << "px';project.style.flex='0 0 " << static_cast<int>(std::round(bottomPanelIt->second.height * scaleY)) << "px';}"
+		<< buildFixedWidthBlock("right", rightWidth)
+		<< buildFixedHeightBlock("topRow", topRowHeight)
+		<< buildFixedPanelBlock("leftPanel", leftWidth, leftHeight)
+		<< buildFixedPanelBlock("rightTopPanel", rightWidth, rightTopHeight)
+		<< buildFixedPanelBlock("rightBottomPanel", rightWidth, rightBottomHeight)
+		<< buildFixedHeightBlock("project", bottomHeight)
 		<< "document.body.offsetHeight;"
 		<< "window.requestAnimationFrame(function(){"
 		<< "if(window.notifyViewportResize){window.notifyViewportResize();}"
+		<< "if(isInitState){"
 		<< "if(window.sendUIPanelIFramesToServer){window.sendUIPanelIFramesToServer();}"
 		<< "if(window.sendIFrameSizesToServer){window.sendIFrameSizesToServer();}"
+		<< "}"
 		<< "document.body.offsetHeight;"
 		<< "});"
 		<< "})();";
@@ -1620,14 +1666,6 @@ void UIHandler::syncBrowserFullScreenPanelLayout(WindowRenderState windowState, 
 		return;
 	}
 
-	float scaleX = 1.0f;
-	float scaleY = 1.0f;
-	if (referenceWidth > 0 && referenceHeight > 0 && currentWidth > 0 && currentHeight > 0)
-	{
-		scaleX = static_cast<float>(currentWidth) / static_cast<float>(referenceWidth);
-		scaleY = static_cast<float>(currentHeight) / static_cast<float>(referenceHeight);
-	}
-
 	auto selectorForPanel = [](const std::string& panelName)
 	{
 		std::string selector = panelName;
@@ -1637,15 +1675,36 @@ void UIHandler::syncBrowserFullScreenPanelLayout(WindowRenderState windowState, 
 
 	const auto leftColumnIt = std::min_element(
 		iframeDataMap.begin(), iframeDataMap.end(),
-		[](const auto& lhs, const auto& rhs) { return lhs.second.clientX < rhs.second.clientX; });
+		[](const auto& lhs, const auto& rhs)
+		{
+			if (lhs.second.x != rhs.second.x)
+			{
+				return lhs.second.x < rhs.second.x;
+			}
+			return lhs.second.y < rhs.second.y;
+		});
 
 	const auto rightColumnIt = std::max_element(
 		iframeDataMap.begin(), iframeDataMap.end(),
-		[](const auto& lhs, const auto& rhs) { return (lhs.second.clientX + lhs.second.width) < (rhs.second.clientX + rhs.second.width); });
+		[](const auto& lhs, const auto& rhs)
+		{
+			if (lhs.second.x != rhs.second.x)
+			{
+				return lhs.second.x < rhs.second.x;
+			}
+			return lhs.second.y < rhs.second.y;
+		});
 
 	const auto bottomPanelIt = std::max_element(
 		iframeDataMap.begin(), iframeDataMap.end(),
-		[](const auto& lhs, const auto& rhs) { return (lhs.second.clientY + lhs.second.height) < (rhs.second.clientY + rhs.second.height); });
+		[](const auto& lhs, const auto& rhs)
+		{
+			if (lhs.second.width != rhs.second.width)
+			{
+				return lhs.second.width < rhs.second.width;
+			}
+			return lhs.second.x < rhs.second.x;
+		});
 
 	if (leftColumnIt == iframeDataMap.end() || rightColumnIt == iframeDataMap.end() || bottomPanelIt == iframeDataMap.end())
 	{
@@ -1654,6 +1713,7 @@ void UIHandler::syncBrowserFullScreenPanelLayout(WindowRenderState windowState, 
 	}
 
 	int topRowHeight = 0;
+
 	for (const auto& pair : iframeDataMap)
 	{
 		if (pair.first != bottomPanelIt->first)
@@ -1664,34 +1724,48 @@ void UIHandler::syncBrowserFullScreenPanelLayout(WindowRenderState windowState, 
 
 	if (topRowHeight <= 0)
 	{
-		std::cout << "[UIHandler] syncBrowserFullScreenPanelLayout: skipped, topRowHeight is 0" << std::endl;
-		return;
+		topRowHeight = leftColumnIt->second.height;
 	}
 
 	auto rightTopPanelIt = iframeDataMap.end();
 	auto rightBottomPanelIt = iframeDataMap.end();
+
 	for (auto it = iframeDataMap.begin(); it != iframeDataMap.end(); ++it)
 	{
 		if (it->first == bottomPanelIt->first || it->first == leftColumnIt->first)
 			continue;
-		if (rightTopPanelIt == iframeDataMap.end() || it->second.clientY < rightTopPanelIt->second.clientY)
+
+		if (it->second.x != rightColumnIt->second.x)
+		{
+			continue;
+		}
+
+		if (rightTopPanelIt == iframeDataMap.end() || it->second.y < rightTopPanelIt->second.y)
 			rightTopPanelIt = it;
-		else
+
+		if (rightBottomPanelIt == iframeDataMap.end() || it->second.y > rightBottomPanelIt->second.y)
 			rightBottomPanelIt = it;
 	}
 
-	const std::string leftPanelSelector    = selectorForPanel(leftColumnIt->first);
-	const std::string bottomPanelSelector  = selectorForPanel(bottomPanelIt->first);
-	const std::string rightTopPanelSelector    = (rightTopPanelIt    != iframeDataMap.end()) ? selectorForPanel(rightTopPanelIt->first)    : std::string();
+	const std::string leftPanelSelector = selectorForPanel(leftColumnIt->first);
+	const std::string bottomPanelSelector = selectorForPanel(bottomPanelIt->first);
+	const std::string rightTopPanelSelector = (rightTopPanelIt != iframeDataMap.end()) ? selectorForPanel(rightTopPanelIt->first) : std::string();
 	const std::string rightBottomPanelSelector = (rightBottomPanelIt != iframeDataMap.end()) ? selectorForPanel(rightBottomPanelIt->first) : std::string();
 
-	const int fsLeftW    = static_cast<int>(std::round(leftColumnIt->second.width  * scaleX));
-	const int fsLeftH    = static_cast<int>(std::round(leftColumnIt->second.height * scaleY));
-	const int fsRightW   = static_cast<int>(std::round(rightColumnIt->second.width * scaleX));
-	const int fsTopRowH  = static_cast<int>(std::round(topRowHeight                * scaleY));
-	const int fsBottomH  = static_cast<int>(std::round(bottomPanelIt->second.height * scaleY));
-	const int fsRightTopH    = (rightTopPanelIt    != iframeDataMap.end()) ? static_cast<int>(std::round(rightTopPanelIt->second.height    * scaleY)) : 0;
-	const int fsRightBottomH = (rightBottomPanelIt != iframeDataMap.end()) ? static_cast<int>(std::round(rightBottomPanelIt->second.height * scaleY)) : 0;
+	const int fsLeftW = leftColumnIt->second.width;
+	const int fsLeftH = leftColumnIt->second.height;
+	const int fsRightW = rightColumnIt->second.width;
+	const int fsTopRowH = topRowHeight;
+	const int fsBottomH = bottomPanelIt->second.height;
+	const int fsRightTopH = (rightTopPanelIt != iframeDataMap.end()) ? rightTopPanelIt->second.height : 0;
+	const int fsRightBottomH = (rightBottomPanelIt != iframeDataMap.end()) ? rightBottomPanelIt->second.height : 0;
+
+	std::cout << "[UIHandler][Fullscreen DOM] left=" << leftColumnIt->first
+		      << " right=" << rightColumnIt->first
+		      << " bottom=" << bottomPanelIt->first
+		      << " rightTop=" << ((rightTopPanelIt != iframeDataMap.end()) ? rightTopPanelIt->first : std::string("<none>"))
+		      << " rightBottom=" << ((rightBottomPanelIt != iframeDataMap.end()) ? rightBottomPanelIt->first : std::string("<none>"))
+		      << std::endl;
 
 	std::ostringstream script;
 	script
@@ -1724,9 +1798,9 @@ void UIHandler::syncBrowserFullScreenPanelLayout(WindowRenderState windowState, 
 		<< "const root=document.documentElement;"
 		<< "const body=document.body;"
 		<< "const mainContainer=document.querySelector('.main-container');"
-		<< "if(root){root.style.width=currentWidth+'px';root.style.height=currentHeight+'px';root.style.overflow='hidden';}"
-		<< "if(body){body.style.width=currentWidth+'px';body.style.height=currentHeight+'px';body.style.margin='0';body.style.overflow='hidden';}"
-		<< "if(mainContainer){mainContainer.style.width=currentWidth+'px';mainContainer.style.height=currentHeight+'px';mainContainer.style.boxSizing='border-box';}"
+		<< "if(root){root.style.width=currentWidth+'px';root.style.height=currentHeight+'px';root.style.minWidth=currentWidth+'px';root.style.minHeight=currentHeight+'px';root.style.maxWidth=currentWidth+'px';root.style.maxHeight=currentHeight+'px';root.style.overflow='hidden';}"
+		<< "if(body){body.style.width=currentWidth+'px';body.style.height=currentHeight+'px';body.style.minWidth=currentWidth+'px';body.style.minHeight=currentHeight+'px';body.style.maxWidth=currentWidth+'px';body.style.maxHeight=currentHeight+'px';body.style.margin='0';body.style.overflow='hidden';}"
+		<< "if(mainContainer){mainContainer.style.width=currentWidth+'px';mainContainer.style.height=currentHeight+'px';mainContainer.style.minWidth=currentWidth+'px';mainContainer.style.minHeight=currentHeight+'px';mainContainer.style.maxWidth=currentWidth+'px';mainContainer.style.maxHeight=currentHeight+'px';mainContainer.style.boxSizing='border-box';}"
 		<< "const left=resetBox(document.querySelector('.left-section'));"
 		<< "const center=resetBox(document.querySelector('.center-section'));"
 		<< "const right=resetBox(document.querySelector('.right-section'));"
@@ -1742,14 +1816,7 @@ void UIHandler::syncBrowserFullScreenPanelLayout(WindowRenderState windowState, 
 		<< "if(leftPanel){leftPanel.style.width='" << fsLeftW << "px';leftPanel.style.height='" << fsLeftH << "px';leftPanel.style.minWidth='" << fsLeftW << "px';leftPanel.style.minHeight='" << fsLeftH << "px';leftPanel.style.maxWidth='" << fsLeftW << "px';leftPanel.style.maxHeight='" << fsLeftH << "px';leftPanel.style.flex='0 0 auto';}"
 		<< "if(rightTopPanel){rightTopPanel.style.width='" << fsRightW << "px';rightTopPanel.style.height='" << fsRightTopH << "px';rightTopPanel.style.minWidth='" << fsRightW << "px';rightTopPanel.style.minHeight='" << fsRightTopH << "px';rightTopPanel.style.maxWidth='" << fsRightW << "px';rightTopPanel.style.maxHeight='" << fsRightTopH << "px';rightTopPanel.style.flex='0 0 auto';}"
 		<< "if(rightBottomPanel){rightBottomPanel.style.width='" << fsRightW << "px';rightBottomPanel.style.height='" << fsRightBottomH << "px';rightBottomPanel.style.minWidth='" << fsRightW << "px';rightBottomPanel.style.minHeight='" << fsRightBottomH << "px';rightBottomPanel.style.maxWidth='" << fsRightW << "px';rightBottomPanel.style.maxHeight='" << fsRightBottomH << "px';rightBottomPanel.style.flex='0 0 auto';}"
-		<< "if(project){project.style.height='" << fsBottomH << "px';project.style.minHeight='" << fsBottomH << "px';project.style.maxHeight='" << fsBottomH << "px';project.style.flex='0 0 " << fsBottomH << "px';}"
-		<< "document.body.offsetHeight;"
-		<< "window.requestAnimationFrame(function(){"
-		<< "if(window.notifyViewportResize){window.notifyViewportResize();}"
-		<< "if(window.sendUIPanelIFramesToServer){window.sendUIPanelIFramesToServer();}"
-		<< "if(window.sendIFrameSizesToServer){window.sendIFrameSizesToServer();}"
-		<< "document.body.offsetHeight;"
-		<< "});"
+		<< "if(project){project.style.width='100%';project.style.minWidth='0';project.style.maxWidth='100%';project.style.alignSelf='stretch';project.style.height='" << fsBottomH << "px';project.style.minHeight='" << fsBottomH << "px';project.style.maxHeight='" << fsBottomH << "px';project.style.flex='0 0 " << fsBottomH << "px';}"
 		<< "})();";
 
 	mainFrame->ExecuteJavaScript(script.str(), mainFrame->GetURL(), 0);

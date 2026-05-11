@@ -995,7 +995,10 @@ void SDL_ApplicationWindow::renderFrame()
 	}
 
 	// ===== Render Pass, Viewport & Scissor Setup =======
-	renderPassViewportAndScissorSetup();
+	if (!renderPassViewportAndScissorSetup())
+	{
+		return;
+	}
 
 	// Get command buffer and window dimensions for state-based rendering
 	VkCommandBuffer commandBuffer = vk_command_buffers_[current_image_index_];
@@ -1171,7 +1174,10 @@ void SDL_ApplicationWindow::renderFrame()
 		debug_tools_->drawDebugTools(commandBuffer, width, height, &ui_manager_->getWorkSpace());
 	}
 
-	finalizeAndSubmitCommandBuffer(commandBuffer); 
+	if (!finalizeAndSubmitCommandBuffer(commandBuffer))
+	{
+		return;
+	}
 
 	presentToScreen();
 }
@@ -1594,7 +1600,7 @@ void SDL_ApplicationWindow::swapchainSetup(int render_frame_count)
 	frame_acquisition_succeeded_ = true;
 }
 
-void SDL_ApplicationWindow::renderPassViewportAndScissorSetup()
+bool SDL_ApplicationWindow::renderPassViewportAndScissorSetup()
 {
 	// ===== Command Buffer Preparation =====
 	VkCommandBuffer commandBuffer = vk_command_buffers_[current_image_index_];
@@ -1607,7 +1613,7 @@ void SDL_ApplicationWindow::renderPassViewportAndScissorSetup()
 	if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
 	{
 		std::cerr << "[SDL_ApplicationWindow] Failed to begin command buffer" << std::endl;
-		return;
+		return false;
 	}
 
 	// ===== Render Pass Configuration =====
@@ -1641,16 +1647,18 @@ void SDL_ApplicationWindow::renderPassViewportAndScissorSetup()
 	scissor.offset = {0, 0};
 	scissor.extent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
 	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+	return true;
 }
 
-void SDL_ApplicationWindow::finalizeAndSubmitCommandBuffer(VkCommandBuffer commandBuffer)
+bool SDL_ApplicationWindow::finalizeAndSubmitCommandBuffer(VkCommandBuffer commandBuffer)
 {
 	vkCmdEndRenderPass(commandBuffer);
 
 	if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
 	{
 		std::cerr << "[SDL_ApplicationWindow] Failed to end command buffer" << std::endl;
-		return;
+		return false;
 	}
 
 	VkSubmitInfo submitInfo{};
@@ -1673,11 +1681,12 @@ void SDL_ApplicationWindow::finalizeAndSubmitCommandBuffer(VkCommandBuffer comma
 		if (vkQueueSubmit(vk_context_->getGraphicsQueue(), 1, &submitInfo, vk_in_flight_fences_[current_frame_]) != VK_SUCCESS)
 		{
 			std::cerr << "[SDL_ApplicationWindow] Failed to submit draw command buffer" << std::endl;
-			return;
+			return false;
 		}
 	}
 
 	vk_image_fences_[current_image_index_] = vk_in_flight_fences_[current_frame_];
+	return true;
 }
 
 void SDL_ApplicationWindow::presentToScreen()

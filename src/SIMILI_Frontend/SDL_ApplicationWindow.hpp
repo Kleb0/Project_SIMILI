@@ -232,8 +232,8 @@ class SDL_ApplicationWindow
 		bool createSyncObjects();
 		void handleSwapchainRecreation();
 		void swapchainSetup(int render_frame_count);
-		void renderPassViewportAndScissorSetup();
-		void finalizeAndSubmitCommandBuffer(VkCommandBuffer commandBuffer);
+		bool renderPassViewportAndScissorSetup();
+		bool finalizeAndSubmitCommandBuffer(VkCommandBuffer commandBuffer);
 		void presentToScreen();
 		void frameCounter();
 };
