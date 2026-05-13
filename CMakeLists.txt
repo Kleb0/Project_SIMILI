@@ -4,6 +4,7 @@ add_definitions(-DUNICODE -D_UNICODE)
 add_definitions(-DWIN32_LEAN_AND_MEAN)
 add_definitions(-DNOMINMAX)
 add_definitions(-D_WIN32_WINNT=0x0A00)
+add_definitions(-DGLM_ENABLE_EXPERIMENTAL)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -160,6 +161,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/SDL_Windows_states
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/UIPanels
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/ThreeDScreen
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/Frontend_Debug_Tools
@@ -218,6 +220,7 @@ file(GLOB CEF_UI_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/ThreeDScreen/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/UIPanels/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/Frontend_Debug_Tools/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/SDL_Windows_states/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_HomeFramework/*.cpp"
 )
 list(REMOVE_ITEM CEF_UI_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/main_ui.cpp")
@@ -414,6 +417,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/types
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Services/middleware
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/SDL_Windows_states
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/CEFDrawing
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/UIPanels

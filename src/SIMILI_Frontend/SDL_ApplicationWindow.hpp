@@ -15,9 +15,10 @@
 #include "viewportLogic/FrameDatas/FrameDatas.hpp"
 #include "../../Engine/VulkanPipeline/VulkanPipeline.hpp"
 #include "SDL_Windows_states/SDL_State_Init.hpp"
+#include "SDL_Windows_states/SDL_State_Maximized.hpp"
 #include "SDL_Windows_states/SDL_State_Reduced.hpp"
-#include "SDL_Windows_states/SDl_State_Scaledown.hpp"
-#include "SDL_Windows_states/SDL_State_ScaleUP.hpp"
+#include "SDL_Windows_states/SDL_State_Scalingdown.hpp"
+#include "SDL_Windows_states/SDL_State_ScalingUP.hpp"
 
 class ThreeDScreen;
 class VKContext;
@@ -231,6 +232,7 @@ class SDL_ApplicationWindow
 
 		// === State Machine ===
 		SDL_State_Init state_init_;
+		SDL_State_Maximized state_maximized_;
 		SDL_State_Reduced state_reduced_;
 		SDL_State_ScaleDown state_scale_down_;
 		SDL_State_ScaleUp state_scale_up_;

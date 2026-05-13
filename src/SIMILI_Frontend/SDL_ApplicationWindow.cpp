@@ -84,6 +84,7 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, cef_texture_uploaded_width_(0)
 	, cef_texture_uploaded_height_(0)
 	, state_init_(this)
+	, state_maximized_(this)
 	, state_reduced_(this)
 	, state_scale_down_(this)
 	, state_scale_up_(this)
@@ -233,7 +234,10 @@ bool SDL_ApplicationWindow::create(const std::string& title, int width, int heig
 	{
 		debug_tools_ = new Enable_UI_Debug_Tools();
 	}
-	
+
+	if (current_state_)
+		current_state_->enter_state();
+
 	return true;
 }
 
@@ -873,6 +877,11 @@ void SDL_ApplicationWindow::processEvents()
 		is_maximized_ = currentMax;
 		std::cout << "[SDL_ApplicationWindow] Window " << (is_maximized_ ? "MAXIMIZED" : "RESTORED") << std::endl;
 		swapchain_needs_recreation_ = true;
+
+		if (is_maximized_)
+			transition_to(&state_maximized_);
+		else
+			transition_to(&state_init_);
 	}
 
 	if (ui_handler_)
@@ -1007,7 +1016,7 @@ void SDL_ApplicationWindow::renderFrame()
 	}
 
 	// ------ when state is Maximized for SDL3 window
-	else if (current_state_ == nullptr)
+	else if (current_state_ == &state_maximized_)
 	{
 		if (ui_manager_)
 		{
@@ -1645,10 +1654,11 @@ void SDL_ApplicationWindow::transition_to(SDL_State* newState)
 WindowRenderState SDL_ApplicationWindow::getWindowRenderState() const
 {
 	if (current_state_ == &state_init_)       return WindowRenderState::Init;
+	if (current_state_ == &state_maximized_)  return WindowRenderState::Maximized;
 	if (current_state_ == &state_reduced_)    return WindowRenderState::Reduced;
 	if (current_state_ == &state_scale_down_) return WindowRenderState::ScaleDown;
 	if (current_state_ == &state_scale_up_)   return WindowRenderState::ScaleUp;
-	return WindowRenderState::Maximized;
+	return WindowRenderState::Init;
 }
 
 void SDL_ApplicationWindow::updateDpiScale()

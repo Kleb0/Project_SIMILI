@@ -16,6 +16,7 @@
         "${workspaceFolder}/src/Engine/MeshEdit",
         "${workspaceFolder}/src/Engine/VulkanPipeline",
         "${workspaceFolder}/src/SIMILI_Frontend/CEFDrawing",
+        "${workspaceFolder}/src/SIMILI_Frontend/SDL_Windows_states",
         "${workspaceFolder}/src/SIMILI_Frontend/viewportLogic",
         "${workspaceFolder}/src/SIMILI_Frontend/viewportLogic/FrameDatas",
         "${workspaceFolder}/src/SIMILI_Frontend/viewportLogic/UIPanels",
