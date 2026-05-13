@@ -228,14 +228,14 @@ class SDL_ApplicationWindow
 		bool createCEFPipeline();
 		bool createCEFTextureSampler(VkDevice device);
 		void uploadCEFPaintBuffer();
-		void transition_to(SDL_State* newState);
+		void StateTransition(SDL_State* from, SDL_State* to);
 
 		// === State Machine ===
 		SDL_State_Init state_init_;
 		SDL_State_Maximized state_maximized_;
 		SDL_State_Reduced state_reduced_;
 		SDL_State_ScaleDown state_scale_down_;
-		SDL_State_ScaleUp state_scale_up_;
+		SDL_State_ScalingUp state_scaling_up_;
 		SDL_State* current_state_;
 
 		// ===== Vulkan Resource Management ===== //

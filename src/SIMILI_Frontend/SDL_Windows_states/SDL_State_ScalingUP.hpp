@@ -1,13 +1,14 @@
 #pragma once
 #include "SDL_State.hpp"
 
-class SDL_State_ScaleUp : public SDL_State
+class SDL_State_ScalingUp : public SDL_State
 {
 public:
-	explicit SDL_State_ScaleUp(SDL_ApplicationWindow* owner) : SDL_State(owner) {}
-	~SDL_State_ScaleUp() override = default;
+	explicit SDL_State_ScalingUp(SDL_ApplicationWindow* owner) : SDL_State(owner) {}
+	~SDL_State_ScalingUp() override = default;
 
-	void enter_state() override {}
+	void enter_state() override { SDL_State::enter_state(); }
 	void leave_state() override {}
 	SDL_State* return_state() override { return this; }
+	std::string name() const override { return "ScalingUp"; }
 };

@@ -1613,6 +1613,8 @@ namespace SIMILI {
 			if (panelGeometryChanged)
 			{
 				panel_frames_overridden_by_splitters_ = true;
+				// Keep the render map in sync so renderFullScreenUIPanels sees the updated positions.
+				fullscreen_prepared_frame_data_map_ = ui_panel_geometry_frame_data_map_;
 				if (isOperating)
 				{
 					pending_geometry_texture_layout_ = true;
@@ -1633,6 +1635,81 @@ namespace SIMILI {
 			}
 
 			was_splitter_operating_ = isOperating;
+		}
+
+		void UIManager::prepareUiPanelsForFullscreen(
+			int drawableWidth, int drawableHeight,
+			const std::map<std::string, IFrameScreenData>& panelFrameDataMap,
+			SDL_Window* window,
+			int referenceWindowWidth, int referenceWindowHeight)
+		{
+			fullscreen_prepared_frame_data_map_.clear();
+
+			if (referenceWindowWidth <= 0 || referenceWindowHeight <= 0 || !window)
+				return;
+
+			int currentLogicalW = 0, currentLogicalH = 0;
+			SDL_GetWindowSize(window, &currentLogicalW, &currentLogicalH);
+			if (currentLogicalW <= 0 || currentLogicalH <= 0)
+				return;
+
+			std::map<std::string, IFrameScreenData> sourceFrameDataMap;
+			{
+				std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+				if ((panel_frames_overridden_by_splitters_ || splitter_mouse_mecanic_.isOperating()) && !ui_panel_geometry_frame_data_map_.empty())
+					sourceFrameDataMap = ui_panel_geometry_frame_data_map_;
+				else if (!panelFrameDataMap.empty())
+					sourceFrameDataMap = panelFrameDataMap;
+				else
+					sourceFrameDataMap = ui_panel_geometry_frame_data_map_;
+			}
+
+			if (sourceFrameDataMap.empty())
+				return;
+
+			if (frameMapMatchesWindowSize(sourceFrameDataMap, currentLogicalW, currentLogicalH))
+			{
+				fullscreen_prepared_frame_data_map_ = sourceFrameDataMap;
+				return;
+			}
+
+			const float scaleX = static_cast<float>(currentLogicalW) / static_cast<float>(referenceWindowWidth);
+			const float scaleY = static_cast<float>(currentLogicalH) / static_cast<float>(referenceWindowHeight);
+
+			for (const auto& pair : sourceFrameDataMap)
+			{
+				IFrameScreenData scaled = pair.second;
+				scaled.relativeX = static_cast<int>(std::round(pair.second.relativeX * scaleX));
+				scaled.relativeY = static_cast<int>(std::round(pair.second.relativeY * scaleY));
+				scaled.width = static_cast<int>(std::round(pair.second.width * scaleX));
+				scaled.height = static_cast<int>(std::round(pair.second.height * scaleY));
+				scaled.clientX = static_cast<int>(std::round(pair.second.clientX * scaleX));
+				scaled.clientY = static_cast<int>(std::round(pair.second.clientY * scaleY));
+				fullscreen_prepared_frame_data_map_[pair.first] = scaled;
+			}
+		}
+
+		void UIManager::renderFullScreenUIPanels(
+			VkCommandBuffer commandBuffer,
+			int drawableWidth, int drawableHeight,
+			bool skipTextureRebuild,
+			SDL_Window* window)
+		{
+			if (fullscreen_prepared_frame_data_map_.empty() || !window)
+				return;
+
+			static constexpr int BORDER = 3;
+			const int borderLeft = BORDER;
+			const int borderTop = BORDER;
+			const int borderWidth = drawableWidth - 2 * BORDER;
+			const int borderHeight = drawableHeight - 2 * BORDER;
+
+			panel_map_builder_.drawInsideAppBorders(
+				commandBuffer, drawableWidth, drawableHeight,
+				fullscreen_prepared_frame_data_map_, skipTextureRebuild,
+				vk_context_, vulkan_pipelines_, vk_render_pass_,
+				ui_panels_, window,
+				borderLeft, borderTop, borderWidth, borderHeight);
 		}
 
 		void UIManager::drawFullScreenUIPanelsInsideBorders(
