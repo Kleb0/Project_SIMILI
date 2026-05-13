@@ -458,37 +458,6 @@ namespace SIMILI {
 			}
 		}
 
-		void UIManager::drawUIPanelsInsideBorders(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild, SDL_Window* window)
-		{
-			if (window) stored_window_ = window;
-			std::map<std::string, IFrameScreenData> effectivePanelFrameDataMap;
-			{
-				std::lock_guard<std::mutex> lock(ui_panel_mutex_);
-				if ((panel_frames_overridden_by_splitters_ || splitter_mouse_mecanic_.isOperating()) && !ui_panel_geometry_frame_data_map_.empty())
-				{
-					effectivePanelFrameDataMap = ui_panel_geometry_frame_data_map_;
-				}
-				else if (!panelFrameDataMap.empty())
-				{
-					effectivePanelFrameDataMap = panelFrameDataMap;
-				}
-				else
-				{
-					effectivePanelFrameDataMap = ui_panel_geometry_frame_data_map_;
-				}
-			}
-
-			if (effectivePanelFrameDataMap.empty())
-			{
-				return;
-			}
-
-			panel_map_builder_.drawInsideAppBorders(commandBuffer, drawableWidth, drawableHeight,
-				effectivePanelFrameDataMap, skipTextureRebuild, vk_context_, vulkan_pipelines_,
-				vk_render_pass_, ui_panels_, window,
-				app_border_left_, app_border_top_, app_border_width_, app_border_height_);
-		}
-
 		void UIManager::drawSplitters(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight)
 		{
 			if (splitter_list_.empty() || !vk_context_ || !vulkan_pipelines_ || vk_render_pass_ == VK_NULL_HANDLE)
@@ -683,6 +652,18 @@ namespace SIMILI {
 		{
 			if (referenceWindowWidth <= 0 || referenceWindowHeight <= 0 || !window)
 			{
+				return;
+			}
+
+			if (!reduced_prepared_frame_data_map_.empty())
+			{
+				static constexpr int BORDER = 3;
+				panel_map_builder_.drawInsideAppBorders(
+					commandBuffer, drawableWidth, drawableHeight,
+					reduced_prepared_frame_data_map_, skipTextureRebuild,
+					vk_context_, vulkan_pipelines_, vk_render_pass_,
+					ui_panels_, window,
+					BORDER, BORDER, drawableWidth - 2 * BORDER, drawableHeight - 2 * BORDER);
 				return;
 			}
 
@@ -1689,7 +1670,20 @@ namespace SIMILI {
 			}
 		}
 
-		void UIManager::renderFullScreenUIPanels(
+		void UIManager::cleanUpDatasBeforeDrawingForReducedScreen()
+		{
+			// Clear the pre-computed map so drawReduceScreenUIpanelsInsideBorders
+			// falls through to its normal per-frame scaling path.
+			// This avoids a timing issue where SDL_GetWindowSize still returns the
+			// maximized size when this function is called on the first RESTORED frame.
+			reduced_prepared_frame_data_map_.clear();
+
+			// Reset all fullscreen freeze state so the normal path reads the
+			// correct current window size dynamically on each frame.
+			ResetFullscreenFreeze();
+		}
+
+		void UIManager::renderFullScreenUIPanelsInsideBorders(
 			VkCommandBuffer commandBuffer,
 			int drawableWidth, int drawableHeight,
 			bool skipTextureRebuild,
@@ -1707,97 +1701,6 @@ namespace SIMILI {
 			panel_map_builder_.drawInsideAppBorders(
 				commandBuffer, drawableWidth, drawableHeight,
 				fullscreen_prepared_frame_data_map_, skipTextureRebuild,
-				vk_context_, vulkan_pipelines_, vk_render_pass_,
-				ui_panels_, window,
-				borderLeft, borderTop, borderWidth, borderHeight);
-		}
-
-		void UIManager::drawFullScreenUIPanelsInsideBorders(
-			VkCommandBuffer commandBuffer,
-			int drawableWidth, int drawableHeight,
-			const std::map<std::string, IFrameScreenData>& panelFrameDataMap,
-			bool skipTextureRebuild, SDL_Window* window,
-			int referenceWindowWidth, int referenceWindowHeight)
-		{
-
-			if (referenceWindowWidth <= 0 || referenceWindowHeight <= 0 || !window)
-			{
-				return;
-			}
-
-			int currentLogicalW = 0, currentLogicalH = 0;
-			SDL_GetWindowSize(window, &currentLogicalW, &currentLogicalH);
-
-			if (currentLogicalW <= 0 || currentLogicalH <= 0)
-			{
-				return;
-			}
-
-			float scaleX = static_cast<float>(currentLogicalW) / static_cast<float>(referenceWindowWidth);
-			float scaleY = static_cast<float>(currentLogicalH) / static_cast<float>(referenceWindowHeight);
-
-			std::map<std::string, IFrameScreenData> sourceFrameDataMap;
-			{
-				std::lock_guard<std::mutex> lock(ui_panel_mutex_);
-				if ((panel_frames_overridden_by_splitters_ || splitter_mouse_mecanic_.isOperating()) && !ui_panel_geometry_frame_data_map_.empty())
-				{
-					sourceFrameDataMap = ui_panel_geometry_frame_data_map_;
-				}
-				else if (!panelFrameDataMap.empty())
-				{
-					sourceFrameDataMap = panelFrameDataMap;
-				}
-				else
-				{
-					sourceFrameDataMap = ui_panel_geometry_frame_data_map_;
-				}
-			}
-
-			if (sourceFrameDataMap.empty())
-			{
-				return;
-			}
-
-			if (frameMapMatchesWindowSize(sourceFrameDataMap, currentLogicalW, currentLogicalH))
-			{
-				static constexpr int BORDER = 3;
-				int borderLeft = BORDER;
-				int borderTop = BORDER;
-				int borderWidth = drawableWidth - 2 * BORDER;
-				int borderHeight = drawableHeight - 2 * BORDER;
-
-				panel_map_builder_.drawInsideAppBorders(
-					commandBuffer, drawableWidth, drawableHeight,
-					sourceFrameDataMap, skipTextureRebuild,
-					vk_context_, vulkan_pipelines_, vk_render_pass_,
-					ui_panels_, window,
-					borderLeft, borderTop, borderWidth, borderHeight);
-				return;
-			}
-
-			std::map<std::string, IFrameScreenData> scaledFrameDataMap;
-
-			for (const auto& pair : sourceFrameDataMap)
-			{
-				IFrameScreenData scaled = pair.second;
-				scaled.relativeX = static_cast<int>(std::round(pair.second.relativeX * scaleX));
-				scaled.relativeY = static_cast<int>(std::round(pair.second.relativeY * scaleY));
-				scaled.width = static_cast<int>(std::round(pair.second.width * scaleX));
-				scaled.height = static_cast<int>(std::round(pair.second.height * scaleY));
-				scaled.clientX = static_cast<int>(std::round(pair.second.clientX * scaleX));
-				scaled.clientY = static_cast<int>(std::round(pair.second.clientY * scaleY));
-				scaledFrameDataMap[pair.first] = scaled;
-			}
-
-			static constexpr int BORDER = 3;
-			int borderLeft = BORDER;
-			int borderTop = BORDER;
-			int borderWidth = drawableWidth - 2 * BORDER;
-			int borderHeight = drawableHeight - 2 * BORDER;
-
-			panel_map_builder_.drawInsideAppBorders(
-				commandBuffer, drawableWidth, drawableHeight,
-				scaledFrameDataMap, skipTextureRebuild,
 				vk_context_, vulkan_pipelines_, vk_render_pass_,
 				ui_panels_, window,
 				borderLeft, borderTop, borderWidth, borderHeight);

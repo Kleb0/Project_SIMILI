@@ -10,7 +10,7 @@
 #include <climits>
 
 class VKContext;
-enum class WindowRenderState : int;
+enum WindowRenderState : int;
 
 namespace SIMILI 
 {

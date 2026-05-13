@@ -15,7 +15,7 @@
 class VKContext;
 class VulkanPipeline;
 struct IFrameData;
-enum class WindowRenderState : int;
+enum WindowRenderState : int;
 
 namespace SIMILI {
 	namespace Frontend {
@@ -55,13 +55,11 @@ namespace SIMILI {
 			void updateUIPanelIFrames(const std::map<std::string, IFrameData>& iframeDataMap);
 			void cacheUIPanelFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas, const std::map<std::string, IFrameScreenData>& splitterFrameDataMap);
 			void syncFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas, SDL_Window* sdlWindow);
+
+			void prepareUiPanelsForFullscreen(int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, SDL_Window* window, int referenceWindowWidth, int referenceWindowHeight);			
+			void renderFullScreenUIPanelsInsideBorders(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, bool skipTextureRebuild, SDL_Window* window);
 			
-			void drawUIPanelsInsideBorders(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild, SDL_Window* window);
-			void drawFullScreenUIPanelsInsideBorders(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild, SDL_Window* window, int referenceWindowWidth, int referenceWindowHeight);
-			
-			void prepareUiPanelsForFullscreen(int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, SDL_Window* window, int referenceWindowWidth, int referenceWindowHeight);
-			void renderFullScreenUIPanels(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, bool skipTextureRebuild, SDL_Window* window);
-			
+			void cleanUpDatasBeforeDrawingForReducedScreen();
 			void drawReduceScreenUIpanelsInsideBorders(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, bool skipTextureRebuild, SDL_Window* window, int referenceWindowWidth, int referenceWindowHeight);
 			
 			void drawSplitters(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight);
@@ -164,6 +162,7 @@ namespace SIMILI {
 			std::map<std::string, IFrameScreenData> frozen_modified_fullscreen_map_;
 			bool has_frozen_modified_fullscreen_map_ = false;
 			std::map<std::string, IFrameScreenData> fullscreen_prepared_frame_data_map_;
+			std::map<std::string, IFrameScreenData> reduced_prepared_frame_data_map_;
 			std::map<int, std::vector<std::string>> pending_fullscreen_modified_panels_by_splitter_;
 			std::map<int, std::vector<std::string>> pending_fullscreen_tracked_panels_by_splitter_;
 			std::map<int, std::map<std::string, IFrameScreenData>> pending_fullscreen_panel_frames_by_splitter_;

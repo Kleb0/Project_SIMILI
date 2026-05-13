@@ -38,7 +38,7 @@ class AppRenderHandler : public CefRenderHandler
 		IMPLEMENT_REFCOUNTING(AppRenderHandler);
 };
 
-enum class WindowRenderState : int
+enum WindowRenderState : int
 {
 	Init,
 	Maximized,
@@ -234,7 +234,7 @@ class SDL_ApplicationWindow
 		SDL_State_Init state_init_;
 		SDL_State_Maximized state_maximized_;
 		SDL_State_Reduced state_reduced_;
-		SDL_State_ScaleDown state_scale_down_;
+		SDL_State_ScalingDown state_scaling_down_;
 		SDL_State_ScalingUp state_scaling_up_;
 		SDL_State* current_state_;
 

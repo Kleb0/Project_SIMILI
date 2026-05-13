@@ -8,7 +8,7 @@
 #include <memory>
 
 class VKContext;
-enum class WindowRenderState : int;
+enum WindowRenderState : int;
 
 class UIPanel
 {

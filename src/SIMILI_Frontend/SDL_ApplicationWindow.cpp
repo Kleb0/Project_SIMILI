@@ -86,7 +86,7 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, state_init_(this)
 	, state_maximized_(this)
 	, state_reduced_(this)
-	, state_scale_down_(this)
+	, state_scaling_down_(this)
 	, state_scaling_up_(this)
 	, current_state_(&state_init_)
 {
@@ -330,6 +330,15 @@ bool SDL_ApplicationWindow::isMaximized() const
 	bool maximized = (flags & SDL_WINDOW_MAXIMIZED) != 0;
 	
 	return maximized;
+}
+
+WindowRenderState SDL_ApplicationWindow::getWindowRenderState() const
+{
+	if (current_state_ == &state_maximized_) return WindowRenderState::Maximized;
+	if (current_state_ == &state_reduced_) return WindowRenderState::Reduced;
+	if (current_state_ == &state_scaling_up_) return WindowRenderState::ScaleUp;
+	if (current_state_ == &state_scaling_down_) return WindowRenderState::ScaleDown;
+	return WindowRenderState::Init;
 }
 
 // ======== Window Properties ======== //
@@ -880,7 +889,7 @@ void SDL_ApplicationWindow::processEvents()
 		if (is_maximized_)
 			StateTransition(current_state_, &state_scaling_up_);
 		else
-			StateTransition(current_state_, &state_init_);
+			StateTransition(current_state_, &state_scaling_down_);
 	}
 
 	if (ui_handler_)
@@ -1000,13 +1009,12 @@ void SDL_ApplicationWindow::renderFrame()
 					app_border_->getWidth(), app_border_->getHeight());
 				borders_set_for_init_ = true;
 			}
-			ui_manager_->drawUIPanelsInsideBorders(commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
-			prepared_panel_frame_data_map_, prepared_skip_texture_rebuild_, window_);
 
+			ui_manager_->drawReduceScreenUIpanelsInsideBorders(commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
+			prepared_panel_frame_data_map_, prepared_skip_texture_rebuild_, window_,
+			reference_window_width_, reference_window_height_);
 
 			ui_manager_->drawSplitters(commandBuffer, prepared_drawable_width_, prepared_drawable_height_);
-
-
 
 		// if (debug_tools_ && ui_manager_)
 		// {
@@ -1055,7 +1063,7 @@ void SDL_ApplicationWindow::renderFrame()
 				app_border_->getLeft(), app_border_->getTop(),
 				app_border_->getWidth(), app_border_->getHeight());
 
-			ui_manager_->renderFullScreenUIPanels(commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
+			ui_manager_->renderFullScreenUIPanelsInsideBorders(commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
 				prepared_skip_texture_rebuild_, window_);
 
 			ui_manager_->drawSplittersFullScreen(commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
@@ -1074,6 +1082,16 @@ void SDL_ApplicationWindow::renderFrame()
 				app_border_->getReferenceWindowWidth(), app_border_->getReferenceWindowHeight());
 		}
 		StateTransition(&state_scaling_up_, &state_maximized_);
+	}
+
+	// ------ ScalingDown : window is being restored from fullscreen toward init
+	else if (current_state_ == &state_scaling_down_)
+	{
+		if (ui_manager_ && app_border_)
+		{
+			ui_manager_->cleanUpDatasBeforeDrawingForReducedScreen();
+		}
+		StateTransition(&state_scaling_down_, &state_init_);
 	}
 
 	else if (current_state_ == &state_reduced_)
@@ -1655,19 +1673,11 @@ void SDL_ApplicationWindow::StateTransition(SDL_State* from, SDL_State* to)
 {
 	if (from)
 		from->leave_state();
+
 	current_state_ = to;
+
 	if (to)
 		to->enter_state();
-}
-
-WindowRenderState SDL_ApplicationWindow::getWindowRenderState() const
-{
-	if (current_state_ == &state_init_) return WindowRenderState::Init;
-	if (current_state_ == &state_maximized_)  return WindowRenderState::Maximized;
-	if (current_state_ == &state_reduced_) return WindowRenderState::Reduced;
-	if (current_state_ == &state_scale_down_) return WindowRenderState::ScaleDown;
-	if (current_state_ == &state_scaling_up_) return WindowRenderState::ScaleUp;
-	return WindowRenderState::Init;
 }
 
 void SDL_ApplicationWindow::updateDpiScale()
