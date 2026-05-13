@@ -12,7 +12,6 @@ App_Border::App_Border()
 	, reference_window_height_(0)
 	, first_update_(true)
 	, debug_line_enabled_(false)
-	, current_state_(BorderState::Init)
 {
 }
 
@@ -38,7 +37,6 @@ void App_Border::updateDimensions(int windowWidth, int windowHeight)
 			<< " ref_window=" << reference_window_width_ << "x" << reference_window_height_ << std::endl;
 		
 		first_update_ = false;
-		current_state_ = BorderState::Init;
 		return;
 	}
 
@@ -48,42 +46,6 @@ void App_Border::updateDimensions(int windowWidth, int windowHeight)
 	bottom_ = windowHeight - BORDER_OFFSET;
 	width_ = right_ - left_;
 	height_ = bottom_ - top_;
-
-	if (windowWidth > reference_window_width_ || windowHeight > reference_window_height_)
-	{
-		if (current_state_ != BorderState::Maximized)
-		{
-
-			current_state_ = BorderState::Maximized;
-
-			// translate in english 
-
-			std::cout << "[App_Border] Switching to MAXIMIZED state (window: " << windowWidth << "x" << windowHeight 
-				<< " vs reference: " << reference_window_width_ << "x" << reference_window_height_ << ")" << std::endl;
-		}
-		return;
-	}
-
-	if (windowWidth == reference_window_width_ && windowHeight == reference_window_height_)
-	{
-		if (current_state_ != BorderState::Init)
-		{
-			std::cout << "[App_Border] Returning to INIT state (reference dimensions)" << std::endl;
-			current_state_ = BorderState::Init;
-		}
-		return;
-	}
-
-	if (windowWidth < reference_window_width_ || windowHeight < reference_window_height_)
-	{
-		if (current_state_ != BorderState::Reduced)
-		{
-			std::cout << "[App_Border] Switching to REDUCED state (window: " << windowWidth << "x" << windowHeight 
-				<< " vs reference: " << reference_window_width_ << "x" << reference_window_height_ << ")" << std::endl;
-			current_state_ = BorderState::Reduced;
-		}
-		return;
-	}
 }
 
 int App_Border::getLeft() const
@@ -124,16 +86,6 @@ void App_Border::enableDebugLine(bool enabled)
 bool App_Border::isDebugLineEnabled() const
 {
 	return debug_line_enabled_;
-}
-
-BorderState App_Border::getCurrentState() const
-{
-	return current_state_;
-}
-
-void App_Border::setState(BorderState newState)
-{
-	current_state_ = newState;
 }
 
 int App_Border::getReferenceWindowWidth() const

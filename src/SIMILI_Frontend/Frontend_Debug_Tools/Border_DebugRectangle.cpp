@@ -104,24 +104,12 @@ void Border_DebugRectangle::draw(VkCommandBuffer commandBuffer, int drawableWidt
 	int refWidth;
 	int refHeight;
 
-	if (border->getCurrentState() == BorderState::Maximized)
-	{
-		refWidth  = drawableWidth;
-		refHeight = drawableHeight;
-		left   = 3;
-		top    = 3;
-		right  = drawableWidth  - 3;
-		bottom = drawableHeight - 3;
-	}
-	else
-	{
-		left   = border->getLeft();
-		top    = border->getTop();
-		right  = border->getRight();
-		bottom = border->getBottom();
-		refWidth  = border->getReferenceWindowWidth();
-		refHeight = border->getReferenceWindowHeight();
-	}
+	left      = border->getLeft();
+	top       = border->getTop();
+	right     = border->getRight();
+	bottom    = border->getBottom();
+	refWidth  = drawableWidth;
+	refHeight = drawableHeight;
 
 	if (refWidth <= 0 || refHeight <= 0)
 	{

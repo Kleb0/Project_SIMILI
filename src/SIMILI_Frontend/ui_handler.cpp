@@ -45,6 +45,10 @@ namespace
 				return "Maximized";
 			case WindowRenderState::Reduced:
 				return "Reduced";
+			case WindowRenderState::ScaleUp:
+				return "ScaleUp";
+			case WindowRenderState::ScaleDown:
+				return "ScaleDown";
 			default:
 				return "Unknown";
 		}

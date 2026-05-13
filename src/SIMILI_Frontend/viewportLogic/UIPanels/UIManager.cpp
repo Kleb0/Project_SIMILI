@@ -1245,6 +1245,54 @@ namespace SIMILI {
 			}
 		}
 
+		void UIManager::FreezeModifiedPanelAtFullScreen()
+		{
+			if (!coordinates_frozen_for_fullscreen_)
+				return;
+
+			if (!panel_frames_overridden_by_splitters_)
+				return;
+
+			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+			frozen_modified_fullscreen_map_ = ui_panel_geometry_frame_data_map_;
+			has_frozen_modified_fullscreen_map_ = true;
+		}
+
+		void UIManager::ScaleDownPanels(int initWidth, int initHeight)
+		{
+			if (!has_frozen_modified_fullscreen_map_)
+				return;
+
+			if (frozen_fullscreen_width_ <= 0 || frozen_fullscreen_height_ <= 0)
+				return;
+
+			if (initWidth <= 0 || initHeight <= 0)
+				return;
+
+			const float scaleX = static_cast<float>(initWidth)  / static_cast<float>(frozen_fullscreen_width_);
+			const float scaleY = static_cast<float>(initHeight) / static_cast<float>(frozen_fullscreen_height_);
+
+			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+
+			for (auto& pair : frozen_modified_fullscreen_map_)
+			{
+				IFrameScreenData& fd = pair.second;
+				fd.relativeX = static_cast<int>(std::round(fd.relativeX * scaleX));
+				fd.relativeY = static_cast<int>(std::round(fd.relativeY * scaleY));
+				fd.width = static_cast<int>(std::round(fd.width * scaleX));
+				fd.height = static_cast<int>(std::round(fd.height * scaleY));
+				fd.clientX = static_cast<int>(std::round(fd.clientX * scaleX));
+				fd.clientY = static_cast<int>(std::round(fd.clientY * scaleY));
+				fd.windowWidth = initWidth;
+				fd.windowHeight = initHeight;
+			}
+
+			ui_panel_frame_data_map_ = frozen_modified_fullscreen_map_;
+
+			has_frozen_modified_fullscreen_map_ = false;
+			frozen_modified_fullscreen_map_.clear();
+		}
+
 		void UIManager::FreezeCoordinatesForFullscreen(int fullscreenWidth, int fullscreenHeight)
 		{
 			if (coordinates_frozen_for_fullscreen_)

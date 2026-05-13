@@ -14,6 +14,10 @@
 #include <mutex>
 #include "viewportLogic/FrameDatas/FrameDatas.hpp"
 #include "../../Engine/VulkanPipeline/VulkanPipeline.hpp"
+#include "SDL_Windows_states/SDL_State_Init.hpp"
+#include "SDL_Windows_states/SDL_State_Reduced.hpp"
+#include "SDL_Windows_states/SDl_State_Scaledown.hpp"
+#include "SDL_Windows_states/SDL_State_ScaleUP.hpp"
 
 class ThreeDScreen;
 class VKContext;
@@ -38,6 +42,8 @@ enum class WindowRenderState : int
 	Init,
 	Maximized,
 	Reduced,
+	ScaleUp,
+	ScaleDown,
 };
 
 struct IFrameData;
@@ -77,7 +83,7 @@ class SDL_ApplicationWindow
 		float getDpiScale() const;
 		bool isMaximized() const;
 		bool isVisible() const;
-		WindowRenderState getWindowRenderState() const { return window_state_; }
+		WindowRenderState getWindowRenderState() const;
 		bool isValid() const { return window_ != nullptr; }
 		SDL_Window* getHandle() const { return window_; }
 
@@ -149,7 +155,6 @@ class SDL_ApplicationWindow
 		int last_width_;
 		int last_height_;
 		float dpi_scale_;
-		WindowRenderState window_state_;
 		int reference_window_width_;
 		int reference_window_height_;
 		
@@ -222,6 +227,14 @@ class SDL_ApplicationWindow
 		bool createCEFPipeline();
 		bool createCEFTextureSampler(VkDevice device);
 		void uploadCEFPaintBuffer();
+		void transition_to(SDL_State* newState);
+
+		// === State Machine ===
+		SDL_State_Init state_init_;
+		SDL_State_Reduced state_reduced_;
+		SDL_State_ScaleDown state_scale_down_;
+		SDL_State_ScaleUp state_scale_up_;
+		SDL_State* current_state_;
 
 		// ===== Vulkan Resource Management ===== //
 		bool createSwapchain();

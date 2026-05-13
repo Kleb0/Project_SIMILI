@@ -46,7 +46,6 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, last_width_(800)
 	, last_height_(600)
 	, dpi_scale_(1.0f)
-	, window_state_(WindowRenderState::Init)
 	, reference_window_width_(1920)
 	, reference_window_height_(1080)
 	, ui_handler_(nullptr)
@@ -84,6 +83,11 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, cef_texture_sampler_(VK_NULL_HANDLE)
 	, cef_texture_uploaded_width_(0)
 	, cef_texture_uploaded_height_(0)
+	, state_init_(this)
+	, state_reduced_(this)
+	, state_scale_down_(this)
+	, state_scale_up_(this)
+	, current_state_(&state_init_)
 {
 }
 SDL_ApplicationWindow::~SDL_ApplicationWindow()
@@ -221,10 +225,9 @@ bool SDL_ApplicationWindow::create(const std::string& title, int width, int heig
 	{
 		app_border_ = new App_Border();
 	}
-	app_border_->setState(BorderState::Init);
 	app_border_->updateDimensions(width, height);
 	
-	std::cout << "[SDL_ApplicationWindow] App_Border initialized with state: Init" << std::endl;
+	std::cout << "[SDL_ApplicationWindow] App_Border initialized" << std::endl;
 	
 	if (!debug_tools_)
 	{
@@ -872,52 +875,6 @@ void SDL_ApplicationWindow::processEvents()
 		swapchain_needs_recreation_ = true;
 	}
 
-	if (app_border_)
-	{
-		BorderState borderState = app_border_->getCurrentState();
-		 
-		static BorderState last_logged_state = BorderState::Init;
-		if (borderState != last_logged_state)
-		{
-			std::string stateName;
-			switch (borderState)
-			{
-				case BorderState::Init: stateName = "Init"; break;
-				case BorderState::Maximized: stateName = "Maximized"; break;
-				case BorderState::Reduced: stateName = "Reduced"; break;
-				case BorderState::Updating: stateName = "Updating"; break;
-			}
-			std::cout << "[SDL_ApplicationWindow] App_Border state changed to: " << stateName << std::endl;
-
-			if (borderState == BorderState::Maximized && window_)
-			{
-				int drawW, drawH;
-				SDL_GetWindowSizeInPixels(window_, &drawW, &drawH);
-				std::cout << "[SDL_ApplicationWindow] App_Border ref size = "
-					<< app_border_->getReferenceWindowWidth() << "x" << app_border_->getReferenceWindowHeight()
-					<< " | drawable = " << drawW << "x" << drawH << std::endl;
-			}
-
-			last_logged_state = borderState;
-		}
-		
-		switch (borderState)
-		{
-			case BorderState::Init:
-				window_state_ = WindowRenderState::Init;
-				if (ui_manager_) ui_manager_->ResetFullscreenFreeze();
-				break;
-			case BorderState::Maximized:
-				window_state_ = WindowRenderState::Maximized;
-				borders_set_for_init_ = false;
-				break;
-			case BorderState::Reduced:
-				window_state_ = WindowRenderState::Reduced;
-				borders_set_for_init_ = false;
-				break;	
-		}
-	}
-
 	if (ui_handler_)
 	{
 		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
@@ -943,50 +900,6 @@ void SDL_ApplicationWindow::renderFrame()
 	// ===== Frame Counter & Debug Logging =====
 	frameCounter();
 
-	// ===== Synchronize window_state_ with app_border_ state EARLY =====
-	if (app_border_)
-	{
-		BorderState borderState = app_border_->getCurrentState();
-		
-		static int sync_log_counter = 0;
-		if (sync_log_counter % 120 == 0)
-		{
-			std::string borderStateName;
-			switch (borderState)
-			{
-				case BorderState::Init: borderStateName = "Init"; break;
-				case BorderState::Maximized: borderStateName = "Maximized"; break;
-				case BorderState::Reduced: borderStateName = "Reduced"; break;
-				case BorderState::Updating: borderStateName = "Updating"; break;
-			}
-			std::cout << "[SDL_ApplicationWindow::renderFrame] App_Border state = " << borderStateName << std::endl;
-		}
-		sync_log_counter++;
-		
-		switch (borderState)
-		{
-			case BorderState::Init:
-				window_state_ = WindowRenderState::Init;
-				if (ui_manager_) ui_manager_->ResetFullscreenFreeze();
-				break;
-			case BorderState::Maximized:
-				window_state_ = WindowRenderState::Maximized;
-				break;
-			case BorderState::Reduced:
-				window_state_ = WindowRenderState::Reduced;
-				break;
-
-		}
-	}
-	else
-	{
-		static bool logged_null_border = false;
-		if (!logged_null_border)
-		{
-			std::cout << "[SDL_ApplicationWindow::renderFrame] WARNING: app_border_ is null!" << std::endl;
-			logged_null_border = true;
-		}
-	}
 	// ===== Swapchain Setup & Image Acquisition =====
 	swapchainSetup(render_frame_count);
 	if (!frame_acquisition_succeeded_)
@@ -1021,12 +934,12 @@ void SDL_ApplicationWindow::renderFrame()
 
 	// ------- Main rendering logic ------- //
 	// ONLY render content when in Init state - otherwise just clear to black
-	if (window_state_ == WindowRenderState::Init)
+	if (current_state_ == &state_init_)
 	{
 		if (ui_manager_)
 		{
 			ui_manager_->bindWorkSpaceSizeToSplitterInteractions();
-			ui_manager_->bindPanelsToSplitters(window_state_);
+			ui_manager_->bindPanelsToSplitters(getWindowRenderState());
 
 			if (ui_manager_->consumePendingCEFRepaintRequest())
 			{
@@ -1038,7 +951,7 @@ void SDL_ApplicationWindow::renderFrame()
 					SDL_GetWindowSize(window_, &currentW, &currentH);
 					// Use SDL reference window size instead of hardcoded values
 					handler->syncBrowserPanelLayoutFromCurrentFrames(
-						window_state_,
+						getWindowRenderState(),
 						currentW, currentH,
 						reference_window_width_, reference_window_height_);
 				}
@@ -1094,7 +1007,7 @@ void SDL_ApplicationWindow::renderFrame()
 	}
 
 	// ------ when state is Maximized for SDL3 window
-	else if (window_state_ == WindowRenderState::Maximized)
+	else if (current_state_ == nullptr)
 	{
 		if (ui_manager_)
 		{
@@ -1102,7 +1015,7 @@ void SDL_ApplicationWindow::renderFrame()
 			SDL_GetWindowSize(window_, &fullscreenW, &fullscreenH);
 			ui_manager_->FreezeCoordinatesForFullscreen(fullscreenW, fullscreenH);
 
-			ui_manager_->bindFullScreenPanelsToSplitters(window_state_);
+			ui_manager_->bindFullScreenPanelsToSplitters(getWindowRenderState());
 
 			if (ui_manager_->consumePendingCEFRepaintRequest())
 			{
@@ -1114,7 +1027,7 @@ void SDL_ApplicationWindow::renderFrame()
 					SDL_GetWindowSize(window_, &currentW, &currentH);
 
 					handler->syncBrowserFullScreenPanelLayout(
-						window_state_,
+						getWindowRenderState(),
 						currentW, currentH,
 						currentW, currentH);
 				}
@@ -1145,7 +1058,7 @@ void SDL_ApplicationWindow::renderFrame()
 	}
 	// For Reduced and Updating states, we just cleared to black in renderPassViewportAndScissorSetup()
 
-	else if (window_state_ == WindowRenderState::Reduced)
+	else if (current_state_ == &state_reduced_)
 	{
 		activateDebugRender();
 
@@ -1719,6 +1632,24 @@ void SDL_ApplicationWindow::presentToScreen()
 
 
 // ==== private methods ==== //
+
+void SDL_ApplicationWindow::transition_to(SDL_State* newState)
+{
+	if (current_state_)
+		current_state_->leave_state();
+	current_state_ = newState;
+	if (current_state_)
+		current_state_->enter_state();
+}
+
+WindowRenderState SDL_ApplicationWindow::getWindowRenderState() const
+{
+	if (current_state_ == &state_init_)       return WindowRenderState::Init;
+	if (current_state_ == &state_reduced_)    return WindowRenderState::Reduced;
+	if (current_state_ == &state_scale_down_) return WindowRenderState::ScaleDown;
+	if (current_state_ == &state_scale_up_)   return WindowRenderState::ScaleUp;
+	return WindowRenderState::Maximized;
+}
 
 void SDL_ApplicationWindow::updateDpiScale()
 {

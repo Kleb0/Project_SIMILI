@@ -75,6 +75,8 @@ namespace SIMILI {
 
 			void FreezeCoordinatesForFullscreen(int fullscreenWidth, int fullscreenHeight);
 			void ResetFullscreenFreeze();
+			void FreezeModifiedPanelAtFullScreen();
+			void ScaleDownPanels(int initWidth, int initHeight);
 			
 			void setCEFTextureForAllPanels(VkImageView view, VkSampler sampler, int cefWidth, int cefHeight);
 			void invalidateCEFTexture();
@@ -155,6 +157,8 @@ namespace SIMILI {
 			int actual_cef_texture_width_ = 0;
 			int actual_cef_texture_height_ = 0;
 			std::map<std::string, std::pair<float, float>> last_fullscreen_uv_size_map_;
+			std::map<std::string, IFrameScreenData> frozen_modified_fullscreen_map_;
+			bool has_frozen_modified_fullscreen_map_ = false;
 			std::map<int, std::vector<std::string>> pending_fullscreen_modified_panels_by_splitter_;
 			std::map<int, std::vector<std::string>> pending_fullscreen_tracked_panels_by_splitter_;
 			std::map<int, std::map<std::string, IFrameScreenData>> pending_fullscreen_panel_frames_by_splitter_;
