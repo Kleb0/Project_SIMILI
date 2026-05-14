@@ -1164,9 +1164,13 @@ namespace SIMILI {
 				? ui_panel_frame_data_map_
 				: ui_panel_geometry_frame_data_map_;
 
-			panel_map_builder_.attachedUpdatedMap(effectiveFrameDataMap, splitter_list_, current_window_render_state_);
-
-			splitter_mouse_mecanic_.setAttachments(panel_map_builder_.getMapData().splitterAttachments);
+			// Only recalculate attachments if NOT frozen. When frozen, attachments are set once
+			// by FreezeCoordinatesForFullscreen() and must remain stable across all drag operations.
+			if (!coordinates_frozen_for_fullscreen_)
+			{
+				panel_map_builder_.attachedUpdatedMap(effectiveFrameDataMap, splitter_list_, current_window_render_state_);
+				splitter_mouse_mecanic_.setAttachments(panel_map_builder_.getMapData().splitterAttachments);
+			}
 
 			if (requestCEFRepaint)
 			{
@@ -1197,7 +1201,6 @@ namespace SIMILI {
 				return;
 
 			std::map<std::string, IFrameScreenData> localFrameDataMap;
-
 			{
 				std::lock_guard<std::mutex> lock(ui_panel_mutex_);
 
@@ -1205,6 +1208,8 @@ namespace SIMILI {
 				had_init_splitter_panel_modification_before_maximized_ = false;
 				frozen_fullscreen_width_ = 0;
 				frozen_fullscreen_height_ = 0;
+				stored_cef_width_ = 0;
+				stored_cef_height_ = 0;
 				last_fullscreen_uv_size_map_.clear();
 				pending_fullscreen_modified_panels_by_splitter_.clear();
 				pending_fullscreen_tracked_panels_by_splitter_.clear();
@@ -1319,6 +1324,7 @@ namespace SIMILI {
 
 			const float scaleX = static_cast<float>(fullscreenWidth)  / static_cast<float>(stored_cef_width_);
 			const float scaleY = static_cast<float>(fullscreenHeight) / static_cast<float>(stored_cef_height_);
+			std::map<std::string, IFrameScreenData> fullscreenGeometryMap;
 
 			{
 				std::lock_guard<std::mutex> lock(ui_panel_mutex_);
@@ -1328,10 +1334,10 @@ namespace SIMILI {
 					IFrameScreenData& fd = pair.second;
 					fd.relativeX  = static_cast<int>(std::round(fd.relativeX * scaleX));
 					fd.relativeY = static_cast<int>(std::round(fd.relativeY * scaleY));
-					fd.width = static_cast<int>(std::round(fd.width     * scaleX));
-					fd.height = static_cast<int>(std::round(fd.height    * scaleY));
-					fd.clientX  = static_cast<int>(std::round(fd.clientX   * scaleX));
-					fd.clientY = static_cast<int>(std::round(fd.clientY   * scaleY));
+					fd.width = static_cast<int>(std::round(fd.width * scaleX));
+					fd.height = static_cast<int>(std::round(fd.height * scaleY));
+					fd.clientX  = static_cast<int>(std::round(fd.clientX * scaleX));
+					fd.clientY = static_cast<int>(std::round(fd.clientY * scaleY));
 					fd.windowWidth  = fullscreenWidth;
 					fd.windowHeight = fullscreenHeight;
 				}
@@ -1352,7 +1358,11 @@ namespace SIMILI {
 
 				last_window_width_ = fullscreenWidth;
 				last_window_height_ = fullscreenHeight;
+				fullscreenGeometryMap = ui_panel_geometry_frame_data_map_;
 			}
+
+			panel_map_builder_.attachedUpdatedMap(fullscreenGeometryMap, splitter_list_, WindowRenderState::Maximized);
+			splitter_mouse_mecanic_.setAttachments(panel_map_builder_.getMapData().splitterAttachments);
 
 			coordinates_frozen_for_fullscreen_ = true;
 			frozen_fullscreen_width_ = fullscreenWidth;
