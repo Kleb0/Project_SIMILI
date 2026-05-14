@@ -1678,8 +1678,16 @@ namespace SIMILI {
 				return;
 			}
 
-			const float scaleX = static_cast<float>(currentLogicalW) / static_cast<float>(referenceWindowWidth);
-			const float scaleY = static_cast<float>(currentLogicalH) / static_cast<float>(referenceWindowHeight);
+			float srcW = static_cast<float>(referenceWindowWidth);
+			float srcH = static_cast<float>(referenceWindowHeight);
+			{
+				const auto& firstFrame = sourceFrameDataMap.begin()->second;
+				if (firstFrame.windowWidth > 0) srcW = static_cast<float>(firstFrame.windowWidth);
+				if (firstFrame.windowHeight > 0) srcH = static_cast<float>(firstFrame.windowHeight);
+			}
+
+			const float scaleX = static_cast<float>(currentLogicalW) / srcW;
+			const float scaleY = static_cast<float>(currentLogicalH) / srcH;
 
 			for (const auto& pair : sourceFrameDataMap)
 			{

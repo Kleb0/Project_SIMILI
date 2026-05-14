@@ -1113,6 +1113,25 @@ void SDL_ApplicationWindow::renderFrame()
 				app_border_->getLeft(), app_border_->getTop(),
 				app_border_->getWidth(), app_border_->getHeight());
 
+			ui_manager_->bindPanelsToSplitters(getWindowRenderState());
+
+			if (ui_manager_->consumePendingCEFRepaintRequest())
+			{
+				if (ui_handler_)
+				{
+					UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+					handler->cacheUIPanelFrameDatas();
+					int currentW = 0, currentH = 0;
+					SDL_GetWindowSize(window_, &currentW, &currentH);
+
+					handler->syncBrowserFullScreenPanelLayout(
+						getWindowRenderState(),
+						currentW, currentH,
+						currentW, currentH);
+				}
+				requestBrowserRepaint();
+			}
+
 			ui_manager_->drawReduceScreenUIpanelsInsideBorders(commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
 				prepared_panel_frame_data_map_, prepared_skip_texture_rebuild_, window_,
 				app_border_->getReferenceWindowWidth(), app_border_->getReferenceWindowHeight());
