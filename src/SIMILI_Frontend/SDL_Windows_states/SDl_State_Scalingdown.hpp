@@ -3,6 +3,7 @@
 
 class SDL_State_ScalingDown : public SDL_State
 {
+
 public:
 	explicit SDL_State_ScalingDown(SDL_ApplicationWindow* owner) : SDL_State(owner) {}
 	~SDL_State_ScalingDown() override = default;

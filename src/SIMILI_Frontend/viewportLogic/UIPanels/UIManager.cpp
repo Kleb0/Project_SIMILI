@@ -569,8 +569,10 @@ namespace SIMILI {
 				return;
 			}
 
-			float scaleX = static_cast<float>(currentLogicalW) / static_cast<float>(referenceWindowWidth);
-			float scaleY = static_cast<float>(currentLogicalH) / static_cast<float>(referenceWindowHeight);
+			const float srcW = last_window_width_ > 0 ? static_cast<float>(last_window_width_) : static_cast<float>(referenceWindowWidth);
+			const float srcH = last_window_height_ > 0 ? static_cast<float>(last_window_height_) : static_cast<float>(referenceWindowHeight);
+			const float scaleX = static_cast<float>(currentLogicalW) / srcW;
+			const float scaleY = static_cast<float>(currentLogicalH) / srcH;
 			const bool splittersAlreadyMatchWindow = last_window_width_ == currentLogicalW && last_window_height_ == currentLogicalH;
 
 			if (!splitter_renderer_)
@@ -675,9 +677,6 @@ namespace SIMILI {
 				return;
 			}
 
-			float scaleX = static_cast<float>(currentLogicalW) / static_cast<float>(referenceWindowWidth);
-			float scaleY = static_cast<float>(currentLogicalH) / static_cast<float>(referenceWindowHeight);
-
 			std::map<std::string, IFrameScreenData> sourceFrameDataMap;
 			{
 				std::lock_guard<std::mutex> lock(ui_panel_mutex_);
@@ -717,6 +716,16 @@ namespace SIMILI {
 				return;
 			}
 
+			float srcW = static_cast<float>(referenceWindowWidth);
+			float srcH = static_cast<float>(referenceWindowHeight);
+			{
+				const auto& firstFrame = sourceFrameDataMap.begin()->second;
+				if (firstFrame.windowWidth > 0) srcW = static_cast<float>(firstFrame.windowWidth);
+				if (firstFrame.windowHeight > 0) srcH = static_cast<float>(firstFrame.windowHeight);
+			}
+			const float scaleX = static_cast<float>(currentLogicalW) / srcW;
+			const float scaleY = static_cast<float>(currentLogicalH) / srcH;
+
 			std::map<std::string, IFrameScreenData> scaledFrameDataMap;
 
 			for (const auto& pair : sourceFrameDataMap)
@@ -754,6 +763,21 @@ namespace SIMILI {
 				return;
 			}
 
+			int hitMouseX = mouseX;
+			int hitMouseY = mouseY;
+
+			if (stored_window_ && last_window_width_ > 0 && last_window_height_ > 0)
+			{
+				int currentLogicalW = 0, currentLogicalH = 0;
+				SDL_GetWindowSize(stored_window_, &currentLogicalW, &currentLogicalH);
+				if (currentLogicalW > 0 && currentLogicalH > 0 &&
+					(currentLogicalW != last_window_width_ || currentLogicalH != last_window_height_))
+				{
+					hitMouseX = static_cast<int>(std::round(mouseX * static_cast<float>(last_window_width_) / static_cast<float>(currentLogicalW)));
+					hitMouseY = static_cast<int>(std::round(mouseY * static_cast<float>(last_window_height_) / static_cast<float>(currentLogicalH)));
+				}
+			}
+
 			std::vector<Splitter::SplitterData> splitterData;
 			splitterData.reserve(splitter_list_.size());
 
@@ -769,10 +793,10 @@ namespace SIMILI {
 				splitterData.push_back(sd);
 			}
 
-			splitter_mouse_mecanic_.update(splitterData, mouseX, mouseY);
+			splitter_mouse_mecanic_.update(splitterData, hitMouseX, hitMouseY);
 			splitter_renderer_->setHoveredIndex(splitter_mouse_mecanic_.getHoveredIndex());
 
-			dragSplitter(mouseX, mouseY, isLeftButtonDown);
+			dragSplitter(hitMouseX, hitMouseY, isLeftButtonDown);
 		}
 
 		void UIManager::dragSplitter(int mouseX, int mouseY, bool isLeftButtonDown)

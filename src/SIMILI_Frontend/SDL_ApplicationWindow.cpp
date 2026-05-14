@@ -877,6 +877,11 @@ void SDL_ApplicationWindow::processEvents()
 		swapchain_needs_recreation_ = true;		
 
 		app_border_->updateDimensions(currentWidth, currentHeight);
+
+		if (current_state_ != &state_scaling_up_ && current_state_ != &state_scaling_down_ && current_state_ != &state_maximized_)
+		{
+			StateTransition(current_state_, &state_reduced_);
+		}
 	}
 	
 	bool currentMax = isMaximized();
@@ -1091,7 +1096,7 @@ void SDL_ApplicationWindow::renderFrame()
 		{
 			ui_manager_->cleanUpDatasBeforeDrawingForReducedScreen();
 		}
-		StateTransition(&state_scaling_down_, &state_init_);
+		StateTransition(&state_scaling_down_, &state_reduced_);
 	}
 
 	else if (current_state_ == &state_reduced_)
@@ -1130,9 +1135,6 @@ void SDL_ApplicationWindow::renderFrame()
 
 	presentToScreen();
 }
-
-
-
 
 void SDL_ApplicationWindow::renderThreeDScreen(const std::map<std::string, IFrameData>&)
 {
@@ -1221,7 +1223,6 @@ void SDL_ApplicationWindow::activateDebugRender()
 		debug_tools_->activateDebugRender();
 	}
 }
-
 
 // ===== Vulkan Lifecycle ====== //
 
