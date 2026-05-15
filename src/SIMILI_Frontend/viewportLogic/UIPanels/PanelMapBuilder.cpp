@@ -1282,5 +1282,140 @@ namespace SIMILI {
 			}
 		}
 
+		void PanelMapBuilder::AttachedSplittersWhenMoving(std::vector<SplitterDefinition>& splitters)
+		{
+			const int STOP_MARGIN = 5;
+			const int ATTACH_TOLERANCE = 15;
+			const int n = static_cast<int>(splitters.size());
+
+			if (n == 0 || map_data_.splitterAttachments.size() < static_cast<std::size_t>(n))
+				return;
+
+			for (int i = 0; i < n; ++i)
+			{
+				for (int j : map_data_.splitterAttachments[i])
+				{
+					if (j <= i || j >= n)
+						continue;
+
+					const bool iIsH = splitters[i].isHorizontal;
+					const bool jIsH = splitters[j].isHorizontal;
+
+					if (iIsH == jIsH)
+						continue;
+
+					const int hi = iIsH ? i : j;
+					const int vi = iIsH ? j : i;
+
+					SplitterDefinition& H = splitters[hi];
+					SplitterDefinition& V = splitters[vi];
+
+					const int distVTop    = std::abs(H.y - V.y);
+					const int distVBottom = std::abs(H.y - (V.y + V.height));
+					const int distHLeft   = std::abs(V.x - H.x);
+					const int distHRight  = std::abs(V.x - (H.x + H.width));
+
+					// Correction Y : seulement si H.y est proche d'une extrémité de V
+					// (évite de déplacer V quand l'attachement est uniquement de type atHLeft/atHRight)
+					if (distVTop <= ATTACH_TOLERANCE || distVBottom <= ATTACH_TOLERANCE)
+					{
+						if (distVTop <= distVBottom)
+						{
+							// H rattaché au sommet de V : V.y = H.y, bas de V fixe
+							const int vBottom = V.y + V.height;
+							const int newVHeight = vBottom - H.y;
+							if (newVHeight >= STOP_MARGIN)
+							{
+								V.y = H.y;
+								V.height = newVHeight;
+							}
+						}
+						else
+						{
+							// H rattaché au bas de V : V.y + V.height = H.y, sommet de V fixe
+							const int newVHeight = H.y - V.y;
+							if (newVHeight >= STOP_MARGIN)
+							{
+								V.height = newVHeight;
+							}
+						}
+					}
+
+					// Correction X : seulement si V.x est proche d'une extrémité de H
+					// (évite de déplacer H quand l'attachement est uniquement de type atVTop/atVBottom)
+					if (distHLeft <= ATTACH_TOLERANCE || distHRight <= ATTACH_TOLERANCE)
+					{
+						if (distHLeft <= distHRight)
+						{
+							// V rattaché au bord gauche de H : H.x = V.x, bord droit fixe
+							const int hRight = H.x + H.width;
+							const int newHWidth = hRight - V.x;
+							if (newHWidth >= STOP_MARGIN)
+							{
+								H.x = V.x;
+								H.width = newHWidth;
+							}
+						}
+						else
+						{
+							// V rattaché au bord droit de H : H.x + H.width = V.x, bord gauche fixe
+							const int newHWidth = V.x - H.x;
+							if (newHWidth >= STOP_MARGIN)
+							{
+								H.width = newHWidth;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		void PanelMapBuilder::ClampBoundarySplitters(
+			std::vector<SplitterDefinition>& splitters,
+			int windowWidth, int windowHeight)
+		{
+			if (splitters.empty() || windowWidth <= 0 || windowHeight <= 0)
+				return;
+
+			const int BORDER_OFFSET = 3;
+			const int CLAMP_TOLERANCE = 15;
+
+			const int borderLeft   = BORDER_OFFSET;
+			const int borderTop    = BORDER_OFFSET;
+			const int borderRight  = windowWidth  - BORDER_OFFSET;
+			const int borderBottom = windowHeight - BORDER_OFFSET;
+
+			for (auto& s : splitters)
+			{
+				// Bord gauche : le splitter commence au bord gauche de l'app
+				if (std::abs(s.x - borderLeft) <= CLAMP_TOLERANCE)
+				{
+					const int rightEdge = s.x + s.width;
+					s.x = borderLeft;
+					s.width = rightEdge - s.x;
+				}
+
+				// Bord droit : le splitter se termine au bord droit de l'app
+				if (std::abs((s.x + s.width) - borderRight) <= CLAMP_TOLERANCE)
+				{
+					s.width = borderRight - s.x;
+				}
+
+				// Bord haut : le splitter commence au bord haut de l'app
+				if (std::abs(s.y - borderTop) <= CLAMP_TOLERANCE)
+				{
+					const int bottomEdge = s.y + s.height;
+					s.y = borderTop;
+					s.height = bottomEdge - s.y;
+				}
+
+				// Bord bas : le splitter se termine au bord bas de l'app
+				if (std::abs((s.y + s.height) - borderBottom) <= CLAMP_TOLERANCE)
+				{
+					s.height = borderBottom - s.y;
+				}
+			}
+		}
+
 	}
 }

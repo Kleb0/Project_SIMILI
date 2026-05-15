@@ -149,6 +149,10 @@ namespace SIMILI
 					const std::vector<SplitterDefinition>& splitterList,
 					WindowRenderState currentWindowState);
 
+				void AttachedSplittersWhenMoving(std::vector<SplitterDefinition>& splitters);
+
+				void ClampBoundarySplitters(std::vector<SplitterDefinition>& splitters, int windowWidth, int windowHeight);
+
 				const WorkSpace& getWorkSpace() const;
 
 				void updateWorkSpaceFromSplitters(const std::vector<SplitterDefinition>& splitterList, int windowWidth, int windowHeight);
