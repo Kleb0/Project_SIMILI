@@ -556,7 +556,6 @@ namespace SIMILI {
 			}
 
 			buildSplittersFromRays(frameDataMap);
-			attachedSplittersAtCreation();
 			buildWorkSpace(frameDataMap);
 
 			splitterList.clear();
@@ -570,6 +569,39 @@ namespace SIMILI {
 				def.isVertical = sc.isVertical;
 				def.isHorizontal = sc.isHorizontal;
 				splitterList.push_back(def);
+			}
+
+			// Compute splitter attachments from build-time positions
+			{
+				const int ATTACH_TOL = 15;
+				const int nSpl = static_cast<int>(splitterList.size());
+				map_data_.splitterAttachments.assign(nSpl, std::vector<int>());
+				for (int i = 0; i < nSpl; ++i)
+				{
+					for (int j = i + 1; j < nSpl; ++j)
+					{
+						const SplitterDefinition& a = splitterList[i];
+						const SplitterDefinition& b = splitterList[j];
+						if (a.isVertical == b.isVertical) continue;
+						const SplitterDefinition& V = a.isVertical ? a : b;
+						const SplitterDefinition& H = a.isVertical ? b : a;
+						const int vi = a.isVertical ? i : j;
+						const int hi = a.isVertical ? j : i;
+						const bool xOverlap = (V.x <= H.x + H.width + ATTACH_TOL) &&
+						                      (V.x + V.width >= H.x - ATTACH_TOL);
+						const bool atVTop    = xOverlap && std::abs(H.y - V.y) <= ATTACH_TOL;
+						const bool atVBottom = xOverlap && std::abs(H.y - (V.y + V.height)) <= ATTACH_TOL;
+						const bool vInHYRange = (V.y <= H.y + ATTACH_TOL) &&
+						                        (V.y + V.height >= H.y - ATTACH_TOL);
+						const bool atHLeft  = vInHYRange && std::abs(V.x - H.x) <= ATTACH_TOL;
+						const bool atHRight = vInHYRange && std::abs(V.x - (H.x + H.width)) <= ATTACH_TOL;
+						if (atVTop || atVBottom || atHLeft || atHRight)
+						{
+							map_data_.splitterAttachments[vi].push_back(hi);
+							map_data_.splitterAttachments[hi].push_back(vi);
+						}
+					}
+				}
 			}
 
 			std::cout << "[PanelMapBuilder::buildMapData] "
@@ -784,7 +816,6 @@ namespace SIMILI {
 				map_data_.splitterCandidates.push_back(candidate);
 			}
 
-			attachedSplittersAtCreation();
 			buildWorkSpace(frameDataMap);
 			if (currentWindowWidth > 0 && currentWindowHeight > 0)
 			{
@@ -1239,55 +1270,12 @@ namespace SIMILI {
 			return workspace_;
 		}
 
-		void PanelMapBuilder::attachedSplittersAtCreation()
-		{
-			const int ATTACH_TOLERANCE = 15;
-			const auto& candidates = map_data_.splitterCandidates;
-			const int n = static_cast<int>(candidates.size());
-
-			map_data_.splitterAttachments.assign(n, std::vector<int>());
-
-			for (int i = 0; i < n; ++i)
-			{
-				for (int j = i + 1; j < n; ++j)
-				{
-					const auto& a = candidates[i];
-					const auto& b = candidates[j];
-
-					if (a.isVertical == b.isVertical)
-						continue;
-
-					const SplitterCandidate& V = a.isVertical ? a : b;
-					const SplitterCandidate& H = a.isVertical ? b : a;
-					const int vi = a.isVertical ? i : j;
-					const int hi = a.isVertical ? j : i;
-
-					const bool xOverlap = (V.x <= H.x + H.width + ATTACH_TOLERANCE) &&
-					                      (V.x + V.width >= H.x - ATTACH_TOLERANCE);
-
-					const bool atVTop = xOverlap && std::abs(H.y - V.y) <= ATTACH_TOLERANCE;
-					const bool atVBottom = xOverlap && std::abs(H.y - (V.y + V.height)) <= ATTACH_TOLERANCE;
-
-					const bool vInHYRange = (V.y <= H.y + ATTACH_TOLERANCE) &&
-					                        (V.y + V.height >= H.y - ATTACH_TOLERANCE);
-					const bool atHLeft = vInHYRange && std::abs(V.x - H.x) <= ATTACH_TOLERANCE;
-					const bool atHRight = vInHYRange && std::abs(V.x - (H.x + H.width)) <= ATTACH_TOLERANCE;
-
-					if (atVTop || atVBottom || atHLeft || atHRight)
-					{
-						map_data_.splitterAttachments[vi].push_back(hi);
-						map_data_.splitterAttachments[hi].push_back(vi);
-					}
-				}
-			}
-		}
-
 		void PanelMapBuilder::AttachedSplittersWhenMoving(std::vector<SplitterDefinition>& splitters)
 		{
 			const int STOP_MARGIN = 5;
-			const int ATTACH_TOLERANCE = 15;
 			const int n = static_cast<int>(splitters.size());
 
+			// Utilise les attachements stables calculés au build-time (pas de re-détection live)
 			if (n == 0 || map_data_.splitterAttachments.size() < static_cast<std::size_t>(n))
 				return;
 
@@ -1310,18 +1298,18 @@ namespace SIMILI {
 					SplitterDefinition& H = splitters[hi];
 					SplitterDefinition& V = splitters[vi];
 
-					const int distVTop    = std::abs(H.y - V.y);
+					const int distVTop = std::abs(H.y - V.y);
 					const int distVBottom = std::abs(H.y - (V.y + V.height));
-					const int distHLeft   = std::abs(V.x - H.x);
-					const int distHRight  = std::abs(V.x - (H.x + H.width));
+					const int distHLeft = std::abs(V.x - H.x);
+					const int distHRight = std::abs(V.x - (H.x + H.width));
 
-					// Correction Y : seulement si H.y est proche d'une extrémité de V
-					// (évite de déplacer V quand l'attachement est uniquement de type atHLeft/atHRight)
-					if (distVTop <= ATTACH_TOLERANCE || distVBottom <= ATTACH_TOLERANCE)
+					const int minY = (std::min)(distVTop, distVBottom);
+					const int minX = (std::min)(distHLeft, distHRight);
+
+					if (minY <= minX)
 					{
 						if (distVTop <= distVBottom)
 						{
-							// H rattaché au sommet de V : V.y = H.y, bas de V fixe
 							const int vBottom = V.y + V.height;
 							const int newVHeight = vBottom - H.y;
 							if (newVHeight >= STOP_MARGIN)
@@ -1332,7 +1320,6 @@ namespace SIMILI {
 						}
 						else
 						{
-							// H rattaché au bas de V : V.y + V.height = H.y, sommet de V fixe
 							const int newVHeight = H.y - V.y;
 							if (newVHeight >= STOP_MARGIN)
 							{
@@ -1341,13 +1328,10 @@ namespace SIMILI {
 						}
 					}
 
-					// Correction X : seulement si V.x est proche d'une extrémité de H
-					// (évite de déplacer H quand l'attachement est uniquement de type atVTop/atVBottom)
-					if (distHLeft <= ATTACH_TOLERANCE || distHRight <= ATTACH_TOLERANCE)
+					if (minX <= minY)
 					{
 						if (distHLeft <= distHRight)
 						{
-							// V rattaché au bord gauche de H : H.x = V.x, bord droit fixe
 							const int hRight = H.x + H.width;
 							const int newHWidth = hRight - V.x;
 							if (newHWidth >= STOP_MARGIN)
@@ -1358,7 +1342,6 @@ namespace SIMILI {
 						}
 						else
 						{
-							// V rattaché au bord droit de H : H.x + H.width = V.x, bord gauche fixe
 							const int newHWidth = V.x - H.x;
 							if (newHWidth >= STOP_MARGIN)
 							{

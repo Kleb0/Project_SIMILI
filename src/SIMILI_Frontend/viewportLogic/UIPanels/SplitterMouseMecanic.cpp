@@ -182,16 +182,18 @@ void SplitterMouseMecanic::dragBindedSplitters(std::vector<Splitter::SplitterDat
 
 		auto& attached = splitters[attachedIdx];
 
+		const int EDGE_TOLERANCE = 15;
+
 		if (dragged.isHorizontal && attached.isVertical)
 		{
 			const int distTop    = std::abs(attached.y - originalY);
 			const int distBottom = std::abs((attached.y + attached.height) - originalY);
-			if (distTop <= distBottom)
+			if (distTop <= EDGE_TOLERANCE)
 			{
 				attached.y += dy;
 				attached.height -= dy;
 			}
-			else
+			else if (distBottom <= EDGE_TOLERANCE)
 			{
 				attached.height += dy;
 			}
@@ -200,12 +202,12 @@ void SplitterMouseMecanic::dragBindedSplitters(std::vector<Splitter::SplitterDat
 		{
 			const int distLeft  = std::abs(attached.x - originalX);
 			const int distRight = std::abs((attached.x + attached.width) - originalX);
-			if (distLeft <= distRight)
+			if (distLeft <= EDGE_TOLERANCE)
 			{
 				attached.x += dx;
 				attached.width -= dx;
 			}
-			else
+			else if (distRight <= EDGE_TOLERANCE)
 			{
 				attached.width += dx;
 			}

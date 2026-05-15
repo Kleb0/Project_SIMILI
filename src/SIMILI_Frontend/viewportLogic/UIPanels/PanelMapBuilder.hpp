@@ -171,9 +171,7 @@ namespace SIMILI
 				const std::map<std::string, PanelState>& panelStateMap,
 				const std::map<std::string, IFrameScreenData>& fallbackFrameDataMap) const;
 
-				void attachedSplittersAtCreation();
-
-				void createViewportPanel(std::map<std::string, PanelState>& panelStateMap,
+			void createViewportPanel(std::map<std::string, PanelState>& panelStateMap,
 				int currentWindowWidth, int currentWindowHeight);
 
 				//void buildSplitters(const std::map<std::string, PanelState>& panelStateMap,
