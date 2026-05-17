@@ -1439,6 +1439,7 @@ namespace SIMILI {
 				const std::vector<std::string>* assignedPanels = nullptr;
 				std::vector<std::string> modifiedPanels;
 				std::vector<std::string> trackedPanels;
+
 				if (i < fullscreenMapData.splitterCandidates.size())
 				{
 					assignedPanels = &fullscreenMapData.splitterCandidates[i].assignedPanels;

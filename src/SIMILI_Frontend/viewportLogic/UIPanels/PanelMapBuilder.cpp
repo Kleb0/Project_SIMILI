@@ -865,6 +865,46 @@ namespace SIMILI {
 				updateWorkSpaceFromSplitters(splitterList, currentWindowWidth, currentWindowHeight);
 			}
 
+			{
+				const int ATTACH_TOL = 15;
+				const int nSpl = static_cast<int>(splitterList.size());
+				map_data_.splitterAttachments.assign(nSpl, std::vector<int>());
+
+				for (int i = 0; i < nSpl; ++i)
+				{
+					for (int j = i + 1; j < nSpl; ++j)
+					{
+						const SplitterDefinition& a = splitterList[i];
+						const SplitterDefinition& b = splitterList[j];
+
+						if (a.isVertical == b.isVertical) continue;
+
+						const SplitterDefinition& V = a.isVertical ? a : b;
+						const SplitterDefinition& H = a.isVertical ? b : a;
+
+						const int vi = a.isVertical ? i : j;
+						const int hi = a.isVertical ? j : i;
+
+						const bool xOverlap = (V.x <= H.x + H.width + ATTACH_TOL) && (V.x + V.width >= H.x - ATTACH_TOL);
+
+						const bool atVTop  = xOverlap && std::abs(H.y - V.y) <= ATTACH_TOL;
+						const bool atVBottom = xOverlap && std::abs(H.y - (V.y + V.height)) <= ATTACH_TOL;
+
+						const bool vInHYRange = (V.y <= H.y + ATTACH_TOL) &&
+						(V.y + V.height >= H.y - ATTACH_TOL);
+
+						const bool atHLeft  = vInHYRange && std::abs(V.x - H.x) <= ATTACH_TOL;
+						const bool atHRight = vInHYRange && std::abs(V.x - (H.x + H.width)) <= ATTACH_TOL;
+
+						if (atVTop || atVBottom || atHLeft || atHRight)
+						{
+							map_data_.splitterAttachments[vi].push_back(hi);
+							map_data_.splitterAttachments[hi].push_back(vi);
+						}
+					}
+				}
+			}
+
 			const char* stateLabel = "Init";
 			if (currentWindowState == WindowRenderState::Maximized)
 			{
