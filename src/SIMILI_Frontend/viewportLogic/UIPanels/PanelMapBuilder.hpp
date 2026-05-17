@@ -32,6 +32,7 @@ namespace SIMILI
 			int height;
 			bool isVertical;
 			bool isHorizontal;
+			std::string id;
 		};
 
 		enum class PanelLayoutType
@@ -71,6 +72,7 @@ namespace SIMILI
 			bool isVertical;
 			bool isHorizontal;
 			std::vector<std::string> assignedPanels;
+			std::string id;
 		};
 
 		struct PanelMapEntry
@@ -163,6 +165,9 @@ namespace SIMILI
 					int windowWidth,
 					int windowHeight) const;
 
+				std::string generateSplitterId() const;
+				std::string makeSplitterSignature(const SplitterCandidate& candidate) const;
+
 				void syncPanelStateMapFromFrameData(
 					const std::map<std::string, IFrameScreenData>& frameDataMap,
 					std::map<std::string, PanelState>& panelStateMap);
@@ -192,6 +197,7 @@ namespace SIMILI
 
 				MapData map_data_;
 				WorkSpace workspace_;
+				std::map<std::string, std::string> splitter_id_registry_;
 		};
 	}
 }

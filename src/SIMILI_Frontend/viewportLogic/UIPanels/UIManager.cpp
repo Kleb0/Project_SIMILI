@@ -484,6 +484,7 @@ namespace SIMILI {
 				sd.height = def.height;
 				sd.isVertical = def.isVertical;
 				sd.isHorizontal = def.isHorizontal;
+				sd.id = def.id;
 				splitterData.push_back(sd);
 			}
 
@@ -543,6 +544,7 @@ namespace SIMILI {
 				}
 				sd.isVertical = def.isVertical;
 				sd.isHorizontal = def.isHorizontal;
+				sd.id = def.id;
 				splitterData.push_back(sd);
 			}
 
@@ -604,6 +606,7 @@ namespace SIMILI {
 				}
 				sd.isVertical = def.isVertical;
 				sd.isHorizontal = def.isHorizontal;
+				sd.id = def.id;
 				splitterData.push_back(sd);
 			}
 
@@ -790,6 +793,7 @@ namespace SIMILI {
 				sd.height = def.height;
 				sd.isVertical = def.isVertical;
 				sd.isHorizontal = def.isHorizontal;
+				sd.id = def.id;
 				splitterData.push_back(sd);
 			}
 
@@ -818,6 +822,7 @@ namespace SIMILI {
 				sd.height = def.height;
 				sd.isVertical = def.isVertical;
 				sd.isHorizontal = def.isHorizontal;
+				sd.id = def.id;
 				splitterData.push_back(sd);
 			}
 

@@ -5,6 +5,8 @@
 #include <iostream>
 #include <algorithm>
 #include <cmath>
+#include <random>
+#include <sstream>
 
 namespace SIMILI {
 	namespace Frontend {
@@ -15,6 +17,33 @@ namespace SIMILI {
 
 		PanelMapBuilder::~PanelMapBuilder()
 		{
+		}
+
+		std::string PanelMapBuilder::generateSplitterId() const
+		{
+			static const char kChars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+			static std::mt19937 rng(std::random_device{}());
+			static std::uniform_int_distribution<int> dist(0, static_cast<int>(sizeof(kChars) - 2));
+			std::string id(7, ' ');
+			for (char& c : id)
+			{
+				c = kChars[dist(rng)];
+			}
+			return id;
+		}
+
+		std::string PanelMapBuilder::makeSplitterSignature(const SplitterCandidate& candidate) const
+		{
+			std::vector<std::string> sorted = candidate.assignedPanels;
+			std::sort(sorted.begin(), sorted.end());
+			std::ostringstream oss;
+			for (std::size_t i = 0; i < sorted.size(); ++i)
+			{
+				if (i > 0) oss << ',';
+				oss << sorted[i];
+			}
+			oss << '|' << (candidate.isVertical ? 'V' : 'H');
+			return oss.str();
 		}
 
 		bool PanelMapBuilder::frameMapMatchesWindowSize(
@@ -559,8 +588,21 @@ namespace SIMILI {
 			buildWorkSpace(frameDataMap);
 
 			splitterList.clear();
-			for (const auto& sc : map_data_.splitterCandidates)
+			for (auto& sc : map_data_.splitterCandidates)
 			{
+				const std::string sig = makeSplitterSignature(sc);
+				auto it = splitter_id_registry_.find(sig);
+				if (it == splitter_id_registry_.end())
+				{
+					const std::string newId = generateSplitterId();
+					splitter_id_registry_[sig] = newId;
+					sc.id = newId;
+				}
+				else
+				{
+					sc.id = it->second;
+				}
+
 				SplitterDefinition def;
 				def.x = sc.x;
 				def.y = sc.y;
@@ -568,6 +610,7 @@ namespace SIMILI {
 				def.height = sc.height;
 				def.isVertical = sc.isVertical;
 				def.isHorizontal = sc.isHorizontal;
+				def.id = sc.id;
 				splitterList.push_back(def);
 			}
 
@@ -611,7 +654,7 @@ namespace SIMILI {
 			int splitterIdx = 1;
 			for (const auto& sc : map_data_.splitterCandidates)
 			{
-				std::cout << "  Splitter " << splitterIdx++ << " ("
+				std::cout << "  Splitter " << splitterIdx++ << " [" << sc.id << "] ("
 				          << (sc.isVertical ? "V" : "H") << ") at ("
 				          << sc.x << "," << sc.y << ") "
 				          << sc.width << "x" << sc.height << " -> panels: ";

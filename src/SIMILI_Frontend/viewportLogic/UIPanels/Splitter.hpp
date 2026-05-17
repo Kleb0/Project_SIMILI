@@ -4,6 +4,7 @@
 #include <vulkan/vulkan.h>
 #include <vector>
 #include <memory>
+#include <string>
 #include "../../../Engine/VulkanPipeline/VulkanPipeline.hpp"
 
 class SplitterMouseMecanic;
@@ -21,6 +22,7 @@ public:
 		int height;
 		bool isVertical;
 		bool isHorizontal;
+		std::string id;
 	};
 
 	Splitter();
