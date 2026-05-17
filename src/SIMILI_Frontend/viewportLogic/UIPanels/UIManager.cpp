@@ -990,8 +990,7 @@ namespace SIMILI {
 				}
 			}
 
-			panel_map_builder_.ClampBoundarySplitters(splitter_list_, last_window_width_, last_window_height_);
-			panel_map_builder_.AttachedSplittersWhenMoving(splitter_list_);
+			// panel_map_builder_.AttachedSplittersWhenMoving(splitter_list_, last_window_width_, last_window_height_);
 			splitter_mouse_mecanic_.setAttachments(panel_map_builder_.getMapData().splitterAttachments);
 
 			for (std::size_t i = 0; i < splitter_list_.size(); ++i)
@@ -1428,8 +1427,7 @@ namespace SIMILI {
 
 			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
 
-			panel_map_builder_.ClampBoundarySplitters(splitter_list_, last_window_width_, last_window_height_);
-			panel_map_builder_.AttachedSplittersWhenMoving(splitter_list_);
+			// panel_map_builder_.AttachedSplittersWhenMoving(splitter_list_, last_window_width_, last_window_height_);
 			splitter_mouse_mecanic_.setAttachments(panel_map_builder_.getMapData().splitterAttachments);
 
 			for (std::size_t i = 0; i < splitter_list_.size(); ++i)

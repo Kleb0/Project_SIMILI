@@ -136,24 +136,17 @@ namespace SIMILI
 
 				void clearUIPanels(std::map<std::string, std::unique_ptr<class UIPanel>>& uiPanels);
 
-				void buildMapData(
-					const std::map<std::string, IFrameScreenData>& frameDataMap,
+				void buildMapData(const std::map<std::string, IFrameScreenData>& frameDataMap,
 					std::vector<SplitterDefinition>& splitterList,
 					int currentWindowWidth);
 
 				const MapData& getMapData() const;
 
-				std::map<std::string, IFrameData> buildIFrameDataMap(
-					const std::map<std::string, IFrameScreenData>& frameDataMap) const;
+				std::map<std::string, IFrameData> buildIFrameDataMap(const std::map<std::string, IFrameScreenData>& frameDataMap) const;
 
-				void attachedUpdatedMap(
-					const std::map<std::string, IFrameScreenData>& frameDataMap,
+				void attachedUpdatedMap(const std::map<std::string, IFrameScreenData>& frameDataMap,
 					const std::vector<SplitterDefinition>& splitterList,
 					WindowRenderState currentWindowState);
-
-				void AttachedSplittersWhenMoving(std::vector<SplitterDefinition>& splitters);
-
-				void ClampBoundarySplitters(std::vector<SplitterDefinition>& splitters, int windowWidth, int windowHeight);
 
 				const WorkSpace& getWorkSpace() const;
 
