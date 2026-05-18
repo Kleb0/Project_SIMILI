@@ -1322,7 +1322,11 @@ namespace SIMILI {
 			if (fullscreenWidth <= 0 || fullscreenHeight <= 0)
 				return;
 
-			if (stored_cef_width_ == fullscreenWidth && stored_cef_height_ == fullscreenHeight)
+			const int splitterSrcW = (last_window_width_ > 0) ? last_window_width_ : stored_cef_width_;
+			const int splitterSrcH = (last_window_height_ > 0) ? last_window_height_ : stored_cef_height_;
+
+			if (stored_cef_width_ == fullscreenWidth && stored_cef_height_ == fullscreenHeight
+				&& splitterSrcW == fullscreenWidth && splitterSrcH == fullscreenHeight)
 			{
 				coordinates_frozen_for_fullscreen_ = true;
 				frozen_fullscreen_width_ = fullscreenWidth;
@@ -1332,6 +1336,8 @@ namespace SIMILI {
 
 			const float scaleX = static_cast<float>(fullscreenWidth)  / static_cast<float>(stored_cef_width_);
 			const float scaleY = static_cast<float>(fullscreenHeight) / static_cast<float>(stored_cef_height_);
+			const float splitterScaleX = static_cast<float>(fullscreenWidth)  / static_cast<float>(splitterSrcW);
+			const float splitterScaleY = static_cast<float>(fullscreenHeight) / static_cast<float>(splitterSrcH);
 			std::map<std::string, IFrameScreenData> fullscreenGeometryMap;
 
 			{
@@ -1352,10 +1358,10 @@ namespace SIMILI {
 
 				for (auto& splitter : splitter_list_)
 				{
-					splitter.x = static_cast<int>(std::round(splitter.x * scaleX));
-					splitter.y = static_cast<int>(std::round(splitter.y * scaleY));
-					splitter.width  = static_cast<int>(std::round(splitter.width  * scaleX));
-					splitter.height = static_cast<int>(std::round(splitter.height * scaleY));
+					splitter.x = static_cast<int>(std::round(splitter.x * splitterScaleX));
+					splitter.y = static_cast<int>(std::round(splitter.y * splitterScaleY));
+					splitter.width  = static_cast<int>(std::round(splitter.width  * splitterScaleX));
+					splitter.height = static_cast<int>(std::round(splitter.height * splitterScaleY));
 				}
 				prev_splitter_list_ = splitter_list_;
 
