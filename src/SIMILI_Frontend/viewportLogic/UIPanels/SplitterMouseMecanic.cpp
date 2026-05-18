@@ -49,7 +49,7 @@ SplitterMouseMecanic::Color SplitterMouseMecanic::getHoverColor() const
 
 SplitterMouseMecanic::Color SplitterMouseMecanic::getDefaultColor() const
 {
-	return { 0.0f, 1.0f, 0.0f, 1.0f };
+	return { 0.0f, 0.0f, 0.0f, 0.0f };
 }
 
 void SplitterMouseMecanic::dragSplitter(std::vector<Splitter::SplitterData>& splitters, int mouseX, int mouseY, bool isLeftButtonDown)

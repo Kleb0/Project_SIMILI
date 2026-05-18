@@ -166,7 +166,7 @@ void Splitter::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawab
 		}
 		else
 		{
-			color[0] = 0.0f; color[1] = 1.0f; color[2] = 0.0f; color[3] = 1.0f;
+			color[0] = 0.0f; color[1] = 0.0f; color[2] = 0.0f; color[3] = 0.0f;
 		}
 		vkCmdPushConstants(commandBuffer, shared_pipeline_->layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(color), color);
 		vkCmdDraw(commandBuffer, 6, 1, i * 6, 0);
