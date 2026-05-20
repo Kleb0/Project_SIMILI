@@ -58,7 +58,7 @@ namespace SIMILI {
 				{
 					// Row panel - determine if it's on the top or bottom of the workspace center
 					int panelBottom = panel.relativeY + panel.height;
-					if (panel.relativeY > centerY)
+					if (panelBottom > centerY)
 					{
 						bottomBound = std::min(bottomBound, panel.relativeY - offset);
 					}
@@ -71,7 +71,7 @@ namespace SIMILI {
 				{
 					// Column panel - determine if it's on the left or right of the workspace center
 					int panelRight = panel.relativeX + panel.width;
-					if (panelRight < centerX)
+					if (panel.relativeX < centerX)
 					{
 						leftBound = std::max(leftBound, panelRight + offset);
 					}

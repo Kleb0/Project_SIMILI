@@ -1321,7 +1321,7 @@ namespace SIMILI {
 			workspace_.set(leftBound, topBound, wsWidth, wsHeight);
 			if (changed)
 			{
-				std::cout << "[WorkSpace] workspace size is now height: " << wsHeight << " width: " << wsWidth
+				std::cout << "[PanelMapBuilder] workspace size is now height: " << wsHeight << " width: " << wsWidth
 					<< " | SDL window: " << windowWidth << "x" << windowHeight << std::endl;
 			}
 		}
