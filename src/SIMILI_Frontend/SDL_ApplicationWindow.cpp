@@ -1034,7 +1034,10 @@ void SDL_ApplicationWindow::renderFrame()
 		{
 			int fullscreenW = 0, fullscreenH = 0;
 			SDL_GetWindowSize(window_, &fullscreenW, &fullscreenH);
+
 			ui_manager_->FreezeCoordinatesForFullscreen(fullscreenW, fullscreenH);
+
+			ui_manager_->bindWorkSpaceSizeToSplitterInteractions();
 
 			ui_manager_->bindFullScreenPanelsToSplitters(getWindowRenderState());
 
@@ -1114,6 +1117,7 @@ void SDL_ApplicationWindow::renderFrame()
 				app_border_->getWidth(), app_border_->getHeight());
 
 			ui_manager_->bindWorkSpaceSizeToSplitterInteractions();
+
 			ui_manager_->bindPanelsToSplitters(getWindowRenderState());
 
 			if (ui_manager_->consumePendingCEFRepaintRequest())

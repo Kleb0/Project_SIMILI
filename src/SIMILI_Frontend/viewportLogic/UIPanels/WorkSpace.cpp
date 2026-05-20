@@ -44,8 +44,8 @@ namespace SIMILI {
 				: 0;
 
 			const float fullWidthThreshold = 0.85f;
-			int centerX = workSpaceBorderLeft + workSpaceBorderWidth / 2;
-			int centerY = workSpaceBorderTop  + workSpaceBorderHeight / 2;
+			const int borderRight  = workSpaceBorderLeft + workSpaceBorderWidth;
+			const int borderBottom = workSpaceBorderTop  + workSpaceBorderHeight;
 
 			for (const auto& pair : panelMap)
 			{
@@ -56,23 +56,27 @@ namespace SIMILI {
 
 				if (widthRatio >= fullWidthThreshold)
 				{
-					// Row panel - determine if it's on the top or bottom of the workspace center
-					int panelBottom = panel.relativeY + panel.height;
-					if (panelBottom > centerY)
+					// Row panel - anchor side = whichever boundary edge is closest
+					int topDist = panel.relativeY - workSpaceBorderTop;
+					int bottomDist = borderBottom - (panel.relativeY + panel.height);
+					if (topDist <= bottomDist)
 					{
-						bottomBound = std::min(bottomBound, panel.relativeY - offset);
+						int panelBottom = panel.relativeY + panel.height;
+						topBound = std::max(topBound, panelBottom + offset);
 					}
 					else
 					{
-						topBound = std::max(topBound, panelBottom + offset);
+						bottomBound = std::min(bottomBound, panel.relativeY - offset);
 					}
 				}
 				else
 				{
-					// Column panel - determine if it's on the left or right of the workspace center
-					int panelRight = panel.relativeX + panel.width;
-					if (panel.relativeX < centerX)
+					// Column panel - anchor side = whichever boundary edge is closest
+					int leftDist  = panel.relativeX - workSpaceBorderLeft;
+					int rightDist = borderRight - (panel.relativeX + panel.width);
+					if (leftDist <= rightDist)
 					{
+						int panelRight = panel.relativeX + panel.width;
 						leftBound = std::max(leftBound, panelRight + offset);
 					}
 					else
