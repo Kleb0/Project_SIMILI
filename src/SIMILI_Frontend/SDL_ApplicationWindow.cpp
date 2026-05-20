@@ -1113,6 +1113,7 @@ void SDL_ApplicationWindow::renderFrame()
 				app_border_->getLeft(), app_border_->getTop(),
 				app_border_->getWidth(), app_border_->getHeight());
 
+			ui_manager_->bindWorkSpaceSizeToSplitterInteractions();
 			ui_manager_->bindPanelsToSplitters(getWindowRenderState());
 
 			if (ui_manager_->consumePendingCEFRepaintRequest())

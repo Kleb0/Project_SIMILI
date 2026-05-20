@@ -842,7 +842,51 @@ namespace SIMILI {
 			if (splitter_list_.empty())
 				return;
 
-			panel_map_builder_.updateWorkSpaceFromSplitters(splitter_list_, last_window_width_, last_window_height_);
+			int targetW = last_window_width_;
+			int targetH = last_window_height_;
+
+			if (stored_window_)
+			{
+				int currentW = 0, currentH = 0;
+				SDL_GetWindowSize(stored_window_, &currentW, &currentH);
+				if (currentW > 0 && currentH > 0)
+				{
+					targetW = currentW;
+					targetH = currentH;
+				}
+			}
+
+			if (targetW <= 0 || targetH <= 0)
+				return;
+
+			if (last_window_width_ <= 0 || last_window_height_ <= 0)
+			{
+				panel_map_builder_.updateWorkSpaceFromSplitters(splitter_list_, targetW, targetH);
+				return;
+			}
+
+			if (targetW == last_window_width_ && targetH == last_window_height_)
+			{
+				panel_map_builder_.updateWorkSpaceFromSplitters(splitter_list_, targetW, targetH);
+				return;
+			}
+
+			const float scaleX = static_cast<float>(targetW) / static_cast<float>(last_window_width_);
+			const float scaleY = static_cast<float>(targetH) / static_cast<float>(last_window_height_);
+
+			std::vector<SplitterDefinition> scaledSplitters;
+			scaledSplitters.reserve(splitter_list_.size());
+			for (const auto& def : splitter_list_)
+			{
+				SplitterDefinition scaled = def;
+				scaled.x = static_cast<int>(std::round(def.x * scaleX));
+				scaled.y = static_cast<int>(std::round(def.y * scaleY));
+				scaled.width = static_cast<int>(std::round(def.width * scaleX));
+				scaled.height = static_cast<int>(std::round(def.height * scaleY));
+				scaledSplitters.push_back(scaled);
+			}
+
+			panel_map_builder_.updateWorkSpaceFromSplitters(scaledSplitters, targetW, targetH);
 		}
 
 		void UIManager::bindPanelsToSplitters(WindowRenderState currentWindowState)

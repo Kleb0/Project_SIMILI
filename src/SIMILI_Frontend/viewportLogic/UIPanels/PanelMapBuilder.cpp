@@ -739,6 +739,7 @@ namespace SIMILI {
 				return;
 			}
 
+			std::vector<SplitterBoundaryRole> savedRoles = map_data_.splitterBoundaryRoles;
 			map_data_.clear();
 			map_data_.splitters = splitterList;
 
@@ -847,6 +848,7 @@ namespace SIMILI {
 
 			map_data_.splitterCandidates.clear();
 			map_data_.splitterCandidates.reserve(splitterList.size());
+
 			for (const auto& splitter : splitterList)
 			{
 				SplitterCandidate candidate;
@@ -859,10 +861,28 @@ namespace SIMILI {
 				map_data_.splitterCandidates.push_back(candidate);
 			}
 
-			buildWorkSpace(frameDataMap);
-			if (currentWindowWidth > 0 && currentWindowHeight > 0)
+			const bool hadSavedRoles = !savedRoles.empty() && savedRoles.size() == splitterList.size();
+
+			if (hadSavedRoles)
 			{
-				updateWorkSpaceFromSplitters(splitterList, currentWindowWidth, currentWindowHeight);
+				map_data_.splitterBoundaryRoles = savedRoles;
+			}
+			else
+			{
+				const bool hadValidWorkspace = workspace_.isValid();
+				const int wsBackupX = workspace_.getX();
+				const int wsBackupY = workspace_.getY();
+				const int wsBackupW = workspace_.getWidth();
+				const int wsBackupH = workspace_.getHeight();
+				buildWorkSpace(frameDataMap);
+				if (hadValidWorkspace)
+				{
+					workspace_.set(wsBackupX, wsBackupY, wsBackupW, wsBackupH);
+				}
+				else if (currentWindowWidth > 0 && currentWindowHeight > 0)
+				{
+					updateWorkSpaceFromSplitters(splitterList, currentWindowWidth, currentWindowHeight);
+				}
 			}
 
 			{
@@ -887,13 +907,13 @@ namespace SIMILI {
 
 						const bool xOverlap = (V.x <= H.x + H.width + ATTACH_TOL) && (V.x + V.width >= H.x - ATTACH_TOL);
 
-						const bool atVTop  = xOverlap && std::abs(H.y - V.y) <= ATTACH_TOL;
+						const bool atVTop = xOverlap && std::abs(H.y - V.y) <= ATTACH_TOL;
 						const bool atVBottom = xOverlap && std::abs(H.y - (V.y + V.height)) <= ATTACH_TOL;
 
 						const bool vInHYRange = (V.y <= H.y + ATTACH_TOL) &&
 						(V.y + V.height >= H.y - ATTACH_TOL);
 
-						const bool atHLeft  = vInHYRange && std::abs(V.x - H.x) <= ATTACH_TOL;
+						const bool atHLeft = vInHYRange && std::abs(V.x - H.x) <= ATTACH_TOL;
 						const bool atHRight = vInHYRange && std::abs(V.x - (H.x + H.width)) <= ATTACH_TOL;
 
 						if (atVTop || atVBottom || atHLeft || atHRight)
@@ -1278,23 +1298,32 @@ namespace SIMILI {
 				switch (role)
 				{
 					case SplitterBoundaryRole::WorkspaceLeft:
-							leftBound = (std::max)(leftBound, def.x + def.width);
+							leftBound = (std::max)(leftBound, def.x + def.width / 2);
 						break;
 					case SplitterBoundaryRole::WorkspaceRight:
-							rightBound = (std::min)(rightBound, def.x);
+							rightBound = (std::min)(rightBound, def.x + def.width / 2);
 						break;
 					case SplitterBoundaryRole::WorkspaceTop:
-							topBound = (std::max)(topBound, def.y + def.height);
+							topBound = (std::max)(topBound, def.y + def.height / 2);
 						break;
 					case SplitterBoundaryRole::WorkspaceBottom:
-							bottomBound = (std::min)(bottomBound, def.y);
+							bottomBound = (std::min)(bottomBound, def.y + def.height / 2);
 						break;
 					default:
 						break;
 				}
 			}
 
-			workspace_.set(leftBound, topBound, rightBound - leftBound, bottomBound - topBound);
+			const int wsWidth  = (std::max)(1, rightBound - leftBound);
+			const int wsHeight = (std::max)(1, bottomBound - topBound);
+			const bool changed = (leftBound != workspace_.getX() || topBound != workspace_.getY()
+				|| wsWidth != workspace_.getWidth() || wsHeight != workspace_.getHeight());
+			workspace_.set(leftBound, topBound, wsWidth, wsHeight);
+			if (changed)
+			{
+				std::cout << "[WorkSpace] workspace size is now height: " << wsHeight << " width: " << wsWidth
+					<< " | SDL window: " << windowWidth << "x" << windowHeight << std::endl;
+			}
 		}
 
 		void PanelMapBuilder::buildWorkSpace(
