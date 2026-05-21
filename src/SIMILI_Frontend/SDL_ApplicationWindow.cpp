@@ -457,6 +457,7 @@ void SDL_ApplicationWindow::onCEFPaint(CefRenderHandler::PaintElementType type, 
 		std::memcpy(cef_paint_buffer_.data(), buffer, size);
 	cef_paint_width_ = width;
 	cef_paint_height_ = height;
+	cef_paint_dirty_ = true;
 }
 
 void SDL_ApplicationWindow::setRenderPass(VkRenderPass renderPass)
@@ -1147,6 +1148,15 @@ void SDL_ApplicationWindow::renderFrame()
 	}
 
 	// functionnalities that dosn't depend on window_state 
+	if (ui_manager_ && browser_)
+	{
+		float mouseXf = 0.0f, mouseYf = 0.0f;
+		SDL_MouseButtonFlags mouseButtons = SDL_GetMouseState(&mouseXf, &mouseYf);
+		const bool isLeftButtonDown = (mouseButtons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
+		const bool isRightButtonDown = (mouseButtons & SDL_BUTTON_MASK(SDL_BUTTON_RIGHT)) != 0;
+		ui_manager_->forwardMouseEventsToPanels(static_cast<int>(mouseXf), static_cast<int>(mouseYf), isLeftButtonDown, isRightButtonDown, browser_);
+	}
+
 	if (debug_tools_ && ui_manager_)
 	{
 		debug_tools_->drawDebugTools(commandBuffer, width, height, &ui_manager_->getWorkSpace());
@@ -1222,8 +1232,11 @@ void SDL_ApplicationWindow::preparePanels()
 		Splitter* splitter = handler->getSplitter();
 	}
 
-	if (vk_context_)
+	if (vk_context_ && cef_paint_dirty_)
+	{
+		cef_paint_dirty_ = false;
 		uploadCEFPaintBuffer();
+	}
 }
 
 void SDL_ApplicationWindow::startSplitter()

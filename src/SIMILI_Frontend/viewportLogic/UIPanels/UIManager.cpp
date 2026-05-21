@@ -1825,6 +1825,21 @@ namespace SIMILI {
 			ui_panels_initialized_ = false;
 		}
 
+		void UIManager::forwardMouseEventsToPanels(int mouseX, int mouseY, bool isLeftButtonDown, bool isRightButtonDown, CefRefPtr<CefBrowser> browser)
+		{
+			if (!browser || stored_cef_width_ <= 0 || stored_cef_height_ <= 0)
+			{
+				return;
+			}
+
+			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
+
+			for (auto& pair : ui_panels_)
+			{
+				pair.second->makePanelTextureInteractible(mouseX, mouseY, isLeftButtonDown, isRightButtonDown, browser, stored_cef_width_, stored_cef_height_);
+			}
+		}
+
 		std::map<std::string, IFrameData> UIManager::getUIPanelIFrames() const
 		{
 			std::lock_guard<std::mutex> lock(ui_panel_mutex_);

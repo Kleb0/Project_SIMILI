@@ -7,6 +7,7 @@
 #include "Splitter.hpp"
 #include "SplitterMouseMecanic.hpp"
 #include "FrameDatas/FrameDatas.hpp"
+#include "include/cef_browser.h"
 #include <map>
 #include <string>
 #include <memory>
@@ -86,6 +87,8 @@ namespace SIMILI {
 			void refreshPanelTextureLayout(bool requestCEFRepaint = false);
 		
 			void clearUIPanels();
+
+			void forwardMouseEventsToPanels(int mouseX, int mouseY, bool isLeftButtonDown, bool isRightButtonDown, CefRefPtr<CefBrowser> browser);
 
 			std::map<std::string, IFrameData> getUIPanelIFrames() const;
 			std::map<std::string, IFrameData> getResolvedUIPanelIFrames() const;

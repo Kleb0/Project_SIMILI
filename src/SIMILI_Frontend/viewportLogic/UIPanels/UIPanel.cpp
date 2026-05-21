@@ -49,6 +49,11 @@ UIPanel::UIPanel()
 	, bound_texture_view_(VK_NULL_HANDLE)
 	, bound_sampler_(VK_NULL_HANDLE)
 	, prevent_window_clipping_(false)
+	, prev_left_button_down_(false)
+	, prev_right_button_down_(false)
+	, prev_mouse_inside_(false)
+	, prev_cef_mouse_x_(0)
+	, prev_cef_mouse_y_(0)
 {
 }
 
@@ -758,6 +763,82 @@ void UIPanel::RedrawSelfTextureAtCorrectResolution(int width, int height)
 
 	std::cout << "[UIPanel::RedrawSelfTextureAtCorrectResolution] " << name_ 
 	          << " - Preserving current CEF texture while waiting for repaint at " << width << "x" << height << std::endl;
+}
+
+bool UIPanel::makePanelTextureInteractible(int mouseX, int mouseY, bool isLeftButtonDown, bool isRightButtonDown, CefRefPtr<CefBrowser> browser, int cefTextureWidth, int cefTextureHeight)
+{
+	if (!initialized_ || !has_valid_bounds_ || !browser || cefTextureWidth <= 0 || cefTextureHeight <= 0 || width_ <= 0 || height_ <= 0)
+	{
+		return false;
+	}
+
+	const bool isInside = (mouseX >= x_ && mouseX < x_ + width_ && mouseY >= y_ && mouseY < y_ + height_);
+
+	if (!isInside)
+	{
+		if (prev_mouse_inside_)
+		{
+			CefMouseEvent leaveEvent;
+			leaveEvent.x = prev_cef_mouse_x_;
+			leaveEvent.y = prev_cef_mouse_y_;
+			leaveEvent.modifiers = 0;
+			browser->GetHost()->SendMouseMoveEvent(leaveEvent, true);
+			prev_mouse_inside_ = false;
+		}
+		prev_left_button_down_ = false;
+		prev_right_button_down_ = false;
+		return false;
+	}
+
+	const int localX = mouseX - x_;
+	const int localY = mouseY - y_;
+
+	const float uvX = texcoord_left_ + (static_cast<float>(localX) / static_cast<float>(width_)) * (texcoord_right_ - texcoord_left_);
+	const float uvY = texcoord_top_ + (static_cast<float>(localY) / static_cast<float>(height_)) * (texcoord_bottom_ - texcoord_top_);
+
+	const int cefX = static_cast<int>(uvX * static_cast<float>(cefTextureWidth));
+	const int cefY = static_cast<int>(uvY * static_cast<float>(cefTextureHeight));
+
+	uint32_t modifiers = 0;
+	if (isLeftButtonDown)  modifiers |= EVENTFLAG_LEFT_MOUSE_BUTTON;
+	if (isRightButtonDown) modifiers |= EVENTFLAG_RIGHT_MOUSE_BUTTON;
+
+	CefMouseEvent mouseEvent;
+	mouseEvent.x = cefX;
+	mouseEvent.y = cefY;
+	mouseEvent.modifiers = modifiers;
+
+	const bool positionChanged = (!prev_mouse_inside_ || cefX != prev_cef_mouse_x_ || cefY != prev_cef_mouse_y_);
+	if (positionChanged)
+	{
+		browser->GetHost()->SendMouseMoveEvent(mouseEvent, false);
+	}
+
+	if (isLeftButtonDown && !prev_left_button_down_)
+	{
+		browser->GetHost()->SendMouseClickEvent(mouseEvent, MBT_LEFT, false, 1);
+	}
+	else if (!isLeftButtonDown && prev_left_button_down_)
+	{
+		browser->GetHost()->SendMouseClickEvent(mouseEvent, MBT_LEFT, true, 1);
+	}
+
+	if (isRightButtonDown && !prev_right_button_down_)
+	{
+		browser->GetHost()->SendMouseClickEvent(mouseEvent, MBT_RIGHT, false, 1);
+	}
+	else if (!isRightButtonDown && prev_right_button_down_)
+	{
+		browser->GetHost()->SendMouseClickEvent(mouseEvent, MBT_RIGHT, true, 1);
+	}
+
+	prev_mouse_inside_ = true;
+	prev_left_button_down_ = isLeftButtonDown;
+	prev_right_button_down_ = isRightButtonDown;
+	prev_cef_mouse_x_ = cefX;
+	prev_cef_mouse_y_ = cefY;
+
+	return true;
 }
 
 bool UIPanel::createVulkanResources()

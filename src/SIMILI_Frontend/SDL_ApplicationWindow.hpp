@@ -185,6 +185,7 @@ class SDL_ApplicationWindow
 		VkSampler cef_texture_sampler_;
 		int cef_texture_uploaded_width_;
 		int cef_texture_uploaded_height_;
+		bool cef_paint_dirty_ = false;
 		
 		// === Vulkan Surface & Swapchain ===
 		VkSurfaceKHR vk_surface_;

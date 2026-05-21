@@ -2,6 +2,7 @@
 
 #include "../FrameDatas/FrameDatas.hpp"
 #include "../../../Engine/VulkanPipeline/VulkanPipeline.hpp"
+#include "include/cef_browser.h"
 #include <SDL3/SDL.h>
 #include <vulkan/vulkan.h>
 #include <string>
@@ -37,6 +38,7 @@ class UIPanel
 		void refreshCEFTextureBinding(VkImageView view, VkSampler sampler);	
 		void invalidateExternalTexture();		
 		void RedrawSelfTextureAtCorrectResolution(int width, int height);
+		bool makePanelTextureInteractible(int mouseX, int mouseY, bool isLeftButtonDown, bool isRightButtonDown, CefRefPtr<CefBrowser> browser, int cefTextureWidth, int cefTextureHeight);
 		const std::string& getName() const { return name_; }
 		DrawingState getDrawingState() const { return drawing_state_; }
 
@@ -92,4 +94,9 @@ class UIPanel
 		VkImageView bound_texture_view_;
 		VkSampler bound_sampler_;
 		bool prevent_window_clipping_;
+		bool prev_left_button_down_;
+		bool prev_right_button_down_;
+		bool prev_mouse_inside_;
+		int prev_cef_mouse_x_;
+		int prev_cef_mouse_y_;
 };
