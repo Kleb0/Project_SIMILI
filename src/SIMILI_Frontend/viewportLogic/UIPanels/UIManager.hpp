@@ -84,6 +84,7 @@ namespace SIMILI {
 			void setCEFTextureForAllPanels(VkImageView view, VkSampler sampler, int cefWidth, int cefHeight);
 			void invalidateCEFTexture();
 			bool consumePendingCEFRepaintRequest();
+			void requestPendingCEFRepaint();
 			void refreshPanelTextureLayout(bool requestCEFRepaint = false);
 		
 			void clearUIPanels();

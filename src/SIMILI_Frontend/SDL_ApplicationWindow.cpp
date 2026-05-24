@@ -71,6 +71,7 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, prepared_drawable_height_(0)
 	, prepared_skip_texture_rebuild_(false)
 	, borders_set_for_init_(false)
+	, pending_window_resize_sync_(false)
 	, browser_(nullptr)
 	, cef_render_handler_(new AppRenderHandler(this))
 	, cef_shared_pipeline_(nullptr)
@@ -457,7 +458,6 @@ void SDL_ApplicationWindow::onCEFPaint(CefRenderHandler::PaintElementType type, 
 		std::memcpy(cef_paint_buffer_.data(), buffer, size);
 	cef_paint_width_ = width;
 	cef_paint_height_ = height;
-	cef_paint_dirty_ = true;
 }
 
 void SDL_ApplicationWindow::setRenderPass(VkRenderPass renderPass)
@@ -883,6 +883,11 @@ void SDL_ApplicationWindow::processEvents()
 		{
 			StateTransition(current_state_, &state_reduced_);
 		}
+
+		if (!isMaximized() && current_state_ != &state_maximized_)
+		{
+			pending_window_resize_sync_ = true;
+		}
 	}
 	
 	bool currentMax = isMaximized();
@@ -964,8 +969,9 @@ void SDL_ApplicationWindow::renderFrame()
 			ui_manager_->bindWorkSpaceSizeToSplitterInteractions();
 			ui_manager_->bindPanelsToSplitters(getWindowRenderState());
 
-			if (ui_manager_->consumePendingCEFRepaintRequest())
+			if (ui_manager_->consumePendingCEFRepaintRequest() || pending_window_resize_sync_)
 			{
+				pending_window_resize_sync_ = false;
 				if (ui_handler_)
 				{
 					UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
@@ -1099,6 +1105,7 @@ void SDL_ApplicationWindow::renderFrame()
 		if (ui_manager_ && app_border_)
 		{
 			ui_manager_->cleanUpDatasBeforeDrawingForReducedScreen();
+			ui_manager_->requestPendingCEFRepaint();
 		}
 		StateTransition(&state_scaling_down_, &state_reduced_);
 	}
@@ -1121,8 +1128,9 @@ void SDL_ApplicationWindow::renderFrame()
 
 			ui_manager_->bindPanelsToSplitters(getWindowRenderState());
 
-			if (ui_manager_->consumePendingCEFRepaintRequest())
+			if (ui_manager_->consumePendingCEFRepaintRequest() || pending_window_resize_sync_)
 			{
+				pending_window_resize_sync_ = false;
 				if (ui_handler_)
 				{
 					UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
@@ -1232,11 +1240,8 @@ void SDL_ApplicationWindow::preparePanels()
 		Splitter* splitter = handler->getSplitter();
 	}
 
-	if (vk_context_ && cef_paint_dirty_)
-	{
-		cef_paint_dirty_ = false;
+	if (vk_context_)
 		uploadCEFPaintBuffer();
-	}
 }
 
 void SDL_ApplicationWindow::startSplitter()

@@ -185,7 +185,6 @@ class SDL_ApplicationWindow
 		VkSampler cef_texture_sampler_;
 		int cef_texture_uploaded_width_;
 		int cef_texture_uploaded_height_;
-		bool cef_paint_dirty_ = false;
 		
 		// === Vulkan Surface & Swapchain ===
 		VkSurfaceKHR vk_surface_;
@@ -221,6 +220,7 @@ class SDL_ApplicationWindow
 		std::map<std::string, SIMILI::Frontend::IFrameScreenData> prepared_panel_frame_data_map_;
 		bool prepared_skip_texture_rebuild_;
 		bool borders_set_for_init_;
+		bool pending_window_resize_sync_;
 
 		// === Private Methods ===
 		void updateDpiScale();

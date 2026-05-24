@@ -344,6 +344,11 @@ namespace SIMILI {
 			return hadPendingRequest;
 		}
 
+		void UIManager::requestPendingCEFRepaint()
+		{
+			pending_cef_repaint_request_ = true;
+		}
+
 		void UIManager::refreshPanelTextureLayout(bool requestCEFRepaint)
 		{
 			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
@@ -943,7 +948,7 @@ namespace SIMILI {
 			std::lock_guard<std::mutex> lock(ui_panel_mutex_);
 
 			// tried this stuff to normalize the splitter geometry
-			if (isOperating && currentLogicalW > 0 && currentLogicalH > 0 && !ui_panel_geometry_frame_data_map_.empty())
+			if (currentLogicalW > 0 && currentLogicalH > 0 && !ui_panel_geometry_frame_data_map_.empty())
 			{
 				int sourceWindowWidth = 0;
 				int sourceWindowHeight = 0;
@@ -1781,6 +1786,10 @@ namespace SIMILI {
 			// This avoids a timing issue where SDL_GetWindowSize still returns the
 			// maximized size when this function is called on the first RESTORED frame.
 			reduced_prepared_frame_data_map_.clear();
+
+			// Normalize panel geometry coords to the actual current window size,
+			// so drawReduceScreenUIpanelsInsideBorders doesn't have to scale from stale maximized coords.
+			// normalizeGeometryFrameDataToCurrentWindow();
 
 			// Reset all fullscreen freeze state so the normal path reads the
 			// correct current window size dynamically on each frame.
