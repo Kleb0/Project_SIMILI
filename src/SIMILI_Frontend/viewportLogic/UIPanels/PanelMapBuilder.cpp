@@ -291,6 +291,7 @@ namespace SIMILI {
 				
 				for (const auto& pair : panelStateMap)
 				{
+					if (pair.first == "top_bar_panel") continue;
 					const auto& frame = pair.second.frame;
 					if (frame.width > 0 && frame.height > 0)
 					{
@@ -318,6 +319,7 @@ namespace SIMILI {
 				{
 					for (const auto& pair : panelStateMap)
 					{
+						if (pair.first == "top_bar_panel") continue;
 						const auto& frame = pair.second.frame;
 						if (frame.width > 0 && frame.height > 0)
 						{
@@ -485,6 +487,10 @@ namespace SIMILI {
 			for (const auto& pair : frameDataMap)
 			{
 				if (pair.first == "viewport_panel")
+				{
+					continue;
+				}
+				if (pair.first == "top_bar_panel")
 				{
 					continue;
 				}
@@ -769,6 +775,10 @@ namespace SIMILI {
 				{
 					continue;
 				}
+				if (pair.first == "top_bar_panel")
+				{
+					continue;
+				}
 
 				const IFrameScreenData& fd = pair.second;
 				float widthRatio = currentWindowWidth > 0
@@ -982,6 +992,7 @@ namespace SIMILI {
 			{
 				if (otherPair.first == sourceName) continue;
 				if (otherPair.first == "viewport_panel") continue;
+				if (otherPair.first == "top_bar_panel") continue;
 
 				const IFrameScreenData& other = otherPair.second;
 				int ox = other.relativeX;
@@ -1086,6 +1097,15 @@ namespace SIMILI {
 			const int borderRight = windowWidth - BORDER_OFFSET;
 			const int borderBottom = windowHeight - BORDER_OFFSET;
 
+			int adjustedBorderTop = borderTop;
+			{
+				auto it = frameDataMap.find("top_bar_panel");
+				if (it != frameDataMap.end() && it->second.height > 0)
+				{
+					adjustedBorderTop = it->second.relativeY + it->second.height;
+				}
+			}
+
 			std::map<std::string, SplitterCandidate> candidateMap;
 
 			const RayDirection directions[4] =
@@ -1100,6 +1120,7 @@ namespace SIMILI {
 			{
 				const std::string& panelName = panelPair.first;
 				if (panelName == "viewport_panel") continue;
+				if (panelName == "top_bar_panel") continue;
 				if (map_data_.panels.find(panelName) == map_data_.panels.end()) continue;
 
 				const IFrameScreenData& src = panelPair.second;
@@ -1111,7 +1132,7 @@ namespace SIMILI {
 				for (RayDirection dir : directions)
 				{
 					RayCastResult hit = castRay(panelName, src, dir, frameDataMap,
-						borderLeft, borderTop, borderRight, borderBottom);
+						borderLeft, adjustedBorderTop, borderRight, borderBottom);
 
 					if (hit.hitType == RayHitType::AppBorder)
 					{
@@ -1287,7 +1308,7 @@ namespace SIMILI {
 			const int BORDER_OFFSET = 3;
 			int leftBound = BORDER_OFFSET;
 			int rightBound = windowWidth  - BORDER_OFFSET;
-			int topBound = BORDER_OFFSET;
+			int topBound = (workspace_.getY() > BORDER_OFFSET) ? workspace_.getY() : BORDER_OFFSET;
 			int bottomBound = windowHeight - BORDER_OFFSET;
 
 			for (std::size_t i = 0; i < splitterList.size(); ++i)

@@ -111,6 +111,13 @@ iframe
     pointer-events: none;
 }
 
+.top-bar-panel {
+    height: 30px;
+    min-height: 30px;
+    max-height: 30px;
+    flex-shrink: 0;
+}
+
 /* Splitter Styles */
 .splitter {
     background-color: #000000;

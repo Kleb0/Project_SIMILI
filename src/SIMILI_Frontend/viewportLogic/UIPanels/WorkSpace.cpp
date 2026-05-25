@@ -47,6 +47,8 @@ namespace SIMILI {
 			const int borderRight  = workSpaceBorderLeft + workSpaceBorderWidth;
 			const int borderBottom = workSpaceBorderTop  + workSpaceBorderHeight;
 
+			int minColumnPanelY = std::numeric_limits<int>::max();
+
 			for (const auto& pair : panelMap)
 			{
 				const IFrameScreenData& panel = pair.second;
@@ -83,8 +85,12 @@ namespace SIMILI {
 					{
 						rightBound = std::min(rightBound, panel.relativeX - offset);
 					}
+					minColumnPanelY = std::min(minColumnPanelY, panel.relativeY);
 				}
 			}
+
+			if (minColumnPanelY != std::numeric_limits<int>::max())
+				topBound = std::max(topBound, minColumnPanelY);
 
 			x_ = leftBound;
 			y_ = topBound;

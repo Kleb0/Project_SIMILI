@@ -1367,7 +1367,8 @@ void UIHandler::syncBrowserPanelLayoutFromCurrentFrames(WindowRenderState window
 		return;
 	}
 
-	const auto iframeDataMap = ui_manager_->getResolvedUIPanelIFrames();
+	auto iframeDataMap = ui_manager_->getResolvedUIPanelIFrames();
+	iframeDataMap.erase("top_bar_panel");
 	if (iframeDataMap.empty())
 	{
 		std::cout << "[UIHandler] syncBrowserPanelLayoutFromCurrentFrames: skipped, no resolved UI panel frames" << std::endl;
@@ -1502,16 +1503,22 @@ void UIHandler::syncBrowserPanelLayoutFromCurrentFrames(WindowRenderState window
 
 	const std::string leftPanelSelector = selectorForPanel(leftColumnIt->first);
 	const std::string bottomPanelSelector = selectorForPanel(bottomPanelIt->first);
-	const std::string rightTopPanelSelector =
-		(rightTopPanelIt != iframeDataMap.end()) ? selectorForPanel(rightTopPanelIt->first) : std::string();
-	const std::string rightBottomPanelSelector =
-		(rightBottomPanelIt != iframeDataMap.end()) ? selectorForPanel(rightBottomPanelIt->first) : std::string();
+	const std::string rightTopPanelSelector = (rightTopPanelIt != iframeDataMap.end()) ? selectorForPanel(rightTopPanelIt->first) : std::string();
+	const std::string rightBottomPanelSelector = (rightBottomPanelIt != iframeDataMap.end()) ? selectorForPanel(rightBottomPanelIt->first) : std::string();
 	const int leftWidth = leftColumnIt->second.width;
 	const int leftHeight = leftColumnIt->second.height;
 	const int rightWidth = rightColumnIt->second.width;
 	const int rightTopHeight = (rightTopPanelIt != iframeDataMap.end()) ? rightTopPanelIt->second.height : 0;
-	const int rightBottomHeight = (rightBottomPanelIt != iframeDataMap.end()) ? rightBottomPanelIt->second.height : 0;
-	const int bottomHeight = bottomPanelIt->second.height;
+	// Fill remaining top-row space to eliminate the gap caused by Vulkan splitter thickness
+	const int rightBottomHeight = (rightBottomPanelIt != iframeDataMap.end())
+		? ((rightTopPanelIt == iframeDataMap.end() || rightBottomPanelIt->first == rightTopPanelIt->first)
+			? topRowHeight
+			: std::max(1, topRowHeight - rightTopHeight))
+		: 0;
+	// Fill remaining main layout space to eliminate the gap caused by Vulkan splitter thickness
+	const int bottomHeight = (topRowHeight > 0)
+		? std::max(1, currentHeight - 30 - topRowHeight)
+		: bottomPanelIt->second.height;
 
 	auto buildFixedWidthBlock = [](const char* elementName, int width)
 	{
@@ -1590,6 +1597,8 @@ void UIHandler::syncBrowserPanelLayoutFromCurrentFrames(WindowRenderState window
 		<< "if(root){root.style.width=currentWidth+'px';root.style.height=currentHeight+'px';root.style.minWidth=currentWidth+'px';root.style.minHeight=currentHeight+'px';root.style.maxWidth=currentWidth+'px';root.style.maxHeight=currentHeight+'px';root.style.overflow='hidden';}"
 		<< "if(body){body.style.width=currentWidth+'px';body.style.height=currentHeight+'px';body.style.minWidth=currentWidth+'px';body.style.minHeight=currentHeight+'px';body.style.maxWidth=currentWidth+'px';body.style.maxHeight=currentHeight+'px';body.style.margin='0';body.style.overflow='hidden';}"
 		<< "if(mainContainer){mainContainer.style.width=currentWidth+'px';mainContainer.style.height=currentHeight+'px';mainContainer.style.minWidth=currentWidth+'px';mainContainer.style.minHeight=currentHeight+'px';mainContainer.style.maxWidth=currentWidth+'px';mainContainer.style.maxHeight=currentHeight+'px';mainContainer.style.boxSizing='border-box';mainContainer.dataset.currentWidth=String(currentWidth);mainContainer.dataset.currentHeight=String(currentHeight);mainContainer.dataset.referenceWidth=String(referenceWidth);mainContainer.dataset.referenceHeight=String(referenceHeight);mainContainer.dataset.scaleX=String(layoutScaleX);mainContainer.dataset.scaleY=String(layoutScaleY);}"
+		<< "const topBarPanelInit=document.querySelector('.top-bar-panel');"
+		<< "if(topBarPanelInit){topBarPanelInit.style.height='30px';topBarPanelInit.style.minHeight='30px';topBarPanelInit.style.maxHeight='30px';topBarPanelInit.style.flex='0 0 30px';}"
 		<< "const left=resetBox(document.querySelector('.left-section'));"
 		<< "const center=resetBox(document.querySelector('.center-section'));"
 		<< "const right=resetBox(document.querySelector('.right-section'));"
@@ -1637,7 +1646,21 @@ void UIHandler::syncBrowserFullScreenPanelLayout(WindowRenderState windowState, 
 		return;
 	}
 
-	const auto iframeDataMap = ui_manager_->getResolvedUIPanelIFrames();
+	auto iframeDataMap = ui_manager_->getResolvedUIPanelIFrames();
+
+	// Retrieve the scaled top-bar height from frozen geometry BEFORE filtering it out.
+	// FreezeCoordinatesForFullscreen scales top_bar_panel like any other panel (30 * scaleY).
+	// We must set the DOM .top-bar-panel to that same scaled height so CEF texture positions
+	// match the UV coordinates in ui_panel_geometry_frame_data_map_, preventing artifacts.
+	int scaledTopBarHeight = 30; // CSS fallback when not yet frozen
+	{
+		auto topBarIt = iframeDataMap.find("top_bar_panel");
+		if (topBarIt != iframeDataMap.end() && topBarIt->second.height > 0)
+			scaledTopBarHeight = topBarIt->second.height;
+	}
+
+	iframeDataMap.erase("top_bar_panel");
+
 	if (iframeDataMap.empty())
 	{
 		std::cout << "[UIHandler] syncBrowserFullScreenPanelLayout: skipped, no resolved UI panel frames" << std::endl;
@@ -1717,13 +1740,11 @@ void UIHandler::syncBrowserFullScreenPanelLayout(WindowRenderState windowState, 
 	}
 
 	int topRowHeight = 0;
-
 	for (const auto& pair : iframeDataMap)
 	{
-		if (pair.first != bottomPanelIt->first)
-		{
-			topRowHeight = (std::max)(topRowHeight, pair.second.height);
-		}
+		if (pair.first == bottomPanelIt->first)
+			continue;
+		topRowHeight = std::max(topRowHeight, pair.second.height);
 	}
 
 	if (topRowHeight <= 0)
@@ -1760,9 +1781,16 @@ void UIHandler::syncBrowserFullScreenPanelLayout(WindowRenderState windowState, 
 	const int fsLeftH = leftColumnIt->second.height;
 	const int fsRightW = rightColumnIt->second.width;
 	const int fsTopRowH = topRowHeight;
-	const int fsBottomH = bottomPanelIt->second.height;
+	const int fsBottomH = (topRowHeight > 0)
+		? std::max(1, currentHeight - scaledTopBarHeight - topRowHeight)
+		: bottomPanelIt->second.height;
 	const int fsRightTopH = (rightTopPanelIt != iframeDataMap.end()) ? rightTopPanelIt->second.height : 0;
-	const int fsRightBottomH = (rightBottomPanelIt != iframeDataMap.end()) ? rightBottomPanelIt->second.height : 0;
+	// Fill remaining top-row space to eliminate the gap caused by scaled Vulkan splitter thickness
+	const int fsRightBottomH = (rightBottomPanelIt != iframeDataMap.end())
+		? ((rightTopPanelIt == iframeDataMap.end() || rightBottomPanelIt->first == rightTopPanelIt->first)
+			? fsTopRowH
+			: std::max(1, fsTopRowH - fsRightTopH))
+		: 0;
 
 	std::cout << "[UIHandler][Fullscreen DOM] left=" << leftColumnIt->first
 		      << " right=" << rightColumnIt->first
@@ -1805,6 +1833,8 @@ void UIHandler::syncBrowserFullScreenPanelLayout(WindowRenderState windowState, 
 		<< "if(root){root.style.width=currentWidth+'px';root.style.height=currentHeight+'px';root.style.minWidth=currentWidth+'px';root.style.minHeight=currentHeight+'px';root.style.maxWidth=currentWidth+'px';root.style.maxHeight=currentHeight+'px';root.style.overflow='hidden';}"
 		<< "if(body){body.style.width=currentWidth+'px';body.style.height=currentHeight+'px';body.style.minWidth=currentWidth+'px';body.style.minHeight=currentHeight+'px';body.style.maxWidth=currentWidth+'px';body.style.maxHeight=currentHeight+'px';body.style.margin='0';body.style.overflow='hidden';}"
 		<< "if(mainContainer){mainContainer.style.width=currentWidth+'px';mainContainer.style.height=currentHeight+'px';mainContainer.style.minWidth=currentWidth+'px';mainContainer.style.minHeight=currentHeight+'px';mainContainer.style.maxWidth=currentWidth+'px';mainContainer.style.maxHeight=currentHeight+'px';mainContainer.style.boxSizing='border-box';}"
+		<< "const topBarPanel=document.querySelector('.top-bar-panel');"
+		<< "if(topBarPanel){topBarPanel.style.height='" << scaledTopBarHeight << "px';topBarPanel.style.minHeight='" << scaledTopBarHeight << "px';topBarPanel.style.maxHeight='" << scaledTopBarHeight << "px';topBarPanel.style.flex='0 0 " << scaledTopBarHeight << "px';}"
 		<< "const left=resetBox(document.querySelector('.left-section'));"
 		<< "const center=resetBox(document.querySelector('.center-section'));"
 		<< "const right=resetBox(document.querySelector('.right-section'));"

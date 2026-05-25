@@ -241,8 +241,6 @@
 
             const dpiScale = window.devicePixelRatio || 1.0;
             
-            console.log(`[Layout] notifyViewportResize PANEL: X=${adjustedX} Y=${adjustedY} W=${adjustedWidth} H=${adjustedHeight}`);
-
             const message = 'VIEWPORT_RESIZE:' + 
                 adjustedX + ',' + 
                 adjustedY + ',' + 
@@ -289,7 +287,8 @@
             { selector: '.object-inspector-panel iframe', name: 'object_inspector_panel' },
             { selector: '.history-panel iframe', name: 'history_panel' },
             { selector: '.project-viewer-panel iframe', name: 'project_viewer_panel' },
-            { selector: '.panel_above_UI iframe', name: 'panel_above_UI' }
+            { selector: '.panel_above_UI iframe', name: 'panel_above_UI' },
+            { selector: '.top-bar-panel iframe', name: 'top_bar_panel' }
         ];
         
         const iframeData = [];
@@ -322,17 +321,13 @@
         });
         
         if (iframeData.length > 0) {
-            console.log('[Layout] Sending iframe data to server:', JSON.stringify(iframeData, null, 2));
             fetch('http://localhost:8080/api/iframes/update', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ iframes: iframeData })
-            })
-            .then(response => response.json())
-            .then(data => console.log('[Layout] Server response:', data))
-            .catch(err => console.error('[Layout] Failed to send iframe data:', err));
+            }).catch(() => {});
         }
     }
 
