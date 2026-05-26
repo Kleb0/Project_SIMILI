@@ -22,6 +22,7 @@
 
 class ThreeDScreen;
 class VKContext;
+class VKScene;
 class App_Border;
 class Enable_UI_Debug_Tools;
 class SDL_ApplicationWindow;
@@ -98,6 +99,7 @@ class SDL_ApplicationWindow
 		void Set_UIHandler(void* handler);
 		void setThreeDScreen(ThreeDScreen* screen);
 		void setVKContext(VKContext* context);
+		void setVKScene(VKScene* scene) { vk_scene_ = scene; }
 		void setVulkanPipelines(VulkanPipeline* pipelines);
 		VulkanPipeline* getVulkanPipelines() const { return vulkan_pipelines_; }
 		void setUIManager(SIMILI::Frontend::UIManager* manager) { ui_manager_ = manager; }
@@ -162,6 +164,7 @@ class SDL_ApplicationWindow
 		// === UI Components ===
 		void* ui_handler_;
 		ThreeDScreen* threed_screen_;
+		VKScene* vk_scene_;
 		SIMILI::Frontend::FrameDatas* frame_datas_;
 		SIMILI::Frontend::UIManager* ui_manager_;
 		App_Border* app_border_;

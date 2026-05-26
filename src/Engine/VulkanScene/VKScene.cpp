@@ -1,6 +1,7 @@
 #include "VKScene.Hpp"
 #include "VKcontext.hpp"
 #include "../SceneObjectContainer/SceneObjectContainer.hpp"
+#include "../GLSL_Compiler/GLSLCompiler.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
@@ -271,4 +272,70 @@ bool VKScene::removeObject(ThreeDObject* object)
 
 	pushInGraveyard(object);
 	return true;
+}
+
+void VKScene::bindSceneViewToWorkSpaceDimensions(int logicalX, int logicalY, int logicalWidth, int logicalHeight,
+                                                  int drawableWidth, int drawableHeight,
+                                                  int logicalWindowWidth, int logicalWindowHeight)
+{
+	if (logicalWindowWidth <= 0 || logicalWindowHeight <= 0 || drawableWidth <= 0 || drawableHeight <= 0)
+	{
+		scene_viewport_bound_ = false;
+		return;
+	}
+
+	float scaleX = static_cast<float>(drawableWidth) / static_cast<float>(logicalWindowWidth);
+	float scaleY = static_cast<float>(drawableHeight) / static_cast<float>(logicalWindowHeight);
+
+	int pixelX = static_cast<int>(static_cast<float>(logicalX) * scaleX);
+	int pixelY_top = static_cast<int>(static_cast<float>(logicalY) * scaleY);
+	int pixelW = static_cast<int>(static_cast<float>(logicalWidth) * scaleX);
+	int pixelH = static_cast<int>(static_cast<float>(logicalHeight) * scaleY);
+
+	scene_viewport_x_ = pixelX;
+	scene_viewport_y_ = pixelY_top;
+	scene_viewport_width_ = pixelW;
+	scene_viewport_height_ = pixelH;
+
+	if (scene_viewport_width_ <= 0 || scene_viewport_height_ <= 0)
+	{
+		scene_viewport_bound_ = false;
+		return;
+	}
+
+	scene_viewport_bound_ = true;
+}
+
+void VKScene::renderRedScreenOnWorkSpaceDimensionsFirst(VkCommandBuffer commandBuffer)
+{
+	if (!scene_viewport_bound_ || commandBuffer == VK_NULL_HANDLE)
+	{
+		return;
+	}
+
+	VkViewport viewport{};
+	viewport.x = static_cast<float>(scene_viewport_x_);
+	viewport.y = static_cast<float>(scene_viewport_y_);
+	viewport.width = static_cast<float>(scene_viewport_width_);
+	viewport.height = static_cast<float>(scene_viewport_height_);
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+	VkRect2D scissor{};
+	scissor.offset = { scene_viewport_x_, scene_viewport_y_ };
+	scissor.extent = { static_cast<uint32_t>(scene_viewport_width_), static_cast<uint32_t>(scene_viewport_height_) };
+	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+	VkClearAttachment clearAttachment{};
+	clearAttachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	clearAttachment.colorAttachment = 0;
+	clearAttachment.clearValue.color = {{ 0.22f, 0.28f, 0.35f, 1.0f }};
+
+	VkClearRect clearRect{};
+	clearRect.rect = scissor;
+	clearRect.baseArrayLayer = 0;
+	clearRect.layerCount = 1;
+
+	vkCmdClearAttachments(commandBuffer, 1, &clearAttachment, 1, &clearRect);
 }

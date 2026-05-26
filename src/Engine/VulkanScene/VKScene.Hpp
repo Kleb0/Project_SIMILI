@@ -58,6 +58,11 @@ public:
 
     std::string getSceneID() const { return sceneID; }
 
+    void bindSceneViewToWorkSpaceDimensions(int logicalX, int logicalY, int logicalWidth, int logicalHeight,
+                                             int drawableWidth, int drawableHeight,
+                                             int logicalWindowWidth, int logicalWindowHeight);
+    void renderRedScreenOnWorkSpaceDimensionsFirst(VkCommandBuffer commandBuffer);
+
 private:
     glm::mat4 lastViewProj{1.0f};
     std::list<ThreeDObject*> objects;
@@ -70,6 +75,12 @@ private:
 
     std::string sceneID;
     std::string generateSceneID();
+
+    int scene_viewport_x_ = 0;
+    int scene_viewport_y_ = 0;
+    int scene_viewport_width_ = 0;
+    int scene_viewport_height_ = 0;
+    bool scene_viewport_bound_ = false;
 
     VkPipeline graphicsPipeline;
     VkPipelineLayout pipelineLayout;

@@ -317,6 +317,9 @@ int main(int argc, char* argv[])
 	handler->setVKScene(&myVKScene);
 	std::cout << "[Main] VKScene linked to UIHandler" << std::endl;
 
+	mainWindow.setVKScene(&myVKScene);
+	std::cout << "[Main] VKScene linked to SDL_ApplicationWindow" << std::endl;
+
 	handler->startRenderTimer();
 	std::cout << "[Main] Render timer started" << std::endl;
 
