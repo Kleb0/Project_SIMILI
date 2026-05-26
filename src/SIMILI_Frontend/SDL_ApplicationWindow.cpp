@@ -1209,7 +1209,11 @@ void SDL_ApplicationWindow::drawThreeDScreen()
 				ws.getX(), ws.getY(), ws.getWidth(), ws.getHeight(),
 				drawableW, drawableH, logicalW, logicalH);
 
-			vk_scene_->renderRedScreenOnWorkSpaceDimensionsFirst(vk_command_buffers_[current_image_index_]);
+			float mouse_x_f = 0.0f, mouse_y_f = 0.0f;
+			SDL_GetMouseState(&mouse_x_f, &mouse_y_f);
+			vk_scene_->renderRedScreenOnWorkSpaceDimensionsFirst(
+				vk_command_buffers_[current_image_index_],
+				static_cast<int>(mouse_x_f), static_cast<int>(mouse_y_f));
 		}
 	}
 }

@@ -297,6 +297,11 @@ void VKScene::bindSceneViewToWorkSpaceDimensions(int logicalX, int logicalY, int
 	scene_viewport_width_ = pixelW;
 	scene_viewport_height_ = pixelH;
 
+	workspace_logical_x_ = logicalX;
+	workspace_logical_y_ = logicalY;
+	workspace_logical_width_ = logicalWidth;
+	workspace_logical_height_ = logicalHeight;
+
 	if (scene_viewport_width_ <= 0 || scene_viewport_height_ <= 0)
 	{
 		scene_viewport_bound_ = false;
@@ -306,11 +311,31 @@ void VKScene::bindSceneViewToWorkSpaceDimensions(int logicalX, int logicalY, int
 	scene_viewport_bound_ = true;
 }
 
-void VKScene::renderRedScreenOnWorkSpaceDimensionsFirst(VkCommandBuffer commandBuffer)
+void VKScene::renderRedScreenOnWorkSpaceDimensionsFirst(VkCommandBuffer commandBuffer, int mouseX, int mouseY)
 {
 	if (!scene_viewport_bound_ || commandBuffer == VK_NULL_HANDLE)
 	{
 		return;
+	}
+
+	const bool isHovered =
+		mouseX >= workspace_logical_x_ &&
+		mouseX < workspace_logical_x_ + workspace_logical_width_ &&
+		mouseY >= workspace_logical_y_ &&
+		mouseY < workspace_logical_y_ + workspace_logical_height_;
+
+	if (isHovered && !hover_active_)
+	{
+		static std::mt19937 rng(std::random_device{}());
+		std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+		hover_r_ = dist(rng);
+		hover_g_ = dist(rng);
+		hover_b_ = dist(rng);
+		hover_active_ = true;
+	}
+	else if (!isHovered)
+	{
+		hover_active_ = false;
 	}
 
 	VkViewport viewport{};
@@ -330,7 +355,9 @@ void VKScene::renderRedScreenOnWorkSpaceDimensionsFirst(VkCommandBuffer commandB
 	VkClearAttachment clearAttachment{};
 	clearAttachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	clearAttachment.colorAttachment = 0;
-	clearAttachment.clearValue.color = {{ 0.22f, 0.28f, 0.35f, 1.0f }};
+	clearAttachment.clearValue.color = hover_active_
+		? VkClearColorValue{{ hover_r_, hover_g_, hover_b_, 1.0f }}
+		: VkClearColorValue{{ 0.22f, 0.28f, 0.35f, 1.0f }};
 
 	VkClearRect clearRect{};
 	clearRect.rect = scissor;

@@ -61,7 +61,7 @@ public:
     void bindSceneViewToWorkSpaceDimensions(int logicalX, int logicalY, int logicalWidth, int logicalHeight,
                                              int drawableWidth, int drawableHeight,
                                              int logicalWindowWidth, int logicalWindowHeight);
-    void renderRedScreenOnWorkSpaceDimensionsFirst(VkCommandBuffer commandBuffer);
+    void renderRedScreenOnWorkSpaceDimensionsFirst(VkCommandBuffer commandBuffer, int mouseX, int mouseY);
 
 private:
     glm::mat4 lastViewProj{1.0f};
@@ -81,6 +81,16 @@ private:
     int scene_viewport_width_ = 0;
     int scene_viewport_height_ = 0;
     bool scene_viewport_bound_ = false;
+
+    int workspace_logical_x_ = 0;
+    int workspace_logical_y_ = 0;
+    int workspace_logical_width_ = 0;
+    int workspace_logical_height_ = 0;
+
+    bool hover_active_ = false;
+    float hover_r_ = 0.22f;
+    float hover_g_ = 0.28f;
+    float hover_b_ = 0.35f;
 
     VkPipeline graphicsPipeline;
     VkPipelineLayout pipelineLayout;
