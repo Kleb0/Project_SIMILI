@@ -3,7 +3,6 @@
 #include "viewportLogic/HTMLTextureRenderer/HtmlTextureRenderer.hpp"
 #include "viewportLogic/HTMLTextureRenderer/Overlay_HTML_Texture_Renderer.hpp"
 #include "viewportLogic/KeyManagement/KeyManager.hpp"
-#include "viewportLogic/Keymanagement/MouseController.hpp"
 #include "../../Engine/VulkanScene/VKScene.Hpp"
 #include "../../Engine/VulkanScene/VKcontext.hpp"
 #include "../../WorldObjects/Camera/Camera.hpp"
@@ -196,7 +195,6 @@ UIHandler::UIHandler() : parent_sdl_window_(nullptr), parent_window_(nullptr), w
 	pending_deferred_layout_refresh_(false),
 	resource_request_handler_(nullptr)
 {
-	mouse_controller_ = new SIMILI::Input::MouseController();
 	ui_manager_ = nullptr;
 	
 	s_instance_ = this;
@@ -342,10 +340,7 @@ void UIHandler::Set_SDLParent(SDL_ApplicationWindow* parentWindow)
 	if (parentWindow)
 	{
 		parent_window_ = parentWindow->getHandle();
-		if (mouse_controller_)
-		{
-			mouse_controller_->setWindowHandle(parent_window_);
-		}
+
 	}
 }
 
@@ -467,77 +462,17 @@ static Uint32 SDLCALL RenderTimerProc(void* param, SDL_TimerID timerID, Uint32 i
 	UIHandler* handler = it->second;
 	if (handler)
 	{
-		if (handler->getMouseController())
-		{
-			handler->getMouseController()->updateMousePosition();
-			handler->getMouseController()->updateWheelState();
+		// if (handler->getMouseController())
+		// {
+		// 	handler->getMouseController()->updateMousePosition();
+		// 	handler->getMouseController()->updateWheelState();
 
-			int mouseX = handler->getMouseController()->getCurrentMouseClientX();
-			int mouseY = handler->getMouseController()->getCurrentMouseClientY();
-			std::string regionName = handler->getMouseController()->detectMouseRegionFromClientCoordinates(mouseX, mouseY);
-			handler->getMouseController()->transitionMouseState(regionName, mouseX, mouseY);
-		}
-		
-		// Camera lateral movement (panning)
-		if (handler->getMouseController()->isShiftLeftClickActive() && handler->getMouseController()->getCurrentMouseState() == handler->getMouseController()->getAboveOverlayState())
-		{
-			handler->setCameraOperationLocked(true);
-		}
-		else
-		{
-			// Unlock state transitions when camera panning stops
-			if (handler->isCameraOperationLocked())
-			{
-				handler->setCameraOperationLocked(false);
-			}
-		}
-		
-		if (handler->getMouseController()->getCurrentMouseState() == handler->getMouseController()->getAboveOverlayState())
-		{
-			if (handler->getMouseController()->hasClickEvent())
-			{
-				// if (handler->getOverlay())
-				// {
-				// 	int mouseX = handler->getMouseController()->getCurrentMouseX();
-				// 	int mouseY = handler->getMouseController()->getCurrentMouseY();
-				// 	handler->getOverlay()->shootRaycastFromUIHandler(mouseX, mouseY);
-				// }
-			}
-		}
-		
-		const bool* keystate = SDL_GetKeyboardState(NULL);
-		bool isShiftPressed = (keystate[SDL_SCANCODE_LSHIFT] || keystate[SDL_SCANCODE_RSHIFT]);
+		// 	int mouseX = handler->getMouseController()->getCurrentMouseClientX();
+		// 	int mouseY = handler->getMouseController()->getCurrentMouseClientY();
+		// 	std::string regionName = handler->getMouseController()->detectMouseRegionFromClientCoordinates(mouseX, mouseY);
+		// 	handler->getMouseController()->transitionMouseState(regionName, mouseX, mouseY);
+		// }
 
-		if (handler->getMouseController()->isLeftButtonClicking() && !isShiftPressed && handler->getMouseController()->getCurrentMouseState() == handler->getMouseController()->getAboveOverlayState())
-		{
-			if (handler->getMouseController()->isClickHeldForDuration(200))
-			{
-				// if (handler->getOverlay() && !handler->getOverlay()->isGizmoActive())
-				// {
-				// 	int deltaX = handler->getMouseController()->getMouseDeltaX();
-				// 	int deltaY = handler->getMouseController()->getMouseDeltaY();
-				// 	handler->getOverlay()->ProcessCameraOrbiting(deltaX, deltaY);
-				// }
-			}
-		}
-		
-		// Process mouse wheel input ONLY when mouse is above overlay
-		if (handler->getMouseController()->getCurrentMouseState() == handler->getMouseController()->getAboveOverlayState())
-		{
-			if (handler->getMouseController()->hasWheelInput())
-			{
-				int wheelDirection = handler->getMouseController()->getMouseWheelDirection();
-				// handler->getOverlay()->ProcessZoom(wheelDirection);
-			}
-		}
-		else
-		{
-			// If mouse is not above overlay, clear any pending wheel input
-			if (handler->getMouseController()->hasWheelInput())
-			{
-				handler->getMouseController()->resetWheelDirection();
-			}
-		}
 		
 		// if (handler->getOverlay() && handler->getMouseController())
 		// {
@@ -777,29 +712,6 @@ void UIHandler::notifySceneChanged()
 	}
 }
 
-void UIHandler::set_MouseControl(SIMILI::Input::MouseController* mouseControl)
-{
-	if (mouse_controller_ == mouseControl)
-	{
-		return;
-	}
-
-	if (mouse_controller_)
-	{
-		delete mouse_controller_;
-		mouse_controller_ = nullptr;
-	}
-
-	mouse_controller_ = mouseControl;
-
-	if (mouse_controller_)
-	{
-		if (parent_window_)
-		{
-			mouse_controller_->setWindowHandle(parent_window_);
-		}
-	}
-}
 
 bool UIHandler::isOwnerThread() const
 {
@@ -1058,19 +970,6 @@ void UIHandler::captureIFramePositions()
 		return;
 	}
 
-	if (mouse_controller_)
-	{
-		mouse_controller_->setWindowHandle(sdlWindow);
-		
-		bool isMaximized = parent_sdl_window_->isMaximized();
-		int left = 0, top = 0, right = 0, bottom = 0;
-		if (isMaximized)
-		{
-			parent_sdl_window_->getBorderOffsets(left, top, right, bottom);
-		}
-		mouse_controller_->setMaximizedState(isMaximized, left, top);
-	}
-
 	frame_datas_->catchFrameData(sdlWindow);
 	
 	last_frame_capture_time_ = currentTime;
@@ -1112,25 +1011,7 @@ void UIHandler::captureIFramePositions()
 			std::cout << "[UIHandler] WARNING: No frame data captured from FrameDatas" << std::endl;
 			return;
 		}
-
-		std::map<std::string, SIMILI::Input::MouseControlFrameData> mouseControlDataMap;
-		for (const auto& pair : frameDataMap)
-		{
-			const auto& data = pair.second;
-			SIMILI::Input::MouseControlFrameData convertedData;
-			convertedData.name = data.name;
-			convertedData.clientX = data.clientX;
-			convertedData.clientY = data.clientY;
-			convertedData.width = data.width;
-			convertedData.height = data.height;
-			mouseControlDataMap[pair.first] = convertedData;
-			
-			std::cout << "\n [UIHandler] Panel '" << data.name << "' bounds: "
-				<< "clientX=" << data.clientX << " clientY=" << data.clientY
-				<< " width=" << data.width << " height=" << data.height << std::endl;
-		}
-
-		mouse_controller_->updateMouseControlPanelBoundsFromFrameData(mouseControlDataMap);
+		
 	}
 		
 	// if (overlay_viewport_ && vk_scene_ && vk_scene_->getActiveCamera())
@@ -1221,18 +1102,6 @@ void UIHandler::forceCaptureIFramePositions()
 		return;
 	}
 
-	if (mouse_controller_)
-	{
-		mouse_controller_->setWindowHandle(sdlWindow);
-		
-		bool isMaximized = parent_sdl_window_->isMaximized();
-		int left = 0, top = 0, right = 0, bottom = 0;
-		if (isMaximized)
-		{
-			parent_sdl_window_->getBorderOffsets(left, top, right, bottom);
-		}
-		mouse_controller_->setMaximizedState(isMaximized, left, top);
-	}
 
 	frame_datas_->catchFrameData(sdlWindow);
 	
@@ -1265,31 +1134,7 @@ void UIHandler::forceCaptureIFramePositions()
 		parent_sdl_window_->updateFrameDatas(frame_datas_);
 	}
 
-	if (mouse_controller_)
-	{
-		auto frameDataMap = getRuntimeFrameDataMap();
-		
-		if (frameDataMap.empty())
-		{
-			std::cout << "[UIHandler] WARNING: No frame data captured from FrameDatas" << std::endl;
-			return;
-		}
 
-		std::map<std::string, SIMILI::Input::MouseControlFrameData> mouseControlDataMap;
-		for (const auto& pair : frameDataMap)
-		{
-			const auto& data = pair.second;
-			SIMILI::Input::MouseControlFrameData convertedData;
-			convertedData.name = data.name;
-			convertedData.clientX = data.clientX;
-			convertedData.clientY = data.clientY;
-			convertedData.width = data.width;
-			convertedData.height = data.height;
-			mouseControlDataMap[pair.first] = convertedData;
-		}
-
-		mouse_controller_->updateMouseControlPanelBoundsFromFrameData(mouseControlDataMap);
-	}
 }
 
 void UIHandler::updateWindowSize(int width, int height)

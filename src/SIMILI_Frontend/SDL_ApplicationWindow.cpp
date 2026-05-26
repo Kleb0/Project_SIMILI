@@ -92,6 +92,7 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, state_scaling_down_(this)
 	, state_scaling_up_(this)
 	, current_state_(&state_init_)
+	, current_mouse_state_(&mouse_state_outside_workspace_)
 {
 }
 SDL_ApplicationWindow::~SDL_ApplicationWindow()
@@ -960,6 +961,7 @@ void SDL_ApplicationWindow::renderFrame()
 		// (The old scaling from 2560→1920 broke hit detection once splitters were frozen in 2560-space.)
 
 		ui_manager_->enableSplitterMouseInteractions(static_cast<int>(mouseXf), static_cast<int>(mouseYf), isLeftButtonDown);
+		updateMouseState(static_cast<int>(mouseXf), static_cast<int>(mouseYf));
 	}
 
 	// ------- Main rendering logic ------- //
@@ -1211,6 +1213,7 @@ void SDL_ApplicationWindow::drawThreeDScreen()
 
 			float mouse_x_f = 0.0f, mouse_y_f = 0.0f;
 			SDL_GetMouseState(&mouse_x_f, &mouse_y_f);
+
 			vk_scene_->renderRedScreenOnWorkSpaceDimensionsFirst(
 				vk_command_buffers_[current_image_index_],
 				static_cast<int>(mouse_x_f), static_cast<int>(mouse_y_f));
@@ -1745,6 +1748,36 @@ void SDL_ApplicationWindow::StateTransition(SDL_State* from, SDL_State* to)
 
 	if (to)
 		to->enter_state();
+}
+
+void SDL_ApplicationWindow::updateMouseState(int mouseX, int mouseY)
+{
+	if (!ui_manager_)
+		return;
+
+	const auto& workspace = ui_manager_->getWorkSpace();
+	if (!workspace.isValid())
+		return;
+
+	const bool isAbove = (mouseX >= workspace.getX()
+		&& mouseX <= workspace.getX() + workspace.getWidth()
+		&& mouseY >= workspace.getY()
+		&& mouseY <= workspace.getY() + workspace.getHeight());
+
+	if (isAbove && current_mouse_state_ != &mouse_state_above_workspace_)
+	{
+		current_mouse_state_->onExit();
+		current_mouse_state_ = &mouse_state_above_workspace_;
+		current_mouse_state_->onEnter();
+		std::cout << "[SDL_ApplicationWindow] Mouse state -> " << current_mouse_state_->getStateName() << std::endl;
+	}
+	else if (!isAbove && current_mouse_state_ != &mouse_state_outside_workspace_)
+	{
+		current_mouse_state_->onExit();
+		current_mouse_state_ = &mouse_state_outside_workspace_;
+		current_mouse_state_->onEnter();
+		std::cout << "[SDL_ApplicationWindow] Mouse state -> " << current_mouse_state_->getStateName() << std::endl;
+	}
 }
 
 void SDL_ApplicationWindow::updateDpiScale()

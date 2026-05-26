@@ -4,7 +4,6 @@
 #include "include/cef_sandbox_win.h"
 #include "SIMILI_Frontend/ui_handler.hpp"
 #include "SIMILI_Frontend/SDL_ApplicationWindow.hpp"
-#include "SIMILI_Frontend/viewportLogic/Keymanagement/MouseController.hpp"
 #include "SIMILI_Frontend/viewportLogic/overlay_viewport.hpp"
 #include "SIMILI_Frontend/viewportLogic/FrameDatas/FrameDatas.hpp"
 #include "SIMILI_Frontend/viewportLogic/ThreeDScreen/ThreeDScreen.hpp"
@@ -116,9 +115,6 @@ int main(int argc, char* argv[])
 	{
 		std::cout << "[Main] Debug logging enabled to: " << logFilePath << std::endl;
 	}
-
-	auto MouseControl = new SIMILI::Input::MouseController();
-	handler->set_MouseControl(MouseControl);
 
 	OverlayViewport ThreeDViewport;
 

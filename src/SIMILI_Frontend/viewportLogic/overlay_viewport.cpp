@@ -41,7 +41,6 @@
 #include "../../Engine/ThreeDInteractions/FaceTransform.hpp"
 #include "../../Engine/ThreeDInteractions/EdgeTransform.hpp"
 #include "Keymanagement/KeyManager.hpp"
-#include "Keymanagement/MouseController.hpp"
 #include "FrameDatas/FrameDatas.hpp"
 #include "../ui_handler.hpp"
 // ============================================================================

@@ -11,10 +11,6 @@
 #include "viewportLogic/UIPanels/UIPanel.hpp"
 #include "viewportLogic/UIPanels/UIManager.hpp"
 #include "viewportLogic/UIPanels/Splitter.hpp"
-#include "viewportLogic/Keymanagement/MouseStates/Mouse_State.hpp"
-#include "viewportLogic/Keymanagement/MouseStates/Mouse_Above_Overlay_State.hpp"
-#include "viewportLogic/Keymanagement/MouseStates/Mouse_Outside_Overlay_State.hpp"
-#include "viewportLogic/Keymanagement/MouseStates/Mouse_Above_UI_Panel_State.hpp"
 #include "viewportLogic/HTMLTextureRenderer/Overlay_HTML_Texture_Renderer.hpp"
 #include "ThreadSafeIFrameMap.hpp"
 #include <list>

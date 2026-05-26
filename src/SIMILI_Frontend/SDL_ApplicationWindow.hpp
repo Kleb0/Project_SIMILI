@@ -19,6 +19,8 @@
 #include "SDL_Windows_states/SDL_State_Reduced.hpp"
 #include "SDL_Windows_states/SDL_State_Scalingdown.hpp"
 #include "SDL_Windows_states/SDL_State_ScalingUP.hpp"
+#include "MouseStates/Mouse_Above_Workspace_State.hpp"
+#include "MouseStates/Mouse_Outside_Workspace_State.hpp"
 
 class ThreeDScreen;
 class VKContext;
@@ -233,6 +235,7 @@ class SDL_ApplicationWindow
 		bool createCEFTextureSampler(VkDevice device);
 		void uploadCEFPaintBuffer();
 		void StateTransition(SDL_State* from, SDL_State* to);
+		void updateMouseState(int mouseX, int mouseY);
 
 		// === State Machine ===
 		SDL_State_Init state_init_;
@@ -241,6 +244,11 @@ class SDL_ApplicationWindow
 		SDL_State_ScalingDown state_scaling_down_;
 		SDL_State_ScalingUp state_scaling_up_;
 		SDL_State* current_state_;
+
+		// === Mouse State Machine ===
+		SIMILI::Input::Mouse_Above_Workspace_State mouse_state_above_workspace_;
+		SIMILI::Input::Mouse_Outside_Workspace_State mouse_state_outside_workspace_;
+		SIMILI::Input::Mouse_State* current_mouse_state_;
 
 		// ===== Vulkan Resource Management ===== //
 		bool createSwapchain();

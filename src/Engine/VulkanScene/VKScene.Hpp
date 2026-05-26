@@ -59,8 +59,8 @@ public:
     std::string getSceneID() const { return sceneID; }
 
     void bindSceneViewToWorkSpaceDimensions(int logicalX, int logicalY, int logicalWidth, int logicalHeight,
-                                             int drawableWidth, int drawableHeight,
-                                             int logicalWindowWidth, int logicalWindowHeight);
+        int drawableWidth, int drawableHeight, int logicalWindowWidth, int logicalWindowHeight);
+
     void renderRedScreenOnWorkSpaceDimensionsFirst(VkCommandBuffer commandBuffer, int mouseX, int mouseY);
 
 private:
