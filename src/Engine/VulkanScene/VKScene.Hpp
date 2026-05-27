@@ -14,6 +14,7 @@ class Vertice;
 class Edge;
 class Face;
 class SceneObjectContainer;
+class VulkanPipeline;
 
 struct VKGraveyardEntry 
 {
@@ -63,6 +64,10 @@ public:
 
     void renderRedScreenOnWorkSpaceDimensionsFirst(VkCommandBuffer commandBuffer, int mouseX, int mouseY);
 
+    void setVulkanPipelines(VulkanPipeline* pipelines, VkRenderPass renderPass);
+    void drawThreeDScene(VkCommandBuffer commandBuffer, int vpX, int vpY, int vpW, int vpH,
+        const glm::mat4& view, const glm::mat4& proj);
+
 private:
     glm::mat4 lastViewProj{1.0f};
     std::list<ThreeDObject*> objects;
@@ -92,10 +97,23 @@ private:
     float hover_g_ = 0.28f;
     float hover_b_ = 0.35f;
 
-    VkPipeline graphicsPipeline;
-    VkPipelineLayout pipelineLayout;
-    VkRenderPass renderPass;
+    VulkanPipeline* vulkan_pipelines_ = nullptr;
+    VkRenderPass scene_render_pass_ = VK_NULL_HANDLE;
+    VkPipeline grid_pipeline_handle_ = VK_NULL_HANDLE;
+    VkPipelineLayout grid_pipeline_layout_ = VK_NULL_HANDLE;
+    VkPipeline background_pipeline_handle_ = VK_NULL_HANDLE;
+    VkPipelineLayout background_pipeline_layout_ = VK_NULL_HANDLE;
+    bool scene_pipeline_initialized_ = false;
+    VkBuffer background_vertex_buffer_ = VK_NULL_HANDLE;
+    VkDeviceMemory background_vertex_memory_ = VK_NULL_HANDLE;
+
     VkBuffer gridVertexBuffer;
     VkDeviceMemory gridVertexBufferMemory;
     uint32_t gridVertexCount;
+
+    bool initializeScenePipelines();
+    bool createGridVertexBuffer();
+    bool createBackgroundVertexBuffer();
+    bool createVulkanBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
+        VkMemoryPropertyFlags memProps, VkBuffer& outBuffer, VkDeviceMemory& outMemory);
 };

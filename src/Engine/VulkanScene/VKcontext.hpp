@@ -44,8 +44,6 @@ public:
 
     void setCamera(Camera* cam);
     Camera* getCamera() const { return camera_; }
-    void ProjectOnThreeDScreen();
-
 
 private:
     int width = 800;

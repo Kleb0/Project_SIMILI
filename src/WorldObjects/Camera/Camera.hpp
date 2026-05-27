@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vulkan/vulkan.h>
 #include "WorldObjects/Entities/ThreedObject.hpp"
 
 class VKScene;
@@ -47,7 +48,8 @@ public:
     void setVKScene(VKScene* scene);
     void renderAttachedVKScene();
     VKScene* getVulkanScene() const { return vulkanScene_; }
-    void ProjectScene(ThreeDScreen* screen);
+    void projectSceneViewOnSDL3WorkSpace(VKScene* scene, VkCommandBuffer commandBuffer,
+        int vpPixelX, int vpPixelY, int vpPixelW, int vpPixelH);
 
     float fov = 45.0f;
     float nearClip = 0.1f;

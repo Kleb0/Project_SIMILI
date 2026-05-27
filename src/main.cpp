@@ -259,6 +259,8 @@ int main(int argc, char* argv[])
 	myVKScene.setVKContext(&vkRenderer);
 	myVKScene.setSceneObjectContainer(&VKSceneObjectContainer);
 	myVKScene.initialize();
+	myVKScene.setVulkanPipelines(&vulkanPipelines, renderPass);
+	std::cout << "[Main] VKScene pipelines initialized" << std::endl;
 	// TEMPORARY: Comment out mesh addition while mesh creation is disabled
 	// myVKScene.addObject(cubeMesh1);
 	myVKScene.addObject(&mainCamera);
@@ -284,7 +286,9 @@ int main(int argc, char* argv[])
 		vkRenderer.setCamera(sceneCamera);
 		vkRenderer.setThreeDScreen(&myThreeDScreen);
 		sceneCamera->setVKScene(&myVKScene);
+		mainWindow.setCamera(sceneCamera);
 		std::cout << "[Main] Camera linked to VKContext" << std::endl;
+		std::cout << "[Main] Camera linked to SDL_ApplicationWindow" << std::endl;
 	}
 
 	std::cout << "[Main] VKScene initialized with ID: " << myVKScene.getSceneID() << std::endl;

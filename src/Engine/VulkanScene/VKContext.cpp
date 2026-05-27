@@ -412,24 +412,3 @@ void VKContext::setCamera(Camera* cam)
 	camera_ = cam;
 }
 
-void VKContext::ProjectOnThreeDScreen()
-{
-	if (!camera_)
-	{
-		std::cout << "[VKContext] ProjectOnThreeDScreen: No camera set" << std::endl;
-		return;
-	}
-	
-	if (!three_d_screen_)
-	{
-		std::cout << "[VKContext] ProjectOnThreeDScreen: No ThreeDScreen set" << std::endl;
-		return;
-	}
-	
-	if (!three_d_screen_->hasValidViewport())
-	{
-		return;
-	}
-	
-	camera_->ProjectScene(three_d_screen_);
-}

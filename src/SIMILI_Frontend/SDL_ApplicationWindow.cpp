@@ -9,6 +9,7 @@
 #include "../../Engine/VulkanScene/VKScene.Hpp"
 #include "../../Engine/VulkanPipeline/VulkanPipeline.hpp"
 #include "../../Engine/GLSL_Compiler/GLSLCompiler.hpp"
+#include "../../WorldObjects/Camera/Camera.hpp"
 #include <SDL3/SDL_vulkan.h>
 #include "include/cef_browser.h"
 #include <set>
@@ -52,6 +53,7 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, ui_handler_(nullptr)
 	, threed_screen_(nullptr)
 	, vk_scene_(nullptr)
+	, camera_(nullptr)
 	, frame_datas_(nullptr)
 	, ui_manager_(nullptr)
 	, app_border_(nullptr)
@@ -1192,12 +1194,7 @@ void SDL_ApplicationWindow::renderThreeDScreen(const std::map<std::string, IFram
 
 void SDL_ApplicationWindow::drawThreeDScreen()
 {
-	if (threed_screen_ && vk_command_buffers_.size() > current_image_index_)
-	{
-		threed_screen_->draw(vk_command_buffers_[current_image_index_], vk_render_pass_, vk_framebuffers_[current_image_index_]);
-	}
-
-	if (vk_scene_ && ui_manager_ && vk_command_buffers_.size() > current_image_index_)
+	if (camera_ && vk_scene_ && ui_manager_ && vk_command_buffers_.size() > current_image_index_)
 	{
 		const SIMILI::Frontend::WorkSpace& ws = ui_manager_->getWorkSpace();
 		if (ws.isValid())
@@ -1207,16 +1204,21 @@ void SDL_ApplicationWindow::drawThreeDScreen()
 			SDL_GetWindowSizeInPixels(window_, &drawableW, &drawableH);
 			SDL_GetWindowSize(window_, &logicalW, &logicalH);
 
-			vk_scene_->bindSceneViewToWorkSpaceDimensions(
-				ws.getX(), ws.getY(), ws.getWidth(), ws.getHeight(),
-				drawableW, drawableH, logicalW, logicalH);
+			if (logicalW > 0 && logicalH > 0)
+			{
+				const float scaleX = static_cast<float>(drawableW) / static_cast<float>(logicalW);
+				const float scaleY = static_cast<float>(drawableH) / static_cast<float>(logicalH);
 
-			float mouse_x_f = 0.0f, mouse_y_f = 0.0f;
-			SDL_GetMouseState(&mouse_x_f, &mouse_y_f);
+				const int vpX = static_cast<int>(ws.getX() * scaleX);
+				const int vpY = static_cast<int>(ws.getY() * scaleY);
+				const int vpW = static_cast<int>(ws.getWidth() * scaleX);
+				const int vpH = static_cast<int>(ws.getHeight() * scaleY);
 
-			vk_scene_->renderRedScreenOnWorkSpaceDimensionsFirst(
-				vk_command_buffers_[current_image_index_],
-				static_cast<int>(mouse_x_f), static_cast<int>(mouse_y_f));
+				camera_->projectSceneViewOnSDL3WorkSpace(
+					vk_scene_,
+					vk_command_buffers_[current_image_index_],
+					vpX, vpY, vpW, vpH);
+			}
 		}
 	}
 }

@@ -125,20 +125,17 @@ void Camera::renderAttachedVKScene()
     }
 }
 
-void Camera::ProjectScene(ThreeDScreen* screen)
+
+void Camera::projectSceneViewOnSDL3WorkSpace(VKScene* scene, VkCommandBuffer commandBuffer,
+    int vpPixelX, int vpPixelY, int vpPixelW, int vpPixelH)
 {
-    if (!screen || !vulkanScene_)
-    {
+    if (!scene || commandBuffer == VK_NULL_HANDLE || vpPixelW <= 0 || vpPixelH <= 0)
         return;
-    }
-    
-    if (!screen->hasValidViewport())
-    {
-        return;
-    }
-    
-    int screenWidth = screen->getWidth();
-    int screenHeight = screen->getHeight();
-    
-    vulkanScene_->render(screenWidth, screenHeight);
+
+    const float aspect = static_cast<float>(vpPixelW) / static_cast<float>(vpPixelH);
+    const glm::mat4 view = getViewMatrix();
+    glm::mat4 proj = getProjectionMatrix(aspect);
+    proj[1][1] *= -1.0f;
+
+    scene->drawThreeDScene(commandBuffer, vpPixelX, vpPixelY, vpPixelW, vpPixelH, view, proj);
 }

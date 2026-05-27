@@ -238,10 +238,11 @@ list(APPEND SOURCES
 
 # Add KeyManager from SIMILI_Frontend (needed for ECS input system)
 list(APPEND SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/Keymanagement/KeyManager.cpp    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/Keymanagement/MouseStates/Mouse_State.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/Keymanagement/MouseStates/Mouse_Above_Overlay_State.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/Keymanagement/MouseStates/Mouse_Outside_Overlay_State.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/Keymanagement/MouseStates/Mouse_Above_UI_Panel_State.cpp")
+    # "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/viewportLogic/Keymanagement/KeyManager.cpp"    
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/MouseStates/Mouse_State.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/MouseStates/Mouse_Above_Workspace_State.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/MouseStates/Mouse_Outside_Workspace_State.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/SIMILI_Frontend/MouseStates/Mouse_Above_UI_Panel_State.cpp")
 
 
 file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS src/*.hpp)

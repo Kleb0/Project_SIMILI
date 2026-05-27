@@ -25,6 +25,7 @@
 class ThreeDScreen;
 class VKContext;
 class VKScene;
+class Camera;
 class App_Border;
 class Enable_UI_Debug_Tools;
 class SDL_ApplicationWindow;
@@ -100,6 +101,7 @@ class SDL_ApplicationWindow
 		// === Component Registration ===
 		void Set_UIHandler(void* handler);
 		void setThreeDScreen(ThreeDScreen* screen);
+		void setCamera(Camera* camera) { camera_ = camera; }
 		void setVKContext(VKContext* context);
 		void setVKScene(VKScene* scene) { vk_scene_ = scene; }
 		void setVulkanPipelines(VulkanPipeline* pipelines);
@@ -167,6 +169,7 @@ class SDL_ApplicationWindow
 		void* ui_handler_;
 		ThreeDScreen* threed_screen_;
 		VKScene* vk_scene_;
+		Camera* camera_;
 		SIMILI::Frontend::FrameDatas* frame_datas_;
 		SIMILI::Frontend::UIManager* ui_manager_;
 		App_Border* app_border_;
