@@ -88,6 +88,9 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, cef_texture_sampler_(VK_NULL_HANDLE)
 	, cef_texture_uploaded_width_(0)
 	, cef_texture_uploaded_height_(0)
+	, vk_depth_image_(VK_NULL_HANDLE)
+	, vk_depth_image_memory_(VK_NULL_HANDLE)
+	, vk_depth_image_view_(VK_NULL_HANDLE)
 	, state_init_(this)
 	, state_maximized_(this)
 	, state_reduced_(this)
@@ -1407,6 +1410,22 @@ void SDL_ApplicationWindow::cleanupVulkan()
 	}
 	vk_framebuffers_.clear();
 
+	if (vk_depth_image_view_ != VK_NULL_HANDLE)
+	{
+		vkDestroyImageView(device, vk_depth_image_view_, nullptr);
+		vk_depth_image_view_ = VK_NULL_HANDLE;
+	}
+	if (vk_depth_image_ != VK_NULL_HANDLE)
+	{
+		vkDestroyImage(device, vk_depth_image_, nullptr);
+		vk_depth_image_ = VK_NULL_HANDLE;
+	}
+	if (vk_depth_image_memory_ != VK_NULL_HANDLE)
+	{
+		vkFreeMemory(device, vk_depth_image_memory_, nullptr);
+		vk_depth_image_memory_ = VK_NULL_HANDLE;
+	}
+
 	if (vk_render_pass_ != VK_NULL_HANDLE)
 	{
 		vkDestroyRenderPass(device, vk_render_pass_, nullptr);
@@ -1648,9 +1667,11 @@ bool SDL_ApplicationWindow::renderPassViewportAndScissorSetup()
 	SDL_GetWindowSizeInPixels(window_, &width, &height);
 	renderPassInfo.renderArea.extent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
 
-	VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
-	renderPassInfo.clearValueCount = 1;
-	renderPassInfo.pClearValues = &clearColor;
+	VkClearValue clearValues[2];
+	clearValues[0] = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+	clearValues[1].depthStencil = { 1.0f, 0 };
+	renderPassInfo.clearValueCount = 2;
+	renderPassInfo.pClearValues = clearValues;
 
 	vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -1937,19 +1958,36 @@ bool SDL_ApplicationWindow::createRenderPass()
 	colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
+	VkAttachmentDescription depthAttachment{};
+	depthAttachment.format = VK_FORMAT_D32_SFLOAT;
+	depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+	depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
 	VkAttachmentReference colorAttachmentRef{};
 	colorAttachmentRef.attachment = 0;
 	colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	VkAttachmentReference depthAttachmentRef{};
+	depthAttachmentRef.attachment = 1;
+	depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 	VkSubpassDescription subpass{};
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 	subpass.colorAttachmentCount = 1;
 	subpass.pColorAttachments = &colorAttachmentRef;
+	subpass.pDepthStencilAttachment = &depthAttachmentRef;
+
+	VkAttachmentDescription attachments[] = { colorAttachment, depthAttachment };
 
 	VkRenderPassCreateInfo renderPassInfo{};
 	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	renderPassInfo.attachmentCount = 1;
-	renderPassInfo.pAttachments = &colorAttachment;
+	renderPassInfo.attachmentCount = 2;
+	renderPassInfo.pAttachments = attachments;
 	renderPassInfo.subpassCount = 1;
 	renderPassInfo.pSubpasses = &subpass;
 
@@ -1966,19 +2004,87 @@ bool SDL_ApplicationWindow::createRenderPass()
 
 bool SDL_ApplicationWindow::createFramebuffers()
 {
-	vk_framebuffers_.resize(vk_swapchain_image_views_.size());
+	VkDevice device = vk_context_->getDevice();
+
+	if (vk_depth_image_view_ != VK_NULL_HANDLE)
+	{
+		vkDestroyImageView(device, vk_depth_image_view_, nullptr);
+		vk_depth_image_view_ = VK_NULL_HANDLE;
+	}
+	if (vk_depth_image_ != VK_NULL_HANDLE)
+	{
+		vkDestroyImage(device, vk_depth_image_, nullptr);
+		vk_depth_image_ = VK_NULL_HANDLE;
+	}
+	if (vk_depth_image_memory_ != VK_NULL_HANDLE)
+	{
+		vkFreeMemory(device, vk_depth_image_memory_, nullptr);
+		vk_depth_image_memory_ = VK_NULL_HANDLE;
+	}
 
 	int width, height;
 	SDL_GetWindowSizeInPixels(window_, &width, &height);
 
+	VkImageCreateInfo depthImageInfo{};
+	depthImageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	depthImageInfo.imageType = VK_IMAGE_TYPE_2D;
+	depthImageInfo.extent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1 };
+	depthImageInfo.mipLevels = 1;
+	depthImageInfo.arrayLayers = 1;
+	depthImageInfo.format = VK_FORMAT_D32_SFLOAT;
+	depthImageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	depthImageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	depthImageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+	depthImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	depthImageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	if (vkCreateImage(device, &depthImageInfo, nullptr, &vk_depth_image_) != VK_SUCCESS)
+	{
+		return false;
+	}
+
+	VkMemoryRequirements depthMemReq;
+	vkGetImageMemoryRequirements(device, vk_depth_image_, &depthMemReq);
+	VkPhysicalDeviceMemoryProperties memProps;
+	vkGetPhysicalDeviceMemoryProperties(vk_context_->getPhysicalDevice(), &memProps);
+	uint32_t depthMemIdx = 0;
+	for (uint32_t i = 0; i < memProps.memoryTypeCount; i++)
+	{
+		if ((depthMemReq.memoryTypeBits & (1 << i)) && (memProps.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+		{
+			depthMemIdx = i;
+			break;
+		}
+	}
+	VkMemoryAllocateInfo depthAllocInfo{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+	depthAllocInfo.allocationSize = depthMemReq.size;
+	depthAllocInfo.memoryTypeIndex = depthMemIdx;
+	if (vkAllocateMemory(device, &depthAllocInfo, nullptr, &vk_depth_image_memory_) != VK_SUCCESS)
+	{
+		return false;
+	}
+	vkBindImageMemory(device, vk_depth_image_, vk_depth_image_memory_, 0);
+
+	VkImageViewCreateInfo depthViewInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+	depthViewInfo.image = vk_depth_image_;
+	depthViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	depthViewInfo.format = VK_FORMAT_D32_SFLOAT;
+	depthViewInfo.subresourceRange = { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 };
+	if (vkCreateImageView(device, &depthViewInfo, nullptr, &vk_depth_image_view_) != VK_SUCCESS)
+	{
+		return false;
+	}
+
+	vk_framebuffers_.resize(vk_swapchain_image_views_.size());
+
 	for (size_t i = 0; i < vk_swapchain_image_views_.size(); i++)
 	{
-		VkImageView attachments[] = {vk_swapchain_image_views_[i]};
+		VkImageView attachments[] = { vk_swapchain_image_views_[i], vk_depth_image_view_ };
 
 		VkFramebufferCreateInfo framebufferInfo{};
 		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 		framebufferInfo.renderPass = vk_render_pass_;
-		framebufferInfo.attachmentCount = 1;
+		framebufferInfo.attachmentCount = 2;
 		framebufferInfo.pAttachments = attachments;
 		framebufferInfo.width = static_cast<uint32_t>(width);
 		framebufferInfo.height = static_cast<uint32_t>(height);

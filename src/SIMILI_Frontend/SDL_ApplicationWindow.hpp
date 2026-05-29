@@ -200,6 +200,9 @@ class SDL_ApplicationWindow
 		std::vector<VkImage> vk_swapchain_images_;
 		std::vector<VkImageView> vk_swapchain_image_views_;
 		std::vector<VkFramebuffer> vk_framebuffers_;
+		VkImage vk_depth_image_;
+		VkDeviceMemory vk_depth_image_memory_;
+		VkImageView vk_depth_image_view_;
 		bool swapchain_needs_recreation_;
 		
 		// === Vulkan Render Resources ===

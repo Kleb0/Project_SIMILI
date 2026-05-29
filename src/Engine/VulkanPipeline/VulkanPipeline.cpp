@@ -642,9 +642,10 @@ bool VulkanPipeline::createGraphicsPipeline(const PipelineConfig& config, Pipeli
     // Depth/stencil state (disabled but explicit)
     VkPipelineDepthStencilStateCreateInfo depthStencil = {};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencil.depthTestEnable = VK_FALSE;
-    depthStencil.depthWriteEnable = VK_FALSE;
-    depthStencil.depthCompareOp = VK_COMPARE_OP_ALWAYS;
+    bool isMeshPipeline = (config.name.rfind("mesh_", 0) == 0);
+    depthStencil.depthTestEnable = isMeshPipeline ? VK_TRUE : VK_FALSE;
+    depthStencil.depthWriteEnable = (isMeshPipeline && config.topology == VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST) ? VK_TRUE : VK_FALSE;
+    depthStencil.depthCompareOp = isMeshPipeline ? VK_COMPARE_OP_LESS : VK_COMPARE_OP_ALWAYS;
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.stencilTestEnable = VK_FALSE;
     depthStencil.minDepthBounds = 0.0f;
