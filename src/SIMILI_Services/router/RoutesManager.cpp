@@ -3,9 +3,9 @@
 #include "../../WorldObjects/Mesh/Mesh.hpp"
 #include "../../WorldObjects/Camera/Camera.hpp"
 #include "../../Engine/PrimitivesCreation/CreatePrimitive.hpp"
-#include "../../SIMILI_Frontend/viewportLogic/HTMLTextureRenderer/TextureEnabler.hpp"
+#include "../../SIMILI_Frontend/viewportLogic/UIPanels/FrameDataCatcher.hpp"
+#include "../../SIMILI_Frontend/viewportLogic/UIPanels/UIManager.hpp"
 #include <iostream>
-#include <sstream>
 #include <fstream>
 #include <GLFW/glfw3.h>
 
@@ -22,15 +22,16 @@ namespace SIMILI {
 			RouterSim& router,
 			VKContext& vkRenderer,
 			VKScene& scene,
-			CefRefPtr<UIHandler>& handler,
-			GLFWwindow* glfwWindow)
+			GLFWwindow* glfwWindow,
+			FrameDataCatcher* frameCatcher,
+			SIMILI::Frontend::UIManager* uiManager)
 		{
 			std::cout << "[RoutesManager] Initializing all routes..." << std::endl;
 			
 			registerContextRoutes(router, vkRenderer);
 			registerSceneRoutes(router, scene, vkRenderer);
-			registerObjectRoutes(router, scene, handler, glfwWindow);
-			registerIFrameRoutes(router, handler);
+			registerObjectRoutes(router, scene, glfwWindow);
+			registerIFrameRoutes(router, frameCatcher, uiManager);
 			
 			std::cout << "[RoutesManager] All routes registered successfully" << std::endl;
 		}
@@ -117,9 +118,9 @@ namespace SIMILI {
 		}
 
 
-		void RoutesManager::registerObjectRoutes(RouterSim& router, VKScene& scene, CefRefPtr<UIHandler>& handler, GLFWwindow* glfwWindow)
+		void RoutesManager::registerObjectRoutes(RouterSim& router, VKScene& scene, GLFWwindow* glfwWindow)
 		{
-			router.post("/api/create-cube", [&scene, &handler, glfwWindow](const Message& msg) -> Response 
+			router.post("/api/create-cube", [&scene, glfwWindow](const Message& msg) -> Response 
 			{
 				static int cubeCounter = 2; 
 				
@@ -146,11 +147,7 @@ namespace SIMILI {
 				
 				scene.addObject(newCube);
 				
-				if (handler) 
-				{
-					handler->reinitializeSingleObject(newCube);
-					handler->notifySceneChanged();
-				}
+				// handler->reinitializeSingleObject / handler->notifySceneChanged -- UIHandler débranché
 				
 				Response resp;
 				resp.statusCode = 200;
@@ -162,9 +159,9 @@ namespace SIMILI {
 			}, "Create a new cube and add it to the scene");
 			
 			// Route: Select object from hierarchy
-			router.post("/api/select-object", [&scene, &handler](const Message& msg) -> Response 
+			router.post("/api/select-object", [&scene](const Message& msg) -> Response 
 			{
-				std::cout << "\n [RoutesManager] /api/select-object called - handler is " << (handler ? "VALID" : "NULL") << std::endl;
+				std::cout << "\n [RoutesManager] /api/select-object called" << std::endl;
 				
 				// if (handler)
 				// {
@@ -259,7 +256,7 @@ namespace SIMILI {
 				return resp;
 			}, "Select object from hierarchy inspector");
 			
-			router.post("/api/slot-texture/toggle", [&handler](const Message& msg) -> Response 
+			router.post("/api/slot-texture/toggle", [](const Message& msg) -> Response 
 			{
 				Response resp;
 				resp.headers["Content-Type"] = "application/json";
@@ -276,17 +273,7 @@ namespace SIMILI {
 				
 				bool visible = requestData["visible"];
 				
-				if (handler)
-				{
-					if (!CefCurrentlyOn(TID_UI))
-					{
-						CefPostTask(TID_UI, new TextureEnablerTask(handler, visible));
-					}
-					else
-					{
-						handler->enableSlotTextureRendering(visible);
-					}
-				}
+				// handler->enableSlotTextureRendering -- UIHandler débranché
 				
 				resp.statusCode = 200;
 				resp.statusMessage = "OK";
@@ -294,7 +281,7 @@ namespace SIMILI {
 				return resp;
 			}, "Toggle SlotTexture visibility");
 			
-			router.post("/api/slot-texture/render", [&handler](const Message& msg) -> Response 
+			router.post("/api/slot-texture/render", [](const Message& msg) -> Response 
 			{
 				Response resp;
 				resp.headers["Content-Type"] = "application/json";
@@ -311,24 +298,7 @@ namespace SIMILI {
 				
 				bool enable = requestData["enable"];
 				
-				if (handler)
-				{
-					if (enable)
-					{
-						handler->CallTestFromServer();
-					}
-					else
-					{
-						if (!CefCurrentlyOn(TID_UI))
-						{
-							CefPostTask(TID_UI, new TextureEnablerTask(handler, false));
-						}
-						else
-						{
-							handler->enableSlotTextureRendering(false);
-						}
-					}
-				}
+				// handler->CallTestFromServer / handler->enableSlotTextureRendering -- UIHandler débranché
 				
 				resp.statusCode = 200;
 				resp.statusMessage = "OK";
@@ -339,7 +309,7 @@ namespace SIMILI {
 			std::cout << "[RoutesManager] Object routes registered" << std::endl;
 		}
 
-		void RoutesManager::registerIFrameRoutes(RouterSim& router, CefRefPtr<UIHandler>& handler)
+		void RoutesManager::registerIFrameRoutes(RouterSim& router, FrameDataCatcher* frameCatcher, SIMILI::Frontend::UIManager* uiManager)
 		{
 			// Serve static UI files
 			std::cout << "[RoutesManager] Registering static file serving for UI..." << std::endl;
@@ -472,8 +442,7 @@ namespace SIMILI {
 				return resp;
 			}, "Debug endpoint for init start");
 
-			router.post("/api/iframes/update", [&handler](const Message& msg) -> Response 
-			{
+			router.post("/api/iframes/update", [frameCatcher](const Message& msg) -> Response {
 				std::cout << "[RoutesManager] /api/iframes/update endpoint called" << std::endl;
 				std::cout << "[RoutesManager] Request body size: " << msg.body.size() << " bytes" << std::endl;
 				
@@ -497,12 +466,12 @@ namespace SIMILI {
 					
 					std::cout << "[RoutesManager] Found " << requestData["iframes"].size() << " iframes in request" << std::endl;
 					
-					if (!handler)
+					if (!frameCatcher)
 					{
-						std::cout << "[RoutesManager] ERROR: Handler not available" << std::endl;
+						std::cout << "[RoutesManager] ERROR: FrameDataCatcher not available" << std::endl;
 						resp.statusCode = 500;
 						resp.statusMessage = "Internal Server Error";
-						resp.body = "{\"success\": false, \"error\": \"Handler not available\"}";
+						resp.body = "{\"success\": false, \"error\": \"FrameDataCatcher not available\"}";
 						return resp;
 					}
 					
@@ -551,10 +520,17 @@ namespace SIMILI {
 						std::cout << "[RoutesManager] Accepting iframe: " << pair.first 
 							<< " (x=" << pair.second.x << ", y=" << pair.second.y 
 							<< ", w=" << pair.second.width << ", h=" << pair.second.height << ")" << std::endl;
-						handler->iframe_data_map_[pair.first] = pair.second;
 					}
 					
-					handler->captureIFramePositions();
+					if (frameCatcher)
+					{
+						for (const auto& pair : tempIFrameMap)
+						{
+							frameCatcher->iframe_data_map_[pair.first] = pair.second;
+						}
+					}
+					
+					// handler->captureIFramePositions(); -- migrated to FrameDataCatcher
 					
 					resp.statusCode = 200;
 					resp.statusMessage = "OK";
@@ -573,7 +549,7 @@ namespace SIMILI {
 
 			std::cout << "[RoutesManager] Registering /api/uipanels/update endpoint..." << std::endl;
 
-			router.post("/api/uipanels/update", [&handler](const Message& msg) -> Response
+			router.post("/api/uipanels/update", [frameCatcher](const Message& msg) -> Response
 			{
 				Response resp;
 				resp.headers["Access-Control-Allow-Origin"] = "*";
@@ -597,11 +573,11 @@ namespace SIMILI {
 
 					std::cout << "[RoutesManager] Found iframes array with " << requestData["iframes"].size() << " elements" << std::endl;
 
-					if (!handler)
+					if (!frameCatcher)
 					{
 						resp.statusCode = 500;
 						resp.statusMessage = "Internal Server Error";
-						resp.body = "{\"success\": false, \"error\": \"Handler not available\"}";
+						resp.body = "{\"success\": false, \"error\": \"FrameDataCatcher not available\"}";
 						return resp;
 					}
 
@@ -644,13 +620,15 @@ namespace SIMILI {
 
 							uiPanelIFrames[name] = data;
 							
-							handler->iframe_data_map_[name] = data;
+							if (FrameDataCatcher* catcher = FrameDataCatcher::getInstance())
+							{
+								catcher->iframe_data_map_[name] = data;
+							}
 						}
 					}
 
 					std::cout << "[RoutesManager] Created " << uiPanelIFrames.size() << " UI panels" << std::endl;
 
-					handler->captureIFramePositions();
 
 					resp.statusCode = 200;
 					resp.statusMessage = "OK";
@@ -666,21 +644,21 @@ namespace SIMILI {
 				return resp;
 			}, "Update UI panel iframes");
 			
-			router.get("/api/iframes/all", [&handler](const Message& msg) -> Response 
+			router.get("/api/iframes/all", [frameCatcher](const Message& msg) -> Response 
 			{
 				Response resp;
 				resp.headers["Access-Control-Allow-Origin"] = "*";
 				resp.headers["Content-Type"] = "application/json";
 				
-				if (!handler)
+				if (!frameCatcher)
 				{
 					resp.statusCode = 500;
 					resp.statusMessage = "Internal Server Error";
-					resp.body = "{\"success\": false, \"error\": \"Handler not available\"}";
+					resp.body = "{\"success\": false, \"error\": \"FrameDataCatcher not available\"}";
 					return resp;
 				}
 				
-				const auto& allIframes = handler->getAllIFrames();
+				const auto allIframes = frameCatcher->getAllIFrames();
 				
 				json responseData = json::array();
 				
@@ -705,28 +683,19 @@ namespace SIMILI {
 				return resp;
 			}, "Get all iframe dimensions");
 
-			router.get("/api/uipanels/all", [&handler](const Message& msg) -> Response
+			router.get("/api/uipanels/all", [uiManager](const Message& msg) -> Response
 			{
 				Response resp;
 				resp.headers["Access-Control-Allow-Origin"] = "*";
 				resp.headers["Content-Type"] = "application/json";
 
-				if (!handler)
+				if (!uiManager)
 				{
 					resp.statusCode = 500;
 					resp.statusMessage = "Internal Server Error";
-					resp.body = "{\"success\": false, \"error\": \"Handler not available\"}";
+					resp.body = "{\"success\": false, \"error\": \"UIManager not available\"}";
 					return resp;
 				}
-
-			auto* uiManager = handler->getUIManager();
-			if (!uiManager)
-			{
-				resp.statusCode = 500;
-				resp.statusMessage = "Internal Server Error";
-				resp.body = "{\"success\": false, \"error\": \"UIManager not available\"}";
-				return resp;
-			}
 
 			const auto& allUIPanels = uiManager->getUIPanelIFrames();
 			json responseData = json::array();

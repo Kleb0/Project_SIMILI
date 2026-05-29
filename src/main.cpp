@@ -1,12 +1,14 @@
 // CEF includes - MUST be first to avoid conflicts
 #include "include/cef_app.h"
-#include "include/cef_client.h"
 #include "include/cef_sandbox_win.h"
-#include "SIMILI_Frontend/ui_handler.hpp"
+#include "SIMILI_Frontend/viewportLogic/UIPanels/UIManager.hpp"
 #include "SIMILI_Frontend/SDL_ApplicationWindow.hpp"
 #include "SIMILI_Frontend/viewportLogic/overlay_viewport.hpp"
 #include "SIMILI_Frontend/viewportLogic/FrameDatas/FrameDatas.hpp"
 #include "SIMILI_Frontend/viewportLogic/ThreeDScreen/ThreeDScreen.hpp"
+#include "SIMILI_Frontend/viewportLogic/UIPanels/FrameDataCatcher.hpp"
+#include "SIMILI_Frontend/viewportLogic/UIPanels/PanelResizingLogic.hpp"
+#include "SIMILI_Frontend/viewportLogic/UIPanels/UIManager.hpp"
 
 #include "SIMILI_Services/router/RouterSim.hpp"
 #include "SIMILI_Services/router/RoutesManager.hpp"
@@ -84,9 +86,7 @@ int main(int argc, char* argv[])
 {
 	CefMainArgs main_args(GetModuleHandle(nullptr));
 
-	CefRefPtr<UIHandler> handler(new UIHandler);
-
-	int exit_code = CefExecuteProcess(main_args, handler, nullptr);
+	int exit_code = CefExecuteProcess(main_args, nullptr, nullptr);
 	if (exit_code >= 0) 
 	{
 		return exit_code;
@@ -172,30 +172,33 @@ int main(int argc, char* argv[])
 	mainWindow.setVulkanPipelines(&vulkanPipelines);
 	std::cout << "[Main] VulkanPipeline set on window" << std::endl;
 	
-	handler->setVKRenderer(&vkRenderer);
-	std::cout << "[Main] VKRenderer linked to UIHandler" << std::endl;
-	
-	handler->setVulkanPipelines(mainWindow.getVulkanPipelines());
-	std::cout << "[Main] VulkanPipeline linked to UIHandler" << std::endl;
-	
 	ThreeDScreen myThreeDScreen;
 	myThreeDScreen.initialize();
 	mainWindow.setThreeDScreen(&myThreeDScreen);
 	vkRenderer.setThreeDScreen(&myThreeDScreen);
 	std::cout << "[Main] ThreeDScreen initialized and linked to SDL_ApplicationWindow" << std::endl;
 	
-	handler->Set_SDLParent(&mainWindow);
-	mainWindow.Set_UIHandler(handler.get());
-	
-	auto* frameDatas = new SIMILI::Frontend::FrameDatas(handler.get());
-	handler->setFrameDatas(frameDatas);
-	std::cout << "[Main] FrameDatas created and linked to UIHandler" << std::endl;
-
 	std::cout << "[Main] Creating UIManager..." << std::endl;
 	SIMILI::Frontend::UIManager myUIManager;
 	mainWindow.setUIManager(&myUIManager);
-	handler->setUIManager(&myUIManager);
-	std::cout << "[Main] UIManager created and linked to SDL_ApplicationWindow and UIHandler" << std::endl;
+	std::cout << "[Main] UIManager created and linked to SDL_ApplicationWindow" << std::endl;
+
+	FrameDataCatcher frameCatcher;
+	FrameDataCatcher::setInstance(&frameCatcher);
+	std::cout << "[Main] FrameDataCatcher created and set as singleton" << std::endl;
+
+	auto* frameDatas = new SIMILI::Frontend::FrameDatas(&frameCatcher);
+	mainWindow.updateFrameDatas(frameDatas);
+	std::cout << "[Main] FrameDatas created and linked to FrameDataCatcher" << std::endl;
+
+	PanelResizingLogic panelResizingLogic;
+	panelResizingLogic.setUIManager(&myUIManager);
+	panelResizingLogic.setSDLWindow(&mainWindow);
+		// panelResizingLogic.setUIHandler: UIHandler no longer used
+	panelResizingLogic.setFrameDatas(frameDatas);
+	panelResizingLogic.setFrameDataCatcher(&frameCatcher);
+	mainWindow.setPanelResizingLogic(&panelResizingLogic);
+	std::cout << "[Main] PanelResizingLogic created and wired" << std::endl;
 	
 	SDL_StartTextInput(mainWindow.getHandle());
 	
@@ -298,7 +301,7 @@ int main(int argc, char* argv[])
 
 	auto& router = SIMILI::Server::SimpleHttpServer::getInstance().getRouter();
 	SIMILI::Router::RoutesManager routesManager;
-	routesManager.initializeRoutes(router, vkRenderer, myVKScene, handler, nullptr);
+	routesManager.initializeRoutes(router, vkRenderer, myVKScene, nullptr, &frameCatcher, &myUIManager);
 	std::cout << "[Main] All API routes initialized via RoutesManager" << std::endl;
 
 	CefSettings settings;
@@ -311,20 +314,14 @@ int main(int argc, char* argv[])
 	
 	std::cout << "[Main] CEF Settings configured with localhost access enabled" << std::endl;
 
-	if (!CefInitialize(main_args, settings, handler, nullptr)) 
+	if (!CefInitialize(main_args, settings, nullptr, nullptr)) 
 	{
 		std::cerr << "[Main] Failed to initialize CEF" << std::endl;
 		return -1;
 	}
 
-	handler->setVKScene(&myVKScene);
-	std::cout << "[Main] VKScene linked to UIHandler" << std::endl;
-
 	mainWindow.setVKScene(&myVKScene);
 	std::cout << "[Main] VKScene linked to SDL_ApplicationWindow" << std::endl;
-
-	handler->startRenderTimer();
-	std::cout << "[Main] Render timer started" << std::endl;
 
 	mainWindow.show();
 	std::cout << "[Main] SDL window shown before CEF creation" << std::endl;
@@ -357,7 +354,7 @@ int main(int argc, char* argv[])
 	std::cout << "[Main] Resolved UI layout path: " << uiPath.string() << std::endl;
 	
 	std::string url = "http://localhost:8080/ui/main_layout.html";
-	mainWindow.SetHTMLAdressToDraw(handler, url, windowWidth, windowHeight);
+	mainWindow.SetHTMLAdressToDraw(mainWindow.getCefClient(), url, windowWidth, windowHeight);
 	std::cout << "[Main] CEF browser created successfully" << std::endl;
 	
 	std::cout << "[Main] Waiting for CEF and JavaScript initialization..." << std::endl;
@@ -368,10 +365,10 @@ int main(int argc, char* argv[])
 	}
 	std::cout << "[Main] CEF initialization wait complete" << std::endl;
 	
-	handler->initializeDefaultUIPanels();
+	mainWindow.initializeDefaultUIPanels();
 	std::cout << "[Main] Default UI panels initialized" << std::endl;
 
-	handler->forceCaptureIFramePositions();
+	mainWindow.forceCaptureIFramePositions();
 	std::cout << "[Main] Initial frame data captured" << std::endl;
 
 
@@ -397,7 +394,7 @@ int main(int argc, char* argv[])
 				running = false;
 			}
 			
-			mainWindow.handleSplitterEvent(event);
+			// mainWindow.handleSplitterEvent(event);
 		}
 		
 		mainWindow.processEvents();
@@ -415,7 +412,6 @@ int main(int argc, char* argv[])
 	}
 	
 	std::cout << "[Main] Shutting down CEF..." << std::endl;
-	handler->clearUIPanels();
 	CefShutdown();
 
 	mainWindow.cleanupVulkan();

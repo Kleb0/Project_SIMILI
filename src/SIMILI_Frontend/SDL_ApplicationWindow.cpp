@@ -1,5 +1,9 @@
 #include "SDL_ApplicationWindow.hpp"
-#include "ui_handler.hpp"
+// #include "ui_handler.hpp"
+#include "ResourcesLoader.hpp"
+#include "viewportLogic/UIPanels/FrameDataCatcher.hpp"
+#include "viewportLogic/FrameDatas/FrameDatas.hpp"
+#include "viewportLogic/UIPanels/PanelResizingLogic.hpp"
 #include "viewportLogic/ThreeDScreen/ThreeDScreen.hpp"
 #include "viewportLogic/UIPanels/UIManager.hpp"
 #include "viewportLogic/UIPanels/Splitter.hpp"
@@ -17,6 +21,37 @@
 
 // Static member definition
 int SDL_ApplicationWindow::render_frame_count = 0;
+
+// ======== SIMILICefClient ========
+
+SIMILICefClient::SIMILICefClient(SDL_ApplicationWindow* owner)
+	: owner_(owner)
+	, resource_request_handler_(nullptr)
+{
+}
+
+CefRefPtr<CefRenderHandler> SIMILICefClient::GetRenderHandler()
+{
+	if (owner_)
+		return owner_->getRenderHandler();
+	return nullptr;
+}
+
+CefRefPtr<CefResourceRequestHandler> SIMILICefClient::GetResourceRequestHandler(
+	CefRefPtr<CefBrowser> browser,
+	CefRefPtr<CefFrame> frame,
+	CefRefPtr<CefRequest> request,
+	bool is_navigation,
+	bool is_download,
+	const CefString& request_initiator,
+	bool& disable_default_handling)
+{
+	if (!resource_request_handler_)
+	{
+		resource_request_handler_ = ResourcesLoader::createRequestHandler();
+	}
+	return resource_request_handler_;
+}
 
 // ======== AppRenderHandler ========
 
@@ -56,6 +91,7 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, camera_(nullptr)
 	, frame_datas_(nullptr)
 	, ui_manager_(nullptr)
+	, panel_resizing_logic_(nullptr)
 	, app_border_(nullptr)
 	, debug_tools_(nullptr)
 	, vk_context_(nullptr)
@@ -77,6 +113,8 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, borders_set_for_init_(false)
 	, pending_window_resize_sync_(false)
 	, browser_(nullptr)
+	, simili_cef_client_(nullptr)
+	, ui_manager_vulkan_initialized_(false)
 	, cef_render_handler_(new AppRenderHandler(this))
 	, cef_shared_pipeline_(nullptr)
 	, cef_descriptor_set_layout_(VK_NULL_HANDLE)
@@ -844,17 +882,6 @@ void SDL_ApplicationWindow::requestBrowserRepaint()
 
 // ====== Event Handling ====== //
 
-bool SDL_ApplicationWindow::handleSplitterEvent(const SDL_Event& event)
-{
-	if (!ui_handler_)
-	{
-		return false;
-	}
-
-	UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-	return handler->handleSplitterEvent(event);
-}
-
 void SDL_ApplicationWindow::processEvents()
 {
 	if (!window_)
@@ -911,11 +938,11 @@ void SDL_ApplicationWindow::processEvents()
 			StateTransition(current_state_, &state_scaling_down_);
 	}
 
-	if (ui_handler_)
-	{
-		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-		handler->processPendingFrameUpdates();
-	}
+	// if (ui_handler_)
+	// {
+	// 	UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+	// 	handler->processPendingFrameUpdates();
+	// }
 	
 	updateUIState();
 }
@@ -981,14 +1008,12 @@ void SDL_ApplicationWindow::renderFrame()
 			if (ui_manager_->consumePendingCEFRepaintRequest() || pending_window_resize_sync_)
 			{
 				pending_window_resize_sync_ = false;
-				if (ui_handler_)
+				if (panel_resizing_logic_)
 				{
-					UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-					handler->cacheUIPanelFrameDatas();
+					panel_resizing_logic_->cacheUIPanelFrameDatas();
 					int currentW = 0, currentH = 0;
 					SDL_GetWindowSize(window_, &currentW, &currentH);
-					// Use SDL reference window size instead of hardcoded values
-					handler->syncBrowserPanelLayoutFromCurrentFrames(
+					panel_resizing_logic_->syncBrowserPanelLayoutFromCurrentFrames(
 						getWindowRenderState(),
 						currentW, currentH,
 						reference_window_width_, reference_window_height_);
@@ -1059,14 +1084,13 @@ void SDL_ApplicationWindow::renderFrame()
 
 			if (ui_manager_->consumePendingCEFRepaintRequest())
 			{
-				if (ui_handler_)
+				if (panel_resizing_logic_)
 				{
-					UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-					handler->cacheUIPanelFrameDatas();
+					panel_resizing_logic_->cacheUIPanelFrameDatas();
 					int currentW = 0, currentH = 0;
 					SDL_GetWindowSize(window_, &currentW, &currentH);
 
-					handler->syncBrowserFullScreenPanelLayout(
+					panel_resizing_logic_->syncBrowserFullScreenPanelLayout(
 						getWindowRenderState(),
 						currentW, currentH,
 						currentW, currentH);
@@ -1140,14 +1164,13 @@ void SDL_ApplicationWindow::renderFrame()
 			if (ui_manager_->consumePendingCEFRepaintRequest() || pending_window_resize_sync_)
 			{
 				pending_window_resize_sync_ = false;
-				if (ui_handler_)
+				if (panel_resizing_logic_)
 				{
-					UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-					handler->cacheUIPanelFrameDatas();
+					panel_resizing_logic_->cacheUIPanelFrameDatas();
 					int currentW = 0, currentH = 0;
 					SDL_GetWindowSize(window_, &currentW, &currentH);
 
-					handler->syncBrowserFullScreenPanelLayout(
+					panel_resizing_logic_->syncBrowserFullScreenPanelLayout(
 						getWindowRenderState(),
 						currentW, currentH,
 						currentW, currentH);
@@ -1236,11 +1259,12 @@ void SDL_ApplicationWindow::preparePanels()
 	SDL_GetWindowSizeInPixels(window_, &prepared_drawable_width_, &prepared_drawable_height_);
 
 	prepared_panel_frame_data_map_.clear();
-	if (ui_handler_)
-	{
-		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-		Splitter* splitter = handler->getSplitter();
-	}
+
+	// if (ui_handler_)
+	// {
+	// 	UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+	// 	Splitter* splitter = handler->getSplitter();
+	// }
 
 	if (prepared_panel_frame_data_map_.empty())
 	{
@@ -1266,11 +1290,12 @@ void SDL_ApplicationWindow::preparePanels()
 	}
 
 	prepared_skip_texture_rebuild_ = false;
-	if (ui_handler_)
-	{
-		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-		Splitter* splitter = handler->getSplitter();
-	}
+
+	// if (ui_handler_)
+	// {
+	// 	UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+	// 	Splitter* splitter = handler->getSplitter();
+	// }
 
 	if (vk_context_)
 		uploadCEFPaintBuffer();
@@ -1278,10 +1303,23 @@ void SDL_ApplicationWindow::preparePanels()
 
 void SDL_ApplicationWindow::startSplitter()
 {
-	if (ui_handler_)
+	// if (ui_handler_)
+	// {
+	// 	UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+	// 	handler->startManager(vk_context_, vk_render_pass_);
+	// }
+
+	if (ui_manager_ && vk_context_ && vk_render_pass_ != VK_NULL_HANDLE && vulkan_pipelines_)
 	{
-		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-		handler->startManager(vk_context_, vk_render_pass_);
+		ui_manager_->setVKContext(vk_context_);
+		ui_manager_->setVulkanPipelines(vulkan_pipelines_);
+		ui_manager_->setRenderPass(vk_render_pass_);
+		std::cout << "[SDL_ApplicationWindow] UIManager initialized with Vulkan resources" << std::endl;
+
+		if (!ui_manager_vulkan_initialized_)
+		{
+			ui_manager_vulkan_initialized_ = true;
+		}
 	}
 
 	if (debug_tools_ && vk_context_ && vk_render_pass_ != VK_NULL_HANDLE && vulkan_pipelines_ && app_border_)
@@ -1290,8 +1328,64 @@ void SDL_ApplicationWindow::startSplitter()
 	}
 }
 
-void SDL_ApplicationWindow::activateDebugRender()
+CefRefPtr<SIMILICefClient> SDL_ApplicationWindow::getCefClient()
 {
+	if (!simili_cef_client_)
+	{
+		simili_cef_client_ = new SIMILICefClient(this);
+	}
+	return simili_cef_client_;
+}
+
+void SDL_ApplicationWindow::initializeDefaultUIPanels()
+{
+	if (ui_manager_)
+	{
+		ui_manager_->initializeDefaultUIPanels();
+		std::cout << "[SDL_ApplicationWindow] Default UI panels initialized" << std::endl;
+	}
+	else
+	{
+		std::cerr << "[SDL_ApplicationWindow] initializeDefaultUIPanels: ui_manager_ is null" << std::endl;
+	}
+}
+
+void SDL_ApplicationWindow::forceCaptureIFramePositions()
+{
+	if (!frame_datas_)
+	{
+		std::cerr << "[SDL_ApplicationWindow] forceCaptureIFramePositions: frame_datas_ not available" << std::endl;
+		return;
+	}
+
+	SDL_Window* sdlWindow = getHandle();
+	if (!sdlWindow)
+	{
+		std::cerr << "[SDL_ApplicationWindow] forceCaptureIFramePositions: SDL window handle not available" << std::endl;
+		return;
+	}
+
+	frame_datas_->catchFrameData(sdlWindow);
+
+	if (ui_manager_)
+	{
+		ui_manager_->syncFrameDatas(frame_datas_, sdlWindow);
+		std::cout << "[SDL_ApplicationWindow] FORCE - UI panel frame data synced to UIManager" << std::endl;
+	}
+	else
+	{
+		std::cerr << "[SDL_ApplicationWindow] FORCE - WARNING: ui_manager_ is null, cannot sync frame data" << std::endl;
+	}
+
+	if (panel_resizing_logic_)
+	{
+		panel_resizing_logic_->cacheUIPanelFrameDatas();
+	}
+
+	updateFrameDatas(frame_datas_);
+}
+
+void SDL_ApplicationWindow::activateDebugRender(){
 	if (debug_tools_)
 	{
 		debug_tools_->activateDebugRender();
@@ -1465,11 +1559,11 @@ bool SDL_ApplicationWindow::recreateSwapchain()
 	std::cout << "[SDL_ApplicationWindow] recreateSwapchain() - New size (drawable): " << drawableWidth << "x" << drawableHeight << std::endl;
 	std::cout << "[SDL_ApplicationWindow] recreateSwapchain() - New size (logical): " << logicalWidth << "x" << logicalHeight << std::endl;
 
-	if (ui_handler_)
-	{
-		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-		handler->updateWindowSize(logicalWidth, logicalHeight);
-	}
+	// if (ui_handler_)
+	// {
+	// 	UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+	// 	handler->updateWindowSize(logicalWidth, logicalHeight);
+	// }
 
 	VkDevice device = vk_context_->getDevice();
 
@@ -1508,17 +1602,17 @@ bool SDL_ApplicationWindow::recreateSwapchain()
 
 	std::cout << "[SDL_ApplicationWindow] Swapchain and framebuffers recreated successfully" << std::endl;
 	
-	if (ui_handler_)
-	{
-		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
+	// if (ui_handler_)
+	// {
+	// 	UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
 		
-		Splitter* splitter = handler->getSplitter();
-		if (splitter)
-		{
-			std::cout << "[SDL_ApplicationWindow] Forcing splitter layout refresh after swapchain recreation" << std::endl;
-			// splitter->forceRefreshLayout();
-		}
-	}
+	// 	Splitter* splitter = handler->getSplitter();
+	// 	if (splitter)
+	// 	{
+	// 		std::cout << "[SDL_ApplicationWindow] Forcing splitter layout refresh after swapchain recreation" << std::endl;
+	// 		// splitter->forceRefreshLayout();
+	// 	}
+	// }
 	
 	return true;
 }
@@ -1838,14 +1932,7 @@ void SDL_ApplicationWindow::updateMaximizedState()
 	is_maximized_ = isMaximized();
 }
 
-void SDL_ApplicationWindow::captureFrameData()
-{
-	if (ui_handler_)
-	{
-		UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-		handler->forceCaptureIFramePositions();
-	}
-}
+
 
 
 // ===== Vulkan Resource Creation Methods ===== //

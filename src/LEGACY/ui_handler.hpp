@@ -23,6 +23,9 @@
 #include <chrono>
 #include <SDL3/SDL.h>
 
+
+// This wholme class is destinated to be deprecated
+
 class SimpleWindowDelegate;
 
 namespace SIMILI 
@@ -125,7 +128,7 @@ public:
 	void setUIManager(SIMILI::Frontend::UIManager* manager) { ui_manager_ = manager; }
 	void startManager(VKContext* vkContext, VkRenderPass renderPass);
 
-	bool handleSplitterEvent(const SDL_Event& event);
+	// bool handleSplitterEvent(const SDL_Event& event);
 	bool getResolvedViewportFrameData(SIMILI::Frontend::IFrameScreenData& outData) const;
 	void processPendingFrameUpdates();
 	std::map<std::string, IFrameData> getAllIFrames() const { return iframe_data_map_.snapshot(); }

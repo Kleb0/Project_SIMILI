@@ -1,13 +1,13 @@
 #include "FrameDatas.hpp"
-#include "../../ui_handler.hpp"
+#include "../UIPanels/FrameDataCatcher.hpp"
 #include <iostream>
 #include <iomanip>
 
 namespace SIMILI {
 	namespace Frontend {
 
-			FrameDatas::FrameDatas(UIHandler* handler)
-				: ui_handler_(handler)
+			FrameDatas::FrameDatas(FrameDataCatcher* catcher)
+				: frame_data_catcher_(catcher)
 			{
 			}
 
@@ -19,17 +19,17 @@ namespace SIMILI {
 					return;
 				}
 				
-				if (!ui_handler_)
+				if (!frame_data_catcher_)
 				{
-					std::cout << "[FrameDatas] No UI handler available" << std::endl;
+					std::cout << "[FrameDatas] No FrameDataCatcher available" << std::endl;
 					return;
 				}
 
-				auto allFrames = ui_handler_->getAllIFrames();
+				auto allFrames = frame_data_catcher_->getAllIFrames();
 				
 				if (allFrames.empty())
 				{
-					std::cout << "[FrameDatas] No frames available in UIHandler" << std::endl;
+					std::cout << "[FrameDatas] No frames available in FrameDataCatcher" << std::endl;
 					return;
 				}
 

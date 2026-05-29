@@ -3,6 +3,8 @@
 #include "include/cef_client.h"
 #include "include/cef_browser.h"
 #include "include/cef_render_handler.h"
+#include "include/cef_request_handler.h"
+#include "include/cef_life_span_handler.h"
 
 #include <SDL3/SDL.h>
 #include <vulkan/vulkan.h>
@@ -29,6 +31,7 @@ class Camera;
 class App_Border;
 class Enable_UI_Debug_Tools;
 class SDL_ApplicationWindow;
+class PanelResizingLogic;
 
 class AppRenderHandler : public CefRenderHandler
 {
@@ -40,6 +43,40 @@ class AppRenderHandler : public CefRenderHandler
 	private:
 		SDL_ApplicationWindow* owner_;
 		IMPLEMENT_REFCOUNTING(AppRenderHandler);
+};
+
+class SIMILICefClient
+	: public CefClient
+	, public CefRequestHandler
+	, public CefLifeSpanHandler
+{
+	public:
+		explicit SIMILICefClient(SDL_ApplicationWindow* owner);
+
+		// CefClient
+		CefRefPtr<CefRenderHandler> GetRenderHandler() override;
+		CefRefPtr<CefRequestHandler> GetRequestHandler() override { return this; }
+		CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override { return this; }
+
+		// CefRequestHandler
+		CefRefPtr<CefResourceRequestHandler> GetResourceRequestHandler(
+			CefRefPtr<CefBrowser> browser,
+			CefRefPtr<CefFrame> frame,
+			CefRefPtr<CefRequest> request,
+			bool is_navigation,
+			bool is_download,
+			const CefString& request_initiator,
+			bool& disable_default_handling) override;
+
+		// CefLifeSpanHandler
+		void OnAfterCreated(CefRefPtr<CefBrowser> browser) override {}
+		bool DoClose(CefRefPtr<CefBrowser> browser) override { return false; }
+		void OnBeforeClose(CefRefPtr<CefBrowser> browser) override {}
+
+	private:
+		SDL_ApplicationWindow* owner_;
+		CefRefPtr<CefResourceRequestHandler> resource_request_handler_;
+		IMPLEMENT_REFCOUNTING(SIMILICefClient);
 };
 
 enum WindowRenderState : int
@@ -95,6 +132,7 @@ class SDL_ApplicationWindow
 		// === Browser Access ===
 		CefRefPtr<CefBrowser> getBrowser() const { return browser_; }
 		CefRefPtr<CefRenderHandler> getRenderHandler() const { return cef_render_handler_; }
+		CefRefPtr<SIMILICefClient> getCefClient();
 		void setRenderPass(VkRenderPass renderPass);
 
 
@@ -107,6 +145,7 @@ class SDL_ApplicationWindow
 		void setVulkanPipelines(VulkanPipeline* pipelines);
 		VulkanPipeline* getVulkanPipelines() const { return vulkan_pipelines_; }
 		void setUIManager(SIMILI::Frontend::UIManager* manager) { ui_manager_ = manager; }
+		void setPanelResizingLogic(PanelResizingLogic* logic) { panel_resizing_logic_ = logic; }
 		void updateFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas);
 		void onCEFPaint(CefRenderHandler::PaintElementType type, const void* buffer, int width, int height);
 
@@ -120,9 +159,12 @@ class SDL_ApplicationWindow
 		
 		// === Event Handling ===
 		void processEvents();
-		bool handleSplitterEvent(const SDL_Event& event);
 		void updateUIState();
 		
+		// === UI Initialization ===
+		void initializeDefaultUIPanels();
+		void forceCaptureIFramePositions();
+
 		// === Rendering ===
 		void renderFrame();
 		void renderThreeDScreen(const std::map<std::string, IFrameData>& frameDataMap);
@@ -172,8 +214,13 @@ class SDL_ApplicationWindow
 		Camera* camera_;
 		SIMILI::Frontend::FrameDatas* frame_datas_;
 		SIMILI::Frontend::UIManager* ui_manager_;
+		PanelResizingLogic* panel_resizing_logic_;
 		App_Border* app_border_;
 		Enable_UI_Debug_Tools* debug_tools_;
+
+		// === CEF Client ===
+		CefRefPtr<SIMILICefClient> simili_cef_client_;
+		bool ui_manager_vulkan_initialized_;
 		
 		// === Graphics Components ===
 		VKContext* vk_context_;
@@ -236,7 +283,6 @@ class SDL_ApplicationWindow
 		// === Private Methods ===
 		void updateDpiScale();
 		void updateMaximizedState();
-		void captureFrameData();
 		bool createCEFPipeline();
 		bool createCEFTextureSampler(VkDevice device);
 		void uploadCEFPaintBuffer();

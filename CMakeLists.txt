@@ -147,6 +147,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/SaveLoadSystem
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/Obj_Export_Import
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/SceneObjectContainer
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/SceneDataContainer
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Engine/VulkanPipeline
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Layout_Theme
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/images

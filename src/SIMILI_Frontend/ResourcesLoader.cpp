@@ -1,5 +1,5 @@
 #include "ResourcesLoader.hpp"
-#include "ui_handler.hpp"
+#include "viewportLogic/UIPanels/FrameDataCatcher.hpp"
 #include "../ThirdParty/json.hpp"
 #include <iostream>
 #include <fstream>
@@ -149,10 +149,10 @@ CefRefPtr<CefResourceHandler> LocalResourceRequestHandler::handleUIPanelUpdate(C
 		return new SimpleResourceHandler("application/json", "{\"success\": false, \"error\": \"Missing iframes array\"}");
 	}
 	
-	UIHandler* handler = UIHandler::getInstance();
-	if (!handler)
+	FrameDataCatcher* catcher = FrameDataCatcher::getInstance();
+	if (!catcher)
 	{
-		return new SimpleResourceHandler("application/json", "{\"success\": false, \"error\": \"Handler not available\"}");
+		return new SimpleResourceHandler("application/json", "{\"success\": false, \"error\": \"FrameDataCatcher not available\"}");
 	}
 	
 	std::map<std::string, IFrameData> uiPanelIFrames;
@@ -178,7 +178,7 @@ CefRefPtr<CefResourceHandler> LocalResourceRequestHandler::handleUIPanelUpdate(C
 			data.clientY = iframe.contains("clientY") ? iframe["clientY"].get<int>() : data.y;
 			uiPanelIFrames[name] = data;
 			
-			handler->iframe_data_map_[name] = data;
+			catcher->iframe_data_map_[name] = data;
 		}
 	}
 			

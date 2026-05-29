@@ -4,7 +4,7 @@
 #include <string>
 #include <map>
 
-class UIHandler;
+class FrameDataCatcher;
 
 namespace SIMILI {
 	namespace Frontend {
@@ -36,7 +36,7 @@ namespace SIMILI {
 		class FrameDatas
 		{
 		public:
-			FrameDatas(UIHandler* handler);
+			FrameDatas(FrameDataCatcher* catcher);
 			~FrameDatas() = default;
 
 			void catchFrameData(SDL_Window* sdlWindow);
@@ -53,7 +53,7 @@ namespace SIMILI {
 			void captureWindowData(SDL_Window* sdlWindow, IFrameScreenData& data);
 			
 			std::map<std::string, IFrameScreenData> frameDataMap_;
-			UIHandler* ui_handler_;
+			FrameDataCatcher* frame_data_catcher_;
 		};
 	}
 }

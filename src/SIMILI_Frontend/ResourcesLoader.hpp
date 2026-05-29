@@ -8,7 +8,7 @@
 #include <string>
 
 // Forward declarations
-class UIHandler;
+class FrameDataCatcher;
 
 /**
  * @brief Simple handler to serve static content to CEF

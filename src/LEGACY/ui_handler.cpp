@@ -3,6 +3,7 @@
 #include "viewportLogic/HTMLTextureRenderer/HtmlTextureRenderer.hpp"
 #include "viewportLogic/HTMLTextureRenderer/Overlay_HTML_Texture_Renderer.hpp"
 #include "viewportLogic/KeyManagement/KeyManager.hpp"
+#include "viewportLogic/UIPanels/FrameDataCatcher.hpp"
 #include "../../Engine/VulkanScene/VKScene.Hpp"
 #include "../../Engine/VulkanScene/VKcontext.hpp"
 #include "../../WorldObjects/Camera/Camera.hpp"
@@ -27,6 +28,9 @@
 #include <SDL3/SDL.h>
 
 #pragma comment(lib, "comctl32.lib")
+
+// This wholme class is destinated to be deprecated
+
 
 static std::unordered_map<SDL_TimerID, UIHandler*> g_timerHandlerMap;
 
@@ -672,8 +676,8 @@ void UIHandler::initializeFrameDatas(SimpleWindowDelegate* windowDelegate)
 		frame_datas_ = nullptr;
 	}
 	
-	frame_datas_ = new SIMILI::Frontend::FrameDatas(this);
-	std::cout << "[UIHandler] FrameDatas initialized with UIHandler" << std::endl;
+	frame_datas_ = new SIMILI::Frontend::FrameDatas(FrameDataCatcher::getInstance());
+	std::cout << "[UIHandler] FrameDatas initialized with FrameDataCatcher" << std::endl;
 }
 
 void UIHandler::reinitializeSingleObject(ThreeDObject* obj)
@@ -860,37 +864,37 @@ void UIHandler::startManager(VKContext* vkContext, VkRenderPass renderPass)
 	}
 }
 
-bool UIHandler::handleSplitterEvent(const SDL_Event& event)
-{
-	if (!splitter_)
-	{
-		return false;
-	}
+// bool UIHandler::handleSplitterEvent(const SDL_Event& event)
+// {
+// 	if (!splitter_)
+// 	{
+// 		return false;
+// 	}
 
-	const bool handled = false; // splitter_->handleEvent(event);
+// 	const bool handled = false; // splitter_->handleEvent(event);
 	
-	const bool isWindowResizeEvent = (event.type == SDL_EVENT_WINDOW_RESIZED ||
-	                                   event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED ||
-	                                   event.type == SDL_EVENT_WINDOW_MAXIMIZED ||
-	                                   event.type == SDL_EVENT_WINDOW_RESTORED);
+// 	const bool isWindowResizeEvent = (event.type == SDL_EVENT_WINDOW_RESIZED ||
+// 	                                   event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED ||
+// 	                                   event.type == SDL_EVENT_WINDOW_MAXIMIZED ||
+// 	                                   event.type == SDL_EVENT_WINDOW_RESTORED);
 	
-	if (handled)
-	{
-		cacheUIPanelFrameDatas();
-	}
-	else if (isWindowResizeEvent)
-	{
-		// const auto currentFrameDataMap = splitter_->getAllFrameDatas();
-		// if (!currentFrameDataMap.empty())
-		// {
-		// 	cef_drawer_->requestRuntimeLayoutSync(buildRuntimeLayoutFrameMap(currentFrameDataMap));
-		// 	cef_drawer_->getResizer().forceLayoutSync();
-		// 	cacheUIPanelFrameDatas();
-		// }
-	}
+// 	if (handled)
+// 	{
+// 		cacheUIPanelFrameDatas();
+// 	}
+// 	else if (isWindowResizeEvent)
+// 	{
+// 		// const auto currentFrameDataMap = splitter_->getAllFrameDatas();
+// 		// if (!currentFrameDataMap.empty())
+// 		// {
+// 		// 	cef_drawer_->requestRuntimeLayoutSync(buildRuntimeLayoutFrameMap(currentFrameDataMap));
+// 		// 	cef_drawer_->getResizer().forceLayoutSync();
+// 		// 	cacheUIPanelFrameDatas();
+// 		// }
+// 	}
 
-	return handled;
-}
+// 	return handled;
+// }
 
 bool UIHandler::getResolvedViewportFrameData(SIMILI::Frontend::IFrameScreenData& outData) const
 {

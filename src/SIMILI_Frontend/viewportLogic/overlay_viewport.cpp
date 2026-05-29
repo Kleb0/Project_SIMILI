@@ -42,7 +42,7 @@
 #include "../../Engine/ThreeDInteractions/EdgeTransform.hpp"
 #include "Keymanagement/KeyManager.hpp"
 #include "FrameDatas/FrameDatas.hpp"
-#include "../ui_handler.hpp"
+// #include "../ui_handler.hpp"
 // ============================================================================
 // LIFECYCLE MANAGEMENT
 // ============================================================================

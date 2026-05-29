@@ -3,7 +3,13 @@
 #include "RouterSim.hpp"
 #include "../../Engine/VulkanScene/VKcontext.hpp"
 #include "../../Engine/VulkanScene/VKScene.Hpp"
-#include "../../SIMILI_Frontend/ui_handler.hpp"
+#include "../../SIMILI_Frontend/viewportLogic/UIPanels/FrameDataCatcher.hpp"
+
+namespace SIMILI {
+	namespace Frontend {
+		class UIManager;
+	}
+}
 
 struct GLFWwindow;
 
@@ -22,15 +28,16 @@ namespace SIMILI
 					RouterSim& router,
 					VKContext& vkRenderer,
 					VKScene& scene,
-					CefRefPtr<UIHandler>& handler,
-					GLFWwindow* glfwWindow
+					GLFWwindow* glfwWindow,
+					FrameDataCatcher* frameCatcher,
+					SIMILI::Frontend::UIManager* uiManager
 				);
 
 			private:
 			void registerContextRoutes(RouterSim& router, VKContext& vkRenderer);
 			void registerSceneRoutes(RouterSim& router, VKScene& scene, VKContext& vkRenderer);
-			void registerObjectRoutes(RouterSim& router, VKScene& scene, CefRefPtr<UIHandler>& handler, GLFWwindow* glfwWindow);
-			void registerIFrameRoutes(RouterSim& router, CefRefPtr<UIHandler>& handler);
+			void registerObjectRoutes(RouterSim& router, VKScene& scene, GLFWwindow* glfwWindow);
+			void registerIFrameRoutes(RouterSim& router, FrameDataCatcher* frameCatcher, SIMILI::Frontend::UIManager* uiManager);
 		};
 
 	} 
