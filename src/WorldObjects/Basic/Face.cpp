@@ -14,6 +14,7 @@ layout(push_constant) uniform PushData {
 } push;
 void main() {
     gl_Position = push.mvp * vec4(aPosition, 1.0);
+    gl_PointSize = 6.0;
 }
 )";
 

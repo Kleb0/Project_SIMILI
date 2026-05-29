@@ -214,6 +214,10 @@ int main(int argc, char* argv[])
 	mainCamera.initialize();
 	std::cout << "[Main] Camera initialized" << std::endl;
 
+	mainCamera.setPosition(glm::vec3(0.0f, 2.0f, -5.0f));
+	mainCamera.target = glm::vec3(0.0f, 0.0f, 0.0f);
+	std::cout << "[Main] Camera position set" << std::endl;
+
 	std::cout << "[Main] Creating cube mesh..." << std::endl;
 	Mesh* cubeMesh1 = Primitives::CreateCubeMesh(1.0f, glm::vec3(0.0f, 0.0f, 0.0f), "Cube", true);
 	std::cout << "[Main] Cube mesh created" << std::endl;
