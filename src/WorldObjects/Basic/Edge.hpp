@@ -46,14 +46,8 @@ private:
     std::vector<class Face*> sharedFaces;
     bool quadEdge = false;
 
-    unsigned int vao = 0;
-    unsigned int vbo = 0;
-    unsigned int shaderProgram = 0;
-
     glm::vec4 color = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f); 
     bool edgeSelected = false;
-
-    void compileShaders();
 
     std::string id;
     static std::string generateEdgeID();

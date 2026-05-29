@@ -111,9 +111,24 @@ private:
     VkDeviceMemory gridVertexBufferMemory;
     uint32_t gridVertexCount;
 
+    // Mesh rendering pipelines (faces=TRIANGLE_LIST, edges=LINE_LIST, vertices=POINT_LIST)
+    VkPipeline mesh_face_pipeline_handle_ = VK_NULL_HANDLE;
+    VkPipelineLayout mesh_face_pipeline_layout_ = VK_NULL_HANDLE;
+    VkPipeline mesh_edge_pipeline_handle_ = VK_NULL_HANDLE;
+    VkPipelineLayout mesh_edge_pipeline_layout_ = VK_NULL_HANDLE;
+    VkPipeline mesh_vertex_pipeline_handle_ = VK_NULL_HANDLE;
+    VkPipelineLayout mesh_vertex_pipeline_layout_ = VK_NULL_HANDLE;
+
+    // Dynamic host-visible buffer for per-frame mesh geometry upload
+    VkBuffer mesh_dynamic_buffer_ = VK_NULL_HANDLE;
+    VkDeviceMemory mesh_dynamic_memory_ = VK_NULL_HANDLE;
+    VkDeviceSize mesh_dynamic_capacity_ = 0;
+
     bool initializeScenePipelines();
     bool createGridVertexBuffer();
     bool createBackgroundVertexBuffer();
     bool createVulkanBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
         VkMemoryPropertyFlags memProps, VkBuffer& outBuffer, VkDeviceMemory& outMemory);
+    bool ensureMeshBuffer(VkDeviceSize neededSize);
+    void drawMeshObjects(VkCommandBuffer commandBuffer, const glm::mat4& view, const glm::mat4& proj);
 };

@@ -44,10 +44,6 @@ protected:
     std::vector<Edge*> edges;
 
 private:
-    unsigned int vao = 0;
-    unsigned int vbo = 0;
-    unsigned int shaderProgram = 0;
-
     bool selected = false;
     glm::mat4 faceTransform = glm::mat4(1.0f);
 
@@ -57,7 +53,4 @@ private:
 
     std::string id;
     static std::string generateFaceID();
-
-    void compileShaders();
-    void uploadFromVertices();
 };

@@ -2,31 +2,27 @@
 #include "WorldObjects/Basic/Vertice.hpp"
 #include "Engine/MeshEdit/CutQuad.hpp"
 #include "WorldObjects/Mesh/Mesh.hpp"
-#include <glad/glad.h>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 #include <random>
 #include <sstream>
-#include <iostream>
 
-
-const char* edgeVertexShaderSrc = R"(
-#version 330 core
-layout(location = 0) in vec3 aPos;
-uniform mat4 viewProj;
-void main()
-{
-    gl_Position = viewProj * vec4(aPos, 1.0);
+const char* kEdgeVertexShaderGLSL = R"(
+#version 450
+layout(location = 0) in vec3 aPosition;
+layout(push_constant) uniform PushData {
+    mat4 mvp;
+} push;
+void main() {
+    gl_Position = push.mvp * vec4(aPosition, 1.0);
 }
 )";
 
-const char* edgeFragmentShaderSrc = R"(
-#version 330 core
-out vec4 FragColor;
-uniform vec4 color;
-void main()
-{
-    FragColor = color;
+const char* kEdgeFragmentShaderGLSL = R"(
+#version 450
+layout(location = 0) out vec4 outColor;
+void main() {
+    outColor = vec4(0.0, 0.0, 0.0, 1.0); // noir
 }
 )";
 
@@ -54,79 +50,17 @@ Edge::~Edge()
     destroy();
 }
 
-void Edge::compileShaders()
-{
-    unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &edgeVertexShaderSrc, nullptr);
-    glCompileShader(vertexShader);
-
-    unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &edgeFragmentShaderSrc, nullptr);
-    glCompileShader(fragmentShader);
-
-    shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
-
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-}
-
 void Edge::initialize()
 {
-    // TEMPORAIRE: Désactivation OpenGL pour éviter crash avec moteur Vulkan
     std::cout << "[Edge] Initialize called for edge ID: " << id << std::endl;
-    
-    // compileShaders();           // <- Commenté temporairement (appels OpenGL)
-    // glGenVertexArrays(1, &vao); // <- Commenté (OpenGL)
-    // glGenBuffers(1, &vbo);      // <- Commenté (OpenGL)
-    
-    std::cout << "[Edge] Edge initialized (OpenGL disabled)" << std::endl;
 }
 
 void Edge::render(const glm::mat4& viewProj, const glm::mat4& modelMatrix)
 {
-    if (!v1 || !v2) return;
-
-    glm::vec3 p1 = glm::vec3(modelMatrix * glm::vec4(v1->getLocalPosition(), 1.0f));
-    glm::vec3 p2 = glm::vec3(modelMatrix * glm::vec4(v2->getLocalPosition(), 1.0f));
-
-    float vertices[] = {
-        p1.x, p1.y, p1.z,
-        p2.x, p2.y, p2.z
-    };
-
-    glBindVertexArray(vao);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
-
-    glUseProgram(shaderProgram);
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
-
-
-   
-    glm::vec4 finalColor = edgeSelected
-        ? glm::vec4(1.0f, 0.5f, 0.0f, 1.0f)  
-        : color;                              
-
-    glUniform4fv(glGetUniformLocation(shaderProgram, "color"), 1, glm::value_ptr(finalColor));
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    glLineWidth(2.0f);
-    glDrawArrays(GL_LINES, 0, 2);
-    glLineWidth(1.0f);
-
-    glBindVertexArray(0);
 }
 
 void Edge::destroy()
 {
-    if (vao) { glDeleteVertexArrays(1, &vao); vao = 0; }
-    if (vbo) { glDeleteBuffers(1, &vbo); vbo = 0; }
-    if (shaderProgram) { glDeleteProgram(shaderProgram); shaderProgram = 0; }
 }
 
 Vertice* Edge::getStart() const { return v1; }

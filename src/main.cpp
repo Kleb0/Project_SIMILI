@@ -215,12 +215,11 @@ int main(int argc, char* argv[])
 	std::cout << "[Main] Camera initialized" << std::endl;
 
 	std::cout << "[Main] Creating cube mesh..." << std::endl;
-	// TEMPORARY: Comment out mesh creation to isolate CEF issue
-	// Mesh* cubeMesh1 = Primitives::CreateCubeMesh(1.0f, glm::vec3(0.0f, 0.0f, 0.0f), "Cube", true);
-	// std::cout << "[Main] Cube mesh created" << std::endl;
-	// 
-	// cubeMesh1->initialize();
-	// std::cout << "[Main] Cube mesh initialized" << std::endl;
+	Mesh* cubeMesh1 = Primitives::CreateCubeMesh(1.0f, glm::vec3(0.0f, 0.0f, 0.0f), "Cube", true);
+	std::cout << "[Main] Cube mesh created" << std::endl;
+
+	cubeMesh1->initialize();
+	std::cout << "[Main] Cube mesh initialized" << std::endl;
 
 	std::cout << "[Main] Setting VKContext on window..." << std::endl;
 	mainWindow.setVKContext(&vkRenderer);
@@ -262,7 +261,7 @@ int main(int argc, char* argv[])
 	myVKScene.setVulkanPipelines(&vulkanPipelines, renderPass);
 	std::cout << "[Main] VKScene pipelines initialized" << std::endl;
 	// TEMPORARY: Comment out mesh addition while mesh creation is disabled
-	// myVKScene.addObject(cubeMesh1);
+	myVKScene.addObject(cubeMesh1);
 	myVKScene.addObject(&mainCamera);
 
 	Camera* sceneCamera = nullptr;

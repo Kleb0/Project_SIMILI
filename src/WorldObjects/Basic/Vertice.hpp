@@ -43,9 +43,6 @@ public:
 
 private:
     ThreeDObject* meshParent = nullptr;
-    unsigned int vao = 0;
-    unsigned int vbo = 0;
-    unsigned int shaderProgram = 0;
     glm::vec3 position = glm::vec3(0.0f);
     glm::vec4 color = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
     std::string name;
@@ -56,6 +53,5 @@ private:
     std::string id;
     static std::string generateVerticeID();
 
-    void compileShaders();
     bool VerticeSelected = false;
 };

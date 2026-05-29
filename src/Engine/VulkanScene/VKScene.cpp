@@ -13,6 +13,14 @@
 #include "WorldObjects/Mesh/Mesh.hpp"
 #include "WorldObjects/Camera/Camera.hpp"
 
+// Shaders définis dans chaque fichier WorldObject
+extern const char* kFaceVertexShaderGLSL;
+extern const char* kFaceFragmentShaderGLSL;
+extern const char* kEdgeVertexShaderGLSL;
+extern const char* kEdgeFragmentShaderGLSL;
+extern const char* kVerticeVertexShaderGLSL;
+extern const char* kVerticeFragmentShaderGLSL;
+
 std::string VKScene::generateSceneID()
 {
 	static const char alphanumeric[] = 
@@ -621,8 +629,286 @@ bool VKScene::initializeScenePipelines()
 		return false;
 	}
 
+	// ---- Mesh pipelines (faces=TRIANGLE_LIST, edges=LINE_LIST, vertices=POINT_LIST) ----
+	// Vertex format: vec3 position only — shaders définis dans Face.cpp, Edge.cpp, Vertice.cpp
+	auto meshVertSpirv = GLSLCompiler::compileGLSL(kFaceVertexShaderGLSL, GLSLCompiler::ShaderType::Vertex);
+	auto faceFragSpirv = GLSLCompiler::compileGLSL(kFaceFragmentShaderGLSL,GLSLCompiler::ShaderType::Fragment);
+	auto edgeFragSpirv = GLSLCompiler::compileGLSL(kEdgeFragmentShaderGLSL, GLSLCompiler::ShaderType::Fragment);
+	auto vertFragSpirv = GLSLCompiler::compileGLSL(kVerticeFragmentShaderGLSL, GLSLCompiler::ShaderType::Fragment);
+
+	if (meshVertSpirv.empty() || faceFragSpirv.empty() || edgeFragSpirv.empty() || vertFragSpirv.empty())
+	{
+		std::cerr << "[VKScene] Failed to compile mesh shaders: " << GLSLCompiler::getLastError() << std::endl;
+		return false;
+	}
+
+	auto meshVertBytes = GLSLCompiler::spirvToBytes(meshVertSpirv);
+	auto faceFragBytes = GLSLCompiler::spirvToBytes(faceFragSpirv);
+	auto edgeFragBytes = GLSLCompiler::spirvToBytes(edgeFragSpirv);
+	auto vertFragBytes = GLSLCompiler::spirvToBytes(vertFragSpirv);
+
+	VkVertexInputAttributeDescription meshAttrPos{};
+	meshAttrPos.binding = 0;
+	meshAttrPos.location = 0;
+	meshAttrPos.format = VK_FORMAT_R32G32B32_SFLOAT;
+	meshAttrPos.offset = 0;
+
+	VkPushConstantRange meshPushRange{};
+	meshPushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	meshPushRange.offset = 0;
+	meshPushRange.size = static_cast<uint32_t>(sizeof(glm::mat4));
+
+	constexpr uint32_t kMeshStride = static_cast<uint32_t>(sizeof(glm::vec3));
+
+	// --- faces pipeline (TRIANGLE_LIST) — blanc ---
+	VulkanPipeline::PipelineConfig faceCfg;
+	faceCfg.name = "mesh_faces";
+	faceCfg.vertexShaderCode = meshVertBytes;
+	faceCfg.fragmentShaderCode = faceFragBytes;
+	faceCfg.renderPass = scene_render_pass_;
+	faceCfg.descriptorSetLayout = VK_NULL_HANDLE;
+	faceCfg.enableBlending = false;
+	faceCfg.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	faceCfg.vertexBindingStride = kMeshStride;
+	faceCfg.vertexAttributes = { meshAttrPos };
+	faceCfg.pushConstantRanges = { meshPushRange };
+
+	auto facePipeline = vulkan_pipelines_->getOrCreatePipeline(faceCfg);
+	if (!facePipeline || facePipeline->pipeline == VK_NULL_HANDLE)
+	{
+		std::cerr << "[VKScene] Failed to create mesh face pipeline" << std::endl;
+		return false;
+	}
+	mesh_face_pipeline_handle_ = facePipeline->pipeline;
+	mesh_face_pipeline_layout_ = facePipeline->layout;
+
+	// --- edges pipeline (LINE_LIST) — noir ---
+	VulkanPipeline::PipelineConfig edgeCfg;
+	edgeCfg.name = "mesh_edges";
+	edgeCfg.vertexShaderCode = meshVertBytes;
+	edgeCfg.fragmentShaderCode = edgeFragBytes;
+	edgeCfg.renderPass = scene_render_pass_;
+	edgeCfg.descriptorSetLayout = VK_NULL_HANDLE;
+	edgeCfg.enableBlending = false;
+	edgeCfg.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+	edgeCfg.vertexBindingStride = kMeshStride;
+	edgeCfg.vertexAttributes = { meshAttrPos };
+	edgeCfg.pushConstantRanges = { meshPushRange };
+
+	auto edgePipeline = vulkan_pipelines_->getOrCreatePipeline(edgeCfg);
+	if (!edgePipeline || edgePipeline->pipeline == VK_NULL_HANDLE)
+	{
+		std::cerr << "[VKScene] Failed to create mesh edge pipeline" << std::endl;
+		return false;
+	}
+	mesh_edge_pipeline_handle_ = edgePipeline->pipeline;
+	mesh_edge_pipeline_layout_ = edgePipeline->layout;
+
+	// --- vertices pipeline (POINT_LIST) — vert ---
+	VulkanPipeline::PipelineConfig vtxCfg;
+	vtxCfg.name = "mesh_vertices";
+	vtxCfg.vertexShaderCode = meshVertBytes;
+	vtxCfg.fragmentShaderCode = vertFragBytes;
+	vtxCfg.renderPass = scene_render_pass_;
+	vtxCfg.descriptorSetLayout = VK_NULL_HANDLE;
+	vtxCfg.enableBlending = false;
+	vtxCfg.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+	vtxCfg.vertexBindingStride = kMeshStride;
+	vtxCfg.vertexAttributes = { meshAttrPos };
+	vtxCfg.pushConstantRanges= { meshPushRange };
+
+	auto vtxPipeline = vulkan_pipelines_->getOrCreatePipeline(vtxCfg);
+	if (!vtxPipeline || vtxPipeline->pipeline == VK_NULL_HANDLE)
+	{
+		std::cerr << "[VKScene] Failed to create mesh vertex pipeline" << std::endl;
+		return false;
+	}
+	mesh_vertex_pipeline_handle_ = vtxPipeline->pipeline;
+	mesh_vertex_pipeline_layout_ = vtxPipeline->layout;
+
 	scene_pipeline_initialized_ = true;
 	return true;
+}
+
+bool VKScene::ensureMeshBuffer(VkDeviceSize neededSize)
+{
+	if (mesh_dynamic_buffer_ != VK_NULL_HANDLE && mesh_dynamic_capacity_ >= neededSize)
+		return true;
+
+	if (mesh_dynamic_buffer_ != VK_NULL_HANDLE)
+	{
+		vkDestroyBuffer(vkctx->getDevice(), mesh_dynamic_buffer_, nullptr);
+		vkFreeMemory(vkctx->getDevice(), mesh_dynamic_memory_, nullptr);
+		mesh_dynamic_buffer_ = VK_NULL_HANDLE;
+		mesh_dynamic_memory_ = VK_NULL_HANDLE;
+		mesh_dynamic_capacity_ = 0;
+	}
+
+	if (!createVulkanBuffer(neededSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		mesh_dynamic_buffer_, mesh_dynamic_memory_))
+	{
+		std::cerr << "[VKScene] Failed to allocate mesh dynamic buffer (" << neededSize << " bytes)" << std::endl;
+		return false;
+	}
+	mesh_dynamic_capacity_ = neededSize;
+	return true;
+}
+
+void VKScene::drawMeshObjects(VkCommandBuffer commandBuffer, const glm::mat4& view, const glm::mat4& proj)
+{
+	if (mesh_face_pipeline_handle_ == VK_NULL_HANDLE)
+		return;
+
+	// Collect all Mesh objects
+	std::vector<Mesh*> meshList;
+
+	for (auto* obj : objects)
+	{
+		Mesh* m = dynamic_cast<Mesh*>(obj);
+		if (m) meshList.push_back(m);
+	}
+
+	if (objectContainer_)
+	{
+		for (auto* obj : objectContainer_->getObjectsRef())
+		{
+			Mesh* m = dynamic_cast<Mesh*>(obj);
+			if (m) meshList.push_back(m);
+		}
+	}
+	if (meshList.empty())
+		return;
+
+	struct FaceBatch {
+		std::vector<glm::vec3> tris;
+		float distToCam;
+	};
+	std::vector<FaceBatch> faceBatches;
+	std::vector<glm::vec3> edgeVerts;
+	std::vector<glm::vec3> vertVerts;
+
+	// Position monde de la caméra extraite de la matrice vue inversée
+	const glm::vec3 camPos = glm::vec3(glm::inverse(view)[3]);
+
+	for (Mesh* mesh : meshList)
+	{
+		const glm::mat4 modelMatrix = mesh->getModelMatrix();
+
+		auto toWorld = [&](const Vertice* v) -> glm::vec3 {
+			return glm::vec3(modelMatrix * glm::vec4(v->getLocalPosition(), 1.0f));
+		};
+
+		// ---- Faces: triangulation en éventail + collecte pour tri ----
+		for (const Face* face : mesh->getFaces())
+		{
+			const auto& fv = face->getVertices();
+			if (fv.size() < 3) continue;
+
+			// Centre monde pour le tri dos-à-face (painter's algorithm)
+			glm::vec3 center(0.0f);
+			for (const Vertice* v : fv)
+				center += toWorld(v);
+			center /= static_cast<float>(fv.size());
+
+			FaceBatch batch;
+			batch.distToCam = glm::length(center - camPos);
+
+			if (fv.size() == 3)
+			{
+				batch.tris.push_back(toWorld(fv[0]));
+				batch.tris.push_back(toWorld(fv[1]));
+				batch.tris.push_back(toWorld(fv[2]));
+			}
+			else
+			{
+				for (size_t i = 1; i + 1 < fv.size(); ++i)
+				{
+					batch.tris.push_back(toWorld(fv[0]));
+					batch.tris.push_back(toWorld(fv[i]));
+					batch.tris.push_back(toWorld(fv[i + 1]));
+				}
+			}
+			faceBatches.push_back(std::move(batch));
+		}
+
+		// ---- Edges: 2 points par edge ----
+		for (const Edge* edge : mesh->getEdges())
+		{
+			edgeVerts.push_back(toWorld(edge->getStart()));
+			edgeVerts.push_back(toWorld(edge->getEnd()));
+		}
+
+		// ---- Vertices: 1 point par vertice ----
+		for (const Vertice* v : mesh->getVertices())
+		{
+			vertVerts.push_back(toWorld(v));
+		}
+	}
+
+	// Trier les faces du plus loin au plus proche (painter's algorithm)
+	std::sort(faceBatches.begin(), faceBatches.end(),
+		[](const FaceBatch& a, const FaceBatch& b) { return a.distToCam > b.distToCam; });
+
+	std::vector<glm::vec3> faceVerts;
+	for (const FaceBatch& batch : faceBatches)
+		for (const glm::vec3& v : batch.tris)
+			faceVerts.push_back(v);
+
+	const VkDeviceSize totalBytes = (faceVerts.size() + edgeVerts.size() + vertVerts.size()) * sizeof(glm::vec3);
+
+	if (totalBytes == 0 || !ensureMeshBuffer(totalBytes))
+		return;
+
+	void* mapped = nullptr;
+	vkMapMemory(vkctx->getDevice(), mesh_dynamic_memory_, 0, totalBytes, 0, &mapped);
+
+	const VkDeviceSize faceOffset = 0;
+	const VkDeviceSize edgeOffset = faceVerts.size() * sizeof(glm::vec3);
+	const VkDeviceSize vertOffset = edgeOffset + edgeVerts.size() * sizeof(glm::vec3);
+
+	if (!faceVerts.empty())
+		memcpy(static_cast<char*>(mapped) + faceOffset, faceVerts.data(), faceVerts.size() * sizeof(glm::vec3));
+	if (!edgeVerts.empty())
+		memcpy(static_cast<char*>(mapped) + edgeOffset, edgeVerts.data(), edgeVerts.size() * sizeof(glm::vec3));
+	if (!vertVerts.empty())
+		memcpy(static_cast<char*>(mapped) + vertOffset, vertVerts.data(), vertVerts.size() * sizeof(glm::vec3));
+
+	vkUnmapMemory(vkctx->getDevice(), mesh_dynamic_memory_);
+
+	const glm::mat4 vp = proj * view;
+
+	if (!faceVerts.empty())
+	{
+		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_face_pipeline_handle_);
+		VkDeviceSize off = faceOffset;
+		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &mesh_dynamic_buffer_, &off);
+		vkCmdPushConstants(commandBuffer, mesh_face_pipeline_layout_,
+			VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &vp);
+		vkCmdDraw(commandBuffer, static_cast<uint32_t>(faceVerts.size()), 1, 0, 0);
+	}
+
+	// Draw edges — noir
+	if (!edgeVerts.empty())
+	{
+		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_edge_pipeline_handle_);
+		VkDeviceSize off = edgeOffset;
+		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &mesh_dynamic_buffer_, &off);
+		vkCmdPushConstants(commandBuffer, mesh_edge_pipeline_layout_,
+			VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &vp);
+		vkCmdDraw(commandBuffer, static_cast<uint32_t>(edgeVerts.size()), 1, 0, 0);
+	}
+
+	// Draw vertices (points) — vert
+	if (!vertVerts.empty())
+	{
+		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_vertex_pipeline_handle_);
+		VkDeviceSize off = vertOffset;
+		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &mesh_dynamic_buffer_, &off);
+		vkCmdPushConstants(commandBuffer, mesh_vertex_pipeline_layout_,
+			VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &vp);
+		vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertVerts.size()), 1, 0, 0);
+	}
 }
 
 void VKScene::drawThreeDScene(VkCommandBuffer commandBuffer, int vpX, int vpY, int vpW, int vpH,
@@ -666,4 +952,6 @@ void VKScene::drawThreeDScene(VkCommandBuffer commandBuffer, int vpX, int vpY, i
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &gridVertexBuffer, &offset);
 		vkCmdDraw(commandBuffer, gridVertexCount, 1, 0, 0);
 	}
+
+	drawMeshObjects(commandBuffer, view, proj);
 }

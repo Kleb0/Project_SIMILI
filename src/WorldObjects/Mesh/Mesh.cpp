@@ -3,7 +3,6 @@
 #include "WorldObjects/Basic/Triangle.hpp"
 #include "WorldObjects/Basic/Ngon.hpp"
 #include <glm/gtc/type_ptr.hpp>
-#include <glad/glad.h>
 #include <iostream>
 
 Mesh::Mesh()
@@ -48,8 +47,6 @@ void Mesh::render(const glm::mat4& viewProj)
     {
         const glm::mat4 modelMatrix = getModelMatrix();
 
-        glEnable(GL_POLYGON_OFFSET_FILL);
-        glPolygonOffset(1.0f, 1.0f);
         for (Face* f : faces) 
         {
             if (f) 
@@ -64,7 +61,6 @@ void Mesh::render(const glm::mat4& viewProj)
                 }
             }
         }
-        glDisable(GL_POLYGON_OFFSET_FILL);
 
         for (Vertice* v : vertices) 
         {
@@ -81,7 +77,6 @@ void Mesh::render(const glm::mat4& viewProj)
             }
         }
 
-        glLineWidth(2.0f);
         for (Edge* e : edges) 
         {
             if (e) 
@@ -96,7 +91,6 @@ void Mesh::render(const glm::mat4& viewProj)
                 }
             }
         }
-        glLineWidth(1.0f);
 
         if(CanDisplayRenderMessage)
         {

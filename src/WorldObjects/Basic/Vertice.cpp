@@ -1,39 +1,26 @@
 #include "WorldObjects/Basic/Vertice.hpp"
-#include <glad/glad.h>
-#include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
 #include <sstream>
 #include <random>
 
-const char* verticeVertexShader = R"(
-#version 330 core
-layout(location = 0) in vec3 aPos;
-uniform mat4 model;
-uniform mat4 viewProj;
-void main()
-{
-    gl_PointSize = 10.0;
-    gl_Position = viewProj * model * vec4(aPos, 1.0);
+const char* kVerticeVertexShaderGLSL = R"(
+#version 450
+layout(location = 0) in vec3 aPosition;
+layout(push_constant) uniform PushData {
+    mat4 mvp;
+} push;
+void main() {
+    gl_PointSize = 6.0;
+    gl_Position = push.mvp * vec4(aPosition, 1.0);
 }
 )";
 
-const char* verticeFragmentShader = R"(
-#version 330 core
-out vec4 FragColor;
-
-uniform vec4 color;
-
-void main()
-{
-    vec2 coord = gl_PointCoord - vec2(0.5);
-    float dist = dot(coord, coord);
-
-    // draw a circle 
-    if (dist > 0.25) 
-        discard;
-
-    FragColor = color;
+const char* kVerticeFragmentShaderGLSL = R"(
+#version 450
+layout(location = 0) out vec4 outColor;
+void main() {
+    outColor = vec4(0.0, 1.0, 0.0, 1.0); // vert
 }
 )";
 
@@ -59,24 +46,6 @@ Vertice::~Vertice()
     destroy();
 }
 
-void Vertice::compileShaders()
-{
-    unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &verticeVertexShader, nullptr);
-    glCompileShader(vertexShader);
-
-    unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &verticeFragmentShader, nullptr);
-    glCompileShader(fragmentShader);
-
-    shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
-
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-}
 
 void Vertice::initialize()
 {
@@ -105,42 +74,10 @@ void Vertice::initialize()
 
 void Vertice::render(const glm::mat4& viewProj, const glm::mat4& modelMatrix)
 {
-    glUseProgram(shaderProgram);
-
-    glm::vec3 worldPos = glm::vec3(modelMatrix * glm::vec4(localPosition, 1.0f));
-    glm::mat4 renderMatrix = glm::translate(glm::mat4(1.0f), worldPos);
-
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(renderMatrix));
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
-
-        glm::vec4 finalColor = isSelected()
-        ? glm::vec4(1.0f, 0.5f, 0.0f, 1.0f) 
-        : color;                           
-
-    glUniform4fv(glGetUniformLocation(shaderProgram, "color"), 1, glm::value_ptr(finalColor));
-
-    glEnable(GL_PROGRAM_POINT_SIZE);
-    glBindVertexArray(vao);
-    glDrawArrays(GL_POINTS, 0, 1);
-    glBindVertexArray(0);
 }
 
 void Vertice::destroy()
 {
-    if (vao != 0) {
-        glDeleteVertexArrays(1, &vao);
-        vao = 0;
-    }
-
-    if (vbo != 0) {
-        glDeleteBuffers(1, &vbo);
-        vbo = 0;
-    }
-
-    if (shaderProgram != 0) {
-        glDeleteProgram(shaderProgram);
-        shaderProgram = 0;
-    }
 }
 
 void Vertice::setColor(const glm::vec4& newColor)
