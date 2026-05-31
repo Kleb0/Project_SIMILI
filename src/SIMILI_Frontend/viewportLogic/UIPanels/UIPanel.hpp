@@ -30,6 +30,10 @@ class UIPanel
 		void updateFromFrameData(const SIMILI::Frontend::IFrameScreenData& frameData, SDL_Window* window, bool skipTextureRebuild = false);
 		void PreventClippingForReducedandMaxizimizedWindows(WindowRenderState windowState);
 		void draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight);
+		void drawDataHolderOverlays(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight);
+
+		int getLogicalWidth()  const { return last_frame_width_; }
+		int getLogicalHeight() const { return last_frame_height_; }
 
 		void setVKContext(VKContext* context);
 		void setRenderPass(VkRenderPass renderPass);

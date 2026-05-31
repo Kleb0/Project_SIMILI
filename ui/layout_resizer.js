@@ -77,6 +77,9 @@
             
             // Send all iframe sizes to server after resize
             sendIFrameSizesToServer();
+            if (window.sendDataHoldersToServer) {
+                window.sendDataHoldersToServer();
+            }
         }, 150); // Wait 150ms after last resize event
     }
 
@@ -257,6 +260,18 @@
         if (hasDragged)
         {
             sendIFrameSizesToServer();
+            // First call at 150ms (quick update)
+            setTimeout(function() {
+                if (window.sendDataHoldersToServer) {
+                    window.sendDataHoldersToServer();
+                }
+            }, 150);
+            // Second call at 450ms (after CSS reflow is stable in CEF)
+            setTimeout(function() {
+                if (window.sendDataHoldersToServer) {
+                    window.sendDataHoldersToServer();
+                }
+            }, 450);
             hasDragged = false;
         }
         if (!isDragging) return;

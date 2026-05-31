@@ -1,6 +1,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 
 #include "UIPanel.hpp"
+#include "DataHolders.hpp"
 #include "../../SDL_ApplicationWindow.hpp"
 #include "../../../Engine/VulkanScene/VKcontext.hpp"
 #include "../../../Engine/GLSL_Compiler/GLSLCompiler.hpp"
@@ -385,7 +386,9 @@ void UIPanel::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawabl
 		VkDeviceSize offsets[] = {0};
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 		vkCmdDraw(commandBuffer, 6, 1, 0, 0);
-		
+
+		drawDataHolderOverlays(commandBuffer, drawableWidth, drawableHeight);
+
 		if (drawing_state_ == DrawingState::IsReadyToBeDrawn)
 		{
 			drawing_state_ = DrawingState::HasBeenDrawn;
@@ -393,6 +396,22 @@ void UIPanel::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawabl
 		
 		needs_redraw_ = false;
 	}
+}
+
+void UIPanel::drawDataHolderOverlays(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight)
+{
+	if (commandBuffer == VK_NULL_HANDLE || !vk_context_ || !has_valid_bounds_) return;
+	if (!vulkan_pipelines_ || vk_render_pass_ == VK_NULL_HANDLE) return;
+
+	DataHolders* dh = DataHolders::getInstance();
+	if (!dh) return;
+
+	dh->drawForPanel(
+		name_,
+		x_, y_, width_, height_,
+		last_frame_width_, last_frame_height_,
+		commandBuffer, drawableWidth, drawableHeight,
+		vk_context_, vulkan_pipelines_, vk_render_pass_);
 }
 
 

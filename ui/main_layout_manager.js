@@ -238,13 +238,27 @@ function sendDataHoldersToServer() {
 
             var dataHolders = [];
             holders.forEach(function(el) {
-                dataHolders.push({ field: el.getAttribute('data-field') });
+                var rect = el.getBoundingClientRect();
+                dataHolders.push({
+                    field: el.getAttribute('data-field'),
+                    x: Math.round(rect.left),
+                    y: Math.round(rect.top),
+                    w: Math.round(rect.width),
+                    h: Math.round(rect.height)
+                });
             });
+
+            var vpW = doc.documentElement.clientWidth;
+            var vpH = doc.documentElement.clientHeight;
+            var iframeW = iframe.clientWidth || iframe.offsetWidth || 1;
+            var iframeH = iframe.clientHeight || iframe.offsetHeight || 1;
+            var vpFracW = (iframeW > 0) ? vpW / iframeW : 1.0;
+            var vpFracH = (iframeH > 0) ? vpH / iframeH : 1.0;
 
             fetch('http://localhost:8080/api/dataholder/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ panel: panelName, dataHolders: dataHolders })
+                body: JSON.stringify({ panel: panelName, vpFracW: vpFracW, vpFracH: vpFracH, dataHolders: dataHolders })
             }).catch(function() {});
         } catch(e) {}
     });

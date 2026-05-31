@@ -377,21 +377,25 @@ void VulkanPipeline::destroyAllPipelines()
         if (pipeline->pipeline != VK_NULL_HANDLE)
         {
             vkDestroyPipeline(device, pipeline->pipeline, nullptr);
+            pipeline->pipeline = VK_NULL_HANDLE;  // null so shared_ptr holders can detect invalidation
         }
 
         if (pipeline->layout != VK_NULL_HANDLE)
         {
             vkDestroyPipelineLayout(device, pipeline->layout, nullptr);
+            pipeline->layout = VK_NULL_HANDLE;
         }
 
         if (pipeline->vertexShader != VK_NULL_HANDLE)
         {
             vkDestroyShaderModule(device, pipeline->vertexShader, nullptr);
+            pipeline->vertexShader = VK_NULL_HANDLE;
         }
 
         if (pipeline->fragmentShader != VK_NULL_HANDLE)
         {
             vkDestroyShaderModule(device, pipeline->fragmentShader, nullptr);
+            pipeline->fragmentShader = VK_NULL_HANDLE;
         }
     }
 
