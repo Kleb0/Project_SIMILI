@@ -1,7 +1,6 @@
 #include "VKcontext.hpp"
 #include "WorldObjects/Entities/ThreeDObject.hpp"
 #include "WorldObjects/Camera/Camera.hpp"
-#include "SIMILI_Frontend/viewportLogic/ThreeDScreen/ThreeDScreen.hpp"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 #include <iostream>

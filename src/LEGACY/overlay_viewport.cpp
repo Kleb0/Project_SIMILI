@@ -68,29 +68,29 @@ OverlayViewport::OverlayViewport() : sdl_window_(nullptr)
 	, current_mode_(nullptr)
 	, was_using_gizmo_last_frame_(false)
 {
-	selector_ = new ThreeDObjectSelector();
-	camera_control_ = new CameraControl(this);
-	raycast_performer_ = new RaycastPerform(this, selector_);
-	click_handler_ = new OverlayClickHandler(this);
+	// selector_ = new ThreeDObjectSelector();
+	// camera_control_ = new CameraControl(this);
+	// raycast_performer_ = new RaycastPerform(this, selector_);
+	// click_handler_ = new OverlayClickHandler(this);
 	
-	normal_mode_ = new Normal_Mode();
-	vertice_mode_ = new Vertice_Mode();
-	face_mode_ = new Face_Mode();
-	edge_mode_ = new Edge_Mode();
+	// normal_mode_ = new Normal_Mode();
+	// vertice_mode_ = new Vertice_Mode();
+	// face_mode_ = new Face_Mode();
+	// edge_mode_ = new Edge_Mode();
 	
-	current_mode_ = normal_mode_;
+	// current_mode_ = normal_mode_;
 	
-	SIMILI::Input::KeyManager::getInstance().initialize();
+	// SIMILI::Input::KeyManager::getInstance().initialize();
 	
-	SIMILI::Input::KeyManager::getInstance().bindGizmoActions(
-		[this]() { this->setGuizmoOperation(ImGuizmo::TRANSLATE); std::cout << "[OverlayViewport] Gizmo switched to TRANSLATE" << std::endl; },
-		[this]() { this->setGuizmoOperation(ImGuizmo::ROTATE); std::cout << "[OverlayViewport] Gizmo switched to ROTATE" << std::endl; },
-		[this]() { this->setGuizmoOperation(ImGuizmo::SCALE); std::cout << "[OverlayViewport] Gizmo switched to SCALE" << std::endl; }
-	);
+	// SIMILI::Input::KeyManager::getInstance().bindGizmoActions(
+	// 	[this]() { this->setGuizmoOperation(ImGuizmo::TRANSLATE); std::cout << "[OverlayViewport] Gizmo switched to TRANSLATE" << std::endl; },
+	// 	[this]() { this->setGuizmoOperation(ImGuizmo::ROTATE); std::cout << "[OverlayViewport] Gizmo switched to ROTATE" << std::endl; },
+	// 	[this]() { this->setGuizmoOperation(ImGuizmo::SCALE); std::cout << "[OverlayViewport] Gizmo switched to SCALE" << std::endl; }
+	// );
 	
-	SIMILI::Input::KeyManager::getInstance().bindModeActions(
-		[this](int mode) { this->switchModeByKey(mode); }
-	);
+	// SIMILI::Input::KeyManager::getInstance().bindModeActions(
+	// 	[this](int mode) { this->switchModeByKey(mode); }
+	// );
 }
 
 OverlayViewport::~OverlayViewport() 
@@ -677,11 +677,11 @@ void OverlayViewport::ProcessWheelInput(int wheelDirection)
 	std::cout << "[OVERLAY_VIEWPORT] Wheel direction received: " << wheelDirection << std::endl;
 }
 
-void OverlayViewport::ProcessZoom(int wheelDirection)
-{
-	if (!camera_control_) return;
-	camera_control_->onZoom(wheelDirection);
-}
+// void OverlayViewport::ProcessZoom(int wheelDirection)
+// {
+// 	if (!camera_control_) return;
+// 	camera_control_->onZoom(wheelDirection);
+// }
 
 void OverlayViewport::ProcessMouseMovementWhileLeftClicking(int deltaX, int deltaY)
 {

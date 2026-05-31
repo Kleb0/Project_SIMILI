@@ -528,9 +528,7 @@ namespace SIMILI {
 						{
 							frameCatcher->iframe_data_map_[pair.first] = pair.second;
 						}
-					}
-					
-					// handler->captureIFramePositions(); -- migrated to FrameDataCatcher
+					}					
 					
 					resp.statusCode = 200;
 					resp.statusMessage = "OK";

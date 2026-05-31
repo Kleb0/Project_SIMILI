@@ -23,6 +23,7 @@
 #include "SDL_Windows_states/SDL_State_ScalingUP.hpp"
 #include "MouseStates/Mouse_Above_Workspace_State.hpp"
 #include "MouseStates/Mouse_Outside_Workspace_State.hpp"
+#include "viewportLogic/CameraControl/cameraControl.hpp"
 
 class ThreeDScreen;
 class VKContext;
@@ -140,6 +141,7 @@ class SDL_ApplicationWindow
 		void Set_UIHandler(void* handler);
 		void setThreeDScreen(ThreeDScreen* screen);
 		void setCamera(Camera* camera) { camera_ = camera; }
+		void setCameraControl(CameraControl* cameraControl) { camera_control_ = cameraControl; }
 		void setVKContext(VKContext* context);
 		void setVKScene(VKScene* scene) { vk_scene_ = scene; }
 		void setVulkanPipelines(VulkanPipeline* pipelines);
@@ -160,6 +162,7 @@ class SDL_ApplicationWindow
 		// === Event Handling ===
 		void processEvents();
 		void updateUIState();
+		void handleSDLEvent(const SDL_Event& event);
 		
 		// === UI Initialization ===
 		void initializeDefaultUIPanels();
@@ -167,8 +170,7 @@ class SDL_ApplicationWindow
 
 		// === Rendering ===
 		void renderFrame();
-		void renderThreeDScreen(const std::map<std::string, IFrameData>& frameDataMap);
-		void drawThreeDScreen();
+		void drawThreeDScreenOnWorkspace();
 		void preparePanels();
 		void startSplitter();
 		void activateDebugRender();
@@ -212,6 +214,7 @@ class SDL_ApplicationWindow
 		ThreeDScreen* threed_screen_;
 		VKScene* vk_scene_;
 		Camera* camera_;
+		CameraControl* camera_control_;
 		SIMILI::Frontend::FrameDatas* frame_datas_;
 		SIMILI::Frontend::UIManager* ui_manager_;
 		PanelResizingLogic* panel_resizing_logic_;
@@ -219,14 +222,17 @@ class SDL_ApplicationWindow
 		Enable_UI_Debug_Tools* debug_tools_;
 
 		// === CEF Client ===
-		CefRefPtr<SIMILICefClient> simili_cef_client_;
-		bool ui_manager_vulkan_initialized_;
-		
-		// === Graphics Components ===
-		VKContext* vk_context_;
-		VulkanPipeline* vulkan_pipelines_;
+		CefRefPtr<SIMILICefClient> simili_cef_client_;		
 		CefRefPtr<CefBrowser> browser_;
 		CefRefPtr<CefRenderHandler> cef_render_handler_;
+
+		
+		
+		// === Graphics Components ===
+		bool ui_manager_vulkan_initialized_;
+		VKContext* vk_context_;
+		VulkanPipeline* vulkan_pipelines_;
+
 		std::shared_ptr<VulkanPipeline::Pipeline> cef_shared_pipeline_;
 		VkDescriptorSetLayout cef_descriptor_set_layout_;
 		std::mutex render_mutex_;
@@ -279,6 +285,8 @@ class SDL_ApplicationWindow
 		bool prepared_skip_texture_rebuild_;
 		bool borders_set_for_init_;
 		bool pending_window_resize_sync_;
+		float pending_wheel_delta_;
+		bool prev_middle_button_down_;
 
 		// === Private Methods ===
 		void updateDpiScale();

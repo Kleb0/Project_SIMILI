@@ -4,7 +4,7 @@
 #include "viewportLogic/UIPanels/FrameDataCatcher.hpp"
 #include "viewportLogic/FrameDatas/FrameDatas.hpp"
 #include "viewportLogic/UIPanels/PanelResizingLogic.hpp"
-#include "viewportLogic/ThreeDScreen/ThreeDScreen.hpp"
+// #include "viewportLogic/ThreeDScreen/ThreeDScreen.hpp"
 #include "viewportLogic/UIPanels/UIManager.hpp"
 #include "viewportLogic/UIPanels/Splitter.hpp"
 #include "App_Border.hpp"
@@ -89,6 +89,7 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, threed_screen_(nullptr)
 	, vk_scene_(nullptr)
 	, camera_(nullptr)
+	, camera_control_(nullptr)
 	, frame_datas_(nullptr)
 	, ui_manager_(nullptr)
 	, panel_resizing_logic_(nullptr)
@@ -112,6 +113,8 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, prepared_skip_texture_rebuild_(false)
 	, borders_set_for_init_(false)
 	, pending_window_resize_sync_(false)
+	, pending_wheel_delta_(0.0f)
+	, prev_middle_button_down_(false)
 	, browser_(nullptr)
 	, simili_cef_client_(nullptr)
 	, ui_manager_vulkan_initialized_(false)
@@ -462,11 +465,6 @@ bool SDL_ApplicationWindow::isVisible() const
 void SDL_ApplicationWindow::Set_UIHandler(void* handler)
 {
 	ui_handler_ = handler;
-}
-
-void SDL_ApplicationWindow::setThreeDScreen(ThreeDScreen* screen)
-{
-	threed_screen_ = screen;
 }
 
 void SDL_ApplicationWindow::setVKContext(VKContext* context)
@@ -936,14 +934,8 @@ void SDL_ApplicationWindow::processEvents()
 			StateTransition(current_state_, &state_scaling_up_);
 		else
 			StateTransition(current_state_, &state_scaling_down_);
-	}
+	}	
 
-	// if (ui_handler_)
-	// {
-	// 	UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-	// 	handler->processPendingFrameUpdates();
-	// }
-	
 	updateUIState();
 }
 
@@ -952,6 +944,14 @@ void SDL_ApplicationWindow::updateUIState()
 	if (ui_manager_ && window_)
 	{
 		ui_manager_->updateUIState(window_);
+	}
+}
+
+void SDL_ApplicationWindow::handleSDLEvent(const SDL_Event& event)
+{
+	if (event.type == SDL_EVENT_MOUSE_WHEEL && current_mouse_state_ == &mouse_state_above_workspace_)
+	{
+		pending_wheel_delta_ += event.wheel.y;
 	}
 }
 
@@ -1024,9 +1024,7 @@ void SDL_ApplicationWindow::renderFrame()
 
 		activateDebugRender();
 
-		// has become useless
-		// drawCEF();
-		drawThreeDScreen();
+		drawThreeDScreenOnWorkspace();
 		
 		preparePanels();
 
@@ -1039,7 +1037,7 @@ void SDL_ApplicationWindow::renderFrame()
 				
 				//   viewport.x = static_cast<float>(appBorderLeft);
 				//   viewport.y = static_cast<float>(appBorderTop);
-				//   viewport.width  = static_cast<float>(appBorderWidth);
+				//   viewport.width = static_cast<float>(appBorderWidth);
 				//   viewport.height = static_cast<float>(appBorderHeight);
 				
 				// Considering that each panel is drawn individually, 
@@ -1061,11 +1059,6 @@ void SDL_ApplicationWindow::renderFrame()
 			reference_window_width_, reference_window_height_);
 
 			ui_manager_->drawSplitters(commandBuffer, prepared_drawable_width_, prepared_drawable_height_);
-
-		// if (debug_tools_ && ui_manager_)
-		// {
-		// 	debug_tools_->drawDebugTools(commandBuffer, width, height, &ui_manager_->getWorkSpace());
-		// }
 	}
 
 	// ------ when state is Maximized for SDL3 window
@@ -1101,7 +1094,7 @@ void SDL_ApplicationWindow::renderFrame()
 
 		activateDebugRender();
 
-		drawThreeDScreen();
+		drawThreeDScreenOnWorkspace();
 
 		preparePanels();
 
@@ -1147,7 +1140,7 @@ void SDL_ApplicationWindow::renderFrame()
 	{
 		activateDebugRender();
 
-		drawThreeDScreen();
+		drawThreeDScreenOnWorkspace();
 
 		preparePanels();
 
@@ -1207,18 +1200,43 @@ void SDL_ApplicationWindow::renderFrame()
 		return;
 	}
 
+	// --- functionnalities when working with 3D screen (independent of window state)  ---
+	if (camera_control_ && current_mouse_state_ == &mouse_state_above_workspace_)
+	{
+		float mouseXf = 0.0f, mouseYf = 0.0f;
+		SDL_MouseButtonFlags mouseButtons = SDL_GetMouseState(&mouseXf, &mouseYf);
+		const int mouseX = static_cast<int>(mouseXf);
+		const int mouseY = static_cast<int>(mouseYf);
+		const bool middleDown = (mouseButtons & SDL_BUTTON_MASK(SDL_BUTTON_MIDDLE)) != 0;
+
+		if (middleDown && !prev_middle_button_down_)
+		{
+			camera_control_->onMiddleButtonDown(mouseX, mouseY);
+		}
+		else if (!middleDown && prev_middle_button_down_)
+		{
+			camera_control_->onMiddleButtonUp();
+		}
+
+		if (middleDown)
+		{
+			camera_control_->onMouseMove(mouseX, mouseY);
+		}
+
+		if (pending_wheel_delta_ != 0.0f)
+		{
+			camera_control_->onWheel(pending_wheel_delta_);
+			pending_wheel_delta_ = 0.0f;
+		}
+
+		prev_middle_button_down_ = middleDown;
+	}
+
 	presentToScreen();
 }
 
-void SDL_ApplicationWindow::renderThreeDScreen(const std::map<std::string, IFrameData>&)
-{
-	if (threed_screen_)
-	{
-		threed_screen_->render(frame_datas_, window_);
-	}
-}
 
-void SDL_ApplicationWindow::drawThreeDScreen()
+void SDL_ApplicationWindow::drawThreeDScreenOnWorkspace()
 {
 	if (camera_ && vk_scene_ && ui_manager_ && vk_command_buffers_.size() > current_image_index_)
 	{
@@ -1249,6 +1267,7 @@ void SDL_ApplicationWindow::drawThreeDScreen()
 	}
 }
 
+
 void SDL_ApplicationWindow::preparePanels()
 {
 	if (!ui_manager_ || vk_command_buffers_.size() <= current_image_index_)
@@ -1259,12 +1278,6 @@ void SDL_ApplicationWindow::preparePanels()
 	SDL_GetWindowSizeInPixels(window_, &prepared_drawable_width_, &prepared_drawable_height_);
 
 	prepared_panel_frame_data_map_.clear();
-
-	// if (ui_handler_)
-	// {
-	// 	UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-	// 	Splitter* splitter = handler->getSplitter();
-	// }
 
 	if (prepared_panel_frame_data_map_.empty())
 	{
@@ -1291,23 +1304,12 @@ void SDL_ApplicationWindow::preparePanels()
 
 	prepared_skip_texture_rebuild_ = false;
 
-	// if (ui_handler_)
-	// {
-	// 	UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-	// 	Splitter* splitter = handler->getSplitter();
-	// }
-
 	if (vk_context_)
 		uploadCEFPaintBuffer();
 }
 
 void SDL_ApplicationWindow::startSplitter()
 {
-	// if (ui_handler_)
-	// {
-	// 	UIHandler* handler = static_cast<UIHandler*>(ui_handler_);
-	// 	handler->startManager(vk_context_, vk_render_pass_);
-	// }
 
 	if (ui_manager_ && vk_context_ && vk_render_pass_ != VK_NULL_HANDLE && vulkan_pipelines_)
 	{
@@ -1327,6 +1329,8 @@ void SDL_ApplicationWindow::startSplitter()
 		debug_tools_->initialize(vk_context_, vk_render_pass_, vulkan_pipelines_, app_border_);
 	}
 }
+
+// ===== End of rendering =====
 
 CefRefPtr<SIMILICefClient> SDL_ApplicationWindow::getCefClient()
 {

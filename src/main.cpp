@@ -3,12 +3,11 @@
 #include "include/cef_sandbox_win.h"
 #include "SIMILI_Frontend/viewportLogic/UIPanels/UIManager.hpp"
 #include "SIMILI_Frontend/SDL_ApplicationWindow.hpp"
-#include "SIMILI_Frontend/viewportLogic/overlay_viewport.hpp"
 #include "SIMILI_Frontend/viewportLogic/FrameDatas/FrameDatas.hpp"
-#include "SIMILI_Frontend/viewportLogic/ThreeDScreen/ThreeDScreen.hpp"
 #include "SIMILI_Frontend/viewportLogic/UIPanels/FrameDataCatcher.hpp"
 #include "SIMILI_Frontend/viewportLogic/UIPanels/PanelResizingLogic.hpp"
 #include "SIMILI_Frontend/viewportLogic/UIPanels/UIManager.hpp"
+#include "SIMILI_Frontend/viewportLogic/CameraControl/cameraControl.hpp"
 
 #include "SIMILI_Services/router/RouterSim.hpp"
 #include "SIMILI_Services/router/RoutesManager.hpp"
@@ -116,8 +115,6 @@ int main(int argc, char* argv[])
 		std::cout << "[Main] Debug logging enabled to: " << logFilePath << std::endl;
 	}
 
-	OverlayViewport ThreeDViewport;
-
 	std::cout << "[Main] Starting SIMILI with CEF..." << std::endl;
 	std::cout << "[Main] Vulkan API version: " << VK_API_VERSION_1_0 << std::endl;
 
@@ -170,13 +167,7 @@ int main(int argc, char* argv[])
 	
 	// Set VulkanPipeline on window for distribution to components
 	mainWindow.setVulkanPipelines(&vulkanPipelines);
-	std::cout << "[Main] VulkanPipeline set on window" << std::endl;
-	
-	ThreeDScreen myThreeDScreen;
-	myThreeDScreen.initialize();
-	mainWindow.setThreeDScreen(&myThreeDScreen);
-	vkRenderer.setThreeDScreen(&myThreeDScreen);
-	std::cout << "[Main] ThreeDScreen initialized and linked to SDL_ApplicationWindow" << std::endl;
+	std::cout << "[Main] VulkanPipeline set on window" << std::endl;	
 	
 	std::cout << "[Main] Creating UIManager..." << std::endl;
 	SIMILI::Frontend::UIManager myUIManager;
@@ -257,8 +248,6 @@ int main(int argc, char* argv[])
 	std::cout << "[Main] Render pass configured on SDL_ApplicationWindow" << std::endl;
 
 
-	myThreeDScreen.setVKContext(&vkRenderer);
-
 	SceneObjectContainer VKSceneObjectContainer;
 
 	VKScene myVKScene;
@@ -287,15 +276,17 @@ int main(int argc, char* argv[])
 	if (sceneCamera)
 	{
 		myVKScene.setCameraToUse(sceneCamera);
-		myThreeDScreen.setCamera(myVKScene.getActiveCamera());
-		ThreeDViewport.setCamera(myVKScene.getActiveCamera());
 		vkRenderer.setCamera(sceneCamera);
-		vkRenderer.setThreeDScreen(&myThreeDScreen);
 		sceneCamera->setVKScene(&myVKScene);
 		mainWindow.setCamera(sceneCamera);
 		std::cout << "[Main] Camera linked to VKContext" << std::endl;
 		std::cout << "[Main] Camera linked to SDL_ApplicationWindow" << std::endl;
 	}
+
+	CameraControl cameraControl;
+	cameraControl.setScene(&myVKScene);
+	mainWindow.setCameraControl(&cameraControl);
+	std::cout << "[Main] CameraControl initialized" << std::endl;
 
 	std::cout << "[Main] VKScene initialized with ID: " << myVKScene.getSceneID() << std::endl;
 
@@ -393,6 +384,8 @@ int main(int argc, char* argv[])
 			{
 				running = false;
 			}
+			
+			mainWindow.handleSDLEvent(event);
 			
 			// mainWindow.handleSplitterEvent(event);
 		}

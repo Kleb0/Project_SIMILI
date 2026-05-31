@@ -22,7 +22,6 @@ public:
     void setTarget(const glm::vec3 &newTarget)
     {
         target = newTarget;
-        orbitRadius = glm::length(getPosition() - target);
     }
 
     glm::vec3 getTarget() const { return target; }
@@ -31,15 +30,9 @@ public:
     bool isSoftwareCamera() const { return true; }
     bool isAGameCamera() const { return false; }
     bool isSelectable() const override { return !isCurrentUserCamera(); }
-    bool isOrbitPrepared = false;
-
     void zoom(float offset);
     void moveForward(float amount);
-    void prepareOrbit();
-    void resetOrbitPreparation();
-    void orbitAroundTarget(float deltaX, float deltaY);
-    void lateralMovement(float deltaX, float deltaY);
-    
+
     void setResolution(int width, int height, float dpiScale = 1.0f);
     int getResolutionWidth() const { return resolutionWidth_; }
     int getResolutionHeight() const { return resolutionHeight_; }
@@ -58,10 +51,6 @@ public:
     float zommFactor = 1.0f;
 
 private:
-    float yaw = -90.0f;
-    float pitch = 0.0f;
-    float orbitRadius = 10.0f;
-    
     int resolutionWidth_ = 800;
     int resolutionHeight_ = 600;
     float dpiScale_ = 1.0f;
