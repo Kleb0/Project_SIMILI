@@ -5,6 +5,7 @@
 #include "../../Engine/PrimitivesCreation/CreatePrimitive.hpp"
 #include "../../SIMILI_Frontend/viewportLogic/UIPanels/FrameDataCatcher.hpp"
 #include "../../SIMILI_Frontend/viewportLogic/UIPanels/UIManager.hpp"
+#include "../../SIMILI_Frontend/viewportLogic/UIPanels/DataHolders.hpp"
 #include <iostream>
 #include <fstream>
 #include <GLFW/glfw3.h>
@@ -32,6 +33,7 @@ namespace SIMILI {
 			registerSceneRoutes(router, scene, vkRenderer);
 			registerObjectRoutes(router, scene, glfwWindow);
 			registerIFrameRoutes(router, frameCatcher, uiManager);
+			registerDataHolderRoutes(router);
 			
 			std::cout << "[RoutesManager] All routes registered successfully" << std::endl;
 		}
@@ -719,6 +721,40 @@ namespace SIMILI {
 		}, "Get all UI panel iframes");
 		
 		std::cout << "[RoutesManager] IFrame routes registered" << std::endl;
+		}
+
+		void RoutesManager::registerDataHolderRoutes(RouterSim& router)
+		{
+			router.post("/api/dataholder/send", [](const Message& msg) -> Response
+			{
+				Response resp;
+				resp.headers["Access-Control-Allow-Origin"] = "*";
+				resp.headers["Content-Type"] = "application/json";
+
+				DataHolders* dataHolders = DataHolders::getInstance();
+				if (!dataHolders)
+				{
+					resp.statusCode = 500;
+					resp.statusMessage = "Internal Server Error";
+					resp.body = "{\"success\": false, \"error\": \"DataHolders not initialized\"}";
+					return resp;
+				}
+
+				if (!dataHolders->receiveDataHolders(msg.body))
+				{
+					resp.statusCode = 400;
+					resp.statusMessage = "Bad Request";
+					resp.body = "{\"success\": false, \"error\": \"Invalid DataHolder payload\"}";
+					return resp;
+				}
+
+				resp.statusCode = 200;
+				resp.statusMessage = "OK";
+				resp.body = "{\"success\": true}";
+				return resp;
+			}, "Receive DataHolder structure from panel");
+
+			std::cout << "[RoutesManager] DataHolder routes registered" << std::endl;
 		}
 	}
 }

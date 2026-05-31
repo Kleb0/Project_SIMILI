@@ -1,5 +1,6 @@
 #include "PanelMapBuilder.hpp"
 #include "UIPanel.hpp"
+#include "DataHolders.hpp"
 #include "../../SDL_ApplicationWindow.hpp"
 #include "../../../Engine/VulkanScene/VKcontext.hpp"
 #include <iostream>
@@ -587,7 +588,18 @@ namespace SIMILI {
 
 			for (const PanelMapEntry* e : ordered)
 			{
-				std::cout << "  " << e->name << " = " << e->index << std::endl;
+				int dhCount = 0;
+				DataHolders* dh = DataHolders::getInstance();
+				if (dh)
+				{
+					dhCount = dh->getCountForPanel(e->name);
+				}
+				std::cout << "  " << e->name << " = " << e->index;
+				if (dhCount > 0)
+				{
+					std::cout << " [DataHolders: " << dhCount << "]";
+				}
+				std::cout << std::endl;
 			}
 
 			buildSplittersFromRays(frameDataMap);

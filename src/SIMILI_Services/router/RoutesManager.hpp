@@ -4,6 +4,7 @@
 #include "../../Engine/VulkanScene/VKcontext.hpp"
 #include "../../Engine/VulkanScene/VKScene.Hpp"
 #include "../../SIMILI_Frontend/viewportLogic/UIPanels/FrameDataCatcher.hpp"
+#include "../../SIMILI_Frontend/viewportLogic/UIPanels/DataHolders.hpp"
 
 namespace SIMILI {
 	namespace Frontend {
@@ -38,6 +39,7 @@ namespace SIMILI
 			void registerSceneRoutes(RouterSim& router, VKScene& scene, VKContext& vkRenderer);
 			void registerObjectRoutes(RouterSim& router, VKScene& scene, GLFWwindow* glfwWindow);
 			void registerIFrameRoutes(RouterSim& router, FrameDataCatcher* frameCatcher, SIMILI::Frontend::UIManager* uiManager);
+			void registerDataHolderRoutes(RouterSim& router);
 		};
 
 	} 

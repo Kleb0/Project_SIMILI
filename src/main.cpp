@@ -5,6 +5,7 @@
 #include "SIMILI_Frontend/SDL_ApplicationWindow.hpp"
 #include "SIMILI_Frontend/viewportLogic/FrameDatas/FrameDatas.hpp"
 #include "SIMILI_Frontend/viewportLogic/UIPanels/FrameDataCatcher.hpp"
+#include "SIMILI_Frontend/viewportLogic/UIPanels/DataHolders.hpp"
 #include "SIMILI_Frontend/viewportLogic/UIPanels/PanelResizingLogic.hpp"
 #include "SIMILI_Frontend/viewportLogic/UIPanels/UIManager.hpp"
 #include "SIMILI_Frontend/viewportLogic/CameraControl/cameraControl.hpp"
@@ -177,6 +178,10 @@ int main(int argc, char* argv[])
 	FrameDataCatcher frameCatcher;
 	FrameDataCatcher::setInstance(&frameCatcher);
 	std::cout << "[Main] FrameDataCatcher created and set as singleton" << std::endl;
+
+	DataHolders dataHolders;
+	DataHolders::setInstance(&dataHolders);
+	std::cout << "[Main] DataHolders created and set as singleton" << std::endl;
 
 	auto* frameDatas = new SIMILI::Frontend::FrameDatas(&frameCatcher);
 	mainWindow.updateFrameDatas(frameDatas);

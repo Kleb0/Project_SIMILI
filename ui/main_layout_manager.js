@@ -222,6 +222,34 @@ function scheduleUIPanelIFramesSync() {
     }, 120);
 }
 
+function sendDataHoldersToServer() {
+    var iframes = document.querySelectorAll('.main-container iframe');
+    iframes.forEach(function(iframe) {
+        try {
+            var doc = iframe.contentDocument || iframe.contentWindow.document;
+            if (!doc) return;
+
+            var container = doc.querySelector('[data-panel]');
+            if (!container) return;
+
+            var panelName = container.getAttribute('data-panel');
+            var holders = container.querySelectorAll('input[data-field], span[data-field], .selected-object[data-field]');
+            if (!holders || holders.length === 0) return;
+
+            var dataHolders = [];
+            holders.forEach(function(el) {
+                dataHolders.push({ field: el.getAttribute('data-field') });
+            });
+
+            fetch('http://localhost:8080/api/dataholder/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ panel: panelName, dataHolders: dataHolders })
+            }).catch(function() {});
+        } catch(e) {}
+    });
+}
+
 // Execute immediately instead of waiting for DOMContentLoaded (CEF issue)
 fetch('http://localhost:8080/api/debug/init-start', { method: 'POST', body: 'Init start from main_layout_manager' }).catch(() => {});
 initializeServerConnection();
@@ -230,7 +258,10 @@ setInterval(pollServerLogs, 1000);
 window.addEventListener('load', () => {
     setTimeout(() => {
         sendUIPanelIFramesToServer();
-    }, 800);
+    }, 500);
+    setTimeout(() => {
+        sendDataHoldersToServer();
+    }, 500);
 });
 
 window.addEventListener('resize', () => {
@@ -238,3 +269,4 @@ window.addEventListener('resize', () => {
 });
 
 window.sendUIPanelIFramesToServer = sendUIPanelIFramesToServer;
+window.sendDataHoldersToServer = sendDataHoldersToServer;
