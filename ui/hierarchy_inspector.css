@@ -39,11 +39,12 @@ h1 {
 .slot {
     background-color: #4a4a4a;
     border-radius: 12px;
+    border: 1px solid #4a4a4a;
     padding: 8px 20px;
     color: #ffffff;
     font-size: 14px;
     text-align: center;
-    transition: background-color 0.2s ease, color 0.2s ease;
+    transition: border-color 0.15s, background-color 0.15s;
     cursor: pointer;
     user-select: none;
     -webkit-user-select: none;
@@ -52,7 +53,8 @@ h1 {
 }
 
 .slot:hover {
-    background-color: #5a5a5a;
+    border-color: #ff8800;
+    background-color: rgba(255, 140, 0, 0.22);
 }
 
 .slot.selected {
@@ -61,6 +63,7 @@ h1 {
 }
 
 .slot.selected:hover {
+    border-color: #27ae60;
     background-color: #27ae60;
 }
 

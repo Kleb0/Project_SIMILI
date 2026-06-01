@@ -754,6 +754,81 @@ namespace SIMILI {
 				return resp;
 			}, "Receive DataHolder structure from panel");
 
+			router.get("/api/dataholder/values", [](const Message& msg) -> Response
+			{
+				Response resp;
+				resp.headers["Access-Control-Allow-Origin"] = "*";
+				resp.headers["Content-Type"] = "application/json";
+
+				DataHolders* dataHolders = DataHolders::getInstance();
+				if (!dataHolders)
+				{
+					resp.statusCode = 500;
+					resp.statusMessage = "Internal Server Error";
+					resp.body = "{\"success\": false}";
+					return resp;
+				}
+
+				std::string panelName = "object_inspector_panel";
+				const auto& query = msg.params;
+				auto it = query.find("panel");
+				if (it != query.end())
+				{
+					panelName = it->second;
+				}
+
+				resp.statusCode = 200;
+				resp.statusMessage = "OK";
+				resp.body = dataHolders->getValuesAsJson(panelName);
+				return resp;
+			}, "Get DataHolder values for a panel");
+
+			router.post("/api/dataholder/values", [](const Message& msg) -> Response
+			{
+				Response resp;
+				resp.headers["Access-Control-Allow-Origin"] = "*";
+				resp.headers["Content-Type"] = "application/json";
+
+				DataHolders* dataHolders = DataHolders::getInstance();
+				if (!dataHolders)
+				{
+					resp.statusCode = 500;
+					resp.statusMessage = "Internal Server Error";
+					resp.body = "{\"success\": false}";
+					return resp;
+				}
+
+				try
+				{
+					json body = json::parse(msg.body, nullptr, false);
+					if (body.is_discarded() || !body.contains("panel") || !body.contains("values"))
+					{
+						resp.statusCode = 400;
+						resp.statusMessage = "Bad Request";
+						resp.body = "{\"success\": false}";
+						return resp;
+					}
+
+					std::string panelName = body["panel"].get<std::string>();
+					for (auto& [field, val] : body["values"].items())
+					{
+						dataHolders->setFieldValue(panelName, field, val.get<std::string>());
+					}
+
+					resp.statusCode = 200;
+					resp.statusMessage = "OK";
+					resp.body = "{\"success\": true}";
+				}
+				catch (const std::exception&)
+				{
+					resp.statusCode = 500;
+					resp.statusMessage = "Internal Server Error";
+					resp.body = "{\"success\": false}";
+				}
+
+				return resp;
+			}, "Set DataHolder values for a panel");
+
 			std::cout << "[RoutesManager] DataHolder routes registered" << std::endl;
 		}
 	}

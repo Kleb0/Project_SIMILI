@@ -241,6 +241,7 @@ function sendDataHoldersToServer() {
                 var rect = el.getBoundingClientRect();
                 dataHolders.push({
                     field: el.getAttribute('data-field'),
+                    parent: panelName,
                     x: Math.round(rect.left),
                     y: Math.round(rect.top),
                     w: Math.round(rect.width),
@@ -284,3 +285,35 @@ window.addEventListener('resize', () => {
 
 window.sendUIPanelIFramesToServer = sendUIPanelIFramesToServer;
 window.sendDataHoldersToServer = sendDataHoldersToServer;
+
+function pollDataHolderValues() {
+    var panelConfigs = [
+        { panelName: 'object_inspector_panel', iframeSelector: '.object-inspector-panel iframe' }
+    ];
+
+    panelConfigs.forEach(function(cfg) {
+        fetch('http://localhost:8080/api/dataholder/values?panel=' + cfg.panelName)
+            .then(function(r) { return r.ok ? r.json() : null; })
+            .then(function(values) {
+                if (!values) return;
+                var iframe = document.querySelector(cfg.iframeSelector);
+                if (!iframe) return;
+                try {
+                    var doc = iframe.contentDocument || iframe.contentWindow.document;
+                    if (!doc) return;
+                    Object.keys(values).forEach(function(field) {
+                        var el = doc.querySelector('[data-field="' + field + '"]');
+                        if (!el) return;
+                        if (el.tagName === 'INPUT') {
+                            if (el.value !== values[field]) el.value = values[field];
+                        } else {
+                            if (el.textContent !== values[field]) el.textContent = values[field];
+                        }
+                    });
+                } catch(e) {}
+            })
+            .catch(function() {});
+    });
+}
+
+setInterval(pollDataHolderValues, 500);

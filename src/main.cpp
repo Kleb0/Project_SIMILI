@@ -181,6 +181,7 @@ int main(int argc, char* argv[])
 
 	DataHolders dataHolders;
 	DataHolders::setInstance(&dataHolders);
+	dataHolders.initPlaceholderValues();
 	std::cout << "[Main] DataHolders created and set as singleton" << std::endl;
 
 	auto* frameDatas = new SIMILI::Frontend::FrameDatas(&frameCatcher);
