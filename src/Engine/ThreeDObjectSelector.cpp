@@ -10,24 +10,6 @@ ThreeDObjectSelector::ThreeDObjectSelector()
 {
 }
 
-void ThreeDObjectSelector::printRaycastDebugHeader(int mouseX, int mouseY, int viewportSize, int viewportHeight, 
-const glm::vec3& cameraPos, const std::vector<ThreeDObject*>& objects)
-{
-	std::cout << "\n ========== RAYCAST DEBUG ==========" << std::endl;
-	std::cout << "[OverlayViewport] Mouse: (" << mouseX << ", " << mouseY << ")" << std::endl;
-	std::cout << "[OverlayViewport] Viewport Resolution: " << viewportSize << "x" << viewportHeight << std::endl;
-	std::cout << "[OverlayViewport] Camera position: (" << cameraPos.x << ", " << cameraPos.y << ", " << cameraPos.z << ")" << std::endl;
-	
-	for (const auto* obj : objects) {
-		if (!obj) continue;
-		std::cout << "[OverlayViewport] Object: " << obj->getName() 
-				  << " | Selectable: " << (obj->isSelectable() ? "YES" : "NO")
-				  << " | Pos: (" << obj->getPosition().x << ", " << obj->getPosition().y << ", " << obj->getPosition().z << ")" << std::endl;
-	}
-	
-	std::cout << "[OverlayViewport] Starting raycast with " << objects.size() << " objects..." << std::endl;
-}
-
 void ThreeDObjectSelector::pickUpMesh(int mouseX, int mouseY, int viewportSize, int viewportHeight, const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObject *> &objects)
 {
 	if (viewportSize <= 0 || viewportHeight <= 0) 

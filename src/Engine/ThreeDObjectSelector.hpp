@@ -13,10 +13,6 @@ class ThreeDObjectSelector
 {
 public:
 	ThreeDObjectSelector();
-	
-	// Print raycast debug header
-	void printRaycastDebugHeader(int mouseX, int mouseY, int screenWidth, int screenHeight, 
-	const glm::vec3& cameraPos, const std::vector<ThreeDObject*>& objects);
 
 // -------- Mesh Picking --------
 
@@ -48,7 +44,6 @@ private:
 	ThreeDObject *selectedObject = nullptr;
 	std::list<ThreeDObject *> multipleSelectedObjects;
 
-	// New proximity-based selection method
 	float calculateDistanceToRay(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object);
 	
 	bool rayIntersectsMesh(const glm::vec3 &rayOrigin, const glm::vec3 &rayDir, const ThreeDObject &object, float* outDistance = nullptr);

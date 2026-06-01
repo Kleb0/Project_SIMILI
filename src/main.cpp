@@ -21,6 +21,8 @@
 #include "WorldObjects/Camera/Camera.hpp"
 #include "WorldObjects/Mesh/Mesh.hpp"
 #include "Engine/PrimitivesCreation/CreatePrimitive.hpp"
+#include "Engine/ThreeDObjectSelector.hpp"
+#include "SIMILI_Frontend/viewportLogic/Raycasting/RaycastPerform.hpp"
 #include "DebugLogger.hpp"
 
 #include <iostream>
@@ -293,6 +295,14 @@ int main(int argc, char* argv[])
 	cameraControl.setScene(&myVKScene);
 	mainWindow.setCameraControl(&cameraControl);
 	std::cout << "[Main] CameraControl initialized" << std::endl;
+
+	// to be upgraded later
+	ThreeDObjectSelector selector;
+	RaycastPerform raycastPerform(&selector);
+	mainWindow.setSelector(&selector);
+	mainWindow.setRaycastPerform(&raycastPerform);
+
+	std::cout << "[Main] RaycastPerform initialized" << std::endl;
 
 	std::cout << "[Main] VKScene initialized with ID: " << myVKScene.getSceneID() << std::endl;
 

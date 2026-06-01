@@ -14,6 +14,8 @@
 #include "../../Engine/VulkanPipeline/VulkanPipeline.hpp"
 #include "../../Engine/GLSL_Compiler/GLSLCompiler.hpp"
 #include "../../WorldObjects/Camera/Camera.hpp"
+#include "../../Engine/ThreeDObjectSelector.hpp"
+#include "viewportLogic/Raycasting/RaycastPerform.hpp"
 #include <SDL3/SDL_vulkan.h>
 #include "include/cef_browser.h"
 #include <set>
@@ -95,6 +97,8 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, panel_resizing_logic_(nullptr)
 	, app_border_(nullptr)
 	, debug_tools_(nullptr)
+	, selector_(nullptr)
+	, raycast_perform_(nullptr)
 	, vk_context_(nullptr)
 	, vulkan_pipelines_(nullptr)
 	, vk_surface_(VK_NULL_HANDLE)
@@ -115,6 +119,8 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, pending_window_resize_sync_(false)
 	, pending_wheel_delta_(0.0f)
 	, prev_middle_button_down_(false)
+	, prev_left_button_down_(false)
+	, pending_left_click_(false)
 	, browser_(nullptr)
 	, simili_cef_client_(nullptr)
 	, ui_manager_vulkan_initialized_(false)
@@ -953,6 +959,13 @@ void SDL_ApplicationWindow::handleSDLEvent(const SDL_Event& event)
 	{
 		pending_wheel_delta_ += event.wheel.y;
 	}
+
+	if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT
+		&& current_mouse_state_ == &mouse_state_above_workspace_)
+	{
+		pending_left_click_ = true;
+	}
+
 }
 
 
@@ -1201,35 +1214,67 @@ void SDL_ApplicationWindow::renderFrame()
 	}
 
 	// --- functionnalities when working with 3D screen (independent of window state)  ---
-	if (camera_control_ && current_mouse_state_ == &mouse_state_above_workspace_)
+	// --- the mouse state let us know if the mouse is above the 3D screen / the workspace or not ---
+	if (current_mouse_state_ == &mouse_state_above_workspace_)
 	{
 		float mouseXf = 0.0f, mouseYf = 0.0f;
 		SDL_MouseButtonFlags mouseButtons = SDL_GetMouseState(&mouseXf, &mouseYf);
 		const int mouseX = static_cast<int>(mouseXf);
 		const int mouseY = static_cast<int>(mouseYf);
 		const bool middleDown = (mouseButtons & SDL_BUTTON_MASK(SDL_BUTTON_MIDDLE)) != 0;
+		const bool leftDown = (mouseButtons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
 
-		if (middleDown && !prev_middle_button_down_)
+		if (camera_control_)
 		{
-			camera_control_->onMiddleButtonDown(mouseX, mouseY);
-		}
-		else if (!middleDown && prev_middle_button_down_)
-		{
-			camera_control_->onMiddleButtonUp();
+			if (middleDown && !prev_middle_button_down_)
+			{
+				camera_control_->onMiddleButtonDown(mouseX, mouseY);
+			}
+			else if (!middleDown && prev_middle_button_down_)
+			{
+				camera_control_->onMiddleButtonUp();
+			}
+
+			if (middleDown)
+			{
+				camera_control_->onMouseMove(mouseX, mouseY);
+			}
+
+			if (pending_wheel_delta_ != 0.0f)
+			{
+				camera_control_->onWheel(pending_wheel_delta_);
+				pending_wheel_delta_ = 0.0f;
+			}
 		}
 
-		if (middleDown)
+		// ----- raycast performing when clicking on 3D screen -----
+		if (pending_left_click_ && raycast_perform_ && camera_ && vk_scene_ && ui_manager_)
 		{
-			camera_control_->onMouseMove(mouseX, mouseY);
-		}
+			pending_left_click_ = false;
+			const SIMILI::Frontend::WorkSpace& ws = ui_manager_->getWorkSpace();
+			if (ws.isValid())
+			{
+				float aspectRatio = (ws.getHeight() > 0)
+					? static_cast<float>(ws.getWidth()) / static_cast<float>(ws.getHeight())
+					: 1.0f;
 
-		if (pending_wheel_delta_ != 0.0f)
-		{
-			camera_control_->onWheel(pending_wheel_delta_);
-			pending_wheel_delta_ = 0.0f;
+				glm::mat4 view = camera_->getViewMatrix();
+				glm::mat4 proj = camera_->getProjectionMatrix(aspectRatio);
+
+				const std::list<ThreeDObject*>& objList = vk_scene_->getObjectsRef();
+				std::vector<ThreeDObject*> objects(objList.begin(), objList.end());
+
+				raycast_perform_->performRaycast(
+					mouseX, mouseY,
+					ws.getX(), ws.getY(),
+					ws.getWidth(), ws.getHeight(),
+					view, proj,
+					objects);
+			}
 		}
 
 		prev_middle_button_down_ = middleDown;
+		prev_left_button_down_ = leftDown;
 	}
 
 	presentToScreen();
@@ -1890,14 +1935,12 @@ void SDL_ApplicationWindow::updateMouseState(int mouseX, int mouseY)
 		current_mouse_state_->onExit();
 		current_mouse_state_ = &mouse_state_above_workspace_;
 		current_mouse_state_->onEnter();
-		std::cout << "[SDL_ApplicationWindow] Mouse state -> " << current_mouse_state_->getStateName() << std::endl;
 	}
 	else if (!isAbove && current_mouse_state_ != &mouse_state_outside_workspace_)
 	{
 		current_mouse_state_->onExit();
 		current_mouse_state_ = &mouse_state_outside_workspace_;
 		current_mouse_state_->onEnter();
-		std::cout << "[SDL_ApplicationWindow] Mouse state -> " << current_mouse_state_->getStateName() << std::endl;
 	}
 }
 

@@ -33,6 +33,8 @@ class App_Border;
 class Enable_UI_Debug_Tools;
 class SDL_ApplicationWindow;
 class PanelResizingLogic;
+class ThreeDObjectSelector;
+class RaycastPerform;
 
 class AppRenderHandler : public CefRenderHandler
 {
@@ -142,6 +144,8 @@ class SDL_ApplicationWindow
 		void setThreeDScreen(ThreeDScreen* screen);
 		void setCamera(Camera* camera) { camera_ = camera; }
 		void setCameraControl(CameraControl* cameraControl) { camera_control_ = cameraControl; }
+		void setSelector(ThreeDObjectSelector* selector) { selector_ = selector; }
+		void setRaycastPerform(RaycastPerform* raycast) { raycast_perform_ = raycast; }
 		void setVKContext(VKContext* context);
 		void setVKScene(VKScene* scene) { vk_scene_ = scene; }
 		void setVulkanPipelines(VulkanPipeline* pipelines);
@@ -220,6 +224,8 @@ class SDL_ApplicationWindow
 		PanelResizingLogic* panel_resizing_logic_;
 		App_Border* app_border_;
 		Enable_UI_Debug_Tools* debug_tools_;
+		ThreeDObjectSelector* selector_;
+		RaycastPerform* raycast_perform_;
 
 		// === CEF Client ===
 		CefRefPtr<SIMILICefClient> simili_cef_client_;		
@@ -287,6 +293,8 @@ class SDL_ApplicationWindow
 		bool pending_window_resize_sync_;
 		float pending_wheel_delta_;
 		bool prev_middle_button_down_;
+		bool prev_left_button_down_;
+		bool pending_left_click_;
 
 		// === Private Methods ===
 		void updateDpiScale();
