@@ -955,3 +955,26 @@ void VKScene::drawThreeDScene(VkCommandBuffer commandBuffer, int vpX, int vpY, i
 
 	drawMeshObjects(commandBuffer, view, proj);
 }
+
+
+void VKScene::setSelectedObjects(const std::list<ThreeDObject*>& objs)
+{
+	for (auto* obj : selectedObjects)
+	{
+		if (obj)
+			obj->setSelected(false);
+	}
+
+	selectedObjects = objs; 
+	std::cout << "[VKScene] Selected objects updated. Count: " << selectedObjects.size() << std::endl;
+
+	for (auto* obj : selectedObjects)
+	{
+		if (obj) 
+		{
+			obj->setSelected(true);
+			std::cout << "  - " << obj->getName() << std::endl;
+		}
+	}	
+	std::cout << "-------- [VKScene] Selection update complete. End of Raycast ------------- " << std::endl;	
+}

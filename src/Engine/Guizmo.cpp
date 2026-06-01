@@ -1,16 +1,20 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "Engine/Guizmo.hpp"
 #include <glm/gtc/type_ptr.hpp>
+#include "../src/SIMILI_Frontend/viewportLogic/UIPanels/WorkSpace.hpp"
 
 
 glm::mat4 Guizmo::renderGizmoForObject(const std::list<ThreeDObject*>& objects, ImGuizmo::OPERATION operation, const glm::mat4& view,
 const glm::mat4& proj, ImVec2 oglChildPos, ImVec2 oglChildSize)
 {
-	// Note: ImGuizmo::BeginFrame() is called once per frame in overlay_viewport.cpp
+	// we will begin to begin Imguizmo frame here
+	ImGuizmo::BeginFrame();
+
 	ImGuizmo::Enable(true);
 	ImGuizmo::SetOrthographic(false);
 	ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
-	ImGuizmo::SetDrawlist();
+	// Use the background draw list so we don't need an active ImGui window
+	ImGuizmo::SetDrawlist(ImGui::GetBackgroundDrawList());
 	ImGuizmo::SetRect(oglChildPos.x, oglChildPos.y, oglChildSize.x, oglChildSize.y);
 	ImGuizmo::SetGizmoSizeClipSpace(0.2f);
 
@@ -42,7 +46,58 @@ const glm::mat4& proj, ImVec2 oglChildPos, ImVec2 oglChildSize)
 	model *= glm::toMat4(glm::normalize(avgRotation));
 	model = glm::scale(model, averageScale);
 
+	// Actually draw the gizmo manipulator
+	glm::mat4 viewCopy = view;
+	glm::mat4 projCopy = proj;
+	ImGuizmo::Manipulate(
+		glm::value_ptr(viewCopy),
+		glm::value_ptr(projCopy),
+		operation,
+		ImGuizmo::LOCAL,
+		glm::value_ptr(model));
+
 	return model;
+}
+
+
+bool Guizmo::manipulateGizmo(const glm::mat4& modelMatrix, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, 
+	ImGuizmo::OPERATION operation, ImGuizmo::MODE mode, ImVec2 viewportPos, ImVec2 viewportSize, glm::mat4& outputModelMatrix)
+{
+    // Setup ImGuizmo
+    ImGuizmo::SetRect(viewportPos.x, viewportPos.y, viewportSize.x, viewportSize.y);
+    ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
+    
+    // Convert model matrix to float array for ImGuizmo
+    float matrix[16];
+    memcpy(matrix, &modelMatrix[0][0], sizeof(float) * 16);
+    
+    // Perform the manipulation
+    bool manipulated = ImGuizmo::Manipulate(
+        glm::value_ptr(viewMatrix),
+        glm::value_ptr(projectionMatrix),
+        operation,
+        mode,
+        matrix,
+        nullptr,
+        nullptr
+    );
+    
+    // Update the output model matrix if manipulation occurred
+    if (manipulated)
+    {
+        memcpy(&outputModelMatrix[0][0], matrix, sizeof(float) * 16);
+    }
+    
+    return manipulated;
+}
+
+void Guizmo::getWorkspaceViewport(const SIMILI::Frontend::WorkSpace& workspace,
+ImVec2& pos, ImVec2& size)
+{
+    pos.x = static_cast<float>(workspace.getX());
+    pos.y = static_cast<float>(workspace.getY());
+    size.x = static_cast<float>(workspace.getWidth());
+    size.y = static_cast<float>(workspace.getHeight());
 }
 
 glm::mat4 Guizmo::renderGizmoForVertices(const std::list<Vertice*>& vertices,ImGuizmo::OPERATION operation, 

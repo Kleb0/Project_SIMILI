@@ -221,7 +221,7 @@ fetchSceneObjects();
 
 setInterval(() => {
     fetchSceneObjects();
-}, 2000);
+}, 200);
 document.addEventListener('mouseup', () => {
     enableSlotTextureRendering(false);
 });

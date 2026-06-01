@@ -32,13 +32,8 @@ void RaycastPerform::printRaycastDebugHeader(int mouseX, int mouseY, int viewpor
     std::cout << "[RaycastPerform] Starting raycast with " << objects.size() << " objects..." << std::endl;
 }
 
-void RaycastPerform::performRaycast(
-    int mouseX, int mouseY,
-    int workspaceX, int workspaceY,
-    int workspaceW, int workspaceH,
-    const glm::mat4& view,
-    const glm::mat4& projection,
-    const std::vector<ThreeDObject*>& objects)
+void RaycastPerform::performRaycast(int mouseX, int mouseY, int workspaceX, int workspaceY, int workspaceW, int workspaceH, 
+const glm::mat4& view, const glm::mat4& projection, const std::vector<ThreeDObject*>& objects)
 {
     if (!selector_)
         return;
@@ -55,8 +50,41 @@ void RaycastPerform::performRaycast(
     selector_->pickUpMesh(localX, localY, workspaceW, workspaceH, view, projection, objects);
 
     ThreeDObject* hit = selector_->getSelectedObject();
+
+    last_hit_objects_.clear();
     if (hit)
+    {
         std::cout << "[RaycastPerform] Hit: " << hit->getName() << std::endl;
+        last_hit_objects_.push_back(hit);
+    }
     else
-        std::cout << "[RaycastPerform] Aucun objet touche" << std::endl;
+    {
+        std::cout << "[RaycastPerform] No hit detected." << std::endl;
+    }
+
+
+}
+
+const std::vector<ThreeDObject*>& RaycastPerform::getLastHitObjects() const
+{
+    return last_hit_objects_;
+}
+
+void RaycastPerform::setLastHitObjects(const std::vector<ThreeDObject*>& objects)
+{
+    last_hit_objects_ = objects;
+}
+
+
+void RaycastPerform::addLastHitObject(ThreeDObject* obj)
+{
+    if (obj != nullptr)
+    {
+        last_hit_objects_.push_back(obj);
+    }
+}
+
+void RaycastPerform::clearLastHitObjects()
+{
+    last_hit_objects_.clear();
 }

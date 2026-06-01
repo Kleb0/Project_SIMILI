@@ -24,6 +24,8 @@
 #include "MouseStates/Mouse_Above_Workspace_State.hpp"
 #include "MouseStates/Mouse_Outside_Workspace_State.hpp"
 #include "viewportLogic/CameraControl/cameraControl.hpp"
+#include "../../WorldObjects/Entities/ThreeDObject.hpp"  
+#include "../../Engine/Guizmo.hpp"
 
 class ThreeDScreen;
 class VKContext;
@@ -35,6 +37,7 @@ class SDL_ApplicationWindow;
 class PanelResizingLogic;
 class ThreeDObjectSelector;
 class RaycastPerform;
+class Guizmo;
 
 class AppRenderHandler : public CefRenderHandler
 {
@@ -200,6 +203,18 @@ class SDL_ApplicationWindow
 		VkSemaphore getImageAvailableSemaphore() const { return vk_image_available_semaphore_; }
 		VkSemaphore getRenderFinishedSemaphore() const { return vk_render_finished_semaphore_; }
 		VkFence getInFlightFence() const { return vk_in_flight_fence_; }
+
+		// ===== Workspace projection ====== // 
+
+		void updateWorkspaceProjectionData();
+
+		int workspaceX_;
+		int workspaceY_;
+		int workspaceWidth_;
+		int workspaceHeight_;
+		glm::mat4 viewMatrix_;
+		glm::mat4 projectionMatrix_;
+		std::list<ThreeDObject*> selectedObjectsList_;  
 		
 	private:
 		// === Window State ===
@@ -231,8 +246,6 @@ class SDL_ApplicationWindow
 		CefRefPtr<SIMILICefClient> simili_cef_client_;		
 		CefRefPtr<CefBrowser> browser_;
 		CefRefPtr<CefRenderHandler> cef_render_handler_;
-
-		
 		
 		// === Graphics Components ===
 		bool ui_manager_vulkan_initialized_;
@@ -331,4 +344,13 @@ class SDL_ApplicationWindow
 		bool finalizeAndSubmitCommandBuffer(VkCommandBuffer commandBuffer);
 		void presentToScreen();
 		void frameCounter();
+
+		// ===== ImGui / ImGuizmo Integration ===== //
+		VkDescriptorPool imgui_descriptor_pool_;
+		VkRenderPass imgui_render_pass_;
+		VkCommandBuffer imgui_command_buffer_;
+		bool imgui_initialized_;
+		bool initializeImGui();
+		void shutdownImGui();
+		void renderImGui();
 };

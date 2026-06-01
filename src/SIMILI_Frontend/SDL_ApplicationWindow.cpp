@@ -18,6 +18,8 @@
 #include "viewportLogic/Raycasting/RaycastPerform.hpp"
 #include <SDL3/SDL_vulkan.h>
 #include "include/cef_browser.h"
+#include "backends/imgui_impl_sdl3.h"
+#include "backends/imgui_impl_vulkan.h"
 #include <set>
 #include <cstring>
 
@@ -145,6 +147,10 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, state_scaling_up_(this)
 	, current_state_(&state_init_)
 	, current_mouse_state_(&mouse_state_outside_workspace_)
+	, imgui_descriptor_pool_(VK_NULL_HANDLE)
+	, imgui_render_pass_(VK_NULL_HANDLE)
+	, imgui_command_buffer_(VK_NULL_HANDLE)
+	, imgui_initialized_(false)
 {
 }
 SDL_ApplicationWindow::~SDL_ApplicationWindow()
@@ -1251,26 +1257,56 @@ void SDL_ApplicationWindow::renderFrame()
 		if (pending_left_click_ && raycast_perform_ && camera_ && vk_scene_ && ui_manager_)
 		{
 			pending_left_click_ = false;
-			const SIMILI::Frontend::WorkSpace& ws = ui_manager_->getWorkSpace();
-			if (ws.isValid())
+			updateWorkspaceProjectionData();
+			
+			float aspectRatio = (workspaceHeight_ > 0)
+				? static_cast<float>(workspaceWidth_) / static_cast<float>(workspaceHeight_)
+				: 1.0f;
+
+			viewMatrix_ = camera_->getViewMatrix();
+			projectionMatrix_ = camera_->getProjectionMatrix(aspectRatio);
+
+			const std::list<ThreeDObject*>& objList = vk_scene_->getObjectsRef();
+			std::vector<ThreeDObject*> objects(objList.begin(), objList.end());
+
+			raycast_perform_->performRaycast(
+				mouseX, mouseY,
+				workspaceX_, workspaceY_,
+				workspaceWidth_, workspaceHeight_,
+				viewMatrix_, projectionMatrix_,
+				objects);
+
+			const std::vector<ThreeDObject*>& selectedObjects = raycast_perform_->getLastHitObjects(); 
+			std::list<ThreeDObject*> selectedObjectsList(selectedObjects.begin(), selectedObjects.end());
+
+			std::cout << " [SDL_ApplicationWindow RenderFrame] the selected objects are : " << std::endl;
+
+			vk_scene_->setSelectedObjects(selectedObjectsList);
+		}
+
+		if (!vk_scene_->getSelectedObjects().empty())
+		{
+			updateWorkspaceProjectionData();
+
+			// Recompute view/proj every frame so the gizmo follows the camera
+			if (camera_ && workspaceHeight_ > 0)
 			{
-				float aspectRatio = (ws.getHeight() > 0)
-					? static_cast<float>(ws.getWidth()) / static_cast<float>(ws.getHeight())
-					: 1.0f;
-
-				glm::mat4 view = camera_->getViewMatrix();
-				glm::mat4 proj = camera_->getProjectionMatrix(aspectRatio);
-
-				const std::list<ThreeDObject*>& objList = vk_scene_->getObjectsRef();
-				std::vector<ThreeDObject*> objects(objList.begin(), objList.end());
-
-				raycast_perform_->performRaycast(
-					mouseX, mouseY,
-					ws.getX(), ws.getY(),
-					ws.getWidth(), ws.getHeight(),
-					view, proj,
-					objects);
+				float aspectRatio = static_cast<float>(workspaceWidth_) / static_cast<float>(workspaceHeight_);
+				viewMatrix_ = camera_->getViewMatrix();
+				projectionMatrix_ = camera_->getProjectionMatrix(aspectRatio);
 			}
+
+			// Start an ImGui frame so ImGuizmo can draw into its overlay draw list
+			ImGui_ImplVulkan_NewFrame();
+			ImGui_ImplSDL3_NewFrame();
+			ImGui::NewFrame();
+
+			// Render gizmo for the selected objects
+			Guizmo::renderGizmoForObject(vk_scene_->getSelectedObjects(), ImGuizmo::TRANSLATE, viewMatrix_, projectionMatrix_, 
+			ImVec2(static_cast<float>(workspaceX_), static_cast<float>(workspaceY_)), ImVec2(static_cast<float>(workspaceWidth_), static_cast<float>(workspaceHeight_)));
+
+			// Submit ImGui draw data (including the gizmo) as an overlay render pass
+			renderImGui();
 		}
 
 		prev_middle_button_down_ = middleDown;
@@ -1502,8 +1538,193 @@ bool SDL_ApplicationWindow::initializeVulkan()
 	}
 	std::cout << "[SDL_ApplicationWindow] Sync objects created" << std::endl;
 
+	if (!initializeImGui())
+	{
+		std::cerr << "[SDL_ApplicationWindow] Failed to initialize ImGui" << std::endl;
+		return false;
+	}
+
 	std::cout << "[SDL_ApplicationWindow] Vulkan initialized successfully" << std::endl;
 	return true;
+}
+
+// ===== ImGui Integration ===== //
+
+bool SDL_ApplicationWindow::initializeImGui()
+{
+	VkDevice device = vk_context_->getDevice();
+
+	// Descriptor pool for ImGui
+	VkDescriptorPoolSize poolSizes[] = {
+		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 16 },
+	};
+	VkDescriptorPoolCreateInfo poolInfo{};
+	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+	poolInfo.maxSets = 16;
+	poolInfo.poolSizeCount = 1;
+	poolInfo.pPoolSizes = poolSizes;
+	if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &imgui_descriptor_pool_) != VK_SUCCESS)
+	{
+		std::cerr << "[SDL_ApplicationWindow] initializeImGui: failed to create descriptor pool" << std::endl;
+		return false;
+	}
+
+	// ImGui render pass: LOAD_OP_LOAD so it overlays on top of the already-rendered frame
+	VkAttachmentDescription colorAttachment{};
+	colorAttachment.format = VK_FORMAT_B8G8R8A8_UNORM;
+	colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+	colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+	colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	colorAttachment.initialLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+	colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+	VkAttachmentReference colorRef{};
+	colorRef.attachment = 0;
+	colorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	VkSubpassDescription subpass{};
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.colorAttachmentCount = 1;
+	subpass.pColorAttachments = &colorRef;
+
+	VkSubpassDependency dep{};
+	dep.srcSubpass = VK_SUBPASS_EXTERNAL;
+	dep.dstSubpass = 0;
+	dep.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dep.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dep.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	dep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+	VkRenderPassCreateInfo rpInfo{};
+	rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	rpInfo.attachmentCount = 1;
+	rpInfo.pAttachments = &colorAttachment;
+	rpInfo.subpassCount = 1;
+	rpInfo.pSubpasses = &subpass;
+	rpInfo.dependencyCount = 1;
+	rpInfo.pDependencies = &dep;
+	if (vkCreateRenderPass(device, &rpInfo, nullptr, &imgui_render_pass_) != VK_SUCCESS)
+	{
+		std::cerr << "[SDL_ApplicationWindow] initializeImGui: failed to create render pass" << std::endl;
+		return false;
+	}
+
+	// Allocate a dedicated command buffer for ImGui submission
+	VkCommandBufferAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.commandPool = vk_command_pool_;
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandBufferCount = 1;
+	if (vkAllocateCommandBuffers(device, &allocInfo, &imgui_command_buffer_) != VK_SUCCESS)
+	{
+		std::cerr << "[SDL_ApplicationWindow] initializeImGui: failed to allocate command buffer" << std::endl;
+		return false;
+	}
+
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGui::GetIO().IniFilename = nullptr;
+
+	ImGui_ImplSDL3_InitForVulkan(window_);
+
+	ImGui_ImplVulkan_InitInfo initInfo{};
+	initInfo.Instance = vk_context_->getInstance();
+	initInfo.PhysicalDevice = vk_context_->getPhysicalDevice();
+	initInfo.Device = device;
+	initInfo.QueueFamily = vk_context_->getGraphicsQueueFamily();
+	initInfo.Queue = vk_context_->getGraphicsQueue();
+	initInfo.DescriptorPool = imgui_descriptor_pool_;
+	initInfo.RenderPass = imgui_render_pass_;
+	initInfo.MinImageCount  = 2;
+	initInfo.ImageCount = static_cast<uint32_t>(vk_swapchain_images_.size());
+	initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+	ImGui_ImplVulkan_Init(&initInfo);
+
+	imgui_initialized_ = true;
+	std::cout << "[SDL_ApplicationWindow] ImGui+ImGuizmo initialized" << std::endl;
+	return true;
+}
+
+void SDL_ApplicationWindow::shutdownImGui()
+{
+	if (!imgui_initialized_) return;
+	vkDeviceWaitIdle(vk_context_->getDevice());
+	ImGui_ImplVulkan_Shutdown();
+	ImGui_ImplSDL3_Shutdown();
+	ImGui::DestroyContext();
+	if (imgui_render_pass_ != VK_NULL_HANDLE)
+	{
+		vkDestroyRenderPass(vk_context_->getDevice(), imgui_render_pass_, nullptr);
+		imgui_render_pass_ = VK_NULL_HANDLE;
+	}
+	if (imgui_descriptor_pool_ != VK_NULL_HANDLE)
+	{
+		vkDestroyDescriptorPool(vk_context_->getDevice(), imgui_descriptor_pool_, nullptr);
+		imgui_descriptor_pool_ = VK_NULL_HANDLE;
+	}
+	imgui_initialized_ = false;
+	std::cout << "[SDL_ApplicationWindow] ImGui shut down" << std::endl;
+}
+
+void SDL_ApplicationWindow::renderImGui()
+{
+	if (!imgui_initialized_) return;
+
+	ImGui::Render();
+	ImDrawData* drawData = ImGui::GetDrawData();
+	if (!drawData || drawData->TotalVtxCount == 0) return;
+
+	VkDevice device = vk_context_->getDevice();
+	VkCommandBuffer cmd = imgui_command_buffer_;
+
+	vkResetCommandBuffer(cmd, 0);
+
+	VkCommandBufferBeginInfo beginInfo{};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	vkBeginCommandBuffer(cmd, &beginInfo);
+
+	int width, height;
+	SDL_GetWindowSizeInPixels(window_, &width, &height);
+
+	// Build a temporary framebuffer for this overlay pass (color only, no depth)
+	VkImageView colorView = vk_swapchain_image_views_[current_image_index_];
+	VkFramebufferCreateInfo fbInfo{};
+	fbInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	fbInfo.renderPass = imgui_render_pass_;
+	fbInfo.attachmentCount = 1;
+	fbInfo.pAttachments = &colorView;
+	fbInfo.width  = static_cast<uint32_t>(width);
+	fbInfo.height = static_cast<uint32_t>(height);
+	fbInfo.layers = 1;
+	VkFramebuffer fb = VK_NULL_HANDLE;
+	vkCreateFramebuffer(device, &fbInfo, nullptr, &fb);
+
+	VkRenderPassBeginInfo rpBegin{};
+	rpBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	rpBegin.renderPass = imgui_render_pass_;
+	rpBegin.framebuffer = fb;
+	rpBegin.renderArea.offset = {0, 0};
+	rpBegin.renderArea.extent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
+	rpBegin.clearValueCount = 0;
+	vkCmdBeginRenderPass(cmd, &rpBegin, VK_SUBPASS_CONTENTS_INLINE);
+
+	ImGui_ImplVulkan_RenderDrawData(drawData, cmd);
+
+	vkCmdEndRenderPass(cmd);
+	vkEndCommandBuffer(cmd);
+
+	VkSubmitInfo submitInfo{};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &cmd;
+	vkQueueSubmit(vk_context_->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+	vkQueueWaitIdle(vk_context_->getGraphicsQueue());
+
+	vkDestroyFramebuffer(device, fb, nullptr);
 }
 
 void SDL_ApplicationWindow::cleanupVulkan()
@@ -1512,6 +1733,8 @@ void SDL_ApplicationWindow::cleanupVulkan()
 	{
 		return;
 	}
+
+	shutdownImGui();
 
 	VkDevice device = vk_context_->getDevice();
 	
@@ -2312,4 +2535,15 @@ void SDL_ApplicationWindow::frameCounter()
 	{
 		std::cout << "[SDL_ApplicationWindow] renderFrame() called " << render_frame_count << " times" << std::endl;
 	}
+}
+
+void SDL_ApplicationWindow::updateWorkspaceProjectionData()
+{
+
+	const auto& workspace = ui_manager_->getWorkSpace();
+
+	workspaceX_ = workspace.getX();
+	workspaceY_ = workspace.getY();
+	workspaceWidth_ = workspace.getWidth();
+	workspaceHeight_ = workspace.getHeight();
 }

@@ -22,6 +22,14 @@ public:
     void printRaycastDebugHeader(int mouseX, int mouseY, int viewportWidth, int viewportHeight,
         const glm::vec3& cameraPos, const std::vector<ThreeDObject*>& objects);
 
+    const std::vector<ThreeDObject*>& getLastHitObjects() const;
+    void setLastHitObjects(const std::vector<ThreeDObject*>& objects);
+    void addLastHitObject(ThreeDObject* obj);
+    void clearLastHitObjects();
+
+    std::vector<ThreeDObject*> last_hit_objects_;
+
+
 private:
     ThreeDObjectSelector* selector_;
 };

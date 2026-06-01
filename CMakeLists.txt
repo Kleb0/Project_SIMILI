@@ -256,6 +256,7 @@ file(GLOB IMGUI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/imgui_widgets.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/backends/imgui_impl_sdl3.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/backends/imgui_impl_opengl3.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/backends/imgui_impl_vulkan.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/imgui_demo.cpp
 )
 
@@ -267,10 +268,12 @@ target_include_directories(imgui PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ThirdParty/imgui/backends
     ${SDL3_INCLUDE_DIR}
+    ${Vulkan_INCLUDE_DIRS}
 )
 
 target_link_libraries(imgui PRIVATE
     ${SDL3_LIBRARY}
+    ${Vulkan_LIBRARIES}
 )
 
 target_compile_definitions(imgui PRIVATE IMGUI_USER_CONFIG="my_imgui_config.h")

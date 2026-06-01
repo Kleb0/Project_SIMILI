@@ -68,6 +68,10 @@ public:
     void drawThreeDScene(VkCommandBuffer commandBuffer, int vpX, int vpY, int vpW, int vpH,
         const glm::mat4& view, const glm::mat4& proj);
 
+    std::list<ThreeDObject*> selectedObjects;
+    void setSelectedObjects(const std::list<ThreeDObject*>& objs);
+    const std::list<ThreeDObject*>& getSelectedObjects() const { return selectedObjects; }
+
 private:
     glm::mat4 lastViewProj{1.0f};
     std::list<ThreeDObject*> objects;
@@ -106,6 +110,9 @@ private:
     bool scene_pipeline_initialized_ = false;
     VkBuffer background_vertex_buffer_ = VK_NULL_HANDLE;
     VkDeviceMemory background_vertex_memory_ = VK_NULL_HANDLE;
+
+    //list of Selected ThreeDObjects for rendering selection highlights
+  
 
     VkBuffer gridVertexBuffer;
     VkDeviceMemory gridVertexBufferMemory;
