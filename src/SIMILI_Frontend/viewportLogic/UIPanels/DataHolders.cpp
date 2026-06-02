@@ -125,73 +125,74 @@ void DataHolders::setInstance(DataHolders* instance)
 	s_instance_ = instance;
 }
 
-bool DataHolders::receiveDataHolders(const std::string& jsonBody)
+void DataHolders::initPlaceholderValues()
 {
-	json requestData = json::parse(jsonBody, nullptr, false);
-	if (requestData.is_discarded())
+	const std::string panel = "object_inspector_panel";
+	std::lock_guard<std::mutex> lock(mutex_);
+
+	data_field_names_[panel] = 
 	{
-		return false;
-	}
+        "selected_object",
+        "position_x", 
+		"position_y", 
+		"position_z",
+        "rotation_x", 
+		"rotation_y", 
+		"rotation_z",
+        "scale_x", 
+		"scale_y",
+		"scale_z"
+    };
 
-	if (!requestData.contains("panel") || !requestData.contains("dataHolders") || !requestData["dataHolders"].is_array())
-	{
-		return false;
-	}
-
-	std::string panelName = requestData["panel"];
-	std::vector<DataHolderEntry> entries;
-
-	for (const auto& holder : requestData["dataHolders"])
-	{
-		if (holder.contains("field"))
-		{
-			DataHolderEntry e;
-			e.field = holder["field"].get<std::string>();
-			e.relX = holder.value("x", 0);
-			e.relY = holder.value("y", 0);
-			e.width = holder.value("w", 50);
-			e.height = holder.value("h", 20);
-			entries.push_back(std::move(e));
-		}
-	}
-
-	float vpFracW = requestData.value("vpFracW", 0.0f);
-	float vpFracH = requestData.value("vpFracH", 0.0f);
-
-	int entryCount = static_cast<int>(entries.size());
-	{
-		std::lock_guard<std::mutex> lock(mutex_);
-		panel_fields_[panelName] = std::move(entries);
-		if (vpFracW > 0.0f && vpFracH > 0.0f)
-			panel_viewport_fracs_[panelName] = { vpFracW, vpFracH };
-
-		auto& fields = panel_fields_[panelName];
-		for (const auto& e : fields)
-		{
-			if (e.field == "selected_object")
-			{
-				if (field_values_[panelName].find("selected_object") == field_values_[panelName].end())
-				{
-					if (panelName == "object_inspector_panel")
-						field_values_[panelName]["selected_object"] = "---- none ----";
-					else
-						field_values_[panelName]["selected_object"] = "No parent";
-				}
-				break;
-			}
-		}
-	}
-
-	std::cout << "[DataHolders] " << panelName << " -> Contains " << entryCount << " DataHolder(s)" << std::endl;
-
-	return true;
+	field_values_[panel]["selected_object"]  = "---- six seven ----";
+	field_values_[panel]["position_x"] = "0.0";
+	field_values_[panel]["position_y"] = "0.0";
+	field_values_[panel]["position_z"] = "0.0";
+	field_values_[panel]["rotation_x"] = "0.0";
+	field_values_[panel]["rotation_y"] = "0.0";
+	field_values_[panel]["rotation_z"] = "0.0";
+	field_values_[panel]["scale_x"] = "6";
+	field_values_[panel]["scale_y"] = "7";
+	field_values_[panel]["scale_z"] = "0.0";
 }
+
+// void DataHolders::computeDataHolders()
+// {
+//     // Use map instead of vector of DataHolderEntry
+//     std::map<std::string, std::string> dataHolder_values;
+// 	std::string panelName = "object_inspector_panel"; 
+// 	nlohmann::json requestData;
+    
+//     // Process the data holders (assuming requestData contains the JSON data)
+//     for (const auto& holder : requestData["dataHolders"])
+//     {
+//         if (holder.contains("field"))
+//         {
+//             std::string field = holder["field"].get<std::string>();
+//             // Store field name as key and default value as empty string
+//             // Position information is now handled differently
+//             dataHolder_values[field] = "";
+//         }
+//     }
+
+// 	field_values_[panel]["selected_object"]  = "---- none ----";
+// 	field_values_[panel]["position_x"] = "0.0";
+// 	field_values_[panel]["position_y"] = "0.0";
+// 	field_values_[panel]["position_z"] = "0.0";
+// 	field_values_[panel]["rotation_x"] = "0.0";
+// 	field_values_[panel]["rotation_y"] = "0.0";
+// 	field_values_[panel]["rotation_z"] = "0.0";
+// 	field_values_[panel]["scale_x"] = "0.0";
+// 	field_values_[panel]["scale_y"] = "0.0";
+// 	field_values_[panel]["scale_z"] = "0.0";
+
+// }
 
 int DataHolders::getCountForPanel(const std::string& panelName) const
 {
 	std::lock_guard<std::mutex> lock(mutex_);
-	auto it = panel_fields_.find(panelName);
-	if (it != panel_fields_.end())
+	auto it = field_values_.find(panelName);
+	if (it != field_values_.end())
 	{
 		return static_cast<int>(it->second.size());
 	}
@@ -229,21 +230,13 @@ std::string DataHolders::getValuesAsJson(const std::string& panelName) const
 	return result.dump();
 }
 
-void DataHolders::initPlaceholderValues()
+void DataHolders::setFieldRect(const std::string& panelName, const std::string& field, int x, int y, int w, int h)
 {
-	const std::string panel = "object_inspector_panel";
 	std::lock_guard<std::mutex> lock(mutex_);
-	field_values_[panel]["selected_object"]  = "---- none ----";
-	field_values_[panel]["position_x"] = "0.0";
-	field_values_[panel]["position_y"] = "0.0";
-	field_values_[panel]["position_z"] = "0.0";
-	field_values_[panel]["rotation_x"] = "0.0";
-	field_values_[panel]["rotation_y"] = "0.0";
-	field_values_[panel]["rotation_z"] = "0.0";
-	field_values_[panel]["scale_x"] = "0.0";
-	field_values_[panel]["scale_y"] = "0.0";
-	field_values_[panel]["scale_z"] = "0.0";
+	field_rects_[panelName][field] = { x, y, w, h };
 }
+
+
 
 bool DataHolders::initializeVulkan(VKContext* context, VulkanPipeline* pipelines, VkRenderPass renderPass)
 {
@@ -414,7 +407,7 @@ uint32_t DataHolders::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags 
 	return 0;
 }
 
-void DataHolders::drawForPanel(
+void DataHolders::drawTextData(
 	const std::string& panelName,
 	int panelDrawX, int panelDrawY, int panelDrawW, int panelDrawH,
 	int logicalW, int logicalH,
@@ -432,7 +425,6 @@ void DataHolders::drawForPanel(
 	}
 	else if (vk_render_pass_ != renderPass)
 	{
-		// RenderPass was recreated (e.g. window resize): rebuild pipeline
 		cleanupVulkan();
 		if (!initializeVulkan(vkContext, vkPipelines, renderPass)) return;
 	}
@@ -442,19 +434,26 @@ void DataHolders::drawForPanel(
 		if (!initializeVulkan(vkContext, vkPipelines, renderPass)) return;
 	}
 
-	std::vector<DataHolderEntry> entries;
-	std::map<std::string, std::string> values;
+	// we will iterate on map dataFieldNames
+
+	std::map<std::string, std::string> dataFieldsToDisplay;
+	std::vector<std::string> dataFieldNames;
 	{
 		std::lock_guard<std::mutex> lock(mutex_);
-		auto it = panel_fields_.find(panelName);
-		if (it == panel_fields_.end() || it->second.empty()) return;
-		entries = it->second;
-		auto vit = field_values_.find(panelName);
-		if (vit != field_values_.end())
-			values = vit->second;
+		auto vit = data_field_names_.find(panelName);
+		if (vit != data_field_names_.end())
+		dataFieldNames = vit->second;
 	}
 
-	int count = std::min(static_cast<int>(entries.size()), kMaxOverlays);
+	for (const auto& fieldName : dataFieldNames)
+	{
+		dataFieldsToDisplay[fieldName] = getFieldValue(panelName, fieldName);
+
+	}
+
+
+
+	int count = static_cast<int>(dataFieldsToDisplay.size()); 
 	float scaleX = (logicalW > 0) ? static_cast<float>(panelDrawW) / logicalW : 1.0f;
 	float scaleY = (logicalH > 0) ? static_cast<float>(panelDrawH) / logicalH : 1.0f;
 
@@ -484,21 +483,37 @@ void DataHolders::drawForPanel(
 	scissor.extent = { static_cast<uint32_t>(scissorW), static_cast<uint32_t>(scissorH) };
 	vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 
-	for (int i = 0; i < count; i++)
+	int index = 0; 
+	for (const auto& entry  : dataFieldsToDisplay)
 	{
-		const auto& e = entries[i];
+		const auto& field = entry.first;  // get field name
+		const auto& value = entry.second; // get field value
+
 
 		std::string text;
-		auto vit2 = values.find(e.field);
-		if (vit2 != values.end())
+		auto vit2 = dataFieldsToDisplay.find(field);
+		if (vit2 != dataFieldsToDisplay.end())
 			text = vit2->second;
 		if (text.empty())
 			continue;
 
-		int texW = std::max(1, e.width);
-		int texH = std::max(1, e.height);
+		int texW = 100;
+		int texH = 20;
+		{
+			std::lock_guard<std::mutex> lock(mutex_);
+			auto panelIt = field_rects_.find(panelName);
+			if (panelIt != field_rects_.end())
+			{
+				auto fieldIt = panelIt->second.find(field);
+				if (fieldIt != panelIt->second.end())
+				{
+					texW = std::max(10, fieldIt->second.w);
+					texH = std::max(10, fieldIt->second.h);
+				}
+			}
+		}
 
-		TextOverlay& ov = text_overlays_[i];
+		TextOverlay& ov = text_overlays_[index];
 		if (ov.lastText != text || ov.lastWidth != texW || ov.lastHeight != texH)
 		{
 			cleanupTextOverlay(ov);
@@ -511,10 +526,38 @@ void DataHolders::drawForPanel(
 		if (ov.descriptorSet == VK_NULL_HANDLE)
 			continue;
 
-		float ax = panelDrawX + e.relX * scaleX;
-		float ay = panelDrawY + e.relY * scaleY;
-		float bx = ax + e.width  * scaleX;
-		float by = ay + e.height * scaleY;
+		// Use stored field rect if available, otherwise fall back to i*30 layout
+		float ax, ay, bx, by;
+		{
+			std::lock_guard<std::mutex> lock(mutex_);
+			auto panelIt = field_rects_.find(panelName);
+			if (panelIt != field_rects_.end())
+			{
+				auto fieldIt = panelIt->second.find(field);
+				if (fieldIt != panelIt->second.end())
+				{
+					const FieldRect& r = fieldIt->second;
+					ax = panelDrawX + r.x * scaleX;
+					ay = panelDrawY + r.y * scaleY;
+					bx = panelDrawX + (r.x + r.w) * scaleX;
+					by = panelDrawY + (r.y + r.h) * scaleY;
+				}
+				else
+				{
+					ax = panelDrawX + 10 * scaleX;
+					ay = panelDrawY + (index * 30) * scaleY;
+					bx = ax + texW * scaleX;
+					by = ay + texH * scaleY;
+				}
+			}
+			else
+			{
+				ax = panelDrawX + 10 * scaleX;
+				ay = panelDrawY + (index * 30) * scaleY;
+				bx = ax + texW * scaleX;
+				by = ay + texH * scaleY;
+			}
+		}
 
 		float ndcX0 = 2.0f * ax / drawableW - 1.0f;
 		float ndcY0 = 2.0f * ay / drawableH - 1.0f;
@@ -532,7 +575,7 @@ void DataHolders::drawForPanel(
 
 		void* mapped;
 		vkMapMemory(vkContext->getDevice(), vertex_buffer_memory_,
-			i * 6 * 4 * sizeof(float), 6 * 4 * sizeof(float), 0, &mapped);
+			index * 6 * 4 * sizeof(float), 6 * 4 * sizeof(float), 0, &mapped);
 		std::memcpy(mapped, verts, sizeof(verts));
 		vkUnmapMemory(vkContext->getDevice(), vertex_buffer_memory_);
 
@@ -540,9 +583,10 @@ void DataHolders::drawForPanel(
 			text_pipeline_->layout, 0, 1, &ov.descriptorSet, 0, nullptr);
 
 		VkBuffer buf = vertex_buffer_;
-		VkDeviceSize offset = static_cast<VkDeviceSize>(i * 6 * 4 * sizeof(float));
+		VkDeviceSize offset = static_cast<VkDeviceSize>(index * 6 * 4 * sizeof(float));
 		vkCmdBindVertexBuffers(cmdBuffer, 0, 1, &buf, &offset);
 		vkCmdDraw(cmdBuffer, 6, 1, 0, 0);
+		++index;
 	}
 
 	VkRect2D fullScissor{};
@@ -773,4 +817,9 @@ void DataHolders::cleanupVulkan()
 	}
 	text_pipeline_ = nullptr;
 	vulkan_initialized_ = false;
+}
+
+void DataHolders::setVKScene(std::shared_ptr<VKScene> scene)
+{
+    vk_scene_ = scene;
 }

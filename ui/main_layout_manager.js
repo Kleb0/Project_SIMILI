@@ -222,48 +222,6 @@ function scheduleUIPanelIFramesSync() {
     }, 120);
 }
 
-function sendDataHoldersToServer() {
-    var iframes = document.querySelectorAll('.main-container iframe');
-    iframes.forEach(function(iframe) {
-        try {
-            var doc = iframe.contentDocument || iframe.contentWindow.document;
-            if (!doc) return;
-
-            var container = doc.querySelector('[data-panel]');
-            if (!container) return;
-
-            var panelName = container.getAttribute('data-panel');
-            var holders = container.querySelectorAll('input[data-field], span[data-field], .selected-object[data-field]');
-            if (!holders || holders.length === 0) return;
-
-            var dataHolders = [];
-            holders.forEach(function(el) {
-                var rect = el.getBoundingClientRect();
-                dataHolders.push({
-                    field: el.getAttribute('data-field'),
-                    parent: panelName,
-                    x: Math.round(rect.left),
-                    y: Math.round(rect.top),
-                    w: Math.round(rect.width),
-                    h: Math.round(rect.height)
-                });
-            });
-
-            var vpW = doc.documentElement.clientWidth;
-            var vpH = doc.documentElement.clientHeight;
-            var iframeW = iframe.clientWidth || iframe.offsetWidth || 1;
-            var iframeH = iframe.clientHeight || iframe.offsetHeight || 1;
-            var vpFracW = (iframeW > 0) ? vpW / iframeW : 1.0;
-            var vpFracH = (iframeH > 0) ? vpH / iframeH : 1.0;
-
-            fetch('http://localhost:8080/api/dataholder/send', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ panel: panelName, vpFracW: vpFracW, vpFracH: vpFracH, dataHolders: dataHolders })
-            }).catch(function() {});
-        } catch(e) {}
-    });
-}
 
 // Execute immediately instead of waiting for DOMContentLoaded (CEF issue)
 fetch('http://localhost:8080/api/debug/init-start', { method: 'POST', body: 'Init start from main_layout_manager' }).catch(() => {});
@@ -275,8 +233,12 @@ window.addEventListener('load', () => {
         sendUIPanelIFramesToServer();
     }, 500);
     setTimeout(() => {
-        sendDataHoldersToServer();
-    }, 500);
+        if (typeof sendAllPanelFieldPositions === 'function') sendAllPanelFieldPositions();
+    }, 600);
+});
+
+window.addEventListener('resize', () => {
+    if (typeof sendAllPanelFieldPositions === 'function') sendAllPanelFieldPositions();
 });
 
 window.addEventListener('resize', () => {
@@ -284,7 +246,6 @@ window.addEventListener('resize', () => {
 });
 
 window.sendUIPanelIFramesToServer = sendUIPanelIFramesToServer;
-window.sendDataHoldersToServer = sendDataHoldersToServer;
 
 function pollDataHolderValues() {
     var panelConfigs = [

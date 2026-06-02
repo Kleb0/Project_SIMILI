@@ -77,6 +77,7 @@ private:
     std::list<ThreeDObject*> objects;
     std::list<ThreeDObject*> graveyard;
     std::vector<VKGraveyardEntry> meshGraveyard;
+    
 
     Camera* activeCamera{nullptr};
     VKContext* vkctx{nullptr};

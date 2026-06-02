@@ -406,7 +406,7 @@ void UIPanel::drawDataHolderOverlays(VkCommandBuffer commandBuffer, int drawable
 	DataHolders* dh = DataHolders::getInstance();
 	if (!dh) return;
 
-	dh->drawForPanel(
+	dh->drawTextData(
 		name_,
 		x_, y_, width_, height_,
 		last_frame_width_, last_frame_height_,

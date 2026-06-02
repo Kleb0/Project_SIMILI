@@ -10,15 +10,7 @@
 #include <vulkan/vulkan.h>
 
 class VKContext;
-
-struct DataHolderEntry
-{
-	std::string field;
-	int relX;
-	int relY;
-	int width;
-	int height;
-};
+class VKScene;
 
 struct TextOverlay
 {
@@ -32,6 +24,11 @@ struct TextOverlay
 	int lastHeight = 0;
 };
 
+struct FieldRect
+{
+	int x = 0, y = 0, w = 0, h = 0;
+};
+
 class DataHolders
 {
 public:
@@ -41,16 +38,18 @@ public:
 	static DataHolders* getInstance();
 	static void setInstance(DataHolders* instance);
 
-	bool receiveDataHolders(const std::string& jsonBody);
+	void computeDataHolders();
 	int getCountForPanel(const std::string& panelName) const;
 
 	void setFieldValue(const std::string& panelName, const std::string& field, const std::string& value);
 	std::string getFieldValue(const std::string& panelName, const std::string& field) const;
 	std::string getValuesAsJson(const std::string& panelName) const;
 
+	void setFieldRect(const std::string& panelName, const std::string& field, int x, int y, int w, int h);
+
 	void initPlaceholderValues();
 
-	void drawForPanel(
+	void drawTextData(
 		const std::string& panelName,
 		int panelDrawX, int panelDrawY, int panelDrawW, int panelDrawH,
 		int logicalW, int logicalH,
@@ -59,8 +58,22 @@ public:
 
 	void cleanupVulkan();
 
+	std::shared_ptr<VKScene> getVKScene() const;
+	void setVKScene(std::shared_ptr<VKScene> scene);
+	std::shared_ptr<VKScene> vk_scene_;
+
+	std::map<std::string, std::vector<std::string>> data_field_names_; 
+	 std::map<std::string, std::map<std::string, std::string>> data_holder_values_; 
+
+
+	// turn dataHolder_values as list 
+
+	// DataHolderEntry definition
+
+
+
 private:
-	static DataHolders* s_instance_;
+	static DataHolders* s_instance_;	
 
 	bool initializeVulkan(VKContext* context, VulkanPipeline* pipelines, VkRenderPass renderPass);
 	bool createVertexBuffer();
@@ -71,9 +84,13 @@ private:
 	static std::vector<uint8_t> rasterizeText(const std::string& text, int width, int height);
 
 	mutable std::mutex mutex_;
-	std::map<std::string, std::vector<DataHolderEntry>> panel_fields_;
+
+	// Deprecated: using DataHolderEntry
+	// std::map<std::string, std::vector<DataHolderEntry>> panel_fields_;
+
 	std::map<std::string, std::pair<float,float>> panel_viewport_fracs_;
 	std::map<std::string, std::map<std::string, std::string>> field_values_;
+	std::map<std::string, std::map<std::string, FieldRect>> field_rects_;
 
 	VKContext* vk_context_ = nullptr;
 	VulkanPipeline* vulkan_pipelines_ = nullptr;

@@ -32,9 +32,7 @@ namespace SIMILI {
 			registerContextRoutes(router, vkRenderer);
 			registerSceneRoutes(router, scene, vkRenderer);
 			registerObjectRoutes(router, scene, glfwWindow);
-			registerIFrameRoutes(router, frameCatcher, uiManager);
-			registerDataHolderRoutes(router);
-			
+			registerIFrameRoutes(router, frameCatcher, uiManager);			
 			std::cout << "[RoutesManager] All routes registered successfully" << std::endl;
 		}
 
@@ -721,115 +719,53 @@ namespace SIMILI {
 		}, "Get all UI panel iframes");
 		
 		std::cout << "[RoutesManager] IFrame routes registered" << std::endl;
-		}
 
-		void RoutesManager::registerDataHolderRoutes(RouterSim& router)
-		{
-			router.post("/api/dataholder/send", [](const Message& msg) -> Response
+			// Route: receive field bounding rects from object_inspector iframe
+			router.post("/api/dataholder/field-positions", [](const Message& msg) -> Response
 			{
 				Response resp;
 				resp.headers["Access-Control-Allow-Origin"] = "*";
 				resp.headers["Content-Type"] = "application/json";
-
-				DataHolders* dataHolders = DataHolders::getInstance();
-				if (!dataHolders)
-				{
-					resp.statusCode = 500;
-					resp.statusMessage = "Internal Server Error";
-					resp.body = "{\"success\": false, \"error\": \"DataHolders not initialized\"}";
-					return resp;
-				}
-
-				if (!dataHolders->receiveDataHolders(msg.body))
-				{
-					resp.statusCode = 400;
-					resp.statusMessage = "Bad Request";
-					resp.body = "{\"success\": false, \"error\": \"Invalid DataHolder payload\"}";
-					return resp;
-				}
-
-				resp.statusCode = 200;
-				resp.statusMessage = "OK";
-				resp.body = "{\"success\": true}";
-				return resp;
-			}, "Receive DataHolder structure from panel");
-
-			router.get("/api/dataholder/values", [](const Message& msg) -> Response
-			{
-				Response resp;
-				resp.headers["Access-Control-Allow-Origin"] = "*";
-				resp.headers["Content-Type"] = "application/json";
-
-				DataHolders* dataHolders = DataHolders::getInstance();
-				if (!dataHolders)
-				{
-					resp.statusCode = 500;
-					resp.statusMessage = "Internal Server Error";
-					resp.body = "{\"success\": false}";
-					return resp;
-				}
-
-				std::string panelName = "object_inspector_panel";
-				const auto& query = msg.params;
-				auto it = query.find("panel");
-				if (it != query.end())
-				{
-					panelName = it->second;
-				}
-
-				resp.statusCode = 200;
-				resp.statusMessage = "OK";
-				resp.body = dataHolders->getValuesAsJson(panelName);
-				return resp;
-			}, "Get DataHolder values for a panel");
-
-			router.post("/api/dataholder/values", [](const Message& msg) -> Response
-			{
-				Response resp;
-				resp.headers["Access-Control-Allow-Origin"] = "*";
-				resp.headers["Content-Type"] = "application/json";
-
-				DataHolders* dataHolders = DataHolders::getInstance();
-				if (!dataHolders)
-				{
-					resp.statusCode = 500;
-					resp.statusMessage = "Internal Server Error";
-					resp.body = "{\"success\": false}";
-					return resp;
-				}
 
 				try
 				{
-					json body = json::parse(msg.body, nullptr, false);
-					if (body.is_discarded() || !body.contains("panel") || !body.contains("values"))
+					auto body = json::parse(msg.body);
+					std::string panelName = body.value("panel", "");
+					if (panelName.empty() || !body.contains("fields"))
 					{
 						resp.statusCode = 400;
 						resp.statusMessage = "Bad Request";
-						resp.body = "{\"success\": false}";
+						resp.body = "{\"success\":false}";
 						return resp;
 					}
 
-					std::string panelName = body["panel"].get<std::string>();
-					for (auto& [field, val] : body["values"].items())
+					DataHolders* dh = DataHolders::getInstance();
+					if (dh)
 					{
-						dataHolders->setFieldValue(panelName, field, val.get<std::string>());
+						for (const auto& f : body["fields"])
+						{
+							std::string field = f.value("field", "");
+							int x = f.value("x", 0);
+							int y = f.value("y", 0);
+							int w = f.value("w", 100);
+							int h = f.value("h", 20);
+							if (!field.empty())
+								dh->setFieldRect(panelName, field, x, y, w, h);
+						}
 					}
 
 					resp.statusCode = 200;
 					resp.statusMessage = "OK";
-					resp.body = "{\"success\": true}";
+					resp.body = "{\"success\":true}";
 				}
-				catch (const std::exception&)
+				catch (...)
 				{
-					resp.statusCode = 500;
-					resp.statusMessage = "Internal Server Error";
-					resp.body = "{\"success\": false}";
+					resp.statusCode = 400;
+					resp.statusMessage = "Bad Request";
+					resp.body = "{\"success\":false}";
 				}
-
 				return resp;
-			}, "Set DataHolder values for a panel");
-
-			std::cout << "[RoutesManager] DataHolder routes registered" << std::endl;
+			}, "Receive field bounding rects for DataHolder overlay positioning");
 		}
 	}
 }

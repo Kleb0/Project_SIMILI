@@ -978,3 +978,4 @@ void VKScene::setSelectedObjects(const std::list<ThreeDObject*>& objs)
 	}	
 	std::cout << "-------- [VKScene] Selection update complete. End of Raycast ------------- " << std::endl;	
 }
+

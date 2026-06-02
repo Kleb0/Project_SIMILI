@@ -270,6 +270,8 @@ int main(int argc, char* argv[])
 
 	Camera* sceneCamera = nullptr;
 
+	dataHolders.setVKScene(std::make_shared<VKScene>(myVKScene));
+
 	for (auto* obj : VKSceneObjectContainer.getObjectsRef())
 	{
 		Camera* cam = dynamic_cast<Camera*>(obj);
