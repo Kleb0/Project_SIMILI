@@ -18,6 +18,7 @@
 #include "viewportLogic/FrameDatas/FrameDatas.hpp"
 #include "../../Engine/VulkanPipeline/VulkanPipeline.hpp"
 #include "viewportLogic/UIPanels/WorkspaceWidget.hpp"
+#include "viewportLogic/UIPanels/ContextualMenuAboveGui.hpp"
 #include "SDL_Windows_states/SDL_State_Init.hpp"
 #include "SDL_Windows_states/SDL_State_Maximized.hpp"
 #include "SDL_Windows_states/SDL_State_Reduced.hpp"
@@ -143,6 +144,7 @@ class SDL_ApplicationWindow
 		CefRefPtr<SIMILICefClient> getCefClient();
 		void setRenderPass(VkRenderPass renderPass);
 		SIMILI::Frontend::WorkspaceWidget* getWorkspaceWidget() const { return workspace_widget_; }
+		SIMILI::Frontend::ContextualMenuAboveGUI* getContextualMenuAboveGUI() const { return contextual_menu_above_gui_; }
 
 
 		// === Component Registration ===
@@ -372,4 +374,10 @@ class SDL_ApplicationWindow
 		SIMILI::Frontend::WorkspaceWidget* workspace_widget_;
 		VkCommandBuffer widget_command_buffer_;
 		void renderWorkspaceWidgets(int wsX, int wsY, int drawableW, int drawableH);
+
+		// ===== ContextualMenuAboveGUI Integration ===== //
+		SIMILI::Frontend::ContextualMenuAboveGUI* contextual_menu_above_gui_;
+		VkCommandBuffer contextual_menu_command_buffer_;
+		bool contextual_menu_visible_;
+		void RenderContextualMenuAboveUI(int drawableW, int drawableH);
 };

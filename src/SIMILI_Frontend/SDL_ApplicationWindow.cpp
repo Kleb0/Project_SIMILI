@@ -153,6 +153,9 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, imgui_initialized_(false)
 	, workspace_widget_(nullptr)
 	, widget_command_buffer_(VK_NULL_HANDLE)
+	, contextual_menu_above_gui_(nullptr)
+	, contextual_menu_command_buffer_(VK_NULL_HANDLE)
+	, contextual_menu_visible_(false)
 {
 }
 SDL_ApplicationWindow::~SDL_ApplicationWindow()
@@ -162,6 +165,12 @@ SDL_ApplicationWindow::~SDL_ApplicationWindow()
 		workspace_widget_->shutdown();
 		delete workspace_widget_;
 		workspace_widget_ = nullptr;
+	}
+	if (contextual_menu_above_gui_)
+	{
+		contextual_menu_above_gui_->shutdown();
+		delete contextual_menu_above_gui_;
+		contextual_menu_above_gui_ = nullptr;
 	}
 	if (debug_tools_)
 	{
@@ -575,6 +584,28 @@ void SDL_ApplicationWindow::setRenderPass(VkRenderPass renderPass)
 			std::cout << "[SDL_ApplicationWindow] WorkspaceWidget initialized" << std::endl;
 		}
 	}
+
+	if (imgui_render_pass_ != VK_NULL_HANDLE && !contextual_menu_above_gui_)
+	{
+		int winW = 1920, winH = 1080;
+		if (window_)
+		{
+			SDL_GetWindowSizeInPixels(window_, &winW, &winH);
+		}
+		int menuW = winW / 4;
+		int menuH = winH / 2;
+		contextual_menu_above_gui_ = new SIMILI::Frontend::ContextualMenuAboveGUI();
+		if (!contextual_menu_above_gui_->initializeVulkan(vk_context_, vulkan_pipelines_, imgui_render_pass_, menuW, menuH))
+		{
+			std::cerr << "[SDL_ApplicationWindow] ContextualMenuAboveGUI::initializeVulkan failed" << std::endl;
+			delete contextual_menu_above_gui_;
+			contextual_menu_above_gui_ = nullptr;
+		}
+		else
+		{
+			std::cout << "[SDL_ApplicationWindow] ContextualMenuAboveGUI initialized with size " << menuW << "x" << menuH << std::endl;
+		}
+	}
 }
 
 bool SDL_ApplicationWindow::createCEFPipeline()
@@ -984,6 +1015,15 @@ void SDL_ApplicationWindow::updateUIState()
 
 void SDL_ApplicationWindow::handleSDLEvent(const SDL_Event& event)
 {
+	if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_RIGHT)
+	{
+		contextual_menu_visible_ = !contextual_menu_visible_;
+		if (contextual_menu_visible_ && contextual_menu_above_gui_)
+		{
+			contextual_menu_above_gui_->SetPos(static_cast<int>(event.button.x), static_cast<int>(event.button.y));
+		}
+	}
+
 	if (event.type == SDL_EVENT_MOUSE_WHEEL && current_mouse_state_ == &mouse_state_above_workspace_)
 	{
 		pending_wheel_delta_ += event.wheel.y;
@@ -1384,6 +1424,19 @@ void SDL_ApplicationWindow::renderFrame()
 		}
 	}
 
+	// ----- render ContextualMenu above everything, GUI and workspace included -----
+	if (contextual_menu_visible_ && contextual_menu_above_gui_ && contextual_menu_command_buffer_ != VK_NULL_HANDLE)
+	{
+		contextual_menu_above_gui_->uploadPaintBuffer();
+
+		int drawableW = 0, drawableH = 0;
+		SDL_GetWindowSizeInPixels(window_, &drawableW, &drawableH);
+		if (drawableW > 0 && drawableH > 0)
+		{
+			RenderContextualMenuAboveUI(drawableW, drawableH);
+		}
+	}
+
 	presentToScreen();
 }
 
@@ -1615,17 +1668,28 @@ bool SDL_ApplicationWindow::initializeVulkan()
 		return false;
 	}
 
+	VkCommandBufferAllocateInfo widgetCmdAlloc{};
+	widgetCmdAlloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	widgetCmdAlloc.commandPool = vk_command_pool_;
+	widgetCmdAlloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	widgetCmdAlloc.commandBufferCount = 1;
+
+	if (vkAllocateCommandBuffers(vk_context_->getDevice(), &widgetCmdAlloc, &widget_command_buffer_) != VK_SUCCESS)
 	{
-		VkCommandBufferAllocateInfo widgetCmdAlloc{};
-		widgetCmdAlloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		widgetCmdAlloc.commandPool = vk_command_pool_;
-		widgetCmdAlloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		widgetCmdAlloc.commandBufferCount = 1;
-		if (vkAllocateCommandBuffers(vk_context_->getDevice(), &widgetCmdAlloc, &widget_command_buffer_) != VK_SUCCESS)
-		{
-			std::cerr << "[SDL_ApplicationWindow] Failed to allocate widget command buffer" << std::endl;
-			return false;
-		}
+		std::cerr << "[SDL_ApplicationWindow] Failed to allocate widget command buffer" << std::endl;
+		return false;
+	}
+
+	VkCommandBufferAllocateInfo contextualMenuCmdAlloc{};
+	contextualMenuCmdAlloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	contextualMenuCmdAlloc.commandPool = vk_command_pool_;
+	contextualMenuCmdAlloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	contextualMenuCmdAlloc.commandBufferCount = 1;
+	
+	if (vkAllocateCommandBuffers(vk_context_->getDevice(), &contextualMenuCmdAlloc, &contextual_menu_command_buffer_) != VK_SUCCESS)
+	{
+		std::cerr << "[SDL_ApplicationWindow] Failed to allocate contextual menu command buffer" << std::endl;
+		return false;
 	}
 
 	std::cout << "[SDL_ApplicationWindow] Vulkan initialized successfully" << std::endl;
@@ -1860,6 +1924,92 @@ void SDL_ApplicationWindow::renderWorkspaceWidgets(int wsX, int wsY, int drawabl
 	vkCmdSetScissor(cmd, 0, 1, &scissor);
 
 	workspace_widget_->draw(cmd, wsX, wsY, drawableW, drawableH);
+
+	vkCmdEndRenderPass(cmd);
+	vkEndCommandBuffer(cmd);
+
+	VkSubmitInfo submitInfo{};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &cmd;
+	vkQueueSubmit(vk_context_->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+	vkQueueWaitIdle(vk_context_->getGraphicsQueue());
+
+	vkDestroyFramebuffer(device, fb, nullptr);
+}
+
+void SDL_ApplicationWindow::RenderContextualMenuAboveUI(int drawableW, int drawableH)
+{
+	if (!contextual_menu_above_gui_ || contextual_menu_command_buffer_ == VK_NULL_HANDLE) return;
+	if (imgui_render_pass_ == VK_NULL_HANDLE) return;
+
+	VkDevice device = vk_context_->getDevice();
+	VkCommandBuffer cmd = contextual_menu_command_buffer_;
+
+	vkResetCommandBuffer(cmd, 0);
+
+	VkCommandBufferBeginInfo beginInfo{};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	vkBeginCommandBuffer(cmd, &beginInfo);
+
+	VkImageView colorView = vk_swapchain_image_views_[current_image_index_];
+	VkFramebufferCreateInfo fbInfo{};
+	fbInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	fbInfo.renderPass = imgui_render_pass_;
+	fbInfo.attachmentCount = 1;
+	fbInfo.pAttachments = &colorView;
+	fbInfo.width  = static_cast<uint32_t>(drawableW);
+	fbInfo.height = static_cast<uint32_t>(drawableH);
+	fbInfo.layers = 1;
+	VkFramebuffer fb = VK_NULL_HANDLE;
+	vkCreateFramebuffer(device, &fbInfo, nullptr, &fb);
+
+	VkRenderPassBeginInfo rpBegin{};
+	rpBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	rpBegin.renderPass = imgui_render_pass_;
+	rpBegin.framebuffer = fb;
+	rpBegin.renderArea.offset = { 0, 0 };
+	rpBegin.renderArea.extent = { static_cast<uint32_t>(drawableW), static_cast<uint32_t>(drawableH) };
+	rpBegin.clearValueCount = 0;
+	vkCmdBeginRenderPass(cmd, &rpBegin, VK_SUBPASS_CONTENTS_INLINE);
+
+	VkViewport vp{};
+	vp.x = 0.0f; vp.y = 0.0f;
+	vp.width  = static_cast<float>(drawableW);
+	vp.height = static_cast<float>(drawableH);
+	vp.minDepth = 0.0f; vp.maxDepth = 1.0f;
+	vkCmdSetViewport(cmd, 0, 1, &vp);
+
+	VkRect2D scissor{};
+	scissor.offset = { 0, 0 };
+	scissor.extent = { static_cast<uint32_t>(drawableW), static_cast<uint32_t>(drawableH) };
+	vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+	// size of the menu
+	int menuW = contextual_menu_above_gui_->getWidgetWidth();
+	int menuH = contextual_menu_above_gui_->getWidgetHeight();
+
+	// Convert logical click menu_x_ and menu_y_ coordinates to drawable coordinates
+	int logicalW = 0, logicalH = 0;
+	SDL_GetWindowSize(window_, &logicalW, &logicalH);
+	float scaleX = (logicalW > 0) ? (static_cast<float>(drawableW) / static_cast<float>(logicalW)) : 1.0f;
+	float scaleY = (logicalH > 0) ? (static_cast<float>(drawableH) / static_cast<float>(logicalH)) : 1.0f;
+
+	int wsX = static_cast<int>(contextual_menu_above_gui_->getMenuX() * scaleX);
+	int wsY = static_cast<int>(contextual_menu_above_gui_->getMenuY() * scaleY);
+
+	// Clamp within safe screen boundaries
+	if (wsX + menuW > drawableW) {
+		wsX = drawableW - menuW;
+	}
+	if (wsY + menuH > drawableH) {
+		wsY = drawableH - menuH;
+	}
+	if (wsX < 0) wsX = 0;
+	if (wsY < 0) wsY = 0;
+
+	contextual_menu_above_gui_->draw(cmd, wsX, wsY, drawableW, drawableH);
 
 	vkCmdEndRenderPass(cmd);
 	vkEndCommandBuffer(cmd);

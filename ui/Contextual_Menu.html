@@ -55,33 +55,33 @@
         btn.addEventListener('click', async function() {
             document.title = 'REPAINT_REQUEST:click';
             
-            try {
-                const response = await fetch('http://localhost:8080/api/create-cube', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
+            // try {
+            //     const response = await fetch('http://localhost:8080/api/create-cube', {
+            //         method: 'POST',
+            //         headers: {
+            //             'Content-Type': 'application/json'
+            //         }
+            //     });
                 
-                if (response.ok) {
-                    const data = await response.json();
-                    btn.textContent = 'Cube Created: ' + data.cubeName;
+            //     if (response.ok) {
+            //         const data = await response.json();
+            //         btn.textContent = 'Cube Created: ' + data.cubeName;
                     
-                    setTimeout(() => {
-                        btn.textContent = 'Create Cube';
-                    }, 2000);
-                } else {
-                    btn.textContent = 'Error!';
-                    setTimeout(() => {
-                        btn.textContent = 'Create Cube';
-                    }, 2000);
-                }
-            } catch (error) {
-                btn.textContent = 'Network Error!';
-                setTimeout(() => {
-                    btn.textContent = 'Create Cube';
-                }, 2000);
-            }
+            //         setTimeout(() => {
+            //             btn.textContent = 'Create Cube';
+            //         }, 2000);
+            //     } else {
+            //         btn.textContent = 'Error!';
+            //         setTimeout(() => {
+            //             btn.textContent = 'Create Cube';
+            //         }, 2000);
+            //     }
+            // } catch (error) {
+            //     btn.textContent = 'Network Error!';
+            //     setTimeout(() => {
+            //         btn.textContent = 'Create Cube';
+            //     }, 2000);
+            // }
         });
     </script>
 </body>

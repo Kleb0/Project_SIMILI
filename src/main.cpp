@@ -351,6 +351,7 @@ int main(int argc, char* argv[])
 	std::cout << "[Main] Window size after show: " << windowWidth << "x" << windowHeight << " (pixels: " << windowPixelWidth << "x" << windowPixelHeight << ")" << std::endl;
 
 	fs::path uiPath = resolveUiLayoutPath();
+
 	if (!fs::exists(uiPath))
 	{
 		std::cerr << "[Main] UI layout not found: " << uiPath.string() << std::endl;
@@ -371,6 +372,16 @@ int main(int argc, char* argv[])
 		mainWindow.getWorkspaceWidget()->loadURL("http://localhost:8080/ui/Mode_UI.html");
 		std::cout << "[Main] WorkspaceWidget browser created" << std::endl;
 	}
+
+	if (mainWindow.getContextualMenuAboveGUI())
+	{
+		mainWindow.getContextualMenuAboveGUI()->loadURL("http://localhost:8080/ui/Contextual_Menu.html");
+		std::cout << "[Main] ContextualMenuAboveGUI browser created" << std::endl;
+	}
+
+	// here we initialize the panel menu 
+
+
 	
 	std::cout << "[Main] Waiting for CEF and JavaScript initialization..." << std::endl;
 	for (int i = 0; i < 120; ++i)
