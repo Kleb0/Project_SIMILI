@@ -179,12 +179,13 @@ int main(int argc, char* argv[])
 
 	FrameDataCatcher frameCatcher;
 	FrameDataCatcher::setInstance(&frameCatcher);
-	std::cout << "[Main] FrameDataCatcher created and set as singleton" << std::endl;
+	std::cout << "[Main] FrameDataCatcher created and set " << std::endl;
 
 	DataHolders dataHolders;
 	DataHolders::setInstance(&dataHolders);
+	mainWindow.setDataHolders(&dataHolders);
 	dataHolders.initPlaceholderValues();
-	std::cout << "[Main] DataHolders created and set as singleton" << std::endl;
+	std::cout << "[Main] DataHolders created and set " << std::endl;
 
 	auto* frameDatas = new SIMILI::Frontend::FrameDatas(&frameCatcher);
 	mainWindow.updateFrameDatas(frameDatas);
@@ -193,7 +194,6 @@ int main(int argc, char* argv[])
 	PanelResizingLogic panelResizingLogic;
 	panelResizingLogic.setUIManager(&myUIManager);
 	panelResizingLogic.setSDLWindow(&mainWindow);
-		// panelResizingLogic.setUIHandler: UIHandler no longer used
 	panelResizingLogic.setFrameDatas(frameDatas);
 	panelResizingLogic.setFrameDataCatcher(&frameCatcher);
 	mainWindow.setPanelResizingLogic(&panelResizingLogic);
@@ -310,7 +310,7 @@ int main(int argc, char* argv[])
 
 	auto& router = SIMILI::Server::SimpleHttpServer::getInstance().getRouter();
 	SIMILI::Router::RoutesManager routesManager;
-	routesManager.initializeRoutes(router, vkRenderer, myVKScene, nullptr, &frameCatcher, &myUIManager);
+	routesManager.initializeRoutes(router, vkRenderer, myVKScene, nullptr, &frameCatcher, &myUIManager, &mainWindow);
 	std::cout << "[Main] All API routes initialized via RoutesManager" << std::endl;
 
 	CefSettings settings;

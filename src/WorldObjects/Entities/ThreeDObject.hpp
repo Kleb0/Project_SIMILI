@@ -73,6 +73,7 @@ public:
     glm::vec3 position = glm::vec3(0.0f);
     glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
     glm::vec3 _scale = glm::vec3(1.0f);
+    std::string name = "Unnamed";
 
     ThreeDObject *parent = nullptr;
     std::list<ThreeDObject *> children;
@@ -94,7 +95,6 @@ protected:
     int movedSlotIndex = -1;
     int slotIndex  = -1;
     bool isCurrentlySelected = false;
-    std::string name = "Unnamed";
     glm::vec3 origin = glm::vec3(0.0f); 
 
     uint64_t id;

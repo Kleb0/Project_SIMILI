@@ -13,6 +13,7 @@ namespace SIMILI {
 }
 
 struct GLFWwindow;
+class SDL_ApplicationWindow;
 
 namespace SIMILI 
 {
@@ -31,13 +32,14 @@ namespace SIMILI
 					VKScene& scene,
 					GLFWwindow* glfwWindow,
 					FrameDataCatcher* frameCatcher,
-					SIMILI::Frontend::UIManager* uiManager
+					SIMILI::Frontend::UIManager* uiManager,
+					SDL_ApplicationWindow* sdlWindow
 				);
 
 			private:
 			void registerContextRoutes(RouterSim& router, VKContext& vkRenderer);
 			void registerSceneRoutes(RouterSim& router, VKScene& scene, VKContext& vkRenderer);
-			void registerObjectRoutes(RouterSim& router, VKScene& scene, GLFWwindow* glfwWindow);
+			void registerObjectRoutes(RouterSim& router, VKScene& scene, GLFWwindow* glfwWindow, SDL_ApplicationWindow* sdlWindow);
 			void registerIFrameRoutes(RouterSim& router, FrameDataCatcher* frameCatcher, SIMILI::Frontend::UIManager* uiManager);
 			void registerDataHolderRoutes(RouterSim& router);
 		};

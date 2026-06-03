@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../../Engine/VulkanPipeline/VulkanPipeline.hpp"
+#include "../../../WorldObjects/Entities/ThreeDObject.hpp"
 #include <string>
 #include <vector>
 #include <array>
@@ -38,7 +39,7 @@ public:
 	static DataHolders* getInstance();
 	static void setInstance(DataHolders* instance);
 
-	void computeDataHolders();
+	void computeNewDataToDataHolders();
 	int getCountForPanel(const std::string& panelName) const;
 
 	void setFieldValue(const std::string& panelName, const std::string& field, const std::string& value);
@@ -63,16 +64,21 @@ public:
 	std::shared_ptr<VKScene> vk_scene_;
 
 	std::map<std::string, std::vector<std::string>> data_field_names_; 
-	 std::map<std::string, std::map<std::string, std::string>> data_holder_values_; 
+	std::map<std::string, std::map<std::string, std::string>> data_holder_values_; 
 
 
 	// turn dataHolder_values as list 
 
 	// DataHolderEntry definition
 
+	void setSelectedObjectsForDataHolders(const std::list<ThreeDObject*>& objects);
+	std::list<ThreeDObject*> getSelectedObjectsForDataHolders() const { return selectedObjectsForDataHolders_; }
+
 
 
 private:
+
+	std::list<ThreeDObject*> selectedObjectsForDataHolders_;
 	static DataHolders* s_instance_;	
 
 	bool initializeVulkan(VKContext* context, VulkanPipeline* pipelines, VkRenderPass renderPass);

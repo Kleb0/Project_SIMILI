@@ -6,6 +6,7 @@
 #include "../../SIMILI_Frontend/viewportLogic/UIPanels/FrameDataCatcher.hpp"
 #include "../../SIMILI_Frontend/viewportLogic/UIPanels/UIManager.hpp"
 #include "../../SIMILI_Frontend/viewportLogic/UIPanels/DataHolders.hpp"
+#include "../../SIMILI_Frontend/SDL_ApplicationWindow.hpp"
 #include <iostream>
 #include <fstream>
 #include <GLFW/glfw3.h>
@@ -25,13 +26,14 @@ namespace SIMILI {
 			VKScene& scene,
 			GLFWwindow* glfwWindow,
 			FrameDataCatcher* frameCatcher,
-			SIMILI::Frontend::UIManager* uiManager)
+			SIMILI::Frontend::UIManager* uiManager,
+			SDL_ApplicationWindow* sdlWindow)
 		{
 			std::cout << "[RoutesManager] Initializing all routes..." << std::endl;
 			
 			registerContextRoutes(router, vkRenderer);
 			registerSceneRoutes(router, scene, vkRenderer);
-			registerObjectRoutes(router, scene, glfwWindow);
+			registerObjectRoutes(router, scene, glfwWindow, sdlWindow);
 			registerIFrameRoutes(router, frameCatcher, uiManager);			
 			std::cout << "[RoutesManager] All routes registered successfully" << std::endl;
 		}
@@ -118,7 +120,7 @@ namespace SIMILI {
 		}
 
 
-		void RoutesManager::registerObjectRoutes(RouterSim& router, VKScene& scene, GLFWwindow* glfwWindow)
+		void RoutesManager::registerObjectRoutes(RouterSim& router, VKScene& scene, GLFWwindow* glfwWindow, SDL_ApplicationWindow* sdlWindow)
 		{
 			router.post("/api/create-cube", [&scene, glfwWindow](const Message& msg) -> Response 
 			{
@@ -159,7 +161,7 @@ namespace SIMILI {
 			}, "Create a new cube and add it to the scene");
 			
 			// Route: Select object from hierarchy
-			router.post("/api/select-object", [&scene](const Message& msg) -> Response 
+			router.post("/api/select-object", [&scene, sdlWindow](const Message& msg) -> Response 
 			{
 				std::cout << "\n [RoutesManager] /api/select-object called" << std::endl;
 				
@@ -202,12 +204,10 @@ namespace SIMILI {
 				int slotIndex = requestData["slotIndex"];
 				std::string objectName = requestData["objectName"];
 				std::string objectType = requestData["objectType"];
-				bool shiftKey = requestData.value("shiftKey", false);
 				
 				std::cout << "[RoutesManager] Selection request - Slot: " << slotIndex 
 						<< " | Object: " << objectName 
-						<< " | Type: " << objectType 
-						<< " | Shift: " << (shiftKey ? "YES" : "NO") << std::endl;
+						<< " | Type: " << objectType << std::endl;
 				
 				auto& objects = scene.getObjectsRef();
 				
@@ -231,12 +231,9 @@ namespace SIMILI {
 					return resp;
 				}
 				
-				if (!shiftKey) 
+				for (auto* obj : objects) 
 				{
-					for (auto* obj : objects) 
-					{
-						if (obj) obj->setSelected(false);
-					}
+					if (obj) obj->setSelected(false);
 				}
 				
 				bool isCamera = (objectType == "Camera");
@@ -244,6 +241,8 @@ namespace SIMILI {
 				if (!isCamera) 
 				{
 					selectedObject->setSelected(true);
+					if (sdlWindow)
+						sdlWindow->onObjectSelectedFromHierarchy(selectedObject);
 				} 
 				else 
 				{

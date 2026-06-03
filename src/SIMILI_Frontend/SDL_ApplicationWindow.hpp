@@ -14,6 +14,7 @@
 #include <vector>
 #include <memory>
 #include <mutex>
+#include "../../SIMILI_Frontend/viewportLogic/UIPanels/DataHolders.hpp"
 #include "viewportLogic/FrameDatas/FrameDatas.hpp"
 #include "../../Engine/VulkanPipeline/VulkanPipeline.hpp"
 #include "SDL_Windows_states/SDL_State_Init.hpp"
@@ -160,6 +161,10 @@ class SDL_ApplicationWindow
 
 		SIMILI::Frontend::UIManager* getUIManager() const { return ui_manager_; }
 		App_Border* getAppBorder() const { return app_border_; }
+
+		// ==== Data Holders Access ====
+		DataHolders& getDataHolders();
+		void setDataHolders(DataHolders* dataHolders);
 		
 		// === SDL Window Reference Size ===
 		void setSDLReferenceWindowSize(int width, int height) { reference_window_width_ = width; reference_window_height_ = height; }
@@ -171,6 +176,9 @@ class SDL_ApplicationWindow
 		void updateUIState();
 		void handleSDLEvent(const SDL_Event& event);
 		
+		// === Selection from Hierarchy ===
+		void onObjectSelectedFromHierarchy(ThreeDObject* object);
+
 		// === UI Initialization ===
 		void initializeDefaultUIPanels();
 		void forceCaptureIFramePositions();
@@ -217,6 +225,7 @@ class SDL_ApplicationWindow
 		std::list<ThreeDObject*> selectedObjectsList_;  
 		
 	private:
+
 		// === Window State ===
 		SDL_Window* window_;
 		bool is_maximized_;
@@ -241,6 +250,9 @@ class SDL_ApplicationWindow
 		Enable_UI_Debug_Tools* debug_tools_;
 		ThreeDObjectSelector* selector_;
 		RaycastPerform* raycast_perform_;
+
+		// ==== Data Holders ====
+		DataHolders* data_holders_;
 
 		// === CEF Client ===
 		CefRefPtr<SIMILICefClient> simili_cef_client_;		

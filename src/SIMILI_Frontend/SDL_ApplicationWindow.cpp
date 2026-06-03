@@ -1282,35 +1282,40 @@ void SDL_ApplicationWindow::renderFrame()
 			std::cout << " [SDL_ApplicationWindow RenderFrame] the selected objects are : " << std::endl;
 
 			vk_scene_->setSelectedObjects(selectedObjectsList);
-		}
 
-		if (!vk_scene_->getSelectedObjects().empty())
-		{
-			updateWorkspaceProjectionData();
-
-			// Recompute view/proj every frame so the gizmo follows the camera
-			if (camera_ && workspaceHeight_ > 0)
+			if (data_holders_)
 			{
-				float aspectRatio = static_cast<float>(workspaceWidth_) / static_cast<float>(workspaceHeight_);
-				viewMatrix_ = camera_->getViewMatrix();
-				projectionMatrix_ = camera_->getProjectionMatrix(aspectRatio);
+				data_holders_->setSelectedObjectsForDataHolders(selectedObjectsList);
+				data_holders_->computeNewDataToDataHolders();
 			}
-
-			// Start an ImGui frame so ImGuizmo can draw into its overlay draw list
-			ImGui_ImplVulkan_NewFrame();
-			ImGui_ImplSDL3_NewFrame();
-			ImGui::NewFrame();
-
-			// Render gizmo for the selected objects
-			Guizmo::renderGizmoForObject(vk_scene_->getSelectedObjects(), ImGuizmo::TRANSLATE, viewMatrix_, projectionMatrix_, 
-			ImVec2(static_cast<float>(workspaceX_), static_cast<float>(workspaceY_)), ImVec2(static_cast<float>(workspaceWidth_), static_cast<float>(workspaceHeight_)));
-
-			// Submit ImGui draw data (including the gizmo) as an overlay render pass
-			renderImGui();
 		}
-
 		prev_middle_button_down_ = middleDown;
 		prev_left_button_down_ = leftDown;
+	}
+
+	if (!vk_scene_->getSelectedObjects().empty())
+	{
+		updateWorkspaceProjectionData();
+
+		// Recompute view/proj every frame so the gizmo follows the camera
+		if (camera_ && workspaceHeight_ > 0)
+		{
+			float aspectRatio = static_cast<float>(workspaceWidth_) / static_cast<float>(workspaceHeight_);
+			viewMatrix_ = camera_->getViewMatrix();
+			projectionMatrix_ = camera_->getProjectionMatrix(aspectRatio);
+		}
+
+		// Start an ImGui frame so ImGuizmo can draw into its overlay draw list
+		ImGui_ImplVulkan_NewFrame();
+		ImGui_ImplSDL3_NewFrame();
+		ImGui::NewFrame();
+
+		// Render gizmo for the selected objects
+		Guizmo::renderGizmoForObject(vk_scene_->getSelectedObjects(), ImGuizmo::TRANSLATE, viewMatrix_, projectionMatrix_, 
+		ImVec2(static_cast<float>(workspaceX_), static_cast<float>(workspaceY_)), ImVec2(static_cast<float>(workspaceWidth_), static_cast<float>(workspaceHeight_)));
+
+		// Submit ImGui draw data (including the gizmo) as an overlay render pass
+		renderImGui();
 	}
 
 	presentToScreen();
@@ -2546,4 +2551,35 @@ void SDL_ApplicationWindow::updateWorkspaceProjectionData()
 	workspaceY_ = workspace.getY();
 	workspaceWidth_ = workspace.getWidth();
 	workspaceHeight_ = workspace.getHeight();
+}
+
+// In SDL_ApplicationWindow.cpp
+DataHolders& SDL_ApplicationWindow::getDataHolders() 
+{
+    return *data_holders_;
+}
+void SDL_ApplicationWindow::setDataHolders(DataHolders* dataHolders) 
+{
+    data_holders_ = dataHolders;
+}
+
+void SDL_ApplicationWindow::onObjectSelectedFromHierarchy(ThreeDObject* object)
+{
+	if (!object) return;
+
+	selectedObjectsList_.clear();
+	selectedObjectsList_.push_back(object);
+
+	if (data_holders_)
+	{
+		data_holders_->setSelectedObjectsForDataHolders(selectedObjectsList_);
+		data_holders_->computeNewDataToDataHolders();
+	}
+
+	if(vk_scene_)
+	{
+		vk_scene_->setSelectedObjects(selectedObjectsList_);
+	}
+
+	std::cout << "[SDL_ApplicationWindow] Object selected from hierarchy: " << object->getName() << std::endl;
 }

@@ -6,6 +6,7 @@
 #include <mutex>
 #include <cstring>
 #include <algorithm>
+#include <glm/glm.hpp>
 
 // 8x8 bitmap font for ASCII 0x20-0x7E (public domain)
 // Each char: 8 bytes, each byte = 1 row, bit 0 = leftmost pixel
@@ -156,37 +157,63 @@ void DataHolders::initPlaceholderValues()
 	field_values_[panel]["scale_z"] = "0.0";
 }
 
-// void DataHolders::computeDataHolders()
-// {
-//     // Use map instead of vector of DataHolderEntry
-//     std::map<std::string, std::string> dataHolder_values;
-// 	std::string panelName = "object_inspector_panel"; 
-// 	nlohmann::json requestData;
+void DataHolders::computeNewDataToDataHolders()
+{
+	std::string panelName = "object_inspector_panel"; 
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    // Update field values based on selected objects
+    if (!selectedObjectsForDataHolders_.empty()) 
+	{
+        field_values_[panelName]["selected_object"] = selectedObjectsForDataHolders_.front()->getName();
+
+        auto pos = selectedObjectsForDataHolders_.front()->getPosition();
+
+        field_values_[panelName]["position_x"] = std::to_string(pos.x);
+        field_values_[panelName]["position_y"] = std::to_string(pos.y);
+        field_values_[panelName]["position_z"] = std::to_string(pos.z);
+
+		auto rot = selectedObjectsForDataHolders_.front()->getRotation(); 
+
+		field_values_[panelName]["rotation_x"] = std::to_string(rot.x);
+		field_values_[panelName]["rotation_y"] = std::to_string(rot.y);
+		field_values_[panelName]["rotation_z"] = std::to_string(rot.z);
+
+		auto scale = selectedObjectsForDataHolders_.front()->getScale();
+		field_values_[panelName]["scale_x"] = std::to_string(scale.x);
+		field_values_[panelName]["scale_y"] = std::to_string(scale.y);
+		field_values_[panelName]["scale_z"] = std::to_string(scale.z);
+
+    } 
+	else 
+	{
+        field_values_[panelName]["selected_object"] = "No Object Selected";
+        field_values_[panelName]["position_x"] = "0.0";
+        field_values_[panelName]["position_y"] = "0.0";
+        field_values_[panelName]["position_z"] = "0.0";
+		field_values_[panelName]["rotation_x"] = "0.0";
+		field_values_[panelName]["rotation_y"] = "0.0";
+		field_values_[panelName]["rotation_z"] = "0.0";
+		field_values_[panelName]["scale_x"] = "1.0";
+		field_values_[panelName]["scale_y"] = "1.0";
+		field_values_[panelName]["scale_z"] = "1.0";
+    }
+
+
     
-//     // Process the data holders (assuming requestData contains the JSON data)
-//     for (const auto& holder : requestData["dataHolders"])
-//     {
-//         if (holder.contains("field"))
-//         {
-//             std::string field = holder["field"].get<std::string>();
-//             // Store field name as key and default value as empty string
-//             // Position information is now handled differently
-//             dataHolder_values[field] = "";
-//         }
-//     }
+    // // Update existing fields with randomized values
+    // field_values_[panelName]["selected_object"] = "---- had became something ---";
+    // field_values_[panelName]["position_x"] = std::to_string(randomFloat(-100.0f, 100.0f));
+    // field_values_[panelName]["position_y"] = std::to_string(randomFloat(-100.0f, 100.0f));
+    // field_values_[panelName]["position_z"] = std::to_string(randomFloat(-100.0f, 100.0f));
+    // field_values_[panelName]["rotation_x"] = std::to_string(randomFloat(-180.0f, 180.0f));
+    // field_values_[panelName]["rotation_y"] = std::to_string(randomFloat(-180.0f, 180.0f));
+    // field_values_[panelName]["rotation_z"] = std::to_string(randomFloat(-180.0f, 180.0f));
+    // field_values_[panelName]["scale_x"] = std::to_string(randomFloat(0.1f, 10.0f));
+    // field_values_[panelName]["scale_y"] = std::to_string(randomFloat(0.1f, 10.0f));
+    // field_values_[panelName]["scale_z"] = std::to_string(randomFloat(0.1f, 10.0f));
 
-// 	field_values_[panel]["selected_object"]  = "---- none ----";
-// 	field_values_[panel]["position_x"] = "0.0";
-// 	field_values_[panel]["position_y"] = "0.0";
-// 	field_values_[panel]["position_z"] = "0.0";
-// 	field_values_[panel]["rotation_x"] = "0.0";
-// 	field_values_[panel]["rotation_y"] = "0.0";
-// 	field_values_[panel]["rotation_z"] = "0.0";
-// 	field_values_[panel]["scale_x"] = "0.0";
-// 	field_values_[panel]["scale_y"] = "0.0";
-// 	field_values_[panel]["scale_z"] = "0.0";
-
-// }
+}
 
 int DataHolders::getCountForPanel(const std::string& panelName) const
 {
@@ -268,6 +295,7 @@ bool DataHolders::initializeVulkan(VKContext* context, VulkanPipeline* pipelines
 	poolSize.descriptorCount = static_cast<uint32_t>(kMaxOverlays);
 
 	VkDescriptorPoolCreateInfo poolInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+	poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 	poolInfo.maxSets = static_cast<uint32_t>(kMaxOverlays);
 	poolInfo.poolSizeCount = 1;
 	poolInfo.pPoolSizes = &poolSize;
@@ -450,7 +478,6 @@ void DataHolders::drawTextData(
 		dataFieldsToDisplay[fieldName] = getFieldValue(panelName, fieldName);
 
 	}
-
 
 
 	int count = static_cast<int>(dataFieldsToDisplay.size()); 
@@ -775,13 +802,38 @@ bool DataHolders::uploadTextTexture(const std::string& text, int width, int heig
 void DataHolders::cleanupTextOverlay(TextOverlay& overlay)
 {
 	if (!vk_context_) return;
+
 	VkDevice device = vk_context_->getDevice();
 	vkQueueWaitIdle(vk_context_->getGraphicsQueue());
-	if (overlay.sampler   != VK_NULL_HANDLE) { vkDestroySampler(device, overlay.sampler, nullptr);   overlay.sampler   = VK_NULL_HANDLE; }
-	if (overlay.view      != VK_NULL_HANDLE) { vkDestroyImageView(device, overlay.view, nullptr);    overlay.view      = VK_NULL_HANDLE; }
-	if (overlay.image     != VK_NULL_HANDLE) { vkDestroyImage(device, overlay.image, nullptr);       overlay.image     = VK_NULL_HANDLE; }
-	if (overlay.memory    != VK_NULL_HANDLE) { vkFreeMemory(device, overlay.memory, nullptr);        overlay.memory    = VK_NULL_HANDLE; }
-	overlay.descriptorSet = VK_NULL_HANDLE;
+
+	if (overlay.descriptorSet != VK_NULL_HANDLE && descriptor_pool_ != VK_NULL_HANDLE)
+	{
+		vkFreeDescriptorSets(device, descriptor_pool_, 1, &overlay.descriptorSet);
+		overlay.descriptorSet = VK_NULL_HANDLE;
+	}
+
+	if (overlay.sampler != VK_NULL_HANDLE) 
+	{ 
+		vkDestroySampler(device, overlay.sampler, nullptr);   
+		overlay.sampler = VK_NULL_HANDLE; 
+	}
+	if (overlay.view != VK_NULL_HANDLE) 
+	{ 
+		vkDestroyImageView(device, overlay.view, nullptr);
+		overlay.view = VK_NULL_HANDLE; 
+	}
+	if (overlay.image != VK_NULL_HANDLE) 
+	{ 
+		vkDestroyImage(device, overlay.image, nullptr);       
+		overlay.image = VK_NULL_HANDLE; 
+	}
+
+	if (overlay.memory != VK_NULL_HANDLE) 
+	{
+
+		vkFreeMemory(device, overlay.memory, nullptr);        
+		overlay.memory = VK_NULL_HANDLE; 
+	}
 	overlay.lastText.clear();
 }
 
@@ -822,4 +874,9 @@ void DataHolders::cleanupVulkan()
 void DataHolders::setVKScene(std::shared_ptr<VKScene> scene)
 {
     vk_scene_ = scene;
+}
+
+void DataHolders::setSelectedObjectsForDataHolders(const std::list<ThreeDObject*>& objects)
+{ 
+	selectedObjectsForDataHolders_ = objects; 
 }
