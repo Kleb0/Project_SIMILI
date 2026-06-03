@@ -4,6 +4,7 @@
 #include <iostream>
 #include <cstring>
 #include <algorithm>
+#include <cmath>
 
 namespace SIMILI {
 	namespace Frontend {
@@ -73,6 +74,12 @@ namespace SIMILI {
 		, last_ws_x_(-1)
 		, last_ws_y_(-1)
 		, geometry_dirty_(true)
+		, alpha_percent_(100.0f)
+		, prev_mouse_inside_(false)
+		, prev_left_button_down_(false)
+		, prev_right_button_down_(false)
+		, prev_cef_mouse_x_(0)
+		, prev_cef_mouse_y_(0)
 	{
 	}
 
@@ -168,16 +175,101 @@ namespace SIMILI {
 
 	void ContextualMenuAboveGUI::makeFullyTransparent(std::vector<unsigned char>& pixelData, int width, int height)
 	{
+		float alphaFactor = alpha_percent_ / 100.0f;
+		if (alphaFactor < 0.0f) alphaFactor = 0.0f;
+		if (alphaFactor > 1.0f) alphaFactor = 1.0f;
+
 		const int pixelCount = width * height;
 		for (int i = 0; i < pixelCount; ++i)
 		{
 			unsigned char* pixel = pixelData.data() + i * 4;
 
+			// Background check: if fully black/transparent, make it completely transparent
 			if (pixel[0] == 0 && pixel[1] == 0 && pixel[2] == 0)
 			{
 				pixel[3] = 0;
+				continue;
 			}
+
+			// Apply general transparency scale
+			float currentAlpha = pixel[3];
+			pixel[3] = static_cast<unsigned char>(currentAlpha * alphaFactor);
 		}
+	}
+
+	bool ContextualMenuAboveGUI::handleMouseEvent(int mouseX, int mouseY, bool isLeftButtonDown, bool isRightButtonDown)
+	{
+		if (!cef_browser_) return false;
+
+		// mouseX and mouseY are in logical window coordinates.
+		// Since menu_x_ and menu_y_ are also in logical coordinates:
+		const bool isInside = (mouseX >= menu_x_ && mouseX < menu_x_ + widget_width_ &&
+		                       mouseY >= menu_y_ && mouseY < menu_y_ + widget_height_);
+
+		if (!isInside)
+		{
+			if (prev_mouse_inside_)
+			{
+				CefMouseEvent leaveEvent;
+				leaveEvent.x = prev_cef_mouse_x_;
+				leaveEvent.y = prev_cef_mouse_y_;
+				leaveEvent.modifiers = 0;
+				cef_browser_->GetHost()->SendMouseMoveEvent(leaveEvent, true);
+				prev_mouse_inside_ = false;
+			}
+			prev_left_button_down_ = false;
+			prev_right_button_down_ = false;
+			return false;
+		}
+
+		const int localX = mouseX - menu_x_;
+		const int localY = mouseY - menu_y_;
+
+		// For the contextual menu, the CEF browser is exactly size widget_width_ by widget_height_.
+		// So localX and localY are already the correct coordinates for the CEF mouse event!
+		const int cefX = localX;
+		const int cefY = localY;
+
+		uint32_t modifiers = 0;
+		if (isLeftButtonDown)  modifiers |= EVENTFLAG_LEFT_MOUSE_BUTTON;
+		if (isRightButtonDown) modifiers |= EVENTFLAG_RIGHT_MOUSE_BUTTON;
+
+		CefMouseEvent mouseEvent;
+		mouseEvent.x = cefX;
+		mouseEvent.y = cefY;
+		mouseEvent.modifiers = modifiers;
+
+		const bool positionChanged = (!prev_mouse_inside_ || cefX != prev_cef_mouse_x_ || cefY != prev_cef_mouse_y_);
+		if (positionChanged)
+		{
+			cef_browser_->GetHost()->SendMouseMoveEvent(mouseEvent, false);
+		}
+
+		if (isLeftButtonDown && !prev_left_button_down_)
+		{
+			cef_browser_->GetHost()->SendMouseClickEvent(mouseEvent, MBT_LEFT, false, 1);
+		}
+		else if (!isLeftButtonDown && prev_left_button_down_)
+		{
+			cef_browser_->GetHost()->SendMouseClickEvent(mouseEvent, MBT_LEFT, true, 1);
+		}
+
+		if (isRightButtonDown && !prev_right_button_down_)
+		{
+			cef_browser_->GetHost()->SendMouseClickEvent(mouseEvent, MBT_RIGHT, false, 1);
+		}
+		else if (!isRightButtonDown && prev_right_button_down_)
+		{
+			cef_browser_->GetHost()->SendMouseClickEvent(mouseEvent, MBT_RIGHT, true, 1);
+		}
+
+		prev_mouse_inside_ = true;
+		prev_left_button_down_ = isLeftButtonDown;
+		prev_right_button_down_ = isRightButtonDown;
+		prev_cef_mouse_x_ = cefX;
+		prev_cef_mouse_y_ = cefY;
+
+		return true;
 	}
 
 	void ContextualMenuAboveGUI::uploadPaintBuffer()

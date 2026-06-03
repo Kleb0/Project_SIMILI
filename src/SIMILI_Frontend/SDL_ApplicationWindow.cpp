@@ -146,6 +146,9 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, state_scaling_down_(this)
 	, state_scaling_up_(this)
 	, current_state_(&state_init_)
+	, mouse_state_above_workspace_()
+	, mouse_state_outside_workspace_()
+	, mouse_state_above_ui_panel_()
 	, current_mouse_state_(&mouse_state_outside_workspace_)
 	, imgui_descriptor_pool_(VK_NULL_HANDLE)
 	, imgui_render_pass_(VK_NULL_HANDLE)
@@ -603,7 +606,8 @@ void SDL_ApplicationWindow::setRenderPass(VkRenderPass renderPass)
 		}
 		else
 		{
-			std::cout << "[SDL_ApplicationWindow] ContextualMenuAboveGUI initialized with size " << menuW << "x" << menuH << std::endl;
+			contextual_menu_above_gui_->SetAlpha(85.0f);
+			std::cout << "[SDL_ApplicationWindow] ContextualMenuAboveGUI initialized with size " << menuW << "x" << menuH << " and alpha 50%" << std::endl;
 		}
 	}
 }
@@ -1018,9 +1022,34 @@ void SDL_ApplicationWindow::handleSDLEvent(const SDL_Event& event)
 	if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_RIGHT)
 	{
 		contextual_menu_visible_ = !contextual_menu_visible_;
-		if (contextual_menu_visible_ && contextual_menu_above_gui_)
+		if (contextual_menu_visible_ && contextual_menu_above_gui_ && window_)
 		{
-			contextual_menu_above_gui_->SetPos(static_cast<int>(event.button.x), static_cast<int>(event.button.y));
+			int logicalW = 0, logicalH = 0;
+			SDL_GetWindowSize(window_, &logicalW, &logicalH);
+			int drawableW = 0, drawableH = 0;
+			SDL_GetWindowSizeInPixels(window_, &drawableW, &drawableH);
+			float scaleX = (logicalW > 0) ? (static_cast<float>(drawableW) / static_cast<float>(logicalW)) : 1.0f;
+			float scaleY = (logicalH > 0) ? (static_cast<float>(drawableH) / static_cast<float>(logicalH)) : 1.0f;
+
+			int menuW = contextual_menu_above_gui_->getWidgetWidth();
+			int menuH = contextual_menu_above_gui_->getWidgetHeight();
+
+			float logicalMenuW = menuW / scaleX;
+			float logicalMenuH = menuH / scaleY;
+
+			int setX = static_cast<int>(event.button.x);
+			int setY = static_cast<int>(event.button.y);
+
+			if (setX + static_cast<int>(logicalMenuW) > logicalW) {
+				setX = logicalW - static_cast<int>(logicalMenuW);
+			}
+			if (setY + static_cast<int>(logicalMenuH) > logicalH) {
+				setY = logicalH - static_cast<int>(logicalMenuH);
+			}
+			if (setX < 0) setX = 0;
+			if (setY < 0) setY = 0;
+
+			contextual_menu_above_gui_->SetPos(setX, setY);
 		}
 	}
 
@@ -1289,6 +1318,15 @@ void SDL_ApplicationWindow::renderFrame()
 		const bool isLeftButtonDown = (mouseButtons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
 		const bool isRightButtonDown = (mouseButtons & SDL_BUTTON_MASK(SDL_BUTTON_RIGHT)) != 0;
 		ui_manager_->forwardMouseEventsToPanels(static_cast<int>(mouseXf), static_cast<int>(mouseYf), isLeftButtonDown, isRightButtonDown, browser_);
+	}
+
+	if (contextual_menu_visible_ && contextual_menu_above_gui_)
+	{
+		float mouseXf = 0.0f, mouseYf = 0.0f;
+		SDL_MouseButtonFlags mouseButtons = SDL_GetMouseState(&mouseXf, &mouseYf);
+		const bool isLeftButtonDown = (mouseButtons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
+		const bool isRightButtonDown = (mouseButtons & SDL_BUTTON_MASK(SDL_BUTTON_RIGHT)) != 0;
+		contextual_menu_above_gui_->handleMouseEvent(static_cast<int>(mouseXf), static_cast<int>(mouseYf), isLeftButtonDown, isRightButtonDown);
 	}
 
 	if (debug_tools_ && ui_manager_)
@@ -2441,26 +2479,61 @@ void SDL_ApplicationWindow::updateMouseState(int mouseX, int mouseY)
 	if (!ui_manager_)
 		return;
 
-	const auto& workspace = ui_manager_->getWorkSpace();
-	if (!workspace.isValid())
-		return;
+	bool isOverUI = false;
 
-	const bool isAbove = (mouseX >= workspace.getX()
-		&& mouseX <= workspace.getX() + workspace.getWidth()
-		&& mouseY >= workspace.getY()
-		&& mouseY <= workspace.getY() + workspace.getHeight());
-
-	if (isAbove && current_mouse_state_ != &mouse_state_above_workspace_)
+	if (contextual_menu_visible_ && contextual_menu_above_gui_ && window_)
 	{
-		current_mouse_state_->onExit();
-		current_mouse_state_ = &mouse_state_above_workspace_;
-		current_mouse_state_->onEnter();
+		int logicalW = 0, logicalH = 0;
+		SDL_GetWindowSize(window_, &logicalW, &logicalH);
+		int drawableW = 0, drawableH = 0;
+		SDL_GetWindowSizeInPixels(window_, &drawableW, &drawableH);
+		float scaleX = (logicalW > 0) ? (static_cast<float>(drawableW) / static_cast<float>(logicalW)) : 1.0f;
+		float scaleY = (logicalH > 0) ? (static_cast<float>(drawableH) / static_cast<float>(logicalH)) : 1.0f;
+
+		int menuX = contextual_menu_above_gui_->getMenuX();
+		int menuY = contextual_menu_above_gui_->getMenuY();
+		int logicalMenuW = static_cast<int>(contextual_menu_above_gui_->getWidgetWidth() / scaleX);
+		int logicalMenuH = static_cast<int>(contextual_menu_above_gui_->getWidgetHeight() / scaleY);
+
+		if (mouseX >= menuX && mouseX < menuX + logicalMenuW &&
+			mouseY >= menuY && mouseY < menuY + logicalMenuH)
+		{
+			isOverUI = true;
+		}
 	}
-	else if (!isAbove && current_mouse_state_ != &mouse_state_outside_workspace_)
+
+	if (isOverUI)
 	{
-		current_mouse_state_->onExit();
-		current_mouse_state_ = &mouse_state_outside_workspace_;
-		current_mouse_state_->onEnter();
+		if (current_mouse_state_ != &mouse_state_above_ui_panel_)
+		{
+			current_mouse_state_->onExit();
+			current_mouse_state_ = &mouse_state_above_ui_panel_;
+			current_mouse_state_->onEnter();
+		}
+	}
+	else
+	{
+		const auto& workspace = ui_manager_->getWorkSpace();
+		if (!workspace.isValid())
+			return;
+
+		const bool isAbove = (mouseX >= workspace.getX()
+			&& mouseX <= workspace.getX() + workspace.getWidth()
+			&& mouseY >= workspace.getY()
+			&& mouseY <= workspace.getY() + workspace.getHeight());
+
+		if (isAbove && current_mouse_state_ != &mouse_state_above_workspace_)
+		{
+			current_mouse_state_->onExit();
+			current_mouse_state_ = &mouse_state_above_workspace_;
+			current_mouse_state_->onEnter();
+		}
+		else if (!isAbove && current_mouse_state_ != &mouse_state_outside_workspace_)
+		{
+			current_mouse_state_->onExit();
+			current_mouse_state_ = &mouse_state_outside_workspace_;
+			current_mouse_state_->onEnter();
+		}
 	}
 }
 

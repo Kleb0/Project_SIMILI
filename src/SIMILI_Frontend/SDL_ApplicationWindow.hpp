@@ -26,6 +26,7 @@
 #include "SDL_Windows_states/SDL_State_ScalingUP.hpp"
 #include "MouseStates/Mouse_Above_Workspace_State.hpp"
 #include "MouseStates/Mouse_Outside_Workspace_State.hpp"
+#include "MouseStates/Mouse_Above_UI_Panel_State.hpp"
 #include "viewportLogic/CameraControl/cameraControl.hpp"
 #include "../../WorldObjects/Entities/ThreeDObject.hpp"  
 #include "../../Engine/Guizmo.hpp"
@@ -345,6 +346,7 @@ class SDL_ApplicationWindow
 		// === Mouse State Machine ===
 		SIMILI::Input::Mouse_Above_Workspace_State mouse_state_above_workspace_;
 		SIMILI::Input::Mouse_Outside_Workspace_State mouse_state_outside_workspace_;
+		SIMILI::Input::Mouse_Above_UI_Panel_State mouse_state_above_ui_panel_;
 		SIMILI::Input::Mouse_State* current_mouse_state_;
 
 		// ===== Vulkan Resource Management ===== //

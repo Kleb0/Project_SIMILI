@@ -70,6 +70,10 @@ namespace SIMILI
                 int getMenuX() const { return menu_x_; }
                 int getMenuY() const { return menu_y_; }
 
+                void SetAlpha(float alphaPercent) { alpha_percent_ = alphaPercent; }
+                float getAlpha() const { return alpha_percent_; }
+                bool handleMouseEvent(int mouseX, int mouseY, bool isLeftButtonDown, bool isRightButtonDown);
+
             private:
                 bool createTexture();
                 bool createVertexBuffer();
@@ -119,6 +123,13 @@ namespace SIMILI
                 int last_ws_x_;
                 int last_ws_y_;
                 bool geometry_dirty_;
+
+                float alpha_percent_;
+                bool prev_mouse_inside_;
+                bool prev_left_button_down_;
+                bool prev_right_button_down_;
+                int  prev_cef_mouse_x_;
+                int  prev_cef_mouse_y_;
             };
     
 
