@@ -256,8 +256,14 @@ namespace SIMILI
 			static_cast<http::status>(routerRes.statusCode), req_.version());
 			
 			response->set(http::field::server, "SIMILI/1.0");
+			// Default headers (may be overridden by router response headers below)
 			response->set(http::field::content_type, "application/json");
 			response->set(http::field::access_control_allow_origin, "*");
+			// Apply headers from the router response (e.g. text/html for .html files)
+			for (const auto& kv : routerRes.headers)
+			{
+				response->set(kv.first, kv.second);
+			}
 			response->keep_alive(req_.keep_alive());
 			
 			response->body() = routerRes.body;

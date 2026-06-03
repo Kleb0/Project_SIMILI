@@ -151,10 +151,18 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, imgui_render_pass_(VK_NULL_HANDLE)
 	, imgui_command_buffer_(VK_NULL_HANDLE)
 	, imgui_initialized_(false)
+	, workspace_widget_(nullptr)
+	, widget_command_buffer_(VK_NULL_HANDLE)
 {
 }
 SDL_ApplicationWindow::~SDL_ApplicationWindow()
 {
+	if (workspace_widget_)
+	{
+		workspace_widget_->shutdown();
+		delete workspace_widget_;
+		workspace_widget_ = nullptr;
+	}
 	if (debug_tools_)
 	{
 		delete debug_tools_;
@@ -551,6 +559,21 @@ void SDL_ApplicationWindow::setRenderPass(VkRenderPass renderPass)
 	{
 		std::cout << "[SDL_ApplicationWindow] CEF pipeline created successfully, handle="
 			<< (cef_shared_pipeline_ ? cef_shared_pipeline_->pipeline : VK_NULL_HANDLE) << std::endl;
+	}
+
+	if (imgui_render_pass_ != VK_NULL_HANDLE && !workspace_widget_)
+	{
+		workspace_widget_ = new SIMILI::Frontend::WorkspaceWidget();
+		if (!workspace_widget_->initializeVulkan(vk_context_, vulkan_pipelines_, imgui_render_pass_, 400, 80))
+		{
+			std::cerr << "[SDL_ApplicationWindow] WorkspaceWidget::initializeVulkan failed" << std::endl;
+			delete workspace_widget_;
+			workspace_widget_ = nullptr;
+		}
+		else
+		{
+			std::cout << "[SDL_ApplicationWindow] WorkspaceWidget initialized" << std::endl;
+		}
 	}
 }
 
@@ -972,6 +995,25 @@ void SDL_ApplicationWindow::handleSDLEvent(const SDL_Event& event)
 		pending_left_click_ = true;
 	}
 
+	// Forward physical keys 1-4 to the WorkspaceWidget CEF browser regardless of keyboard layout
+	// (on French layout: & é " ' are the physical keys 1 2 3 4)
+	if (event.type == SDL_EVENT_KEY_DOWN && workspace_widget_)
+	{
+		static const SDL_Scancode modeScancodes[4] = {
+			SDL_SCANCODE_1, SDL_SCANCODE_2, SDL_SCANCODE_3, SDL_SCANCODE_4
+		};
+		static const char* modeKeys[4] = { "1", "2", "3", "4" };
+
+		for (int i = 0; i < 4; ++i)
+		{
+			if (event.key.scancode == modeScancodes[i])
+			{
+				workspace_widget_->sendKeyEvent(modeKeys[i]);
+				break;
+			}
+		}
+	}
+
 }
 
 
@@ -1318,6 +1360,30 @@ void SDL_ApplicationWindow::renderFrame()
 		renderImGui();
 	}
 
+	// -------- render Widgets above Workspace Screen -------- //
+
+	if (workspace_widget_ && ui_manager_ && widget_command_buffer_ != VK_NULL_HANDLE)
+	{
+		workspace_widget_->uploadPaintBuffer();
+
+		const SIMILI::Frontend::WorkSpace& ws = ui_manager_->getWorkSpace();
+		if (ws.isValid())
+		{
+			int drawableW = 0, drawableH = 0;
+			int logicalW = 0, logicalH = 0;
+			SDL_GetWindowSizeInPixels(window_, &drawableW, &drawableH);
+			SDL_GetWindowSize(window_, &logicalW, &logicalH);
+			if (logicalW > 0 && logicalH > 0)
+			{
+				const float scaleX = static_cast<float>(drawableW) / static_cast<float>(logicalW);
+				const float scaleY = static_cast<float>(drawableH) / static_cast<float>(logicalH);
+				const int wsXDrawable = static_cast<int>(static_cast<float>(ws.getX()) * scaleX);
+				const int wsYDrawable = static_cast<int>(static_cast<float>(ws.getY()) * scaleY);
+				renderWorkspaceWidgets(wsXDrawable, wsYDrawable, drawableW, drawableH);
+			}
+		}
+	}
+
 	presentToScreen();
 }
 
@@ -1549,6 +1615,19 @@ bool SDL_ApplicationWindow::initializeVulkan()
 		return false;
 	}
 
+	{
+		VkCommandBufferAllocateInfo widgetCmdAlloc{};
+		widgetCmdAlloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		widgetCmdAlloc.commandPool = vk_command_pool_;
+		widgetCmdAlloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		widgetCmdAlloc.commandBufferCount = 1;
+		if (vkAllocateCommandBuffers(vk_context_->getDevice(), &widgetCmdAlloc, &widget_command_buffer_) != VK_SUCCESS)
+		{
+			std::cerr << "[SDL_ApplicationWindow] Failed to allocate widget command buffer" << std::endl;
+			return false;
+		}
+	}
+
 	std::cout << "[SDL_ApplicationWindow] Vulkan initialized successfully" << std::endl;
 	return true;
 }
@@ -1718,6 +1797,69 @@ void SDL_ApplicationWindow::renderImGui()
 	vkCmdBeginRenderPass(cmd, &rpBegin, VK_SUBPASS_CONTENTS_INLINE);
 
 	ImGui_ImplVulkan_RenderDrawData(drawData, cmd);
+
+	vkCmdEndRenderPass(cmd);
+	vkEndCommandBuffer(cmd);
+
+	VkSubmitInfo submitInfo{};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &cmd;
+	vkQueueSubmit(vk_context_->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+	vkQueueWaitIdle(vk_context_->getGraphicsQueue());
+
+	vkDestroyFramebuffer(device, fb, nullptr);
+}
+
+void SDL_ApplicationWindow::renderWorkspaceWidgets(int wsX, int wsY, int drawableW, int drawableH)
+{
+	if (!workspace_widget_ || widget_command_buffer_ == VK_NULL_HANDLE) return;
+	if (imgui_render_pass_ == VK_NULL_HANDLE) return;
+
+	VkDevice device = vk_context_->getDevice();
+	VkCommandBuffer cmd = widget_command_buffer_;
+
+	vkResetCommandBuffer(cmd, 0);
+
+	VkCommandBufferBeginInfo beginInfo{};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	vkBeginCommandBuffer(cmd, &beginInfo);
+
+	VkImageView colorView = vk_swapchain_image_views_[current_image_index_];
+	VkFramebufferCreateInfo fbInfo{};
+	fbInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	fbInfo.renderPass = imgui_render_pass_;
+	fbInfo.attachmentCount = 1;
+	fbInfo.pAttachments = &colorView;
+	fbInfo.width  = static_cast<uint32_t>(drawableW);
+	fbInfo.height = static_cast<uint32_t>(drawableH);
+	fbInfo.layers = 1;
+	VkFramebuffer fb = VK_NULL_HANDLE;
+	vkCreateFramebuffer(device, &fbInfo, nullptr, &fb);
+
+	VkRenderPassBeginInfo rpBegin{};
+	rpBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	rpBegin.renderPass = imgui_render_pass_;
+	rpBegin.framebuffer = fb;
+	rpBegin.renderArea.offset = { 0, 0 };
+	rpBegin.renderArea.extent = { static_cast<uint32_t>(drawableW), static_cast<uint32_t>(drawableH) };
+	rpBegin.clearValueCount = 0;
+	vkCmdBeginRenderPass(cmd, &rpBegin, VK_SUBPASS_CONTENTS_INLINE);
+
+	VkViewport vp{};
+	vp.x = 0.0f; vp.y = 0.0f;
+	vp.width  = static_cast<float>(drawableW);
+	vp.height = static_cast<float>(drawableH);
+	vp.minDepth = 0.0f; vp.maxDepth = 1.0f;
+	vkCmdSetViewport(cmd, 0, 1, &vp);
+
+	VkRect2D scissor{};
+	scissor.offset = { 0, 0 };
+	scissor.extent = { static_cast<uint32_t>(drawableW), static_cast<uint32_t>(drawableH) };
+	vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+	workspace_widget_->draw(cmd, wsX, wsY, drawableW, drawableH);
 
 	vkCmdEndRenderPass(cmd);
 	vkEndCommandBuffer(cmd);

@@ -365,6 +365,12 @@ int main(int argc, char* argv[])
 	std::string url = "http://localhost:8080/ui/main_layout.html";
 	mainWindow.SetHTMLAdressToDraw(mainWindow.getCefClient(), url, windowWidth, windowHeight);
 	std::cout << "[Main] CEF browser created successfully" << std::endl;
+
+	if (mainWindow.getWorkspaceWidget())
+	{
+		mainWindow.getWorkspaceWidget()->loadURL("http://localhost:8080/ui/Mode_UI.html");
+		std::cout << "[Main] WorkspaceWidget browser created" << std::endl;
+	}
 	
 	std::cout << "[Main] Waiting for CEF and JavaScript initialization..." << std::endl;
 	for (int i = 0; i < 120; ++i)

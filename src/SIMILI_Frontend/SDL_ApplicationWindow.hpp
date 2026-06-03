@@ -17,6 +17,7 @@
 #include "../../SIMILI_Frontend/viewportLogic/UIPanels/DataHolders.hpp"
 #include "viewportLogic/FrameDatas/FrameDatas.hpp"
 #include "../../Engine/VulkanPipeline/VulkanPipeline.hpp"
+#include "viewportLogic/UIPanels/WorkspaceWidget.hpp"
 #include "SDL_Windows_states/SDL_State_Init.hpp"
 #include "SDL_Windows_states/SDL_State_Maximized.hpp"
 #include "SDL_Windows_states/SDL_State_Reduced.hpp"
@@ -141,6 +142,7 @@ class SDL_ApplicationWindow
 		CefRefPtr<CefRenderHandler> getRenderHandler() const { return cef_render_handler_; }
 		CefRefPtr<SIMILICefClient> getCefClient();
 		void setRenderPass(VkRenderPass renderPass);
+		SIMILI::Frontend::WorkspaceWidget* getWorkspaceWidget() const { return workspace_widget_; }
 
 
 		// === Component Registration ===
@@ -365,4 +367,9 @@ class SDL_ApplicationWindow
 		bool initializeImGui();
 		void shutdownImGui();
 		void renderImGui();
+
+		// ===== WorkspaceWidget Integration ===== //
+		SIMILI::Frontend::WorkspaceWidget* workspace_widget_;
+		VkCommandBuffer widget_command_buffer_;
+		void renderWorkspaceWidgets(int wsX, int wsY, int drawableW, int drawableH);
 };
