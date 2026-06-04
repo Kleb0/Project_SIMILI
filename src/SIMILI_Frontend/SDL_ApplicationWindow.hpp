@@ -48,6 +48,12 @@ class ThreeDObjectSelector;
 class RaycastPerform;
 class Guizmo;
 
+class ThreeDMode;
+class Vertice_Mode;
+class Edge_Mode;
+class Face_Mode;
+class Normal_Mode;
+
 class AppRenderHandler : public CefRenderHandler
 {
 	public:
@@ -177,6 +183,14 @@ class SDL_ApplicationWindow
 		// ==== Data Holders Access ====
 		DataHolders& getDataHolders();
 		void setDataHolders(DataHolders* dataHolders);
+
+		// ===== Switch ThreeDMode =====
+		void switchToThreeDMode(ThreeDMode* mode);
+		void setThreeDModeAtStartUP(ThreeDMode* mode);
+
+		// ==== Key_handling for Guizmo ==== //
+
+		void switchTransformModeForGuizmo();
 		
 		// === SDL Window Reference Size ===
 		void setSDLReferenceWindowSize(int width, int height) { reference_window_width_ = width; reference_window_height_ = height; }
@@ -392,4 +406,6 @@ class SDL_ApplicationWindow
 		VkCommandBuffer contextual_menu_command_buffer_;
 		bool contextual_menu_visible_;
 		void RenderContextualMenuAboveUI(int drawableW, int drawableH);
+
+		ThreeDMode * currentThreeDmode;
 };

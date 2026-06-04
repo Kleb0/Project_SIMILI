@@ -131,14 +131,18 @@ namespace MeshTransform
 			if (wKeyState && wKeyState->isFirstPress)
 			{
 				currentGizmoOperation = ImGuizmo::TRANSLATE;
+				std::cout << "[MeshTransform] Switched to TRANSLATE mode" << std::endl;
 			}
 			if (rKeyState && rKeyState->isFirstPress)
 			{
 				currentGizmoOperation = ImGuizmo::ROTATE;
+				std::cout << "[MeshTransform] Switched to ROTATE mode" << std::endl;
+
 			}
 			if (sKeyState && sKeyState->isFirstPress)
 			{
 				currentGizmoOperation = ImGuizmo::SCALE;
+				std::cout << "[MeshTransform] Switched to SCALE mode" << std::endl;
 			}
 		}
 		

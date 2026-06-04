@@ -168,6 +168,18 @@ namespace SIMILI {
 		frame->ExecuteJavaScript(js, frame->GetURL(), 0);
 	}
 
+	void WorkspaceWidget::executeJavaScript(const std::string& script)
+	{
+		if (!cef_browser_)
+			return;
+
+		CefRefPtr<CefFrame> frame = cef_browser_->GetMainFrame();
+		if (!frame)
+			return;
+
+		frame->ExecuteJavaScript(script, frame->GetURL(), 0);
+	}
+
 	void WorkspaceWidget::shutdown()
 	{
 		if (cef_browser_)

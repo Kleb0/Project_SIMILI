@@ -16,6 +16,7 @@
 #include "../../WorldObjects/Camera/Camera.hpp"
 #include "../../Engine/ThreeDObjectSelector.hpp"
 #include "viewportLogic/Raycasting/RaycastPerform.hpp"
+#include "viewportLogic/Keymanagement/KeyManager.hpp"
 #include <SDL3/SDL_vulkan.h>
 #include "include/cef_browser.h"
 #include "backends/imgui_impl_sdl3.h"
@@ -23,8 +24,20 @@
 #include <set>
 #include <cstring>
 
+#include "../../Engine/ThreeDModes/ThreeDMode.hpp"
+#include "../../Engine/ThreeDModes/Normal_Mode.hpp"
+#include "../../Engine/ThreeDModes/Edge_Mode.hpp"
+#include "../../Engine/ThreeDModes/Vertice_Mode.hpp"
+#include "../../Engine/ThreeDModes/Face_Mode.hpp"
+
 // Static member definition
 int SDL_ApplicationWindow::render_frame_count = 0;
+
+// Static instances of ThreeDModes used by keyboard switching
+static Normal_Mode g_normal_mode;
+static Edge_Mode g_edge_mode;
+static Vertice_Mode g_vertice_mode;
+static Face_Mode g_face_mode;
 
 // ======== SIMILICefClient ========
 
@@ -161,6 +174,7 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, contextual_menu_above_gui_(nullptr)
 	, contextual_menu_command_buffer_(VK_NULL_HANDLE)
 	, contextual_menu_visible_(false)
+	, currentThreeDmode(nullptr)
 {
 }
 SDL_ApplicationWindow::~SDL_ApplicationWindow()
@@ -321,6 +335,9 @@ bool SDL_ApplicationWindow::create(const std::string& title, int width, int heig
 
 	if (current_state_)
 		current_state_->enter_state();
+
+	// Initialize the KeyManager
+	SIMILI::Input::KeyManager::getInstance().initialize();
 
 	return true;
 }
@@ -1068,25 +1085,80 @@ void SDL_ApplicationWindow::handleSDLEvent(const SDL_Event& event)
 		pending_left_click_ = true;
 	}
 
-	// Forward physical keys 1-4 to the WorkspaceWidget CEF browser regardless of keyboard layout
-	// (on French layout: & é " ' are the physical keys 1 2 3 4)
-	if (event.type == SDL_EVENT_KEY_DOWN && workspace_widget_)
+	// Keyboard 3D Mode Switching (handles French & é " ' and English 1 2 3 4 via scancodes)
+	if (event.type == SDL_EVENT_KEY_DOWN)
 	{
 		static const SDL_Scancode modeScancodes[4] = {
 			SDL_SCANCODE_1, SDL_SCANCODE_2, SDL_SCANCODE_3, SDL_SCANCODE_4
 		};
-		static const char* modeKeys[4] = { "1", "2", "3", "4" };
+		ThreeDMode* modes[4] = {
+			&g_normal_mode,
+			&g_edge_mode,
+			&g_vertice_mode,
+			&g_face_mode
+		};
 
 		for (int i = 0; i < 4; ++i)
 		{
 			if (event.key.scancode == modeScancodes[i])
 			{
-				workspace_widget_->sendKeyEvent(modeKeys[i]);
+				switchToThreeDMode(modes[i]);
 				break;
 			}
 		}
 	}
 
+	// Route physical keys/scancodes to standard KeyManager for Gizmo W/R/S interaction
+	if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP)
+	{
+		int winKey = 0;
+		if (event.key.scancode == SDL_SCANCODE_W || event.key.key == SDLK_W) winKey = 'W';
+		else if (event.key.scancode == SDL_SCANCODE_R || event.key.key == SDLK_R) winKey = 'R';
+		else if (event.key.scancode == SDL_SCANCODE_S || event.key.key == SDLK_S) winKey = 'S';
+		else if (event.key.scancode == SDL_SCANCODE_1 || event.key.key == SDLK_1) winKey = '1';
+		else if (event.key.scancode == SDL_SCANCODE_2 || event.key.key == SDLK_2) winKey = '2';
+		else if (event.key.scancode == SDL_SCANCODE_3 || event.key.key == SDLK_3) winKey = '3';
+		else if (event.key.scancode == SDL_SCANCODE_4 || event.key.key == SDLK_4) winKey = '4';
+		else if (event.key.scancode == SDL_SCANCODE_LSHIFT || event.key.key == SDLK_LSHIFT) winKey = VK_LSHIFT;
+		else if (event.key.scancode == SDL_SCANCODE_RSHIFT || event.key.key == SDLK_RSHIFT) winKey = VK_RSHIFT;
+
+		if (winKey != 0)
+		{
+			if (event.type == SDL_EVENT_KEY_DOWN)
+			{
+				LPARAM lParam = 0;
+				if (event.key.repeat)
+				{
+					lParam |= (1 << 30);
+				}
+				SIMILI::Input::KeyManager::getInstance().handleKeyDown(winKey, lParam);
+			}
+			else
+			{
+				SIMILI::Input::KeyManager::getInstance().handleKeyUp(winKey);
+			}
+		}
+	}
+
+}
+
+void SDL_ApplicationWindow::switchToThreeDMode(ThreeDMode* mode)
+{
+	if (!mode) return;
+	currentThreeDmode = mode;
+	std::cout << "[SDL_ApplicationWindow] Switch to ThreeDMode: " << mode->getName() << std::endl;
+
+	if (workspace_widget_)
+	{
+		std::string script = "updateMode('-- " + std::string(mode->getName()) + "');";
+		workspace_widget_->executeJavaScript(script);
+	}
+}
+
+void SDL_ApplicationWindow::setThreeDModeAtStartUP(ThreeDMode* mode)
+{
+	currentThreeDmode = mode;
+	std::cout << "[SDL_ApplicationWindow] Startup ThreeDMode set to: " << (mode ? mode->getName() : "None") << std::endl;
 }
 
 
@@ -1382,13 +1454,13 @@ void SDL_ApplicationWindow::renderFrame()
 		{
 			pending_left_click_ = false;
 
-			// Sometime the raycast cancels the moving if we click/drag the gizmo.
-			// If we are hovering or using the gizmo (or were using it last frame), skip raycasting!
-			if (ImGuizmo::IsOver() || ImGuizmo::IsUsing() || wasUsingGizmoLastFrame_)
+			bool isNormalMode = false;
+			if (currentThreeDmode && std::strcmp(currentThreeDmode->getName(), "Normal Mode") == 0)
 			{
-				std::cout << " [SDL_ApplicationWindow RenderFrame] Raycast skipped because ImGuizmo is active or hovered." << std::endl;
+				isNormalMode = true;
 			}
-			else
+
+			if (isNormalMode && !ImGuizmo::IsOver() && !ImGuizmo::IsUsing() && !wasUsingGizmoLastFrame_)
 			{
 				updateWorkspaceProjectionData();
 				
@@ -1421,6 +1493,10 @@ void SDL_ApplicationWindow::renderFrame()
 					data_holders_->setSelectedObjectsForDataHolders(selectedObjectsList);
 					data_holders_->computeNewDataToDataHolders();
 				}
+			}
+			else
+			{
+				std::cout << " [SDL_ApplicationWindow RenderFrame] Click ignored for follwing reasons : Current mode isnt Normal Mode, Mouse is Over Guizmo and Guizmo is active" << std::endl;
 			}
 		}
 		prev_middle_button_down_ = middleDown;
@@ -1478,6 +1554,12 @@ void SDL_ApplicationWindow::renderFrame()
 			projectionMatrix_
 		);
 
+		//here we update the datas in data holder in realTime
+		if (data_holders_)
+		{
+			data_holders_->computeNewDataToDataHolders();
+		}
+
 		// Submit ImGui draw data (including the gizmo) as an overlay render pass
 		renderImGui();
 	}
@@ -1520,6 +1602,9 @@ void SDL_ApplicationWindow::renderFrame()
 	}
 
 	presentToScreen();
+
+	// Clear temporary transition key flags like isFirstPress / justReleased for next frame
+	SIMILI::Input::KeyManager::getInstance().update();
 }
 
 

@@ -198,23 +198,7 @@ void DataHolders::computeNewDataToDataHolders()
 		field_values_[panelName]["scale_y"] = "1.0";
 		field_values_[panelName]["scale_z"] = "1.0";
     }
-
-
-    
-    // // Update existing fields with randomized values
-    // field_values_[panelName]["selected_object"] = "---- had became something ---";
-    // field_values_[panelName]["position_x"] = std::to_string(randomFloat(-100.0f, 100.0f));
-    // field_values_[panelName]["position_y"] = std::to_string(randomFloat(-100.0f, 100.0f));
-    // field_values_[panelName]["position_z"] = std::to_string(randomFloat(-100.0f, 100.0f));
-    // field_values_[panelName]["rotation_x"] = std::to_string(randomFloat(-180.0f, 180.0f));
-    // field_values_[panelName]["rotation_y"] = std::to_string(randomFloat(-180.0f, 180.0f));
-    // field_values_[panelName]["rotation_z"] = std::to_string(randomFloat(-180.0f, 180.0f));
-    // field_values_[panelName]["scale_x"] = std::to_string(randomFloat(0.1f, 10.0f));
-    // field_values_[panelName]["scale_y"] = std::to_string(randomFloat(0.1f, 10.0f));
-    // field_values_[panelName]["scale_z"] = std::to_string(randomFloat(0.1f, 10.0f));
-
 }
-
 int DataHolders::getCountForPanel(const std::string& panelName) const
 {
 	std::lock_guard<std::mutex> lock(mutex_);

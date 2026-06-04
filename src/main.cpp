@@ -24,6 +24,7 @@
 #include "Engine/ThreeDObjectSelector.hpp"
 #include "SIMILI_Frontend/viewportLogic/Raycasting/RaycastPerform.hpp"
 #include "DebugLogger.hpp"
+#include "Engine/ThreeDModes/Normal_Mode.hpp"
 
 #include <iostream>
 #include <sstream>
@@ -331,6 +332,9 @@ int main(int argc, char* argv[])
 
 	mainWindow.setVKScene(&myVKScene);
 	std::cout << "[Main] VKScene linked to SDL_ApplicationWindow" << std::endl;
+
+	static Normal_Mode normalMode;
+	mainWindow.setThreeDModeAtStartUP(&normalMode);
 
 	mainWindow.show();
 	std::cout << "[Main] SDL window shown before CEF creation" << std::endl;

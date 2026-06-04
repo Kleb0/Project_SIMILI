@@ -59,6 +59,7 @@ namespace SIMILI {
 							unsigned char r, unsigned char g, unsigned char b, unsigned char threshold);
 			void draw(VkCommandBuffer commandBuffer, int wsX, int wsY, int drawableWidth, int drawableHeight);
 			void sendKeyEvent(const std::string& key);
+			void executeJavaScript(const std::string& script);
 
 			int getWidgetWidth()  const { return widget_width_;  }
 			int getWidgetHeight() const { return widget_height_; }
