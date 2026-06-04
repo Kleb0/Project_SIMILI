@@ -14,22 +14,27 @@
 #include <vector>
 #include <memory>
 #include <mutex>
+
 #include "../../SIMILI_Frontend/viewportLogic/UIPanels/DataHolders.hpp"
 #include "viewportLogic/FrameDatas/FrameDatas.hpp"
 #include "../../Engine/VulkanPipeline/VulkanPipeline.hpp"
 #include "viewportLogic/UIPanels/WorkspaceWidget.hpp"
 #include "viewportLogic/UIPanels/ContextualMenuAboveGui.hpp"
+
 #include "SDL_Windows_states/SDL_State_Init.hpp"
 #include "SDL_Windows_states/SDL_State_Maximized.hpp"
 #include "SDL_Windows_states/SDL_State_Reduced.hpp"
 #include "SDL_Windows_states/SDL_State_Scalingdown.hpp"
 #include "SDL_Windows_states/SDL_State_ScalingUP.hpp"
+
 #include "MouseStates/Mouse_Above_Workspace_State.hpp"
 #include "MouseStates/Mouse_Outside_Workspace_State.hpp"
 #include "MouseStates/Mouse_Above_UI_Panel_State.hpp"
 #include "viewportLogic/CameraControl/cameraControl.hpp"
 #include "../../WorldObjects/Entities/ThreeDObject.hpp"  
 #include "../../Engine/Guizmo.hpp"
+
+#include "../../Engine/ThreeDInteractions/MeshTransform.hpp"
 
 class ThreeDScreen;
 class VKContext;
@@ -155,6 +160,7 @@ class SDL_ApplicationWindow
 		void setCameraControl(CameraControl* cameraControl) { camera_control_ = cameraControl; }
 		void setSelector(ThreeDObjectSelector* selector) { selector_ = selector; }
 		void setRaycastPerform(RaycastPerform* raycast) { raycast_perform_ = raycast; }
+	
 		void setVKContext(VKContext* context);
 		void setVKScene(VKScene* scene) { vk_scene_ = scene; }
 		void setVulkanPipelines(VulkanPipeline* pipelines);
@@ -163,6 +169,7 @@ class SDL_ApplicationWindow
 		void setPanelResizingLogic(PanelResizingLogic* logic) { panel_resizing_logic_ = logic; }
 		void updateFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas);
 		void onCEFPaint(CefRenderHandler::PaintElementType type, const void* buffer, int width, int height);
+
 
 		SIMILI::Frontend::UIManager* getUIManager() const { return ui_manager_; }
 		App_Border* getAppBorder() const { return app_border_; }
@@ -321,10 +328,13 @@ class SDL_ApplicationWindow
 		bool prepared_skip_texture_rebuild_;
 		bool borders_set_for_init_;
 		bool pending_window_resize_sync_;
+
 		float pending_wheel_delta_;
 		bool prev_middle_button_down_;
 		bool prev_left_button_down_;
 		bool pending_left_click_;
+		bool pending_hold_left_click_;
+		bool wasUsingGizmoLastFrame_;
 
 		// === Private Methods ===
 		void updateDpiScale();

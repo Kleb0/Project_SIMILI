@@ -123,6 +123,8 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, prev_middle_button_down_(false)
 	, prev_left_button_down_(false)
 	, pending_left_click_(false)
+	, pending_hold_left_click_(false)
+	, wasUsingGizmoLastFrame_(false)
 	, browser_(nullptr)
 	, simili_cef_client_(nullptr)
 	, ui_manager_vulkan_initialized_(false)
@@ -1019,6 +1021,8 @@ void SDL_ApplicationWindow::updateUIState()
 
 void SDL_ApplicationWindow::handleSDLEvent(const SDL_Event& event)
 {
+	ImGui_ImplSDL3_ProcessEvent(&event);
+
 	if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_RIGHT)
 	{
 		contextual_menu_visible_ = !contextual_menu_visible_;
@@ -1377,40 +1381,67 @@ void SDL_ApplicationWindow::renderFrame()
 		if (pending_left_click_ && raycast_perform_ && camera_ && vk_scene_ && ui_manager_)
 		{
 			pending_left_click_ = false;
-			updateWorkspaceProjectionData();
-			
-			float aspectRatio = (workspaceHeight_ > 0)
-				? static_cast<float>(workspaceWidth_) / static_cast<float>(workspaceHeight_)
-				: 1.0f;
 
-			viewMatrix_ = camera_->getViewMatrix();
-			projectionMatrix_ = camera_->getProjectionMatrix(aspectRatio);
-
-			const std::list<ThreeDObject*>& objList = vk_scene_->getObjectsRef();
-			std::vector<ThreeDObject*> objects(objList.begin(), objList.end());
-
-			raycast_perform_->performRaycast(
-				mouseX, mouseY,
-				workspaceX_, workspaceY_,
-				workspaceWidth_, workspaceHeight_,
-				viewMatrix_, projectionMatrix_,
-				objects);
-
-			const std::vector<ThreeDObject*>& selectedObjects = raycast_perform_->getLastHitObjects(); 
-			std::list<ThreeDObject*> selectedObjectsList(selectedObjects.begin(), selectedObjects.end());
-
-			std::cout << " [SDL_ApplicationWindow RenderFrame] the selected objects are : " << std::endl;
-
-			vk_scene_->setSelectedObjects(selectedObjectsList);
-
-			if (data_holders_)
+			// Sometime the raycast cancels the moving if we click/drag the gizmo.
+			// If we are hovering or using the gizmo (or were using it last frame), skip raycasting!
+			if (ImGuizmo::IsOver() || ImGuizmo::IsUsing() || wasUsingGizmoLastFrame_)
 			{
-				data_holders_->setSelectedObjectsForDataHolders(selectedObjectsList);
-				data_holders_->computeNewDataToDataHolders();
+				std::cout << " [SDL_ApplicationWindow RenderFrame] Raycast skipped because ImGuizmo is active or hovered." << std::endl;
+			}
+			else
+			{
+				updateWorkspaceProjectionData();
+				
+				float aspectRatio = (workspaceHeight_ > 0)
+					? static_cast<float>(workspaceWidth_) / static_cast<float>(workspaceHeight_)
+					: 1.0f;
+
+				viewMatrix_ = camera_->getViewMatrix();
+				projectionMatrix_ = camera_->getProjectionMatrix(aspectRatio);
+
+				const std::list<ThreeDObject*>& objList = vk_scene_->getObjectsRef();
+				std::vector<ThreeDObject*> objects(objList.begin(), objList.end());
+
+				raycast_perform_->performRaycast(
+					mouseX, mouseY,
+					workspaceX_, workspaceY_,
+					workspaceWidth_, workspaceHeight_,
+					viewMatrix_, projectionMatrix_,
+					objects);
+
+				const std::vector<ThreeDObject*>& selectedObjects = raycast_perform_->getLastHitObjects(); 
+				std::list<ThreeDObject*> selectedObjectsList(selectedObjects.begin(), selectedObjects.end());
+
+				std::cout << " [SDL_ApplicationWindow RenderFrame] the selected objects are : " << std::endl;
+
+				vk_scene_->setSelectedObjects(selectedObjectsList);
+
+				if (data_holders_)
+				{
+					data_holders_->setSelectedObjectsForDataHolders(selectedObjectsList);
+					data_holders_->computeNewDataToDataHolders();
+				}
 			}
 		}
 		prev_middle_button_down_ = middleDown;
 		prev_left_button_down_ = leftDown;
+
+		//---------- hold left mouse button to move selected objects on the 3D screen (with gizmo) ---------//
+		pending_hold_left_click_ = leftDown;
+	}
+	else
+	{
+		float mouseXf = 0.0f, mouseYf = 0.0f;
+		SDL_MouseButtonFlags mouseButtons = SDL_GetMouseState(&mouseXf, &mouseYf);
+		const bool leftDown = (mouseButtons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
+		if (ImGuizmo::IsUsing() && leftDown)
+		{
+			pending_hold_left_click_ = true;
+		}
+		else
+		{
+			pending_hold_left_click_ = false;
+		}
 	}
 
 	if (!vk_scene_->getSelectedObjects().empty())
@@ -1430,9 +1461,22 @@ void SDL_ApplicationWindow::renderFrame()
 		ImGui_ImplSDL3_NewFrame();
 		ImGui::NewFrame();
 
-		// Render gizmo for the selected objects
-		Guizmo::renderGizmoForObject(vk_scene_->getSelectedObjects(), ImGuizmo::TRANSLATE, viewMatrix_, projectionMatrix_, 
-		ImVec2(static_cast<float>(workspaceX_), static_cast<float>(workspaceY_)), ImVec2(static_cast<float>(workspaceWidth_), static_cast<float>(workspaceHeight_)));
+		// Feed the mouse state and holding condition into ImGui
+		float mouseXf = 0.0f, mouseYf = 0.0f;
+		SDL_GetMouseState(&mouseXf, &mouseYf);
+		ImGui::GetIO().MousePos = ImVec2(mouseXf, mouseYf);
+		ImGui::GetIO().MouseDown[0] = pending_hold_left_click_;
+
+		// Call manipulateMesh to handle active manipulation and rendering
+		MeshTransform::manipulateMesh(
+			vk_scene_,
+			vk_scene_->getSelectedObjects(),
+			ImVec2(static_cast<float>(workspaceX_), static_cast<float>(workspaceY_)),
+			ImVec2(static_cast<float>(workspaceWidth_), static_cast<float>(workspaceHeight_)),
+			wasUsingGizmoLastFrame_,
+			viewMatrix_,
+			projectionMatrix_
+		);
 
 		// Submit ImGui draw data (including the gizmo) as an overlay render pass
 		renderImGui();

@@ -148,7 +148,43 @@ namespace MeshTransform
 		glm::mat4 view = viewMatrix;
 		glm::mat4 proj = projectionMatrix;
 
-		glm::mat4 dummyMatrix = Guizmo::renderGizmoForObject(selectedObjects, currentGizmoOperation, view, proj, oglChildPos, oglChildSize);
+		// 1. Begin ImGuizmo frame and set draw states (exactly once here!)
+		ImGuizmo::BeginFrame();
+		ImGuizmo::Enable(true);
+		ImGuizmo::SetOrthographic(false);
+		ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
+		ImGuizmo::SetDrawlist(ImGui::GetBackgroundDrawList());
+		ImGuizmo::SetRect(oglChildPos.x, oglChildPos.y, oglChildSize.x, oglChildSize.y);
+		ImGuizmo::SetGizmoSizeClipSpace(0.2f);
+
+		// 2. Compute the current average translation, rotation, scale to construct the dummyMatrix
+		glm::vec3 center(0.0f);
+		glm::vec3 averageScale(0.0f);
+		std::vector<glm::quat> rotations;
+
+		for (auto* obj : selectedObjects)
+		{
+			center += obj->getPosition();
+			averageScale += obj->getScale();
+			rotations.push_back(obj->rotation);
+		}
+
+		center /= static_cast<float>(selectedObjects.size());
+		averageScale /= static_cast<float>(selectedObjects.size());
+
+		glm::vec4 cumulative(0.0f);
+		for (const auto& q : rotations)
+		{
+			glm::quat aligned = glm::dot(q, rotations[0]) < 0.0f ? -q : q;
+			cumulative += glm::vec4(aligned.x, aligned.y, aligned.z, aligned.w);
+		}
+
+		cumulative = glm::normalize(cumulative);
+		glm::quat avgRotation = glm::quat(cumulative.w, cumulative.x, cumulative.y, cumulative.z);
+
+		glm::mat4 dummyMatrix = glm::translate(glm::mat4(1.0f), center);
+		dummyMatrix *= glm::toMat4(glm::normalize(avgRotation));
+		dummyMatrix = glm::scale(dummyMatrix, averageScale);
 
 		static glm::mat4 startMatrix = glm::mat4(1.0f);
 		static glm::mat4 prevMatrix  = glm::mat4(1.0f);
@@ -173,6 +209,7 @@ namespace MeshTransform
 			}
 		}
 
+		// 3. Actually perform single manipulation in ImGuizmo::WORLD mode
 		if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(proj),
 		currentGizmoOperation, ImGuizmo::WORLD, glm::value_ptr(dummyMatrix)))
 		{
