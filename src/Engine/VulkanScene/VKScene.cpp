@@ -636,7 +636,26 @@ bool VKScene::initializeScenePipelines()
 	auto edgeFragSpirv = GLSLCompiler::compileGLSL(kEdgeFragmentShaderGLSL, GLSLCompiler::ShaderType::Fragment);
 	auto vertFragSpirv = GLSLCompiler::compileGLSL(kVerticeFragmentShaderGLSL, GLSLCompiler::ShaderType::Fragment);
 
-	if (meshVertSpirv.empty() || faceFragSpirv.empty() || edgeFragSpirv.empty() || vertFragSpirv.empty())
+	const char* kSelectedFaceFragmentShaderGLSL = R"(
+		#version 450
+		layout(location = 0) out vec4 outColor;
+		void main() {
+			outColor = vec4(1.0, 0.5, 0.0, 1.0); // orange
+		}
+	)";
+
+	const char* kSelectedEdgeFragmentShaderGLSL = R"(
+		#version 450
+		layout(location = 0) out vec4 outColor;
+		void main() {
+			outColor = vec4(1.0, 0.5, 0.0, 1.0); // orange
+		}
+	)";
+
+	auto selFaceFragSpirv = GLSLCompiler::compileGLSL(kSelectedFaceFragmentShaderGLSL, GLSLCompiler::ShaderType::Fragment);
+	auto selEdgeFragSpirv = GLSLCompiler::compileGLSL(kSelectedEdgeFragmentShaderGLSL, GLSLCompiler::ShaderType::Fragment);
+
+	if (meshVertSpirv.empty() || faceFragSpirv.empty() || edgeFragSpirv.empty() || vertFragSpirv.empty() || selFaceFragSpirv.empty() || selEdgeFragSpirv.empty())
 	{
 		std::cerr << "[VKScene] Failed to compile mesh shaders: " << GLSLCompiler::getLastError() << std::endl;
 		return false;
@@ -646,6 +665,8 @@ bool VKScene::initializeScenePipelines()
 	auto faceFragBytes = GLSLCompiler::spirvToBytes(faceFragSpirv);
 	auto edgeFragBytes = GLSLCompiler::spirvToBytes(edgeFragSpirv);
 	auto vertFragBytes = GLSLCompiler::spirvToBytes(vertFragSpirv);
+	auto selFaceFragBytes = GLSLCompiler::spirvToBytes(selFaceFragSpirv);
+	auto selEdgeFragBytes = GLSLCompiler::spirvToBytes(selEdgeFragSpirv);
 
 	VkVertexInputAttributeDescription meshAttrPos{};
 	meshAttrPos.binding = 0;
@@ -726,6 +747,50 @@ bool VKScene::initializeScenePipelines()
 	mesh_vertex_pipeline_handle_ = vtxPipeline->pipeline;
 	mesh_vertex_pipeline_layout_ = vtxPipeline->layout;
 
+	// --- selected faces pipeline (TRIANGLE_LIST) — orange ---
+	VulkanPipeline::PipelineConfig selFaceCfg;
+	selFaceCfg.name = "mesh_selected_faces";
+	selFaceCfg.vertexShaderCode = meshVertBytes;
+	selFaceCfg.fragmentShaderCode = selFaceFragBytes;
+	selFaceCfg.renderPass = scene_render_pass_;
+	selFaceCfg.descriptorSetLayout = VK_NULL_HANDLE;
+	selFaceCfg.enableBlending = false;
+	selFaceCfg.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	selFaceCfg.vertexBindingStride = kMeshStride;
+	selFaceCfg.vertexAttributes = { meshAttrPos };
+	selFaceCfg.pushConstantRanges = { meshPushRange };
+
+	auto selFacePipeline = vulkan_pipelines_->getOrCreatePipeline(selFaceCfg);
+	if (!selFacePipeline || selFacePipeline->pipeline == VK_NULL_HANDLE)
+	{
+		std::cerr << "[VKScene] Failed to create mesh selected face pipeline" << std::endl;
+		return false;
+	}
+	mesh_selected_face_pipeline_handle_ = selFacePipeline->pipeline;
+	mesh_selected_face_pipeline_layout_ = selFacePipeline->layout;
+
+	// --- selected edges pipeline (LINE_LIST) — orange ---
+	VulkanPipeline::PipelineConfig selEdgeCfg;
+	selEdgeCfg.name = "mesh_selected_edges";
+	selEdgeCfg.vertexShaderCode = meshVertBytes;
+	selEdgeCfg.fragmentShaderCode = selEdgeFragBytes;
+	selEdgeCfg.renderPass = scene_render_pass_;
+	selEdgeCfg.descriptorSetLayout = VK_NULL_HANDLE;
+	selEdgeCfg.enableBlending = false;
+	selEdgeCfg.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+	selEdgeCfg.vertexBindingStride = kMeshStride;
+	selEdgeCfg.vertexAttributes = { meshAttrPos };
+	selEdgeCfg.pushConstantRanges = { meshPushRange };
+
+	auto selEdgePipeline = vulkan_pipelines_->getOrCreatePipeline(selEdgeCfg);
+	if (!selEdgePipeline || selEdgePipeline->pipeline == VK_NULL_HANDLE)
+	{
+		std::cerr << "[VKScene] Failed to create mesh selected edge pipeline" << std::endl;
+		return false;
+	}
+	mesh_selected_edge_pipeline_handle_ = selEdgePipeline->pipeline;
+	mesh_selected_edge_pipeline_layout_ = selEdgePipeline->layout;
+
 	scene_pipeline_initialized_ = true;
 	return true;
 }
@@ -783,9 +848,12 @@ void VKScene::drawMeshObjects(VkCommandBuffer commandBuffer, const glm::mat4& vi
 	struct FaceBatch {
 		std::vector<glm::vec3> tris;
 		float distToCam;
+		bool selected;
 	};
-	std::vector<FaceBatch> faceBatches;
+	std::vector<FaceBatch> normalFaceBatches;
+	std::vector<FaceBatch> selectedFaceBatches;
 	std::vector<glm::vec3> edgeVerts;
+	std::vector<glm::vec3> selectedEdgeVerts;
 	std::vector<glm::vec3> vertVerts;
 
 	// Position monde de la caméra extraite de la matrice vue inversée
@@ -813,6 +881,7 @@ void VKScene::drawMeshObjects(VkCommandBuffer commandBuffer, const glm::mat4& vi
 
 			FaceBatch batch;
 			batch.distToCam = glm::length(center - camPos);
+			batch.selected = face->isSelected();
 
 			if (fv.size() == 3)
 			{
@@ -829,14 +898,44 @@ void VKScene::drawMeshObjects(VkCommandBuffer commandBuffer, const glm::mat4& vi
 					batch.tris.push_back(toWorld(fv[i + 1]));
 				}
 			}
-			faceBatches.push_back(std::move(batch));
+
+			if (batch.selected)
+			{
+				selectedFaceBatches.push_back(std::move(batch));
+
+				// "fine black rays for the faces"
+				// Add boundary edges of selected face in black
+				for (size_t j = 0; j < fv.size(); ++j)
+				{
+					edgeVerts.push_back(toWorld(fv[j]));
+					edgeVerts.push_back(toWorld(fv[(j + 1) % fv.size()]));
+				}
+				// Add lines from face center to each vertex in black (diagonals/rays)
+				for (const Vertice* v : fv)
+				{
+					edgeVerts.push_back(center);
+					edgeVerts.push_back(toWorld(v));
+				}
+			}
+			else
+			{
+				normalFaceBatches.push_back(std::move(batch));
+			}
 		}
 
 		// ---- Edges: 2 points par edge ----
 		for (const Edge* edge : mesh->getEdges())
 		{
-			edgeVerts.push_back(toWorld(edge->getStart()));
-			edgeVerts.push_back(toWorld(edge->getEnd()));
+			if (edge->isSelected())
+			{
+				selectedEdgeVerts.push_back(toWorld(edge->getStart()));
+				selectedEdgeVerts.push_back(toWorld(edge->getEnd()));
+			}
+			else
+			{
+				edgeVerts.push_back(toWorld(edge->getStart()));
+				edgeVerts.push_back(toWorld(edge->getEnd()));
+			}
 		}
 
 		// ---- Vertices: 1 point par vertice ----
@@ -847,15 +946,22 @@ void VKScene::drawMeshObjects(VkCommandBuffer commandBuffer, const glm::mat4& vi
 	}
 
 	// Trier les faces du plus loin au plus proche (painter's algorithm)
-	std::sort(faceBatches.begin(), faceBatches.end(),
+	std::sort(normalFaceBatches.begin(), normalFaceBatches.end(),
+		[](const FaceBatch& a, const FaceBatch& b) { return a.distToCam > b.distToCam; });
+	std::sort(selectedFaceBatches.begin(), selectedFaceBatches.end(),
 		[](const FaceBatch& a, const FaceBatch& b) { return a.distToCam > b.distToCam; });
 
 	std::vector<glm::vec3> faceVerts;
-	for (const FaceBatch& batch : faceBatches)
+	for (const FaceBatch& batch : normalFaceBatches)
 		for (const glm::vec3& v : batch.tris)
 			faceVerts.push_back(v);
 
-	const VkDeviceSize totalBytes = (faceVerts.size() + edgeVerts.size() + vertVerts.size()) * sizeof(glm::vec3);
+	std::vector<glm::vec3> selectedFaceVerts;
+	for (const FaceBatch& batch : selectedFaceBatches)
+		for (const glm::vec3& v : batch.tris)
+			selectedFaceVerts.push_back(v);
+
+	const VkDeviceSize totalBytes = (faceVerts.size() + selectedFaceVerts.size() + edgeVerts.size() + selectedEdgeVerts.size() + vertVerts.size()) * sizeof(glm::vec3);
 
 	if (totalBytes == 0 || !ensureMeshBuffer(totalBytes))
 		return;
@@ -864,13 +970,19 @@ void VKScene::drawMeshObjects(VkCommandBuffer commandBuffer, const glm::mat4& vi
 	vkMapMemory(vkctx->getDevice(), mesh_dynamic_memory_, 0, totalBytes, 0, &mapped);
 
 	const VkDeviceSize faceOffset = 0;
-	const VkDeviceSize edgeOffset = faceVerts.size() * sizeof(glm::vec3);
-	const VkDeviceSize vertOffset = edgeOffset + edgeVerts.size() * sizeof(glm::vec3);
+	const VkDeviceSize selFaceOffset = faceOffset + faceVerts.size() * sizeof(glm::vec3);
+	const VkDeviceSize edgeOffset = selFaceOffset + selectedFaceVerts.size() * sizeof(glm::vec3);
+	const VkDeviceSize selEdgeOffset = edgeOffset + edgeVerts.size() * sizeof(glm::vec3);
+	const VkDeviceSize vertOffset = selEdgeOffset + selectedEdgeVerts.size() * sizeof(glm::vec3);
 
 	if (!faceVerts.empty())
 		memcpy(static_cast<char*>(mapped) + faceOffset, faceVerts.data(), faceVerts.size() * sizeof(glm::vec3));
+	if (!selectedFaceVerts.empty())
+		memcpy(static_cast<char*>(mapped) + selFaceOffset, selectedFaceVerts.data(), selectedFaceVerts.size() * sizeof(glm::vec3));
 	if (!edgeVerts.empty())
 		memcpy(static_cast<char*>(mapped) + edgeOffset, edgeVerts.data(), edgeVerts.size() * sizeof(glm::vec3));
+	if (!selectedEdgeVerts.empty())
+		memcpy(static_cast<char*>(mapped) + selEdgeOffset, selectedEdgeVerts.data(), selectedEdgeVerts.size() * sizeof(glm::vec3));
 	if (!vertVerts.empty())
 		memcpy(static_cast<char*>(mapped) + vertOffset, vertVerts.data(), vertVerts.size() * sizeof(glm::vec3));
 
@@ -878,6 +990,7 @@ void VKScene::drawMeshObjects(VkCommandBuffer commandBuffer, const glm::mat4& vi
 
 	const glm::mat4 vp = proj * view;
 
+	// Draw faces — blanc/naturel
 	if (!faceVerts.empty())
 	{
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_face_pipeline_handle_);
@@ -888,7 +1001,18 @@ void VKScene::drawMeshObjects(VkCommandBuffer commandBuffer, const glm::mat4& vi
 		vkCmdDraw(commandBuffer, static_cast<uint32_t>(faceVerts.size()), 1, 0, 0);
 	}
 
-	// Draw edges — noir
+	// Draw selected faces — orange
+	if (!selectedFaceVerts.empty())
+	{
+		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_selected_face_pipeline_handle_);
+		VkDeviceSize off = selFaceOffset;
+		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &mesh_dynamic_buffer_, &off);
+		vkCmdPushConstants(commandBuffer, mesh_selected_face_pipeline_layout_,
+			VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &vp);
+		vkCmdDraw(commandBuffer, static_cast<uint32_t>(selectedFaceVerts.size()), 1, 0, 0);
+	}
+
+	// Draw edges (including face fine black rays) — black
 	if (!edgeVerts.empty())
 	{
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_edge_pipeline_handle_);
@@ -897,6 +1021,17 @@ void VKScene::drawMeshObjects(VkCommandBuffer commandBuffer, const glm::mat4& vi
 		vkCmdPushConstants(commandBuffer, mesh_edge_pipeline_layout_,
 			VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &vp);
 		vkCmdDraw(commandBuffer, static_cast<uint32_t>(edgeVerts.size()), 1, 0, 0);
+	}
+
+	// Draw selected edges — orange
+	if (!selectedEdgeVerts.empty())
+	{
+		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_selected_edge_pipeline_handle_);
+		VkDeviceSize off = selEdgeOffset;
+		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &mesh_dynamic_buffer_, &off);
+		vkCmdPushConstants(commandBuffer, mesh_selected_edge_pipeline_layout_,
+			VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &vp);
+		vkCmdDraw(commandBuffer, static_cast<uint32_t>(selectedEdgeVerts.size()), 1, 0, 0);
 	}
 
 	// Draw vertices (points) — vert

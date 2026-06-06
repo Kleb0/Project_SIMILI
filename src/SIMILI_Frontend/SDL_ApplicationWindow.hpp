@@ -34,7 +34,13 @@
 #include "../../WorldObjects/Entities/ThreeDObject.hpp"  
 #include "../../Engine/Guizmo.hpp"
 
+#include "../../Engine/ThreeDModes/Edge_Mode.hpp"
+#include "../../Engine/ThreeDModes/Face_Mode.hpp"
+#include "../../Engine/ThreeDModes/Normal_Mode.hpp"
+#include "../../Engine/ThreeDModes/Vertice_Mode.hpp"
+
 #include "../../Engine/ThreeDInteractions/MeshTransform.hpp"
+
 
 class ThreeDScreen;
 class VKContext;
@@ -47,12 +53,10 @@ class PanelResizingLogic;
 class ThreeDObjectSelector;
 class RaycastPerform;
 class Guizmo;
+class Edge;
+class Face;
+class Vertice;
 
-class ThreeDMode;
-class Vertice_Mode;
-class Edge_Mode;
-class Face_Mode;
-class Normal_Mode;
 
 class AppRenderHandler : public CefRenderHandler
 {
@@ -161,7 +165,6 @@ class SDL_ApplicationWindow
 
 		// === Component Registration ===
 		void Set_UIHandler(void* handler);
-		void setThreeDScreen(ThreeDScreen* screen);
 		void setCamera(Camera* camera) { camera_ = camera; }
 		void setCameraControl(CameraControl* cameraControl) { camera_control_ = cameraControl; }
 		void setSelector(ThreeDObjectSelector* selector) { selector_ = selector; }
@@ -185,12 +188,8 @@ class SDL_ApplicationWindow
 		void setDataHolders(DataHolders* dataHolders);
 
 		// ===== Switch ThreeDMode =====
-		void switchToThreeDMode(ThreeDMode* mode);
-		void setThreeDModeAtStartUP(ThreeDMode* mode);
-
-		// ==== Key_handling for Guizmo ==== //
-
-		void switchTransformModeForGuizmo();
+		void switchThreeDMode(ThreeDMode* mode);
+		void setThreeDModeAtStart(ThreeDMode* mode);
 		
 		// === SDL Window Reference Size ===
 		void setSDLReferenceWindowSize(int width, int height) { reference_window_width_ = width; reference_window_height_ = height; }
@@ -249,6 +248,9 @@ class SDL_ApplicationWindow
 		glm::mat4 viewMatrix_;
 		glm::mat4 projectionMatrix_;
 		std::list<ThreeDObject*> selectedObjectsList_;  
+		std::list<Edge*> selectedEdgesList_;
+		std::list<Vertice*> selectedVerticeList_;
+		std::list<Face*> selectedFaceList_;
 		
 	private:
 
@@ -359,7 +361,9 @@ class SDL_ApplicationWindow
 		void StateTransition(SDL_State* from, SDL_State* to);
 		void updateMouseState(int mouseX, int mouseY);
 
-		// === State Machine ===
+
+		
+		// === State Machine and mods ===
 		SDL_State_Init state_init_;
 		SDL_State_Maximized state_maximized_;
 		SDL_State_Reduced state_reduced_;
@@ -372,6 +376,13 @@ class SDL_ApplicationWindow
 		SIMILI::Input::Mouse_Outside_Workspace_State mouse_state_outside_workspace_;
 		SIMILI::Input::Mouse_Above_UI_Panel_State mouse_state_above_ui_panel_;
 		SIMILI::Input::Mouse_State* current_mouse_state_;
+
+		// threeDModes
+		Edge_Mode vertice_mode_;
+		Edge_Mode edge_mode_;
+		Face_Mode face_mode_;	
+		Normal_Mode normal_mode_;
+		ThreeDMode* current_mode_;
 
 		// ===== Vulkan Resource Management ===== //
 		bool createSwapchain();

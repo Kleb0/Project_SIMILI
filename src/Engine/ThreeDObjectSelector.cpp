@@ -614,8 +614,8 @@ const glm::mat4 &view, const glm::mat4 &projection, const std::vector<ThreeDObje
 	float mouseY_GL = screenHeight - mouseY;
 	
 	glm::vec3 rayStart = glm::unProject(glm::vec3(mouseX, mouseY_GL, 0.0f), view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
-	glm::vec3 rayEnd   = glm::unProject(glm::vec3(mouseX, mouseY_GL, 1.0f), view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
-	glm::vec3 rayDir   = glm::normalize(rayEnd - rayStart);
+	glm::vec3 rayEnd = glm::unProject(glm::vec3(mouseX, mouseY_GL, 1.0f), view, projection, glm::vec4(0, 0, screenWidth, screenHeight));
+	glm::vec3 rayDir = glm::normalize(rayEnd - rayStart);
 	glm::vec3 rayOrigin = rayStart;
 
 	// NEW APPROACH: Find closest edge by proximity to ray (like mesh selection)

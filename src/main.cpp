@@ -334,7 +334,7 @@ int main(int argc, char* argv[])
 	std::cout << "[Main] VKScene linked to SDL_ApplicationWindow" << std::endl;
 
 	static Normal_Mode normalMode;
-	mainWindow.setThreeDModeAtStartUP(&normalMode);
+	mainWindow.setThreeDModeAtStart(&normalMode);
 
 	mainWindow.show();
 	std::cout << "[Main] SDL window shown before CEF creation" << std::endl;

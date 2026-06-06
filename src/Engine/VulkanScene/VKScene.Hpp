@@ -127,6 +127,12 @@ private:
     VkPipeline mesh_vertex_pipeline_handle_ = VK_NULL_HANDLE;
     VkPipelineLayout mesh_vertex_pipeline_layout_ = VK_NULL_HANDLE;
 
+    // Selected mesh element rendering pipelines
+    VkPipeline mesh_selected_face_pipeline_handle_ = VK_NULL_HANDLE;
+    VkPipelineLayout mesh_selected_face_pipeline_layout_ = VK_NULL_HANDLE;
+    VkPipeline mesh_selected_edge_pipeline_handle_ = VK_NULL_HANDLE;
+    VkPipelineLayout mesh_selected_edge_pipeline_layout_ = VK_NULL_HANDLE;
+
     // Dynamic host-visible buffer for per-frame mesh geometry upload
     VkBuffer mesh_dynamic_buffer_ = VK_NULL_HANDLE;
     VkDeviceMemory mesh_dynamic_memory_ = VK_NULL_HANDLE;

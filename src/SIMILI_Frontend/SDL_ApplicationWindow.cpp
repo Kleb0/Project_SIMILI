@@ -29,6 +29,11 @@
 #include "../../Engine/ThreeDModes/Edge_Mode.hpp"
 #include "../../Engine/ThreeDModes/Vertice_Mode.hpp"
 #include "../../Engine/ThreeDModes/Face_Mode.hpp"
+#include "../../Engine/ThreeDInteractions/EdgeTransform.hpp"
+#include "../../Engine/ThreeDInteractions/VerticeTransform.hpp"
+#include "../../Engine/ThreeDInteractions/FaceTransform.hpp"
+#include "../../WorldObjects/Basic/Edge.hpp"
+#include "../../WorldObjects/Mesh/Mesh.hpp"
 
 // Static member definition
 int SDL_ApplicationWindow::render_frame_count = 0;
@@ -1102,7 +1107,7 @@ void SDL_ApplicationWindow::handleSDLEvent(const SDL_Event& event)
 		{
 			if (event.key.scancode == modeScancodes[i])
 			{
-				switchToThreeDMode(modes[i]);
+				switchThreeDMode(modes[i]);
 				break;
 			}
 		}
@@ -1142,7 +1147,7 @@ void SDL_ApplicationWindow::handleSDLEvent(const SDL_Event& event)
 
 }
 
-void SDL_ApplicationWindow::switchToThreeDMode(ThreeDMode* mode)
+void SDL_ApplicationWindow::switchThreeDMode(ThreeDMode* mode)
 {
 	if (!mode) return;
 	currentThreeDmode = mode;
@@ -1155,7 +1160,7 @@ void SDL_ApplicationWindow::switchToThreeDMode(ThreeDMode* mode)
 	}
 }
 
-void SDL_ApplicationWindow::setThreeDModeAtStartUP(ThreeDMode* mode)
+void SDL_ApplicationWindow::setThreeDModeAtStart(ThreeDMode* mode)
 {
 	currentThreeDmode = mode;
 	std::cout << "[SDL_ApplicationWindow] Startup ThreeDMode set to: " << (mode ? mode->getName() : "None") << std::endl;
@@ -1455,9 +1460,31 @@ void SDL_ApplicationWindow::renderFrame()
 			pending_left_click_ = false;
 
 			bool isNormalMode = false;
-			if (currentThreeDmode && std::strcmp(currentThreeDmode->getName(), "Normal Mode") == 0)
+			bool isEdgeMode = false;
+			bool isVerticeMode = false;
+			bool isFaceMode = false;
+			if (currentThreeDmode)
 			{
-				isNormalMode = true;
+				if (std::strcmp(currentThreeDmode->getName(), "Normal Mode") == 0)
+				{
+					isNormalMode = true;
+				}
+					
+				else if (std::strcmp(currentThreeDmode->getName(), "Edge Mode") == 0)
+				{
+					isEdgeMode = true;
+
+				}
+				else if (std::strcmp(currentThreeDmode->getName(), "Vertice Mode") == 0)
+				{
+					isVerticeMode = true;
+				}
+
+				else if (std::strcmp(currentThreeDmode->getName(), "Face Mode") == 0)
+				{
+					isFaceMode = true;
+				}
+
 			}
 
 			if (isNormalMode && !ImGuizmo::IsOver() && !ImGuizmo::IsUsing() && !wasUsingGizmoLastFrame_)
@@ -1474,12 +1501,15 @@ void SDL_ApplicationWindow::renderFrame()
 				const std::list<ThreeDObject*>& objList = vk_scene_->getObjectsRef();
 				std::vector<ThreeDObject*> objects(objList.begin(), objList.end());
 
+				selectedEdgesList_.clear();
+
 				raycast_perform_->performRaycast(
 					mouseX, mouseY,
 					workspaceX_, workspaceY_,
 					workspaceWidth_, workspaceHeight_,
 					viewMatrix_, projectionMatrix_,
-					objects);
+					objects,
+					currentThreeDmode);
 
 				const std::vector<ThreeDObject*>& selectedObjects = raycast_perform_->getLastHitObjects(); 
 				std::list<ThreeDObject*> selectedObjectsList(selectedObjects.begin(), selectedObjects.end());
@@ -1494,11 +1524,165 @@ void SDL_ApplicationWindow::renderFrame()
 					data_holders_->computeNewDataToDataHolders();
 				}
 			}
+			else if (isEdgeMode && !ImGuizmo::IsOver() && !ImGuizmo::IsUsing() && !wasUsingGizmoLastFrame_)
+			{
+				updateWorkspaceProjectionData();
+				
+				float aspectRatio = (workspaceHeight_ > 0)
+					? static_cast<float>(workspaceWidth_) / static_cast<float>(workspaceHeight_)
+					: 1.0f;
+
+				viewMatrix_ = camera_->getViewMatrix();
+				projectionMatrix_ = camera_->getProjectionMatrix(aspectRatio);
+
+				const std::list<ThreeDObject*>& objList = vk_scene_->getObjectsRef();
+				std::vector<ThreeDObject*> objects(objList.begin(), objList.end());
+
+				// Clear active mesh selections for coherence
+				std::list<ThreeDObject*> emptyObjs;
+				vk_scene_->setSelectedObjects(emptyObjs);
+				if (data_holders_)
+				{
+					data_holders_->setSelectedObjectsForDataHolders(emptyObjs);
+					data_holders_->computeNewDataToDataHolders();
+				}
+
+				raycast_perform_->performRaycast(
+					mouseX, mouseY,
+					workspaceX_, workspaceY_,
+					workspaceWidth_, workspaceHeight_,
+					viewMatrix_, projectionMatrix_,
+					objects,
+					currentThreeDmode);
+
+				const std::vector<Edge*>& selectedEdges = raycast_perform_->getLastHitEdges();
+				selectedEdgesList_ = std::list<Edge*>(selectedEdges.begin(), selectedEdges.end());
+
+				std::cout << " [SDL_ApplicationWindow RenderFrame] the selected edges are : " << selectedEdgesList_.size() << std::endl;
+
+				// Make sure we explicitly mark selected edges as selected and non-selected as false
+				for (ThreeDObject* obj : objects)
+				{
+					Mesh* mesh = dynamic_cast<Mesh*>(obj);
+					if (!mesh) continue;
+					for (Edge* e : mesh->getEdges())
+					{
+						if (e)
+						{
+							bool isSel = (std::find(selectedEdgesList_.begin(), selectedEdgesList_.end(), e) != selectedEdgesList_.end());
+							e->setSelected(isSel);
+						}
+					}
+				}
+			}
+			else if (isVerticeMode && !ImGuizmo::IsOver() && !ImGuizmo::IsUsing() && !wasUsingGizmoLastFrame_)
+			{
+				updateWorkspaceProjectionData();
+				
+				float aspectRatio = (workspaceHeight_ > 0)
+					? static_cast<float>(workspaceWidth_) / static_cast<float>(workspaceHeight_)
+					: 1.0f;
+
+				viewMatrix_ = camera_->getViewMatrix();
+				projectionMatrix_ = camera_->getProjectionMatrix(aspectRatio);
+
+				const std::list<ThreeDObject*>& objList = vk_scene_->getObjectsRef();
+				std::vector<ThreeDObject*> objects(objList.begin(), objList.end());
+
+				// Clear active mesh selections for coherence
+				std::list<ThreeDObject*> emptyObjs;
+				vk_scene_->setSelectedObjects(emptyObjs);
+				if (data_holders_)
+				{
+					data_holders_->setSelectedObjectsForDataHolders(emptyObjs);
+					data_holders_->computeNewDataToDataHolders();
+				}
+
+				raycast_perform_->performRaycast(
+					mouseX, mouseY,
+					workspaceX_, workspaceY_,
+					workspaceWidth_, workspaceHeight_,
+					viewMatrix_, projectionMatrix_,
+					objects,
+					currentThreeDmode);
+
+				const std::vector<Vertice*>& selectedVertices = raycast_perform_->getLastHitVertices();
+				selectedVerticeList_ = std::list<Vertice*>(selectedVertices.begin(), selectedVertices.end());
+
+				std::cout << " [SDL_ApplicationWindow RenderFrame] the selected vertices are : " << selectedVerticeList_.size() << std::endl;
+
+				// Make sure we explicitly mark selected vertices as selected and non-selected as false
+				for (ThreeDObject* obj : objects)
+				{
+					Mesh* mesh = dynamic_cast<Mesh*>(obj);
+					if (!mesh) continue;
+					for (Vertice* v : mesh->getVertices())
+					{
+						if (v)
+						{
+							bool isSel = (std::find(selectedVerticeList_.begin(), selectedVerticeList_.end(), v) != selectedVerticeList_.end());
+							v->setSelected(isSel);
+						}
+					}
+				}
+			}
+			else if (isFaceMode && !ImGuizmo::IsOver() && !ImGuizmo::IsUsing() && !wasUsingGizmoLastFrame_)
+			{
+				updateWorkspaceProjectionData();
+				
+				float aspectRatio = (workspaceHeight_ > 0)
+					? static_cast<float>(workspaceWidth_) / static_cast<float>(workspaceHeight_)
+					: 1.0f;
+
+				viewMatrix_ = camera_->getViewMatrix();
+				projectionMatrix_ = camera_->getProjectionMatrix(aspectRatio);
+
+				const std::list<ThreeDObject*>& objList = vk_scene_->getObjectsRef();
+				std::vector<ThreeDObject*> objects(objList.begin(), objList.end());
+
+				// Clear active mesh selections for coherence
+				std::list<ThreeDObject*> emptyObjs;
+				vk_scene_->setSelectedObjects(emptyObjs);
+				if (data_holders_)
+				{
+					data_holders_->setSelectedObjectsForDataHolders(emptyObjs);
+					data_holders_->computeNewDataToDataHolders();
+				}
+
+				raycast_perform_->performRaycast(
+					mouseX, mouseY,
+					workspaceX_, workspaceY_,
+					workspaceWidth_, workspaceHeight_,
+					viewMatrix_, projectionMatrix_,
+					objects,
+					currentThreeDmode);
+
+				const std::vector<Face*>& selectedFaces = raycast_perform_->getLastHitFaces();
+				selectedFaceList_ = std::list<Face*>(selectedFaces.begin(), selectedFaces.end());
+
+				std::cout << " [SDL_ApplicationWindow RenderFrame] the selected faces are : " << selectedFaceList_.size() << std::endl;
+
+				// Make sure we explicitly mark selected faces as selected and non-selected as false
+				for (ThreeDObject* obj : objects)
+				{
+					Mesh* mesh = dynamic_cast<Mesh*>(obj);
+					if (!mesh) continue;
+					for (Face* f : mesh->getFaces())
+					{
+						if (f)
+						{
+							bool isSel = (std::find(selectedFaceList_.begin(), selectedFaceList_.end(), f) != selectedFaceList_.end());
+							f->setSelected(isSel);
+						}
+					}
+				}
+			}
 			else
 			{
-				std::cout << " [SDL_ApplicationWindow RenderFrame] Click ignored for follwing reasons : Current mode isnt Normal Mode, Mouse is Over Guizmo and Guizmo is active" << std::endl;
+				std::cout << " [SDL_ApplicationWindow RenderFrame] Click ignored for follwing reasons : Current mode isnt Normal Mode or Edge/Vertice/Face Mode, Mouse is Over Guizmo and Guizmo is active" << std::endl;
 			}
 		}
+
 		prev_middle_button_down_ = middleDown;
 		prev_left_button_down_ = leftDown;
 
@@ -1520,7 +1704,130 @@ void SDL_ApplicationWindow::renderFrame()
 		}
 	}
 
-	if (!vk_scene_->getSelectedObjects().empty())
+	bool isEdgeModeRendering = (currentThreeDmode && std::strcmp(currentThreeDmode->getName(), "Edge Mode") == 0);
+
+	if (isEdgeModeRendering && !selectedEdgesList_.empty())
+	{
+		updateWorkspaceProjectionData();
+
+		// Recompute view/proj every frame so the gizmo follows the camera
+		if (camera_ && workspaceHeight_ > 0)
+		{
+			float aspectRatio = static_cast<float>(workspaceWidth_) / static_cast<float>(workspaceHeight_);
+			viewMatrix_ = camera_->getViewMatrix();
+			projectionMatrix_ = camera_->getProjectionMatrix(aspectRatio);
+		}
+
+		// Start an ImGui frame so ImGuizmo can draw into its overlay draw list
+		ImGui_ImplVulkan_NewFrame();
+		ImGui_ImplSDL3_NewFrame();
+		ImGui::NewFrame();
+
+		// Feed the mouse state and holding condition into ImGui
+		float mouseXf = 0.0f, mouseYf = 0.0f;
+		SDL_GetMouseState(&mouseXf, &mouseYf);
+		ImGui::GetIO().MousePos = ImVec2(mouseXf, mouseYf);
+		ImGui::GetIO().MouseDown[0] = pending_hold_left_click_;
+
+		// Call manipulateEdges to handle active manipulation and rendering
+		EdgeTransform::manipulateEdges(
+			vk_scene_,
+			selectedEdgesList_,
+			ImVec2(static_cast<float>(workspaceX_), static_cast<float>(workspaceY_)),
+			ImVec2(static_cast<float>(workspaceWidth_), static_cast<float>(workspaceHeight_)),
+			wasUsingGizmoLastFrame_,
+			viewMatrix_,
+			projectionMatrix_
+		);
+
+		// Submit ImGui draw data (including the gizmo) as an overlay render pass
+		renderImGui();
+	}
+
+	bool isVerticeModeRendering = (currentThreeDmode && std::strcmp(currentThreeDmode->getName(), "Vertice Mode") == 0);
+
+	if (isVerticeModeRendering && !selectedVerticeList_.empty())
+	{
+		updateWorkspaceProjectionData();
+
+		// Recompute view/proj every frame so the gizmo follows the camera
+		if (camera_ && workspaceHeight_ > 0)
+		{
+			float aspectRatio = static_cast<float>(workspaceWidth_) / static_cast<float>(workspaceHeight_);
+			viewMatrix_ = camera_->getViewMatrix();
+			projectionMatrix_ = camera_->getProjectionMatrix(aspectRatio);
+		}
+
+		// Start an ImGui frame so ImGuizmo can draw into its overlay draw list
+		ImGui_ImplVulkan_NewFrame();
+		ImGui_ImplSDL3_NewFrame();
+		ImGui::NewFrame();
+
+		// Feed the mouse state and holding condition into ImGui
+		float mouseXf = 0.0f, mouseYf = 0.0f;
+		SDL_GetMouseState(&mouseXf, &mouseYf);
+		ImGui::GetIO().MousePos = ImVec2(mouseXf, mouseYf);
+		ImGui::GetIO().MouseDown[0] = pending_hold_left_click_;
+
+		// Call manipulateVertices to handle active manipulation and rendering
+		VerticeTransform::manipulateVertices(
+			vk_scene_,
+			selectedVerticeList_,
+			ImVec2(static_cast<float>(workspaceX_), static_cast<float>(workspaceY_)),
+			ImVec2(static_cast<float>(workspaceWidth_), static_cast<float>(workspaceHeight_)),
+			wasUsingGizmoLastFrame_,
+			viewMatrix_,
+			projectionMatrix_
+		);
+
+		// Submit ImGui draw data (including the gizmo) as an overlay render pass
+		renderImGui();
+	}	
+
+	bool isFaceModeRendering = (currentThreeDmode && std::strcmp(currentThreeDmode->getName(), "Face Mode") == 0);
+
+	if (isFaceModeRendering && !selectedFaceList_.empty())
+	{
+		updateWorkspaceProjectionData();
+
+		// Recompute view/proj every frame so the gizmo follows the camera
+		if (camera_ && workspaceHeight_ > 0)
+		{
+			float aspectRatio = static_cast<float>(workspaceWidth_) / static_cast<float>(workspaceHeight_);
+			viewMatrix_ = camera_->getViewMatrix();
+			projectionMatrix_ = camera_->getProjectionMatrix(aspectRatio);
+		}
+
+		// Start an ImGui frame so ImGuizmo can draw into its overlay draw list
+		ImGui_ImplVulkan_NewFrame();
+		ImGui_ImplSDL3_NewFrame();
+		ImGui::NewFrame();
+
+		// Feed the mouse state and holding condition into ImGui
+		float mouseXf = 0.0f, mouseYf = 0.0f;
+		SDL_GetMouseState(&mouseXf, &mouseYf);
+		ImGui::GetIO().MousePos = ImVec2(mouseXf, mouseYf);
+		ImGui::GetIO().MouseDown[0] = pending_hold_left_click_;
+
+		// Call manipulateVertices to handle active manipulation and rendering
+		FaceTransform::manipulateFaces(
+			vk_scene_,
+			selectedFaceList_,
+			ImVec2(static_cast<float>(workspaceX_), static_cast<float>(workspaceY_)),
+			ImVec2(static_cast<float>(workspaceWidth_), static_cast<float>(workspaceHeight_)),
+			wasUsingGizmoLastFrame_,
+			false, // bakeToVertices flag
+			viewMatrix_,
+			projectionMatrix_
+		);
+
+		// Submit ImGui draw data (including the gizmo) as an overlay render pass
+		renderImGui();
+	}	
+
+
+
+	else if (!vk_scene_->getSelectedObjects().empty())
 	{
 		updateWorkspaceProjectionData();
 
@@ -1554,6 +1861,10 @@ void SDL_ApplicationWindow::renderFrame()
 			projectionMatrix_
 		);
 
+		
+
+
+
 		//here we update the datas in data holder in realTime
 		if (data_holders_)
 		{
@@ -1562,6 +1873,7 @@ void SDL_ApplicationWindow::renderFrame()
 
 		// Submit ImGui draw data (including the gizmo) as an overlay render pass
 		renderImGui();
+
 	}
 
 	// -------- render Widgets above Workspace Screen -------- //
@@ -1605,6 +1917,7 @@ void SDL_ApplicationWindow::renderFrame()
 
 	// Clear temporary transition key flags like isFirstPress / justReleased for next frame
 	SIMILI::Input::KeyManager::getInstance().update();
+
 }
 
 

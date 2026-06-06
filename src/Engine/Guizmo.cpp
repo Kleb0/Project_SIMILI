@@ -107,7 +107,7 @@ const glm::mat4& view, const glm::mat4& proj, ImVec2 oglChildPos, ImVec2 oglChil
 	ImGuizmo::Enable(true);
 	ImGuizmo::SetOrthographic(false);
 	ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
-	ImGuizmo::SetDrawlist();
+	ImGuizmo::SetDrawlist(ImGui::GetBackgroundDrawList());
 	ImGuizmo::SetRect(oglChildPos.x, oglChildPos.y, oglChildSize.x, oglChildSize.y);
 	ImGuizmo::SetGizmoSizeClipSpace(0.2f);
 
@@ -136,7 +136,7 @@ const glm::mat4& view, const glm::mat4& proj, ImVec2 oglChildPos, ImVec2 oglChil
 	ImGuizmo::Enable(true);
 	ImGuizmo::SetOrthographic(false);
 	ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
-	ImGuizmo::SetDrawlist();
+	ImGuizmo::SetDrawlist(ImGui::GetBackgroundDrawList());
 	ImGuizmo::SetRect(oglChildPos.x, oglChildPos.y, oglChildSize.x, oglChildSize.y);
 	ImGuizmo::SetGizmoSizeClipSpace(0.2f);
 
@@ -186,7 +186,7 @@ const glm::mat4& view, const glm::mat4& proj, ImVec2 oglChildPos, ImVec2 oglChil
 	ImGuizmo::Enable(true);
 	ImGuizmo::SetOrthographic(false);
 	ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
-	ImGuizmo::SetDrawlist();
+	ImGuizmo::SetDrawlist(ImGui::GetBackgroundDrawList());
 	ImGuizmo::SetRect(oglChildPos.x, oglChildPos.y, oglChildSize.x, oglChildSize.y);
 	ImGuizmo::SetGizmoSizeClipSpace(0.2f);
 

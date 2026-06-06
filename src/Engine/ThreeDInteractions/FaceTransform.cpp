@@ -75,18 +75,64 @@ const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
     }
     
     // Early return if no faces selected - mode switching still works above
-    if (selectedFaces.empty()) return;
+    if (selectedFaces.empty()) 
+    {
+        return;
+    }
+
+
 
     const glm::mat4 view = viewMatrix;
     const glm::mat4 proj = projectionMatrix;
+
+    // 1. Begin ImGuizmo frame and set draw states (exactly once here!)
+	ImGuizmo::BeginFrame();
+	ImGuizmo::Enable(true);
+	ImGuizmo::SetOrthographic(false);
+	ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
+	ImGuizmo::SetDrawlist(ImGui::GetBackgroundDrawList());
+	ImGuizmo::SetRect(oglChildPos.x, oglChildPos.y, oglChildSize.x, oglChildSize.y);
+	ImGuizmo::SetGizmoSizeClipSpace(0.2f);
+
+    // Calculate center of selected faces in world space by averaging unique vertices
+    glm::vec3 center(0.0f);
+    int count = 0;
+    ThreeDObject* firstParent = nullptr;
+
+    std::unordered_set<Vertice*> uniqueVerts;
+    for (auto* f : selectedFaces)
+    {
+        if (!f) continue;
+        for (auto* v : f->getVertices())
+        {
+            if (v)
+            {
+                uniqueVerts.insert(v);
+            }
+        }
+    }
+
+    for (auto* v : uniqueVerts)
+    {
+        if (!firstParent) {
+            firstParent = v->getMeshParent();
+        }
+
+        ThreeDObject* parent = v->getMeshParent();
+        glm::mat4 parentMat = parent ? parent->getModelMatrix() : glm::mat4(1.0f);
+
+        glm::vec3 wv = glm::vec3(parentMat * glm::vec4(v->getLocalPosition(), 1.0f));
+
+        center += wv;
+        ++count;
+    }
+    if (count > 0) center /= static_cast<float>(count);
 
     static glm::mat4 dummyMatrix = glm::mat4(1.0f);
     static glm::mat4 startMatrix = glm::mat4(1.0f);
     static glm::mat4 prevMatrix = glm::mat4(1.0f);
     static size_t previousSetHash = 0;
     static bool gizmoActive = false;
-    static glm::vec3 lockedCenter = glm::vec3(0.0f);  // CRITICAL: Lock center during drag
-    static ThreeDObject* lockedParent = nullptr;
 
     static std::unordered_map<Vertice*, glm::vec3> initialLocalPositions;
     static glm::mat4 totalAccumDelta = glm::mat4(1.0f);
@@ -107,20 +153,20 @@ const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
         ThreeDObject* parent = (vs.empty() || !vs[0]) ? nullptr : vs[0]->getMeshParent();
         const glm::mat4 parentModel = parent ? parent->getModelMatrix() : glm::mat4(1.0f);
 
-        glm::vec3 center(0.0f);
-        int count = 0;
+        glm::vec3 extrudeCenter(0.0f);
+        int vcount = 0;
 
         for (auto* v : vs) 
         {
             if (!v) continue;
             const glm::vec3 L = v->getLocalPosition();
             const glm::vec3 W = glm::vec3(parentModel * glm::vec4(L, 1.0f));
-            center += W; ++count;
+            extrudeCenter += W; ++vcount;
         }
-        if (count > 0) center /= float(count);
+        if (vcount > 0) extrudeCenter /= float(vcount);
 
         currentGizmoOperation = ImGuizmo::TRANSLATE;
-        dummyMatrix           = glm::translate(glm::mat4(1.0f), center);
+        dummyMatrix           = glm::translate(glm::mat4(1.0f), extrudeCenter);
         prevMatrix            = dummyMatrix;
         wasUsingGizmoLastFrame = false;
         return;
@@ -138,56 +184,15 @@ const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
     };
 
     size_t currentHash = hashSet();
-    bool usingGizmo = ImGuizmo::IsUsing();
+    const bool isUsing = ImGuizmo::IsUsing();
     bool selectionChanged = (currentHash != previousSetHash);
 
-    // Calculate center of selected faces in world space (only when NOT dragging)
-    glm::vec3 center = lockedCenter;
-    ThreeDObject* firstParent = lockedParent;
-    
-    if (!gizmoActive)
-    {
-        glm::vec3 gizmoCenter(0.0f);
-        int faceCount = 0;
-        firstParent = nullptr;
-
-        for (auto* f : selectedFaces)
-        {
-            if (!f) continue;
-            const auto& verts = f->getVertices();
-            if (verts.empty()) continue;
-
-            if (!firstParent && verts[0]) {
-                firstParent = verts[0]->getMeshParent();
-            }
-
-            ThreeDObject* parent = verts[0] ? verts[0]->getMeshParent() : nullptr;
-            const glm::mat4 parentModel = parent ? parent->getModelMatrix() : glm::mat4(1.0f);
-
-            glm::vec3 faceCenter(0.0f);
-            int vcount = 0;
-            for (auto* v : verts) 
-            {
-                if (!v) continue;
-                const glm::vec3 L = v->getLocalPosition();
-                const glm::vec3 W = glm::vec3(parentModel * glm::vec4(L, 1.0f));
-                faceCenter += W; ++vcount;
-            }
-            if (vcount > 0) { faceCenter /= float(vcount); gizmoCenter += faceCenter; ++faceCount; }
-        }
-
-        if (faceCount > 0) gizmoCenter /= float(faceCount);
-        center = gizmoCenter;
-    }
-    
-    if (selectionChanged || (!usingGizmo && !gizmoActive)) 
+    if (selectionChanged || (!isUsing && !gizmoActive)) 
     {
         dummyMatrix = glm::translate(glm::mat4(1.0f), center);
         startMatrix = dummyMatrix;
         prevMatrix = dummyMatrix;
         gizmoActive = false;
-        lockedCenter = center;
-        lockedParent = firstParent;
         initialLocalPositions.clear();
         totalAccumDelta = glm::mat4(1.0f);
         
@@ -197,31 +202,14 @@ const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
         }
     }
 
-    // CRITICAL: Always render the gizmo, not just when inactive
-    glm::mat4 gizmoMatrix = Guizmo::renderGizmoForFaces(selectedFaces, currentGizmoOperation, view, proj, oglChildPos, oglChildSize);
-    
-    // Only update dummyMatrix if we're not actively dragging
-    if (!gizmoActive)
-    {
-        dummyMatrix = gizmoMatrix;
-    }
-
-    // Start of drag: capture initial vertex positions and LOCK the center
-    if (usingGizmo && !gizmoActive)
+    // Start of drag: capture initial vertex positions
+    if (isUsing && !gizmoActive)
     {
         gizmoActive = true;
-        lockedCenter = center;
-        lockedParent = firstParent;
         startMatrix = dummyMatrix;
         prevMatrix = dummyMatrix;
         initialLocalPositions.clear();
         totalAccumDelta = glm::mat4(1.0f);
-        
-        std::unordered_set<Vertice*> uniqueVerts;
-        for (auto* f : selectedFaces) {
-            if (!f) continue;
-            for (auto* v : f->getVertices()) if (v) uniqueVerts.insert(v);
-        }
         
         for (auto* v : uniqueVerts)
         {
@@ -241,7 +229,7 @@ const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
     );
 
     // During drag: apply transformation from INITIAL positions
-    if (usingGizmo && Manipulated && lockedParent)
+    if (isUsing && Manipulated && firstParent)
     {
         // Calculate TOTAL delta from start of drag
         glm::mat4 totalDelta = dummyMatrix * glm::inverse(startMatrix);
@@ -249,7 +237,7 @@ const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
         // Check if delta is not identity
         if (!isIdentity(totalDelta))
         {
-            glm::mat4 parentMat = lockedParent->getModelMatrix();
+            glm::mat4 parentMat = firstParent->getModelMatrix();
             glm::mat4 parentInv = glm::inverse(parentMat);
             
             // Apply total transformation from initial positions
@@ -281,7 +269,7 @@ const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
     }
 
     // End of drag: track changes in DNA
-    if (!usingGizmo && gizmoActive)
+    if (!isUsing && gizmoActive)
     {
         Mesh* parentMesh = nullptr;
         std::vector<Vertice*> vertsSnapshot;
@@ -321,7 +309,7 @@ const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
         totalAccumDelta = glm::mat4(1.0f);
     }
     
-    wasUsingGizmoLastFrame = usingGizmo;
+    wasUsingGizmoLastFrame = isUsing;
 }
 
 

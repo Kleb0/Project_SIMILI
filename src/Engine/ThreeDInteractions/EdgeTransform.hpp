@@ -14,7 +14,7 @@ namespace EdgeTransform
    const std::list<Edge*>& edges, const ImVec2& oglChildPos, const ImVec2& oglChildSize);
 
    void manipulateEdges(VKScene* scene, std::list<Edge*>& selectedEdges,
-   const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame, ThreeDWindow* threeDWindow,
+   const ImVec2& oglChildPos, const ImVec2& oglChildSize, bool& wasUsingGizmoLastFrame,
    const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
 
    void EnableEdgeLoop(VKScene* scene, std::list<Edge*>& selectedEdges, const ImVec2& oglChildPos, const ImVec2& oglChildSize, ThreeDWindow* window);
