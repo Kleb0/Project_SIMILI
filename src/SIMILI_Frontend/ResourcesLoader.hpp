@@ -55,6 +55,7 @@ public:
 
 private:
 	CefRefPtr<CefResourceHandler> handleUIPanelUpdate(CefRefPtr<CefRequest> request);
+	CefRefPtr<CefResourceHandler> handleUIPanelClear(CefRefPtr<CefRequest> request);
 	CefRefPtr<CefResourceHandler> serveLocalFile(const std::string& filePath);
 	std::string getMimeType(const std::string& filePath) const;
 	std::string loadFileContent(const std::string& filePath);

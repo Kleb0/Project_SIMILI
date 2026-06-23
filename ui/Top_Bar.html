@@ -7,6 +7,74 @@
     <link rel="stylesheet" href="http://localhost:8080/ui/Top_Bar.css">
 </head>
 <body>
-    <span>Top Bar</span>
+    <span class="logo">SIMILI ENGINE </span>
+    
+    <div class="nav-buttons">
+        <button id="btn-option">Option</button>
+        
+        <div class="btn-group">
+            <button id="btn-3d" class="active">3D Workspace</button>
+            <button id="btn-drawing">Drawing Workspace</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const btnOption = document.getElementById('btn-option');
+            const btn3d = document.getElementById('btn-3d');
+            const btnDrawing = document.getElementById('btn-drawing');
+
+            // Default to '3d' if not set
+            let activeWorkspace = localStorage.getItem('activeWorkspace');
+            if (!activeWorkspace) {
+                activeWorkspace = '3d';
+                localStorage.setItem('activeWorkspace', '3d');
+            }
+
+            function updateUI(ws) {
+                if (ws === '3d') {
+                    btn3d.classList.add('active');
+                    btnDrawing.classList.remove('active');
+                } else {
+                    btnDrawing.classList.add('active');
+                    btn3d.classList.remove('active');
+                }
+            }
+
+            // Sync with current state
+            updateUI(activeWorkspace);
+
+            btnOption.addEventListener('click', () => {
+                window.parent.postMessage({ type: 'TOPBAR_ACTION', action: 'option' }, '*');
+            });
+
+            btn3d.addEventListener('click', () => {
+                const current = localStorage.getItem('activeWorkspace');
+                if (current === '3d') return;
+                
+                localStorage.setItem('activeWorkspace', '3d');
+                updateUI('3d');
+                window.parent.postMessage({ type: 'SWITCH_WORKSPACE', workspace: '3d' }, '*');
+            });
+
+            btnDrawing.addEventListener('click', () => {
+                const current = localStorage.getItem('activeWorkspace');
+                if (current === 'drawing') return;
+                
+                localStorage.setItem('activeWorkspace', 'drawing');
+                updateUI('drawing');
+                window.parent.postMessage({ type: 'SWITCH_WORKSPACE', workspace: 'drawing' }, '*');
+            });
+
+            // Listen for changes from main manager to keep top bar synced
+            window.addEventListener('message', (event) => {
+                if (event.data.type === 'SYNC_WORKSPACE_BUTTONS') {
+                    const ws = event.data.workspace;
+                    localStorage.setItem('activeWorkspace', ws);
+                    updateUI(ws);
+                }
+            });
+        });
+    </script>
 </body>
 </html>

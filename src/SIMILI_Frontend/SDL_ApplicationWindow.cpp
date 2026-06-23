@@ -2,7 +2,7 @@
 // #include "ui_handler.hpp"
 #include "ResourcesLoader.hpp"
 #include "viewportLogic/UIPanels/FrameDataCatcher.hpp"
-#include "viewportLogic/FrameDatas/FrameDatas.hpp"
+#include "viewportLogic/FrameDatas/IFrameDatas.hpp"
 #include "viewportLogic/UIPanels/PanelResizingLogic.hpp"
 // #include "viewportLogic/ThreeDScreen/ThreeDScreen.hpp"
 #include "viewportLogic/UIPanels/UIManager.hpp"
@@ -37,6 +37,7 @@
 
 // Static member definition
 int SDL_ApplicationWindow::render_frame_count = 0;
+SDL_ApplicationWindow* SDL_ApplicationWindow::s_instance_ = nullptr;
 
 // Static instances of ThreeDModes used by keyboard switching
 static Normal_Mode g_normal_mode;
@@ -137,6 +138,10 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, prepared_skip_texture_rebuild_(false)
 	, borders_set_for_init_(false)
 	, pending_window_resize_sync_(false)
+	, last_border_left_(-1)
+	, last_border_top_(-1)
+	, last_border_width_(-1)
+	, last_border_height_(-1)
 	, pending_wheel_delta_(0.0f)
 	, prev_middle_button_down_(false)
 	, prev_left_button_down_(false)
@@ -179,11 +184,20 @@ SDL_ApplicationWindow::SDL_ApplicationWindow()
 	, contextual_menu_above_gui_(nullptr)
 	, contextual_menu_command_buffer_(VK_NULL_HANDLE)
 	, contextual_menu_visible_(false)
+	, is_drawing_board_active_(false)
+	, pending_workspace_clear_(false)
+	, pending_frame_resync_(false)
+	, pending_prepare_for_redraw_(false)
 	, currentThreeDmode(nullptr)
 {
+	s_instance_ = this;
 }
 SDL_ApplicationWindow::~SDL_ApplicationWindow()
 {
+	if (s_instance_ == this)
+	{
+		s_instance_ = nullptr;
+	}
 	if (workspace_widget_)
 	{
 		workspace_widget_->shutdown();
@@ -544,10 +558,6 @@ void SDL_ApplicationWindow::setVulkanPipelines(VulkanPipeline* pipelines)
 	std::cout << "[SDL_ApplicationWindow] VulkanPipeline instance set" << std::endl;
 }
 
-void SDL_ApplicationWindow::updateFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas)
-{
-	frame_datas_ = frameDatas;
-}
 
 void SDL_ApplicationWindow::onCEFPaint(CefRenderHandler::PaintElementType type, const void* buffer, int width, int height)
 {
@@ -762,15 +772,24 @@ void SDL_ApplicationWindow::uploadCEFPaintBuffer()
 			std::lock_guard<std::mutex> qlock(queue_mutex_);
 			vkQueueWaitIdle(vk_context_->getGraphicsQueue());
 		}
-		if (cef_texture_view_ != VK_NULL_HANDLE) { vkDestroyImageView(device, cef_texture_view_, nullptr); cef_texture_view_ = VK_NULL_HANDLE; }
-		if (cef_texture_sampler_ != VK_NULL_HANDLE) { vkDestroySampler(device, cef_texture_sampler_, nullptr); cef_texture_sampler_ = VK_NULL_HANDLE; }
-		if (cef_texture_image_ != VK_NULL_HANDLE) { vkDestroyImage(device, cef_texture_image_, nullptr); cef_texture_image_ = VK_NULL_HANDLE; }
-		if (cef_texture_memory_ != VK_NULL_HANDLE) { vkFreeMemory(device, cef_texture_memory_, nullptr); cef_texture_memory_ = VK_NULL_HANDLE; }
-		
-		if (ui_manager_)
-		{
-			ui_manager_->invalidateCEFTexture();
+		if (cef_texture_view_ != VK_NULL_HANDLE) 
+		{ 
+			vkDestroyImageView(device, cef_texture_view_, nullptr); cef_texture_view_ = VK_NULL_HANDLE; 
 		}
+		if (cef_texture_sampler_ != VK_NULL_HANDLE) 
+		{ 
+			vkDestroySampler(device, cef_texture_sampler_, nullptr); cef_texture_sampler_ = VK_NULL_HANDLE; 
+		}
+		if (cef_texture_image_ != VK_NULL_HANDLE) 
+		{ 
+			vkDestroyImage(device, cef_texture_image_, nullptr); cef_texture_image_ = VK_NULL_HANDLE; 
+		}
+		if (cef_texture_memory_ != VK_NULL_HANDLE) 
+		{ 
+			vkFreeMemory(device, cef_texture_memory_, nullptr); cef_texture_memory_ = VK_NULL_HANDLE; 
+		}
+		
+
 	}
 
 	if (cef_texture_image_ == VK_NULL_HANDLE)
@@ -1171,6 +1190,56 @@ void SDL_ApplicationWindow::setThreeDModeAtStart(ThreeDMode* mode)
 
 void SDL_ApplicationWindow::renderFrame()
 {
+	// ===== Deferred workspace clear (safe GPU-thread point) =====
+	if (pending_workspace_clear_.exchange(false))
+	{
+		if (vk_context_)
+		{
+			VkDevice device = vk_context_->getDevice();
+			if (device != VK_NULL_HANDLE)
+			{
+				vkDeviceWaitIdle(device);
+			}
+		}
+		if (ui_manager_)
+		{
+			ui_manager_->Clear_Everything();
+		}
+		// After clear, schedule a redraw pass to pick up any panels populated by DrawingScreenPanels
+		pending_prepare_for_redraw_.store(true);
+		std::cout << "[SDL_ApplicationWindow] Deferred workspace clear executed on render thread" << std::endl;
+	}
+
+	// ===== Prepare for redraw: re-sync frame data and force CEF repaint =====
+	if (pending_prepare_for_redraw_.exchange(false))
+	{
+		if (panel_resizing_logic_)
+		{
+			panel_resizing_logic_->cacheUIPanelFrameDatas();
+		}
+		// In drawing board mode the JS layout is managed by the drawing workspace page;
+		// triggering a browser repaint here would cause an infinite loop
+		// (DrawingScreenPanels → requestFrameResync → pending_prepare_for_redraw → repaint → repeat).
+		if (!is_drawing_board_active_)
+		{
+			requestBrowserRepaint();
+		}
+		pending_window_resize_sync_ = true;
+		std::cout << "[SDL_ApplicationWindow] Prepare_For_Redraw executed: CEF repaint " << (is_drawing_board_active_ ? "skipped (drawing mode)" : "requested") << std::endl;
+	}
+
+	// ===== Deferred frame re-sync (after DrawingScreenPanels populates frameCatcher) =====
+	if (pending_frame_resync_.exchange(false))
+	{
+		if (ui_manager_ && frame_datas_ && window_)
+		{
+			ui_manager_->syncFrameDatas(frame_datas_, window_);
+			std::cout << "[SDL_ApplicationWindow] Frame re-sync executed: top_bar data pulled from frameCatcher" << std::endl;
+		}
+		// Chain into prepare-for-redraw so the CEF paint and panel cache are refreshed
+		pending_prepare_for_redraw_.store(true);
+	}
+
 	// ===== Frame Counter & Debug Logging =====
 	frameCounter();
 
@@ -1213,10 +1282,10 @@ void SDL_ApplicationWindow::renderFrame()
 	{
 		if (ui_manager_)
 		{
-			ui_manager_->bindWorkSpaceSizeToSplitterInteractions();
 			ui_manager_->bindPanelsToSplitters(getWindowRenderState());
+			ui_manager_->bindWorkSpaceSizeToSplitterInteractions();
 
-			if (ui_manager_->consumePendingCEFRepaintRequest() || pending_window_resize_sync_)
+			if (!is_drawing_board_active_ && (ui_manager_->consumePendingCEFRepaintRequest() || pending_window_resize_sync_))
 			{
 				pending_window_resize_sync_ = false;
 				if (panel_resizing_logic_)
@@ -1231,11 +1300,29 @@ void SDL_ApplicationWindow::renderFrame()
 				}
 				requestBrowserRepaint();
 			}
+			else if (is_drawing_board_active_ && ui_manager_->consumePendingCEFRepaintRequest())
+			{
+				// Drawing mode: sync iframe sizes after splitter release, but do NOT call requestBrowserRepaint
+				// (that would cause an infinite loop via DrawingScreenPanels).
+				if (panel_resizing_logic_)
+				{
+					panel_resizing_logic_->cacheUIPanelFrameDatas();
+					int currentW = 0, currentH = 0;
+					SDL_GetWindowSize(window_, &currentW, &currentH);
+					panel_resizing_logic_->syncBrowserPanelLayoutFromCurrentFrames(
+						getWindowRenderState(),
+						currentW, currentH,
+						reference_window_width_, reference_window_height_,
+						/*suppressServerNotify=*/true);
+				}
+			}
 		}
 
 		activateDebugRender();
 
-		drawThreeDScreenOnWorkspace();
+		if (!is_drawing_board_active_)
+			drawThreeDScreenOnWorkspace();
+		
 		
 		preparePanels();
 
@@ -1259,17 +1346,54 @@ void SDL_ApplicationWindow::renderFrame()
 				// if you write getLeft() + 50 you will see an offset 
 				// -------------------- end of explanation ---------------------
 
-				ui_manager_->setBorders(
-					app_border_->getLeft(), app_border_->getTop(),
-					app_border_->getWidth(), app_border_->getHeight());
+				if (panel_resizing_logic_)
+				{
+					int currentLeft = app_border_->getLeft();
+					int currentTop = app_border_->getTop();
+					int currentWidth = app_border_->getWidth();
+					int currentHeight = app_border_->getHeight();
+
+					if (currentLeft != last_border_left_ ||
+						currentTop != last_border_top_ ||
+						currentWidth != last_border_width_ ||
+						currentHeight != last_border_height_)
+					{
+						panel_resizing_logic_->Set_App_Borders(
+							*app_border_, window_,
+							currentLeft, currentTop,
+							currentWidth, currentHeight);
+
+						last_border_left_ = currentLeft;
+						last_border_top_ = currentTop;
+						last_border_width_ = currentWidth;
+						last_border_height_ = currentHeight;
+					}
+				}
 				borders_set_for_init_ = true;
 			}
 
-			ui_manager_->drawReduceScreenUIpanelsInsideBorders(commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
-			prepared_panel_frame_data_map_, prepared_skip_texture_rebuild_, window_,
-			reference_window_width_, reference_window_height_);
+			if (panel_resizing_logic_)
+			{
+				panel_resizing_logic_->Redraw_Inside_App_Borders(
+					commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
+					prepared_skip_texture_rebuild_, window_,
+					reference_window_width_, reference_window_height_);
+			}
 
-			ui_manager_->drawSplitters(commandBuffer, prepared_drawable_width_, prepared_drawable_height_);
+			if (ui_manager_)
+			{
+				ui_manager_->drawSplitters(commandBuffer, prepared_drawable_width_, prepared_drawable_height_);
+			}
+
+		// Drawing workspace canvas rendered LAST so it appears on top of any stale CEF panel texture
+		if (is_drawing_board_active_ && ui_manager_)
+		{
+			int drawableW = 0, drawableH = 0, logicalW = 0, logicalH = 0;
+			SDL_GetWindowSizeInPixels(window_, &drawableW, &drawableH);
+			SDL_GetWindowSize(window_, &logicalW, &logicalH);
+			const float dpi = (logicalW > 0) ? static_cast<float>(drawableW) / static_cast<float>(logicalW) : 1.0f;
+			ui_manager_->getWorkSpace().Render2DDrawingScreen(commandBuffer, dpi);
+		}
 	}
 
 	// ------ when state is Maximized for SDL3 window
@@ -1282,11 +1406,10 @@ void SDL_ApplicationWindow::renderFrame()
 
 			ui_manager_->FreezeCoordinatesForFullscreen(fullscreenW, fullscreenH);
 
+			ui_manager_->bindFullScreenPanelsToSplitters(getWindowRenderState());
 			ui_manager_->bindWorkSpaceSizeToSplitterInteractions();
 
-			ui_manager_->bindFullScreenPanelsToSplitters(getWindowRenderState());
-
-			if (ui_manager_->consumePendingCEFRepaintRequest())
+			if (!is_drawing_board_active_ && ui_manager_->consumePendingCEFRepaintRequest())
 			{
 				if (panel_resizing_logic_)
 				{
@@ -1301,25 +1424,69 @@ void SDL_ApplicationWindow::renderFrame()
 				}
 				requestBrowserRepaint();
 			}
+			else if (is_drawing_board_active_ && ui_manager_->consumePendingCEFRepaintRequest())
+			{
+				if (panel_resizing_logic_)
+				{
+					panel_resizing_logic_->cacheUIPanelFrameDatas();
+					int currentW = 0, currentH = 0;
+					SDL_GetWindowSize(window_, &currentW, &currentH);
+					panel_resizing_logic_->syncBrowserFullScreenPanelLayout(
+						getWindowRenderState(),
+						currentW, currentH,
+						currentW, currentH);
+				}
+			}
 		}
 
 		activateDebugRender();
 
-		drawThreeDScreenOnWorkspace();
+		if (!is_drawing_board_active_)
+			drawThreeDScreenOnWorkspace();
 
 		preparePanels();
 
-		if (ui_manager_ && app_border_)
+		if (panel_resizing_logic_ && app_border_)
 		{
-			ui_manager_->setBorders(
-				app_border_->getLeft(), app_border_->getTop(),
-				app_border_->getWidth(), app_border_->getHeight());
+			int currentLeft = app_border_->getLeft();
+			int currentTop = app_border_->getTop();
+			int currentWidth = app_border_->getWidth();
+			int currentHeight = app_border_->getHeight();
 
-			ui_manager_->renderFullScreenUIPanelsInsideBorders(commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
-				prepared_skip_texture_rebuild_, window_);
+			if (currentLeft != last_border_left_ ||
+				currentTop != last_border_top_ ||
+				currentWidth != last_border_width_ ||
+				currentHeight != last_border_height_)
+			{
+				panel_resizing_logic_->Set_App_Borders(
+					*app_border_, window_,
+					currentLeft, currentTop,
+					currentWidth, currentHeight);
 
-			ui_manager_->drawSplittersFullScreen(commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
-				window_, app_border_->getReferenceWindowWidth(), app_border_->getReferenceWindowHeight());
+				last_border_left_ = currentLeft;
+				last_border_top_ = currentTop;
+				last_border_width_ = currentWidth;
+				last_border_height_ = currentHeight;
+			}
+
+			panel_resizing_logic_->Redraw_Inside_App_Borders(commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
+				prepared_skip_texture_rebuild_, window_, app_border_->getReferenceWindowWidth(), app_border_->getReferenceWindowHeight());
+
+			if (ui_manager_)
+			{
+				ui_manager_->drawSplittersFullScreen(commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
+					window_, app_border_->getReferenceWindowWidth(), app_border_->getReferenceWindowHeight());
+			}
+		}
+
+		// Drawing workspace canvas rendered LAST so it appears on top of any stale CEF panel texture
+		if (is_drawing_board_active_ && ui_manager_)
+		{
+			int drawableW = 0, drawableH = 0, logicalW = 0, logicalH = 0;
+			SDL_GetWindowSizeInPixels(window_, &drawableW, &drawableH);
+			SDL_GetWindowSize(window_, &logicalW, &logicalH);
+			const float dpi = (logicalW > 0) ? static_cast<float>(drawableW) / static_cast<float>(logicalW) : 1.0f;
+			ui_manager_->getWorkSpace().Render2DDrawingScreen(commandBuffer, dpi);
 		}
 	}
 
@@ -1351,7 +1518,8 @@ void SDL_ApplicationWindow::renderFrame()
 	{
 		activateDebugRender();
 
-		drawThreeDScreenOnWorkspace();
+		if (!is_drawing_board_active_)
+			drawThreeDScreenOnWorkspace();
 
 		preparePanels();
 
@@ -1361,11 +1529,10 @@ void SDL_ApplicationWindow::renderFrame()
 				app_border_->getLeft(), app_border_->getTop(),
 				app_border_->getWidth(), app_border_->getHeight());
 
+			ui_manager_->bindPanelsToSplitters(getWindowRenderState());
 			ui_manager_->bindWorkSpaceSizeToSplitterInteractions();
 
-			ui_manager_->bindPanelsToSplitters(getWindowRenderState());
-
-			if (ui_manager_->consumePendingCEFRepaintRequest() || pending_window_resize_sync_)
+			if (!is_drawing_board_active_ && (ui_manager_->consumePendingCEFRepaintRequest() || pending_window_resize_sync_))
 			{
 				pending_window_resize_sync_ = false;
 				if (panel_resizing_logic_)
@@ -1374,20 +1541,46 @@ void SDL_ApplicationWindow::renderFrame()
 					int currentW = 0, currentH = 0;
 					SDL_GetWindowSize(window_, &currentW, &currentH);
 
-					panel_resizing_logic_->syncBrowserFullScreenPanelLayout(
+					panel_resizing_logic_->syncBrowserPanelLayoutFromCurrentFrames(
 						getWindowRenderState(),
 						currentW, currentH,
-						currentW, currentH);
+						reference_window_width_, reference_window_height_);
 				}
 				requestBrowserRepaint();
 			}
+			else if (is_drawing_board_active_ && ui_manager_->consumePendingCEFRepaintRequest())
+			{
+				if (panel_resizing_logic_)
+				{
+					panel_resizing_logic_->cacheUIPanelFrameDatas();
+					int currentW = 0, currentH = 0;
+					SDL_GetWindowSize(window_, &currentW, &currentH);
+					panel_resizing_logic_->syncBrowserPanelLayoutFromCurrentFrames(
+						getWindowRenderState(),
+						currentW, currentH,
+						reference_window_width_, reference_window_height_,
+						/*suppressServerNotify=*/true);
+				}
+			}
 
-			ui_manager_->drawReduceScreenUIpanelsInsideBorders(commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
-				prepared_panel_frame_data_map_, prepared_skip_texture_rebuild_, window_,
-				app_border_->getReferenceWindowWidth(), app_border_->getReferenceWindowHeight());
+			if (panel_resizing_logic_ && app_border_)
+			{
+				panel_resizing_logic_->Redraw_Inside_App_Borders(commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
+					prepared_skip_texture_rebuild_, window_, app_border_->getReferenceWindowWidth(), app_border_->getReferenceWindowHeight());
+			}
 
 			ui_manager_->drawSplittersReducedScreenSize(commandBuffer, prepared_drawable_width_, prepared_drawable_height_,
 				window_, app_border_->getReferenceWindowWidth(), app_border_->getReferenceWindowHeight());
+		}
+
+		// Drawing workspace canvas rendered LAST so it appears on top of any stale CEF panel texture
+		if (is_drawing_board_active_ && ui_manager_)
+		{
+			int drawableW = 0, drawableH = 0, logicalW = 0, logicalH = 0;
+			SDL_GetWindowSizeInPixels(window_, &drawableW, &drawableH);
+			SDL_GetWindowSize(window_, &logicalW, &logicalH);
+			const float dpi = (logicalW > 0) ? static_cast<float>(drawableW) / static_cast<float>(logicalW) : 1.0f;
+			ui_manager_->getWorkSpace().Render2DDrawingScreen(commandBuffer, dpi);
 		}
 	}
 
@@ -1422,7 +1615,7 @@ void SDL_ApplicationWindow::renderFrame()
 
 	// --- functionnalities when working with 3D screen (independent of window state)  ---
 	// --- the mouse state let us know if the mouse is above the 3D screen / the workspace or not ---
-	if (current_mouse_state_ == &mouse_state_above_workspace_)
+	if (!is_drawing_board_active_ && current_mouse_state_ == &mouse_state_above_workspace_)
 	{
 		float mouseXf = 0.0f, mouseYf = 0.0f;
 		SDL_MouseButtonFlags mouseButtons = SDL_GetMouseState(&mouseXf, &mouseYf);
@@ -1878,7 +2071,7 @@ void SDL_ApplicationWindow::renderFrame()
 
 	// -------- render Widgets above Workspace Screen -------- //
 
-	if (workspace_widget_ && ui_manager_ && widget_command_buffer_ != VK_NULL_HANDLE)
+	if (!is_drawing_board_active_ && workspace_widget_ && ui_manager_ && widget_command_buffer_ != VK_NULL_HANDLE)
 	{
 		workspace_widget_->uploadPaintBuffer();
 
@@ -2037,6 +2230,20 @@ void SDL_ApplicationWindow::initializeDefaultUIPanels()
 	{
 		std::cerr << "[SDL_ApplicationWindow] initializeDefaultUIPanels: ui_manager_ is null" << std::endl;
 	}
+}
+
+void SDL_ApplicationWindow::setDrawingBoardActive(bool active)
+{
+	is_drawing_board_active_ = active;
+	pending_window_resize_sync_ = true;
+
+	if (active)
+	{
+		std::cout << "[SDL_ApplicationWindow] setDrawingBoardActive: Drawing mode ON — skipping panel sync" << std::endl;
+		return;
+	}
+
+
 }
 
 void SDL_ApplicationWindow::forceCaptureIFramePositions()

@@ -223,60 +223,11 @@ namespace SIMILI {
 			return effectiveFrameDataMap;
 		}
 
-		void PanelMapBuilder::syncSplittersAndPanels(
-		const std::map<std::string, IFrameScreenData>& frameDataMap,
-		int currentWindowWidth, int currentWindowHeight,
-		std::map<std::string, PanelState>& panelStateMap,
-		std::vector<SplitterDefinition>& splitterList,
-		int& lastWindowWidth, int& lastWindowHeight,
-		SDL_Window* window)
-		{
-			std::cout << "[PanelMapBuilder::syncSplittersAndPanes] Called with " << frameDataMap.size() 
-			          << " panels for window " << currentWindowWidth << "x" << currentWindowHeight << std::endl;
-
-			syncPanelStateMapFromFrameData(frameDataMap, panelStateMap);
-
-
-			if (currentWindowWidth > 0 && currentWindowHeight > 0 && window)
-			{
-				int windowWidth = 0;
-				int windowHeight = 0;
-				SDL_GetWindowSize(window, &windowWidth, &windowHeight);
-				const bool incomingFrameMapMatchesWindow = frameMapMatchesWindowSize(frameDataMap, windowWidth, windowHeight);
-				
-				if (windowWidth > 0 && windowHeight > 0 && 
-				    (windowWidth != lastWindowWidth || windowHeight != lastWindowHeight))
-				{
-					if (incomingFrameMapMatchesWindow)
-					{
-						std::cout << "[PanelMapBuilder::syncSplittersAndPanes] Window size changed, but incoming frame data already matches "
-						          << windowWidth << "x" << windowHeight << " - skipping scaling" << std::endl;
-						lastWindowWidth = windowWidth;
-						lastWindowHeight = windowHeight;
-					}
-					else
-					{
-						std::cout << "[PanelMapBuilder::syncSplittersAndPanes] Window size changed, scaling..." << std::endl;
-						scaleLayoutToWindow(windowWidth, windowHeight, panelStateMap, lastWindowWidth, lastWindowHeight, window);
-					}
-				}
-			}
-
-			updateClientCoordinates(panelStateMap);
-			createViewportPanel(panelStateMap, currentWindowWidth, currentWindowHeight);
-
-			const auto effectiveFrameDataMap = buildFrameDataMapFromPanelState(panelStateMap, frameDataMap);
-
-			buildMapData(effectiveFrameDataMap, splitterList, currentWindowWidth);
-
-			std::cout << "[PanelMapBuilder::syncSplittersAndPanes] Completed - " << effectiveFrameDataMap.size() 
-			          << " panels, " << splitterList.size() << " splitters" << std::endl;
-		}
-
 		void PanelMapBuilder::createViewportPanel(
 		std::map<std::string, PanelState>& panelStateMap,
 		int currentWindowWidth, int currentWindowHeight)
 		{
+			std::cout << "\n ------ Panel Map Creation Begin ! ------ " << std::endl;
 			std::cout << "[PanelMapBuilder::createViewportPanel] Checking viewport_panel auto-creation: window=" 
 			          << currentWindowWidth << "x" << currentWindowHeight 
 			          << " panels=" << panelStateMap.size() << std::endl;
@@ -368,6 +319,63 @@ namespace SIMILI {
 			}
 		}
 
+
+		void PanelMapBuilder::syncSplittersAndPanels(
+		const std::map<std::string, IFrameScreenData>& frameDataMap,
+		int currentWindowWidth, int currentWindowHeight,
+		std::map<std::string, PanelState>& panelStateMap,
+		std::vector<SplitterDefinition>& splitterList,
+		int& lastWindowWidth, int& lastWindowHeight,
+		SDL_Window* window)
+		{
+		
+			std::cout << "[PanelMapBuilder::syncSplittersAndPanes] Called with " << frameDataMap.size() 
+			          << " panels for window " << currentWindowWidth << "x" << currentWindowHeight << "\n" << std::endl;
+		
+
+			syncPanelStateMapFromFrameData(frameDataMap, panelStateMap);
+
+
+			if (currentWindowWidth > 0 && currentWindowHeight > 0 && window)
+			{
+				int windowWidth = 0;
+				int windowHeight = 0;
+				SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+				const bool incomingFrameMapMatchesWindow = frameMapMatchesWindowSize(frameDataMap, windowWidth, windowHeight);
+				
+				if (windowWidth > 0 && windowHeight > 0 && 
+				    (windowWidth != lastWindowWidth || windowHeight != lastWindowHeight))
+				{
+					if (incomingFrameMapMatchesWindow)
+					{
+						std::cout << "[PanelMapBuilder::syncSplittersAndPanes] Window size changed, but incoming frame data already matches "
+						          << windowWidth << "x" << windowHeight << " - skipping scaling" << std::endl;
+						lastWindowWidth = windowWidth;
+						lastWindowHeight = windowHeight;
+					}
+					else
+					{
+						std::cout << "[PanelMapBuilder::syncSplittersAndPanes] Window size changed, scaling..." << std::endl;
+						scaleLayoutToWindow(windowWidth, windowHeight, panelStateMap, lastWindowWidth, lastWindowHeight, window);
+					}
+				}
+			}
+
+			updateClientCoordinates(panelStateMap);
+			createViewportPanel(panelStateMap, currentWindowWidth, currentWindowHeight);
+
+			const auto effectiveFrameDataMap = buildFrameDataMapFromPanelState(panelStateMap, frameDataMap);
+
+			buildMapData(effectiveFrameDataMap, splitterList, currentWindowWidth);
+
+			std::cout << "[PanelMapBuilder::syncSplittersAndPanes] Completed - " << effectiveFrameDataMap.size() 
+			          << " panels, " << splitterList.size() << " splitters" << std::endl;
+
+			std::cout << "---------------------------------------------\n" << std::endl;
+
+
+		}
+
 		void PanelMapBuilder::drawInsideAppBorders(
 		VkCommandBuffer commandBuffer,
 		int drawableWidth, int drawableHeight,
@@ -385,14 +393,12 @@ namespace SIMILI {
 				return;
 			}
 
-			// Viewport offset = App_Border origin: NDC(-1,-1) maps to (borderLeft, borderTop) on screen.
-			// This translates the entire group of panels by the border offset, without any clipping.
-
+			// Viewport matches full window to align with CEF's exact iframe coordinate layout.
 			VkViewport viewport = {};
-			viewport.x = static_cast<float>(appBorderLeft);
-			viewport.y = static_cast<float>(appBorderTop);
-			viewport.width  = static_cast<float>(appBorderWidth);
-			viewport.height = static_cast<float>(appBorderHeight);
+			viewport.x = 0.0f;
+			viewport.y = 0.0f;
+			viewport.width  = static_cast<float>(drawableWidth);
+			viewport.height = static_cast<float>(drawableHeight);
 			viewport.minDepth = 0.0f;
 			viewport.maxDepth = 1.0f;
 			vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
@@ -402,6 +408,10 @@ namespace SIMILI {
 			scissor.offset = {0, 0};
 			scissor.extent = {static_cast<uint32_t>(drawableWidth), static_cast<uint32_t>(drawableHeight)};
 			vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+			// Silence unused viewport parameters
+			(void)appBorderWidth;
+			(void)appBorderHeight;
 
 			for (const auto& pair : panelFrameDataMap)
 			{
@@ -432,8 +442,7 @@ namespace SIMILI {
 
 				if (it != uiPanels.end() && it->second)
 				{
-					it->second->updateFromFrameData(frameData, window, skipTextureRebuild);
-					it->second->draw(commandBuffer, appBorderWidth, appBorderHeight);
+					it->second->draw(commandBuffer, drawableWidth, drawableHeight, frameData, window, skipTextureRebuild, appBorderLeft, appBorderTop);
 				}
 			}
 		}
@@ -451,7 +460,77 @@ namespace SIMILI {
 			std::cout << "[PanelMapBuilder] clearUIPanels: All UI panels cleared" << std::endl;
 		}
 
-		void MapData::clear()
+		void PanelMapBuilder::Clear_Everything()
+		{
+			map_data_.clear();
+			workspace_.set(0, 0, 0, 0);
+			splitter_id_registry_.clear();
+			std::cout << "[PanelMapBuilder] Clear_Everything executed: map data, workspace, and splitter registries cleared" << std::endl;
+		}
+
+		void PanelMapBuilder::CreateNewMapFromSwitchCall(const std::map<std::string, IFrameScreenData>& panels)
+		{
+			// Start from a clean slate
+			map_data_.clear();
+			workspace_.set(0, 0, 0, 0);
+			splitter_id_registry_.clear();
+
+			if (panels.empty())
+			{
+				std::cout << "[PanelMapBuilder] CreateNewMapFromSwitchCall: no panels provided" << std::endl;
+				return;
+			}
+
+			// top_bar_panel is intentionally excluded from buildMapData (it's a fixed header).
+			// For the drawing workspace we need workspace bounds AND splitter candidates so
+			// bindFullScreenPanelsToSplitters can filter panels per-splitter correctly.
+			buildWorkSpace(panels);
+
+			buildSplittersFromRays(panels);
+
+			const int ATTACH_TOL = 15;
+			const int nSpl = static_cast<int>(map_data_.splitterCandidates.size());
+			map_data_.splitterAttachments.assign(nSpl, std::vector<int>());
+
+			for (int i = 0; i < nSpl; ++i)
+			{
+				for (int j = i + 1; j < nSpl; ++j)
+				{
+					const SplitterCandidate& a = map_data_.splitterCandidates[i];
+					const SplitterCandidate& b = map_data_.splitterCandidates[j];
+
+					if (a.isVertical == b.isVertical) 
+					{
+						continue;
+					}
+
+					const SplitterCandidate& Vertical = a.isVertical ? a : b;
+					const SplitterCandidate& Horizontal = a.isVertical ? b : a;
+
+					const int vi = a.isVertical ? i : j;
+					const int hi = a.isVertical ? j : i;
+
+					const bool xOverlap = (Vertical.x <= Horizontal.x + Horizontal.width + ATTACH_TOL) && (Vertical.x + Vertical.width >= Horizontal.x - ATTACH_TOL);
+					const bool atVTop = xOverlap && std::abs(Horizontal.y - Vertical.y) <= ATTACH_TOL;
+					const bool atVBottom = xOverlap && std::abs(Horizontal.y - (Vertical.y + Vertical.height)) <= ATTACH_TOL;
+
+					const bool vInHYRange = (Vertical.y <= Horizontal.y + ATTACH_TOL) && (Vertical.y + Vertical.height >= Horizontal.y - ATTACH_TOL);
+					const bool atHLeft  = vInHYRange && std::abs(Vertical.x - Horizontal.x) <= ATTACH_TOL;
+					const bool atHRight = vInHYRange && std::abs(Vertical.x - (Horizontal.x + Horizontal.width)) <= ATTACH_TOL;
+
+					if (atVTop || atVBottom || atHLeft || atHRight)
+					{
+						map_data_.splitterAttachments[vi].push_back(hi);
+						map_data_.splitterAttachments[hi].push_back(vi);
+					}
+				}
+			}
+
+			std::cout << "[PanelMapBuilder] CreateNewMapFromSwitchCall: workspace set from "
+			          << panels.size() << " panel(s), splitterCandidates=" << map_data_.splitterCandidates.size() << std::endl;
+		}
+
+		void dataMap::clear()
 		{
 			panels.clear();
 			splitters.clear();
@@ -570,8 +649,9 @@ namespace SIMILI {
 				++nextIndex;
 			}
 
-			std::cout << "\n -------------- [Panel Map Building ] --------------" << std::endl;
-			std::cout << "[PanelMapBuilder::buildMapData] Layout map:" << std::endl;
+			if (!map_data_.panels.empty())
+			{				
+				std::cout << "[PanelMapBuilder::buildMapData] Layout map:" << std::endl;
 
 			std::vector<const PanelMapEntry*> ordered;
 
@@ -595,6 +675,7 @@ namespace SIMILI {
 					dhCount = dh->getCountForPanel(e->name);
 				}
 				std::cout << "  " << e->name << " = " << e->index;
+
 				if (dhCount > 0)
 				{
 					std::cout << " [DataHolders: " << dhCount << "]";
@@ -684,10 +765,11 @@ namespace SIMILI {
 				std::cout << std::endl;
 			}
 
-			std::cout << " ------------------ [End of Panel Map Building ] -----------------------------\n" << std::endl;
+				std::cout << " ------------------ [End of Panel Map Building ] -----------------------------\n" << std::endl;
+			}
 		}
 
-		const MapData& PanelMapBuilder::getMapData() const
+		const dataMap& PanelMapBuilder::getMapData() const
 		{
 			return map_data_;
 		}
@@ -891,20 +973,12 @@ namespace SIMILI {
 			}
 			else
 			{
-				const bool hadValidWorkspace = workspace_.isValid();
-				const int wsBackupX = workspace_.getX();
-				const int wsBackupY = workspace_.getY();
-				const int wsBackupW = workspace_.getWidth();
-				const int wsBackupH = workspace_.getHeight();
 				buildWorkSpace(frameDataMap);
-				if (hadValidWorkspace)
-				{
-					workspace_.set(wsBackupX, wsBackupY, wsBackupW, wsBackupH);
-				}
-				else if (currentWindowWidth > 0 && currentWindowHeight > 0)
-				{
-					updateWorkSpaceFromSplitters(splitterList, currentWindowWidth, currentWindowHeight);
-				}
+			}
+
+			if (currentWindowWidth > 0 && currentWindowHeight > 0)
+			{
+				updateWorkSpaceFromSplitters(splitterList, currentWindowWidth, currentWindowHeight);
 			}
 
 			{
@@ -1077,7 +1151,7 @@ namespace SIMILI {
 		}
 
 		void PanelMapBuilder::buildSplittersFromRays(
-			const std::map<std::string, IFrameScreenData>& frameDataMap)
+		const std::map<std::string, IFrameScreenData>& frameDataMap)
 		{
 			map_data_.splitterCandidates.clear();
 
@@ -1088,13 +1162,14 @@ namespace SIMILI {
 
 			const int BORDER_OFFSET = 3;
 			const int SPLITTER_THICKNESS = 10;
+			const int GAP_TOLERANCE = SPLITTER_THICKNESS * 2;
 
 			int windowWidth = 0;
 			int windowHeight = 0;
 
 			for (const auto& p : frameDataMap)
 			{
-				if (p.second.windowWidth  > 0) windowWidth = p.second.windowWidth;
+				if (p.second.windowWidth > 0) windowWidth = p.second.windowWidth;
 				if (p.second.windowHeight > 0) windowHeight = p.second.windowHeight;
 				if (windowWidth > 0 && windowHeight > 0) break;
 			}
@@ -1213,6 +1288,68 @@ namespace SIMILI {
 					{
 						SplitterCandidate& existing = it->second;
 
+						// Only merge if the new segment is actually adjacent to the existing one.
+						// If there is a large gap (e.g. the center viewport), create a separate splitter
+						// with an extended key that includes the panel's position.
+						const bool adjacent = isVertical
+							? (sy <= existing.y + existing.height + GAP_TOLERANCE && sy + sh >= existing.y - GAP_TOLERANCE)
+							: (sx <= existing.x + existing.width + GAP_TOLERANCE && sx + sw >= existing.x - GAP_TOLERANCE);
+
+						if (!adjacent)
+						{
+							// Non-adjacent segment at the same axis — treat as an independent splitter.
+							const std::string fallbackKey = dedupKey + "|" + std::to_string(isVertical ? sy : sx);
+							auto fit = candidateMap.find(fallbackKey);
+							if (fit == candidateMap.end())
+							{
+								SplitterCandidate candidate;
+								candidate.x = sx;
+								candidate.y = sy;
+								candidate.width = sw;
+								candidate.height = sh;
+								candidate.isVertical = isVertical;
+								candidate.isHorizontal = !isVertical;
+								candidate.assignedPanels.push_back(panelName);
+								if (hit.hitType == RayHitType::Panel && !hit.hitPanelName.empty())
+								{
+									candidate.assignedPanels.push_back(hit.hitPanelName);
+								}
+								candidateMap[fallbackKey] = candidate;
+							}
+							else
+							{
+								SplitterCandidate& fb = fit->second;
+								if (isVertical)
+								{
+									const int minY = (std::min)(fb.y, sy);
+									const int maxY = (std::max)(fb.y + fb.height, sy + sh);
+									fb.y = minY;
+									fb.height = maxY - minY;
+								}
+								else
+								{
+									const int minX = (std::min)(fb.x, sx);
+									const int maxX = (std::max)(fb.x + fb.width, sx + sw);
+									fb.x = minX;
+									fb.width = maxX - minX;
+								}
+								auto addIfMissingFb = [&fb](const std::string& name)
+								{
+									if (!name.empty() &&
+										std::find(fb.assignedPanels.begin(), fb.assignedPanels.end(), name) == fb.assignedPanels.end())
+									{
+										fb.assignedPanels.push_back(name);
+									}
+								};
+								addIfMissingFb(panelName);
+								if (hit.hitType == RayHitType::Panel)
+								{
+									addIfMissingFb(hit.hitPanelName);
+								}
+							}
+							continue;
+						}
+
 						if (isVertical)
 						{
 							const int minY = (std::min)(existing.y, sy);
@@ -1250,10 +1387,11 @@ namespace SIMILI {
 
 			std::vector<SplitterCandidate> allCandidates;
 			allCandidates.reserve(candidateMap.size());
-			for (auto& kv : candidateMap)
-				allCandidates.push_back(kv.second);
 
-			const int GAP_TOLERANCE = SPLITTER_THICKNESS * 2;
+			for (auto& kv : candidateMap)
+			{
+				allCandidates.push_back(kv.second);
+			}
 
 			for (auto& cand : allCandidates)
 			{
@@ -1267,7 +1405,9 @@ namespace SIMILI {
 						const bool xCross = other.x < cand.x + cand.width + GAP_TOLERANCE &&
 						                    other.x + other.width > cand.x - GAP_TOLERANCE;
 						if (!xCross)
+						{
 							continue;
+						}
 
 						const int candBottom = cand.y + cand.height;
 						const int otherBottom = other.y + other.height;
@@ -1286,7 +1426,9 @@ namespace SIMILI {
 						const bool yCross = other.y < cand.y + cand.height + GAP_TOLERANCE &&
 						                    other.y + other.height > cand.y - GAP_TOLERANCE;
 						if (!yCross)
+						{
 							continue;
+						}
 
 						const int candRight = cand.x + cand.width;
 						const int otherRight = other.x + other.width;
@@ -1351,7 +1493,8 @@ namespace SIMILI {
 			const int wsHeight = (std::max)(1, bottomBound - topBound);
 			const bool changed = (leftBound != workspace_.getX() || topBound != workspace_.getY()
 				|| wsWidth != workspace_.getWidth() || wsHeight != workspace_.getHeight());
-			workspace_.set(leftBound, topBound, wsWidth, wsHeight);
+			workspace_.setBounds(leftBound, topBound, rightBound, bottomBound);
+
 			if (changed)
 			{
 				std::cout << "[PanelMapBuilder] workspace size is now height: " << wsHeight << " width: " << wsWidth
@@ -1389,23 +1532,51 @@ namespace SIMILI {
 				SPLITTER_THICKNESS);
 
 			const int MATCH_TOLERANCE = 15;
+
 			map_data_.splitterBoundaryRoles.assign(map_data_.splitterCandidates.size(), SplitterBoundaryRole::None);
+
 			for (int i = 0; i < static_cast<int>(map_data_.splitterCandidates.size()); ++i)
 			{
 				const auto& cand = map_data_.splitterCandidates[i];
+
 				if (cand.isVertical)
 				{
 					if (std::abs((cand.x + cand.width) - workspace_.getX()) <= MATCH_TOLERANCE)
+					{
 						map_data_.splitterBoundaryRoles[i] = SplitterBoundaryRole::WorkspaceLeft;
-					else if (std::abs(cand.x - (workspace_.getX() + workspace_.getWidth())) <= MATCH_TOLERANCE)
+
+						std::cout << "TEST CANDIDATE Splitter " << i << " role: WorkspaceLeft" << std::endl;
+
+
+					}
+					else if (std::abs(cand.x - (workspace_.getX() + workspace_.getWidth())) <= MATCH_TOLERANCE) 
+					{
 						map_data_.splitterBoundaryRoles[i] = SplitterBoundaryRole::WorkspaceRight;
+
+						std::cout << "TEST CANDIDATE Splitter " << i << " role: WorkspaceRight" << std::endl;
+
+
+					}
+
 				}
-				else
+
+				if (cand.isHorizontal)
 				{
 					if (std::abs((cand.y + cand.height) - workspace_.getY()) <= MATCH_TOLERANCE)
+					{
 						map_data_.splitterBoundaryRoles[i] = SplitterBoundaryRole::WorkspaceTop;
+
+						std::cout << "TEST CANDIDATE Splitter " << i << " role: WorkspaceTop" << std::endl;
+
+					}
+
 					else if (std::abs(cand.y - (workspace_.getY() + workspace_.getHeight())) <= MATCH_TOLERANCE)
+					{
 						map_data_.splitterBoundaryRoles[i] = SplitterBoundaryRole::WorkspaceBottom;
+
+						std::cout << "TEST CANDIDATE Splitter " << i << " role: WorkspaceBottom" << std::endl;
+
+					}
 				}
 			}
 		}
@@ -1413,6 +1584,11 @@ namespace SIMILI {
 		const WorkSpace& PanelMapBuilder::getWorkSpace() const
 		{
 			return workspace_;
+		}
+
+		void PanelMapBuilder::setWorkSpace(int x, int y, int width, int height)
+		{
+			workspace_.set(x, y, width, height);
 		}
 
 	}

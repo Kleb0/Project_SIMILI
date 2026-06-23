@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tilemap Builder</title>
+    <style>
+        body {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 10px;
+            box-sizing: border-box;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #9b59b6;
+        }
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 2px;
+            background-color: #333;
+            padding: 3px;
+            border-radius: 4px;
+            flex: 1;
+            overflow: auto;
+        }
+        .grid-tile {
+            background-color: #222;
+            aspect-ratio: 1;
+            border-radius: 2px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.1s;
+        }
+        .grid-tile:hover {
+            border-color: #9b59b6;
+            background-color: #333;
+        }
+        .grid-tile.painted {
+            background-color: #9b59b6;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+        }
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <h3>Tilemap Builder</h3>
+    <div class="grid-container" id="grid">
+        <!-- JS will populate a 8x8 grid of tiles -->
+    </div>
+    <div class="controls">
+        <span>Tool: Paint Brush</span>
+        <button onclick="clearGrid()" style="background:#555; color:#fff; border:none; padding:3px 8px; border-radius:2px; cursor:pointer;">Clear</button>
+    </div>
+
+    <script>
+        const grid = document.getElementById('grid');
+        for (let i = 0; i < 64; i++) {
+            const tile = document.createElement('div');
+            tile.className = 'grid-tile';
+            tile.addEventListener('click', () => {
+                tile.classList.toggle('painted');
+            });
+            grid.appendChild(tile);
+        }
+        function clearGrid() {
+            document.querySelectorAll('.grid-tile').forEach(t => t.classList.remove('painted'));
+        }
+    </script>
+</body>
+</html>

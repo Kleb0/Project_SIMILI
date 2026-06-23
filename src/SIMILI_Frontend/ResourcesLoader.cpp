@@ -87,6 +87,22 @@ CefRefPtr<CefResourceHandler> LocalResourceRequestHandler::GetResourceHandler(
 		return handleUIPanelUpdate(request);
 	}
 
+	if (url == "http://localhost:8080/api/Endpoint/ThreeDScenePanels")
+	{
+		return handleUIPanelUpdate(request);
+	}
+
+
+	if (url == "http://localhost:8080/api/uipanels/clear")
+	{
+		return handleUIPanelClear(request);
+	}
+
+	if (url == "http://localhost:8080/api/Endpoint/WorkspaceClear")
+	{
+		return handleUIPanelClear(request);
+	}
+
 	if (url.find("http://localhost:8080/api/") == 0)
 	{
 		return nullptr;
@@ -183,6 +199,17 @@ CefRefPtr<CefResourceHandler> LocalResourceRequestHandler::handleUIPanelUpdate(C
 	}
 			
 	std::string response = "{\"success\": true, \"count\": " + std::to_string(uiPanelIFrames.size()) + "}";
+	return new SimpleResourceHandler("application/json", response);
+}
+
+CefRefPtr<CefResourceHandler> LocalResourceRequestHandler::handleUIPanelClear(CefRefPtr<CefRequest> request)
+{
+	if (FrameDataCatcher* catcher = FrameDataCatcher::getInstance())
+	{
+		catcher->iframe_data_map_.clear();
+	}
+	
+	std::string response = "{\"success\": true}";
 	return new SimpleResourceHandler("application/json", response);
 }
 

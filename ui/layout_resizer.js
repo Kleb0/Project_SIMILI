@@ -296,43 +296,46 @@
     
     function sendIFrameSizesToServer()
     {
-        const panels = [
-            { selector: '.hierarchy-panel iframe', name: 'hierarchy_panel' },
-            { selector: '.viewport-panel iframe', name: 'viewport_panel' },
-            { selector: '.object-inspector-panel iframe', name: 'object_inspector_panel' },
-            { selector: '.history-panel iframe', name: 'history_panel' },
-            { selector: '.project-viewer-panel iframe', name: 'project_viewer_panel' },
-            { selector: '.panel_above_UI iframe', name: 'panel_above_UI' },
-            { selector: '.top-bar-panel iframe', name: 'top_bar_panel' }
-        ];
-        
+        const isDrawingWorkspace = window.location.href.includes('drawing_board_layout.html');
+        const iframes = document.querySelectorAll('.main-container iframe');
         const iframeData = [];
         
-        panels.forEach(item => {
-            const iframe = document.querySelector(item.selector);
-            if (iframe) {
-                const iframeRect = iframe.getBoundingClientRect();
-                const parentPanel = iframe.parentElement;
-                const panelRect = parentPanel.getBoundingClientRect();
-                
-                const logicalX = Math.round(iframeRect.left);
-                const logicalY = Math.round(iframeRect.top);
-                const logicalWidth = Math.round(iframeRect.width);
-                const logicalHeight = Math.round(iframeRect.height);
-                
-                iframeData.push({
-                    name: item.name,
-                    x: logicalX,
-                    y: logicalY,
-                    width: logicalWidth,
-                    height: logicalHeight,
-                    clientX: logicalX + 40,
-                    clientY: logicalY + 50,
-                    marginLeft: 40,
-                    marginRight: 40,
-                });                
-
+        iframes.forEach(iframe => {
+            const src = iframe.getAttribute('src') || '';
+            
+            // Get panel name from parent class
+            const parentPanel = iframe.parentElement;
+            if (!parentPanel) return;
+            
+            let name = null;
+            const panelClasses = parentPanel.classList;
+            for (let index = 0; index < panelClasses.length; index++) {
+                const className = panelClasses[index];
+                if (!className || className === 'panel') continue;
+                name = className.replace(/-/g, '_');
             }
+            if (!name) return;
+
+            // In Drawing Workspace, only allow top_bar_panel through
+            if (isDrawingWorkspace && name !== 'top_bar_panel') return;
+
+            const iframeRect = iframe.getBoundingClientRect();
+            const logicalX = Math.round(iframeRect.left);
+            const logicalY = Math.round(iframeRect.top);
+            const logicalWidth = Math.round(iframeRect.width);
+            const logicalHeight = Math.round(iframeRect.height);
+            
+            iframeData.push({
+                name: name,
+                x: logicalX,
+                y: logicalY,
+                width: logicalWidth,
+                height: logicalHeight,
+                clientX: logicalX + 40,
+                clientY: logicalY + 50,
+                marginLeft: 40,
+                marginRight: 40,
+            });
         });
         
         if (iframeData.length > 0) {

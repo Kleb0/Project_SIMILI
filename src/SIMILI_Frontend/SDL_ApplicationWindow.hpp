@@ -14,9 +14,10 @@
 #include <vector>
 #include <memory>
 #include <mutex>
+#include <atomic>
 
 #include "../../SIMILI_Frontend/viewportLogic/UIPanels/DataHolders.hpp"
-#include "viewportLogic/FrameDatas/FrameDatas.hpp"
+#include "viewportLogic/FrameDatas/IFrameDatas.hpp"
 #include "../../Engine/VulkanPipeline/VulkanPipeline.hpp"
 #include "viewportLogic/UIPanels/WorkspaceWidget.hpp"
 #include "viewportLogic/UIPanels/ContextualMenuAboveGui.hpp"
@@ -126,6 +127,14 @@ namespace SIMILI
 class SDL_ApplicationWindow
 {
 	public:
+		static SDL_ApplicationWindow* getInstance() { return s_instance_; }
+
+		bool isDrawingBoardActive() const { return is_drawing_board_active_; }
+		void setDrawingBoardActive(bool active);
+		void requestWorkspaceClear() { pending_workspace_clear_.store(true); }
+		void requestFrameResync()    { pending_frame_resync_.store(true); }
+		void requestPrepareForRedraw() { pending_prepare_for_redraw_.store(true); }
+
 		// === Lifecycle ===
 		SDL_ApplicationWindow();
 		~SDL_ApplicationWindow();
@@ -174,9 +183,9 @@ class SDL_ApplicationWindow
 		void setVKScene(VKScene* scene) { vk_scene_ = scene; }
 		void setVulkanPipelines(VulkanPipeline* pipelines);
 		VulkanPipeline* getVulkanPipelines() const { return vulkan_pipelines_; }
+
 		void setUIManager(SIMILI::Frontend::UIManager* manager) { ui_manager_ = manager; }
 		void setPanelResizingLogic(PanelResizingLogic* logic) { panel_resizing_logic_ = logic; }
-		void updateFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas);
 		void onCEFPaint(CefRenderHandler::PaintElementType type, const void* buffer, int width, int height);
 
 
@@ -271,7 +280,7 @@ class SDL_ApplicationWindow
 		VKScene* vk_scene_;
 		Camera* camera_;
 		CameraControl* camera_control_;
-		SIMILI::Frontend::FrameDatas* frame_datas_;
+		SIMILI::Frontend::IFrameDatas* frame_datas_;
 		SIMILI::Frontend::UIManager* ui_manager_;
 		PanelResizingLogic* panel_resizing_logic_;
 		App_Border* app_border_;
@@ -340,10 +349,14 @@ class SDL_ApplicationWindow
 		// === Panel Rendering Data ===
 		int prepared_drawable_width_;
 		int prepared_drawable_height_;
-		std::map<std::string, SIMILI::Frontend::IFrameScreenData> prepared_panel_frame_data_map_;
+		// std::map<std::string, SIMILI::Frontend::IFrameScreenData> prepared_panel_frame_data_map_;
 		bool prepared_skip_texture_rebuild_;
 		bool borders_set_for_init_;
 		bool pending_window_resize_sync_;
+		int last_border_left_;
+		int last_border_top_;
+		int last_border_width_;
+		int last_border_height_;
 
 		float pending_wheel_delta_;
 		bool prev_middle_button_down_;
@@ -417,6 +430,12 @@ class SDL_ApplicationWindow
 		VkCommandBuffer contextual_menu_command_buffer_;
 		bool contextual_menu_visible_;
 		void RenderContextualMenuAboveUI(int drawableW, int drawableH);
+
+		bool is_drawing_board_active_;
+		std::atomic<bool> pending_workspace_clear_;
+		std::atomic<bool> pending_frame_resync_;
+		std::atomic<bool> pending_prepare_for_redraw_;
+		static SDL_ApplicationWindow* s_instance_;
 
 		ThreeDMode * currentThreeDmode;
 };

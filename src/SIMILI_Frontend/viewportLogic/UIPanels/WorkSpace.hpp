@@ -1,6 +1,7 @@
 #pragma once
 
-#include "../FrameDatas/FrameDatas.hpp"
+#include "../FrameDatas/IFrameDatas.hpp"
+#include <vulkan/vulkan.h>
 #include <map>
 #include <string>
 
@@ -14,25 +15,30 @@ namespace SIMILI {
 			~WorkSpace() = default;
 
 			void computeFromPanels(
-				const std::map<std::string, IFrameScreenData>& panelMap,
 				int workSpaceBorderLeft, int workSpaceBorderTop,
 				int workSpaceBorderWidth, int workSpaceBorderHeight,
 				int splitterThickness = 0);
 
 			void set(int x, int y, int width, int height);
+			void setBounds(int left, int top, int right, int bottom);
 
-			int getX() const;
-			int getY() const;
-			int getWidth() const;
-			int getHeight() const;
+			// Renders a solid 2D canvas in the workspace area (for Drawing workspace).
+			void Render2DDrawingScreen(VkCommandBuffer commandBuffer, float dpiScale = 1.0f) const;
+
+			int getX() const;      // == left
+			int getY() const;      // == top
+			int getWidth() const;  // == right - left
+			int getHeight() const; // == bottom - top
+			int getRight() const;
+			int getBottom() const;
 
 			bool isValid() const;
 
 		private:
-			int x_;
-			int y_;
-			int width_;
-			int height_;
+			int left_;
+			int top_;
+			int right_;
+			int bottom_;
 		};
 
 	}

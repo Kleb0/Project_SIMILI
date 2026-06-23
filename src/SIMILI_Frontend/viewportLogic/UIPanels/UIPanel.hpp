@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../FrameDatas/FrameDatas.hpp"
+#include "../FrameDatas/IFrameDatas.hpp"
 #include "../../../Engine/VulkanPipeline/VulkanPipeline.hpp"
 #include "include/cef_browser.h"
 #include <SDL3/SDL.h>
@@ -27,13 +27,9 @@ class UIPanel
 
 		bool initialize(const std::string& panelName);
 		void shutdown();
-		void updateFromFrameData(const SIMILI::Frontend::IFrameScreenData& frameData, SDL_Window* window, bool skipTextureRebuild = false);
 		void PreventClippingForReducedandMaxizimizedWindows(WindowRenderState windowState);
-		void draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight);
-		void drawDataHolderOverlays(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight);
-
-		int getLogicalWidth()  const { return last_frame_width_; }
-		int getLogicalHeight() const { return last_frame_height_; }
+		void draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const SIMILI::Frontend::IFrameScreenData& frameData, SDL_Window* window, bool skipTextureRebuild, int appBorderLeft = 0, int appBorderTop = 0);
+		void drawDataHolderOverlays(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, int logicalW, int logicalH);
 
 		void setVKContext(VKContext* context);
 		void setRenderPass(VkRenderPass renderPass);
@@ -41,7 +37,6 @@ class UIPanel
 		void setCEFTexture(VkImageView view, VkSampler sampler, float u0, float v0, float u1, float v1);
 		void refreshCEFTextureBinding(VkImageView view, VkSampler sampler);	
 		void invalidateExternalTexture();		
-		void RedrawSelfTextureAtCorrectResolution(int width, int height);
 		bool makePanelTextureInteractible(int mouseX, int mouseY, bool isLeftButtonDown, bool isRightButtonDown, CefRefPtr<CefBrowser> browser, int cefTextureWidth, int cefTextureHeight);
 		const std::string& getName() const { return name_; }
 		DrawingState getDrawingState() const { return drawing_state_; }
@@ -57,6 +52,7 @@ class UIPanel
 		bool createVulkanVertexBuffer();
 		bool createVulkanDescriptorSet();
 		bool updateDescriptorTextureBinding();
+
 		uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
 		std::string name_;
@@ -65,22 +61,31 @@ class UIPanel
 		float red_;
 		float green_;
 		float blue_;
-		int x_;
-		int y_;
+
+		int horizontal_position_;
+		int vertical_position_;
 		int width_;
 		int height_;
-		int last_frame_x_;
-		int last_frame_y_;
-		int last_frame_width_;
-		int last_frame_height_;
+
 		float texcoord_left_;
 		float texcoord_top_;
 		float texcoord_right_;
 		float texcoord_bottom_;
+
 		bool initialized_;
 		bool has_valid_bounds_;
 		bool needs_redraw_;
 		bool first_draw_done_;
+
+
+
+		bool prevent_window_clipping_;
+		bool prev_left_button_down_;
+		bool prev_right_button_down_;
+		bool prev_mouse_inside_;
+		int prev_cef_mouse_x_;
+		int prev_cef_mouse_y_;		
+
 		DrawingState drawing_state_;
 		VKContext* vk_context_;
 		VulkanPipeline* vulkan_pipelines_;
@@ -97,10 +102,4 @@ class UIPanel
 		VkSampler external_sampler_;
 		VkImageView bound_texture_view_;
 		VkSampler bound_sampler_;
-		bool prevent_window_clipping_;
-		bool prev_left_button_down_;
-		bool prev_right_button_down_;
-		bool prev_mouse_inside_;
-		int prev_cef_mouse_x_;
-		int prev_cef_mouse_y_;
 };

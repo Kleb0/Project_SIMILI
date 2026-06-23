@@ -1,9 +1,9 @@
 #define NOMINMAX
 #include "PanelResizingLogic.hpp"
 #include "UIManager.hpp"
-#include "FrameDataCatcher.hpp"
 #include "../../SDL_ApplicationWindow.hpp"
-#include "FrameDatas.hpp"
+#include "IFrameDatas.hpp"
+#include "../../App_Border.hpp"
 #include "include/base/cef_callback.h"
 #include "include/wrapper/cef_closure_task.h"
 #include "include/cef_task.h"
@@ -15,7 +15,6 @@ PanelResizingLogic::PanelResizingLogic()
 	: ui_manager_(nullptr)
 	, sdl_window_(nullptr)
 	, frame_datas_(nullptr)
-	, frame_data_catcher_(nullptr)
 	, pending_deferred_layout_refresh_(false)
 {
 }
@@ -30,14 +29,9 @@ void PanelResizingLogic::setSDLWindow(SDL_ApplicationWindow* sdlWindow)
 	sdl_window_ = sdlWindow;
 }
 
-void PanelResizingLogic::setFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas)
+void PanelResizingLogic::setFrameDatas(SIMILI::Frontend::IFrameDatas* frameDatas)
 {
 	frame_datas_ = frameDatas;
-}
-
-void PanelResizingLogic::setFrameDataCatcher(FrameDataCatcher* catcher)
-{
-	frame_data_catcher_ = catcher;
 }
 
 void PanelResizingLogic::cacheUIPanelFrameDatas()
@@ -97,8 +91,13 @@ void PanelResizingLogic::cacheUIPanelFrameDatas()
 	}
 }
 
-void PanelResizingLogic::syncBrowserPanelLayoutFromCurrentFrames(WindowRenderState windowState, int currentWidth, int currentHeight, int referenceWidth, int referenceHeight)
+void PanelResizingLogic::syncBrowserPanelLayoutFromCurrentFrames(WindowRenderState windowState, int currentWidth, int currentHeight, int referenceWidth, int referenceHeight, bool suppressServerNotify)
 {
+	// =========================================================================
+	// PART 1: Layout Anchor Determination
+	// Identify Left-Column, Right-Column, and Bottom panels from geometries
+	// =========================================================================
+
 	if (!ui_manager_)
 	{
 		std::cout << "[PanelResizingLogic] syncBrowserPanelLayoutFromCurrentFrames: skipped, ui_manager_ is null" << std::endl;
@@ -115,7 +114,7 @@ void PanelResizingLogic::syncBrowserPanelLayoutFromCurrentFrames(WindowRenderSta
 
 	if (!CefCurrentlyOn(TID_UI))
 	{
-		CefPostTask(TID_UI, base::BindOnce(&PanelResizingLogic::syncBrowserPanelLayoutFromCurrentFrames, base::Unretained(this), windowState, currentWidth, currentHeight, referenceWidth, referenceHeight));
+		CefPostTask(TID_UI, base::BindOnce(&PanelResizingLogic::syncBrowserPanelLayoutFromCurrentFrames, base::Unretained(this), windowState, currentWidth, currentHeight, referenceWidth, referenceHeight, suppressServerNotify));
 		return;
 	}
 
@@ -139,84 +138,17 @@ void PanelResizingLogic::syncBrowserPanelLayoutFromCurrentFrames(WindowRenderSta
 		return;
 	}
 
-	const auto leftColumnIt = std::min_element(
-		iframeDataMap.begin(), iframeDataMap.end(),
-		[](const auto& lhs, const auto& rhs)
-		{
-			if (lhs.second.x != rhs.second.x)
-			{
-				return lhs.second.x < rhs.second.x;
-			}
-			return lhs.second.y < rhs.second.y;
-		});
-
-	const auto rightColumnIt = std::min_element(
-		iframeDataMap.begin(), iframeDataMap.end(),
-		[](const auto& lhs, const auto& rhs)
-		{
-			if (lhs.second.x != rhs.second.x)
-			{
-				return lhs.second.x > rhs.second.x;
-			}
-			return lhs.second.y < rhs.second.y;
-		});
-
-	const auto bottomPanelIt = std::max_element(
-		iframeDataMap.begin(), iframeDataMap.end(),
-		[](const auto& lhs, const auto& rhs)
-		{
-			if (lhs.second.width != rhs.second.width)
-			{
-				return lhs.second.width < rhs.second.width;
-			}
-			return lhs.second.y < rhs.second.y;
-		});
-
-	if (leftColumnIt == iframeDataMap.end() || rightColumnIt == iframeDataMap.end() || bottomPanelIt == iframeDataMap.end())
+	PanelLayoutBoundary boundary = findColumnsAndBoundaries(iframeDataMap);
+	if (boundary.bottomPanelName.empty())
 	{
-		std::cout << "[PanelResizingLogic] syncBrowserPanelLayoutFromCurrentFrames: skipped, unable to derive layout anchors" << std::endl;
+		std::cout << "[PanelResizingLogic] syncBrowserPanelLayoutFromCurrentFrames: skipped, no bottom panel found" << std::endl;
 		return;
 	}
 
-	int topRowHeight = 0;
-	for (const auto& pair : iframeDataMap)
-	{
-		if (pair.first == bottomPanelIt->first)
-		{
-			continue;
-		}
-		topRowHeight = (std::max)(topRowHeight, pair.second.height);
-	}
-
-	if (topRowHeight <= 0)
-	{
-		topRowHeight = leftColumnIt->second.height;
-	}
-
-	auto rightTopPanelIt = iframeDataMap.end();
-	auto rightBottomPanelIt = iframeDataMap.end();
-	for (auto it = iframeDataMap.begin(); it != iframeDataMap.end(); ++it)
-	{
-		if (it->first == bottomPanelIt->first)
-		{
-			continue;
-		}
-
-		if (it->second.x != rightColumnIt->second.x)
-		{
-			continue;
-		}
-
-		if (rightTopPanelIt == iframeDataMap.end() || it->second.y < rightTopPanelIt->second.y)
-		{
-			rightTopPanelIt = it;
-		}
-
-		if (rightBottomPanelIt == iframeDataMap.end() || it->second.y > rightBottomPanelIt->second.y)
-		{
-			rightBottomPanelIt = it;
-		}
-	}
+	// =========================================================================
+	// PART 2: Scale Factor and Sizing Calculation
+	// Apply DPI and render states to compute final element widths and heights
+	// =========================================================================
 
 	float scaleX = 1.0f;
 	float scaleY = 1.0f;
@@ -230,29 +162,14 @@ void PanelResizingLogic::syncBrowserPanelLayoutFromCurrentFrames(WindowRenderSta
 		}
 	}
 
-	auto selectorForPanel = [](const std::string& panelName)
-	{
-		std::string selector = panelName;
-		std::replace(selector.begin(), selector.end(), '_', '-');
-		return selector;
-	};
+	PanelDimensions dims = calculatePanelDimensions(
+		iframeDataMap, scaleX, scaleY, currentHeight, boundary.topRowHeight,
+		boundary.leftTopName, boundary.leftBottomName, boundary.rightTopName, boundary.rightBottomName, boundary.bottomPanelName, 30);
 
-	const std::string leftPanelSelector = selectorForPanel(leftColumnIt->first);
-	const std::string bottomPanelSelector = selectorForPanel(bottomPanelIt->first);
-	const std::string rightTopPanelSelector = (rightTopPanelIt != iframeDataMap.end()) ? selectorForPanel(rightTopPanelIt->first) : std::string();
-	const std::string rightBottomPanelSelector = (rightBottomPanelIt != iframeDataMap.end()) ? selectorForPanel(rightBottomPanelIt->first) : std::string();
-	const int leftWidth = leftColumnIt->second.width;
-	const int leftHeight = leftColumnIt->second.height;
-	const int rightWidth = rightColumnIt->second.width;
-	const int rightTopHeight = (rightTopPanelIt != iframeDataMap.end()) ? rightTopPanelIt->second.height : 0;
-	const int rightBottomHeight = (rightBottomPanelIt != iframeDataMap.end())
-		? ((rightTopPanelIt == iframeDataMap.end() || rightBottomPanelIt->first == rightTopPanelIt->first)
-			? topRowHeight
-			: std::max(1, topRowHeight - rightTopHeight))
-		: 0;
-	const int bottomHeight = (topRowHeight > 0)
-		? std::max(1, currentHeight - 30 - topRowHeight)
-		: bottomPanelIt->second.height;
+	// =========================================================================
+	// PART 3: JavaScript Block Construction & Execution
+	// Generate clean, inline flexbox style overlays applied to DOM
+	// =========================================================================
 
 	auto buildFixedWidthBlock = [](const char* elementName, int width)
 	{
@@ -301,7 +218,7 @@ void PanelResizingLogic::syncBrowserPanelLayoutFromCurrentFrames(WindowRenderSta
 		<< "const referenceHeight=" << referenceHeight << ";"
 		<< "const layoutScaleX=" << scaleX << ";"
 		<< "const layoutScaleY=" << scaleY << ";"
-		<< "const isInitState=" << (windowState == WindowRenderState::Init ? "true" : "false") << ";"
+		<< "const isInitState=" << ((windowState == WindowRenderState::Init && !suppressServerNotify) ? "true" : "false") << ";"
 		<< "const findPanelElement=function(selector){"
 		<< "return document.querySelector('.'+selector) || document.querySelector('.'+selector.replace(/-UI/g,'_UI'));"
 		<< "};"
@@ -337,18 +254,20 @@ void PanelResizingLogic::syncBrowserPanelLayoutFromCurrentFrames(WindowRenderSta
 		<< "const center=resetBox(document.querySelector('.center-section'));"
 		<< "const right=resetBox(document.querySelector('.right-section'));"
 		<< "const topRow=resetBox(document.querySelector('.top-row'));"
-		<< "const leftPanel=clampPanel('" << leftPanelSelector << "');"
-		<< "const rightTopPanel=" << (rightTopPanelSelector.empty() ? "null" : "clampPanel('" + rightTopPanelSelector + "')") << ";"
-		<< "const rightBottomPanel=" << (rightBottomPanelSelector.empty() ? "null" : "clampPanel('" + rightBottomPanelSelector + "')") << ";"
-		<< "const project=clampPanel('" << bottomPanelSelector << "');"
-		<< buildFixedWidthBlock("left", leftWidth)
+		<< "const leftTopPanel=" << (dims.leftTopSelector.empty() ? "null" : "clampPanel('" + dims.leftTopSelector + "')") << ";"
+		<< "const leftBottomPanel=" << (dims.leftBottomSelector.empty() ? "null" : "clampPanel('" + dims.leftBottomSelector + "')") << ";"
+		<< "const rightTopPanel=" << (dims.rightTopSelector.empty() ? "null" : "clampPanel('" + dims.rightTopSelector + "')") << ";"
+		<< "const rightBottomPanel=" << (dims.rightBottomSelector.empty() ? "null" : "clampPanel('" + dims.rightBottomSelector + "')") << ";"
+		<< "const project=clampPanel('" << dims.bottomSelector << "');"
+		<< buildFixedWidthBlock("left", dims.leftWidth)
 		<< "if(center){center.style.flex='1 1 auto';center.style.minWidth='0';center.style.overflow='hidden';}"
-		<< buildFixedWidthBlock("right", rightWidth)
-		<< buildFixedHeightBlock("topRow", topRowHeight)
-		<< buildFixedPanelBlock("leftPanel", leftWidth, leftHeight)
-		<< buildFixedPanelBlock("rightTopPanel", rightWidth, rightTopHeight)
-		<< buildFixedPanelBlock("rightBottomPanel", rightWidth, rightBottomHeight)
-		<< buildFixedHeightBlock("project", bottomHeight)
+		<< buildFixedWidthBlock("right", dims.rightWidth)
+		<< buildFixedHeightBlock("topRow", dims.topRowHeightScaled)
+		<< buildFixedPanelBlock("leftTopPanel", dims.leftWidth, dims.leftTopHeight)
+		<< buildFixedPanelBlock("leftBottomPanel", dims.leftWidth, dims.leftBottomHeight)
+		<< buildFixedPanelBlock("rightTopPanel", dims.rightWidth, dims.rightTopHeight)
+		<< buildFixedPanelBlock("rightBottomPanel", dims.rightWidth, dims.rightBottomHeight)
+		<< buildFixedHeightBlock("project", dims.bottomHeight)
 		<< "document.body.offsetHeight;"
 		<< "window.requestAnimationFrame(function(){"
 		<< "if(window.notifyViewportResize){window.notifyViewportResize();}"
@@ -422,111 +341,25 @@ void PanelResizingLogic::syncBrowserFullScreenPanelLayout(WindowRenderState wind
 		return;
 	}
 
-	auto selectorForPanel = [](const std::string& panelName)
+	PanelLayoutBoundary boundary = findColumnsAndBoundaries(iframeDataMap);
+	if (boundary.bottomPanelName.empty())
 	{
-		std::string selector = panelName;
-		std::replace(selector.begin(), selector.end(), '_', '-');
-		return selector;
-	};
-
-	const auto leftColumnIt = std::min_element(
-		iframeDataMap.begin(), iframeDataMap.end(),
-		[](const auto& lhs, const auto& rhs)
-		{
-			if (lhs.second.x != rhs.second.x)
-			{
-				return lhs.second.x < rhs.second.x;
-			}
-			return lhs.second.y < rhs.second.y;
-		});
-
-	const auto rightColumnIt = std::max_element(
-		iframeDataMap.begin(), iframeDataMap.end(),
-		[](const auto& lhs, const auto& rhs)
-		{
-			if (lhs.second.x != rhs.second.x)
-			{
-				return lhs.second.x < rhs.second.x;
-			}
-			return lhs.second.y < rhs.second.y;
-		});
-
-	const auto bottomPanelIt = std::max_element(
-		iframeDataMap.begin(), iframeDataMap.end(),
-		[](const auto& lhs, const auto& rhs)
-		{
-			if (lhs.second.width != rhs.second.width)
-			{
-				return lhs.second.width < rhs.second.width;
-			}
-			return lhs.second.x < rhs.second.x;
-		});
-
-	if (leftColumnIt == iframeDataMap.end() || rightColumnIt == iframeDataMap.end() || bottomPanelIt == iframeDataMap.end())
-	{
-		std::cout << "[PanelResizingLogic] syncBrowserFullScreenPanelLayout: skipped, unable to derive layout anchors" << std::endl;
+		std::cout << "[PanelResizingLogic] syncBrowserFullScreenPanelLayout: skipped, no bottom panel found" << std::endl;
 		return;
 	}
 
-	int topRowHeight = 0;
-	for (const auto& pair : iframeDataMap)
+	// For Fullscreen, layout frames are already at correct positions. No scaling required (use 1.0f)
+	PanelDimensions dims = calculatePanelDimensions(
+		iframeDataMap, 1.0f, 1.0f, currentHeight, boundary.topRowHeight,
+		boundary.leftTopName, boundary.leftBottomName, boundary.rightTopName, boundary.rightBottomName, boundary.bottomPanelName, scaledTopBarHeight);
+
 	{
-		if (pair.first == bottomPanelIt->first)
-		{
-			continue;
-		}
-		topRowHeight = std::max(topRowHeight, pair.second.height);
+		int wsX = dims.leftWidth;
+		int wsY = scaledTopBarHeight;
+		int wsW = (std::max)(1, currentWidth - dims.leftWidth - dims.rightWidth);
+		int wsH = (std::max)(1, currentHeight - scaledTopBarHeight - dims.bottomHeight);
+		Set_Workspace_Render_Borders(wsX, wsY, wsW, wsH);
 	}
-
-	if (topRowHeight <= 0)
-	{
-		topRowHeight = leftColumnIt->second.height;
-	}
-
-	auto rightTopPanelIt = iframeDataMap.end();
-	auto rightBottomPanelIt = iframeDataMap.end();
-
-	for (auto it = iframeDataMap.begin(); it != iframeDataMap.end(); ++it)
-	{
-		if (it->first == bottomPanelIt->first || it->first == leftColumnIt->first)
-		{
-			continue;
-		}
-
-		if (it->second.x != rightColumnIt->second.x)
-		{
-			continue;
-		}
-
-		if (rightTopPanelIt == iframeDataMap.end() || it->second.y < rightTopPanelIt->second.y)
-		{
-			rightTopPanelIt = it;
-		}
-
-		if (rightBottomPanelIt == iframeDataMap.end() || it->second.y > rightBottomPanelIt->second.y)
-		{
-			rightBottomPanelIt = it;
-		}
-	}
-
-	const std::string leftPanelSelector = selectorForPanel(leftColumnIt->first);
-	const std::string bottomPanelSelector = selectorForPanel(bottomPanelIt->first);
-	const std::string rightTopPanelSelector = (rightTopPanelIt != iframeDataMap.end()) ? selectorForPanel(rightTopPanelIt->first) : std::string();
-	const std::string rightBottomPanelSelector = (rightBottomPanelIt != iframeDataMap.end()) ? selectorForPanel(rightBottomPanelIt->first) : std::string();
-
-	const int fsLeftW = leftColumnIt->second.width;
-	const int fsLeftH = leftColumnIt->second.height;
-	const int fsRightW = rightColumnIt->second.width;
-	const int fsTopRowH = topRowHeight;
-	const int fsBottomH = (topRowHeight > 0)
-		? std::max(1, currentHeight - scaledTopBarHeight - topRowHeight)
-		: bottomPanelIt->second.height;
-	const int fsRightTopH = (rightTopPanelIt != iframeDataMap.end()) ? rightTopPanelIt->second.height : 0;
-	const int fsRightBottomH = (rightBottomPanelIt != iframeDataMap.end())
-		? ((rightTopPanelIt == iframeDataMap.end() || rightBottomPanelIt->first == rightTopPanelIt->first)
-			? fsTopRowH
-			: std::max(1, fsTopRowH - fsRightTopH))
-		: 0;
 
 	std::ostringstream script;
 	script
@@ -568,18 +401,20 @@ void PanelResizingLogic::syncBrowserFullScreenPanelLayout(WindowRenderState wind
 		<< "const center=resetBox(document.querySelector('.center-section'));"
 		<< "const right=resetBox(document.querySelector('.right-section'));"
 		<< "const topRow=resetBox(document.querySelector('.top-row'));"
-		<< "const leftPanel=clampPanel('" << leftPanelSelector << "');"
-		<< "const rightTopPanel=" << (rightTopPanelSelector.empty() ? "null" : "clampPanel('" + rightTopPanelSelector + "')") << ";"
-		<< "const rightBottomPanel=" << (rightBottomPanelSelector.empty() ? "null" : "clampPanel('" + rightBottomPanelSelector + "')") << ";"
-		<< "const project=clampPanel('" << bottomPanelSelector << "');"
-		<< "if(left){left.style.width='" << fsLeftW << "px';left.style.minWidth='" << fsLeftW << "px';left.style.maxWidth='" << fsLeftW << "px';left.style.flex='0 0 " << fsLeftW << "px';left.style.overflow='hidden';}"
+		<< "const leftTopPanel=" << (dims.leftTopSelector.empty() ? "null" : "clampPanel('" + dims.leftTopSelector + "')") << ";"
+		<< "const leftBottomPanel=" << (dims.leftBottomSelector.empty() ? "null" : "clampPanel('" + dims.leftBottomSelector + "')") << ";"
+		<< "const rightTopPanel=" << (dims.rightTopSelector.empty() ? "null" : "clampPanel('" + dims.rightTopSelector + "')") << ";"
+		<< "const rightBottomPanel=" << (dims.rightBottomSelector.empty() ? "null" : "clampPanel('" + dims.rightBottomSelector + "')") << ";"
+		<< "const project=clampPanel('" << dims.bottomSelector << "');"
+		<< "if(left){left.style.width='" << dims.leftWidth << "px';left.style.minWidth='" << dims.leftWidth << "px';left.style.maxWidth='" << dims.leftWidth << "px';left.style.flex='0 0 " << dims.leftWidth << "px';left.style.overflow='hidden';}"
 		<< "if(center){center.style.flex='1 1 auto';center.style.minWidth='0';center.style.overflow='hidden';}"
-		<< "if(right){right.style.width='" << fsRightW << "px';right.style.minWidth='" << fsRightW << "px';right.style.maxWidth='" << fsRightW << "px';right.style.flex='0 0 " << fsRightW << "px';right.style.overflow='hidden';}"
-		<< "if(topRow){topRow.style.height='" << fsTopRowH << "px';topRow.style.minHeight='" << fsTopRowH << "px';topRow.style.maxHeight='" << fsTopRowH << "px';topRow.style.flex='0 0 " << fsTopRowH << "px';topRow.style.overflow='hidden';}"
-		<< "if(leftPanel){leftPanel.style.width='" << fsLeftW << "px';leftPanel.style.height='" << fsLeftH << "px';leftPanel.style.minWidth='" << fsLeftW << "px';leftPanel.style.minHeight='" << fsLeftH << "px';leftPanel.style.maxWidth='" << fsLeftW << "px';leftPanel.style.maxHeight='" << fsLeftH << "px';leftPanel.style.flex='0 0 auto';}"
-		<< "if(rightTopPanel){rightTopPanel.style.width='" << fsRightW << "px';rightTopPanel.style.height='" << fsRightTopH << "px';rightTopPanel.style.minWidth='" << fsRightW << "px';rightTopPanel.style.minHeight='" << fsRightTopH << "px';rightTopPanel.style.maxWidth='" << fsRightW << "px';rightTopPanel.style.maxHeight='" << fsRightTopH << "px';rightTopPanel.style.flex='0 0 auto';}"
-		<< "if(rightBottomPanel){rightBottomPanel.style.width='" << fsRightW << "px';rightBottomPanel.style.height='" << fsRightBottomH << "px';rightBottomPanel.style.minWidth='" << fsRightW << "px';rightBottomPanel.style.minHeight='" << fsRightBottomH << "px';rightBottomPanel.style.maxWidth='" << fsRightW << "px';rightBottomPanel.style.maxHeight='" << fsRightBottomH << "px';rightBottomPanel.style.flex='0 0 auto';}"
-		<< "if(project){project.style.width='100%';project.style.minWidth='0';project.style.maxWidth='100%';project.style.alignSelf='stretch';project.style.height='" << fsBottomH << "px';project.style.minHeight='" << fsBottomH << "px';project.style.maxHeight='" << fsBottomH << "px';project.style.flex='0 0 " << fsBottomH << "px';}"
+		<< "if(right){right.style.width='" << dims.rightWidth << "px';right.style.minWidth='" << dims.rightWidth << "px';right.style.maxWidth='" << dims.rightWidth << "px';right.style.flex='0 0 " << dims.rightWidth << "px';right.style.overflow='hidden';}"
+		<< "if(topRow){topRow.style.height='" << dims.topRowHeightScaled << "px';topRow.style.minHeight='" << dims.topRowHeightScaled << "px';topRow.style.maxHeight='" << dims.topRowHeightScaled << "px';topRow.style.flex='0 0 " << dims.topRowHeightScaled << "px';topRow.style.overflow='hidden';}"
+		<< "if(leftTopPanel){leftTopPanel.style.width='" << dims.leftWidth << "px';leftTopPanel.style.height='" << dims.leftTopHeight << "px';leftTopPanel.style.minWidth='" << dims.leftWidth << "px';leftTopPanel.style.minHeight='" << dims.leftTopHeight << "px';leftTopPanel.style.maxWidth='" << dims.leftWidth << "px';leftTopPanel.style.maxHeight='" << dims.leftTopHeight << "px';leftTopPanel.style.flex='0 0 auto';}"
+		<< "if(leftBottomPanel){leftBottomPanel.style.width='" << dims.leftWidth << "px';leftBottomPanel.style.height='" << dims.leftBottomHeight << "px';leftBottomPanel.style.minWidth='" << dims.leftWidth << "px';leftBottomPanel.style.minHeight='" << dims.leftBottomHeight << "px';leftBottomPanel.style.maxWidth='" << dims.leftWidth << "px';leftBottomPanel.style.maxHeight='" << dims.leftBottomHeight << "px';leftBottomPanel.style.flex='0 0 auto';}"
+		<< "if(rightTopPanel){rightTopPanel.style.width='" << dims.rightWidth << "px';rightTopPanel.style.height='" << dims.rightTopHeight << "px';rightTopPanel.style.minWidth='" << dims.rightWidth << "px';rightTopPanel.style.minHeight='" << dims.rightTopHeight << "px';rightTopPanel.style.maxWidth='" << dims.rightWidth << "px';rightTopPanel.style.maxHeight='" << dims.rightTopHeight << "px';rightTopPanel.style.flex='0 0 auto';}"
+		<< "if(rightBottomPanel){rightBottomPanel.style.width='" << dims.rightWidth << "px';rightBottomPanel.style.height='" << dims.rightBottomHeight << "px';rightBottomPanel.style.minWidth='" << dims.rightWidth << "px';rightBottomPanel.style.minHeight='" << dims.rightBottomHeight << "px';rightBottomPanel.style.maxWidth='" << dims.rightWidth << "px';rightBottomPanel.style.maxHeight='" << dims.rightBottomHeight << "px';rightBottomPanel.style.flex='0 0 auto';}"
+		<< "if(project){project.style.width='100%';project.style.minWidth='0';project.style.maxWidth='100%';project.style.alignSelf='stretch';project.style.height='" << dims.bottomHeight << "px';project.style.minHeight='" << dims.bottomHeight << "px';project.style.maxHeight='" << dims.bottomHeight << "px';project.style.flex='0 0 " << dims.bottomHeight << "px';}"
 		<< "})();";
 
 	mainFrame->ExecuteJavaScript(script.str(), mainFrame->GetURL(), 0);
@@ -598,5 +433,192 @@ void PanelResizingLogic::finalizeDeferredLayoutRefresh(CefRefPtr<CefBrowser> del
 	if (delayedBrowser && delayedBrowser->GetHost())
 	{
 		delayedBrowser->GetHost()->Invalidate(PET_VIEW);
+	}
+}
+
+PanelResizingLogic::PanelDimensions PanelResizingLogic::calculatePanelDimensions(
+	const std::map<std::string, IFrameData>& iframeDataMap,
+	float scaleX,
+	float scaleY,
+	int currentHeight,
+	int topRowHeight,
+	const std::string& leftTopName,
+	const std::string& leftBottomName,
+	const std::string& rightTopName,
+	const std::string& rightBottomName,
+	const std::string& bottomPanelName,
+	int topBarHeight) const
+{
+	auto selectorForPanel = [](const std::string& panelName)
+	{
+		if (panelName.empty()) return std::string();
+		std::string selector = panelName;
+		std::replace(selector.begin(), selector.end(), '_', '-');
+		return selector;
+	};
+
+	PanelDimensions dims;
+
+	dims.leftTopSelector = selectorForPanel(leftTopName);
+	dims.leftBottomSelector = (leftBottomName != leftTopName) ? selectorForPanel(leftBottomName) : "";
+	dims.rightTopSelector = selectorForPanel(rightTopName);
+	dims.rightBottomSelector = (rightBottomName != rightTopName) ? selectorForPanel(rightBottomName) : "";
+	dims.bottomSelector = selectorForPanel(bottomPanelName);
+
+	// Left section dimensions
+	if (!leftTopName.empty() && iframeDataMap.count(leftTopName))
+	{
+		dims.leftWidth = static_cast<int>(std::round(iframeDataMap.at(leftTopName).width * scaleX));
+		dims.leftTopHeight = static_cast<int>(std::round(iframeDataMap.at(leftTopName).height * scaleY));
+	}
+	if (!dims.leftBottomSelector.empty() && iframeDataMap.count(leftBottomName))
+	{
+		dims.leftBottomHeight = static_cast<int>(std::round(iframeDataMap.at(leftBottomName).height * scaleY));
+	}
+
+	// Right section dimensions
+	if (!rightTopName.empty() && iframeDataMap.count(rightTopName))
+	{
+		dims.rightWidth = static_cast<int>(std::round(iframeDataMap.at(rightTopName).width * scaleX));
+		dims.rightTopHeight = static_cast<int>(std::round(iframeDataMap.at(rightTopName).height * scaleY));
+	}
+	if (!dims.rightBottomSelector.empty() && iframeDataMap.count(rightBottomName))
+	{
+		dims.rightBottomHeight = static_cast<int>(std::round(iframeDataMap.at(rightBottomName).height * scaleY));
+	}
+
+	// Global layouts heights
+	dims.topRowHeightScaled = static_cast<int>(std::round(topRowHeight * scaleY));
+	if (dims.topRowHeightScaled > 0)
+	{
+		dims.bottomHeight = (std::max)(1, currentHeight - topBarHeight - dims.topRowHeightScaled);
+	}
+	else if (!bottomPanelName.empty() && iframeDataMap.count(bottomPanelName))
+	{
+		dims.bottomHeight = static_cast<int>(std::round(iframeDataMap.at(bottomPanelName).height * scaleY));
+	}
+
+	return dims;
+}
+
+PanelResizingLogic::PanelLayoutBoundary PanelResizingLogic::findColumnsAndBoundaries(
+const std::map<std::string, IFrameData>& iframeDataMap) const
+{
+	PanelLayoutBoundary boundary;
+	boundary.minX = INT_MAX;
+	boundary.maxX = INT_MIN;
+	int maxBottomY = INT_MIN;
+
+	for (const auto& pair : iframeDataMap)
+	{
+		const std::string& name = pair.first;
+		const auto& data = pair.second;
+
+		if (data.x < boundary.minX) boundary.minX = data.x;
+		if (data.x > boundary.maxX) boundary.maxX = data.x;
+		if (data.y > maxBottomY)
+		{
+			maxBottomY = data.y;
+			boundary.bottomPanelName = name;
+		}
+	}
+
+	if (boundary.bottomPanelName.empty())
+	{
+		return boundary;
+	}
+
+	int leftTopY = INT_MAX;
+	int leftBottomY = INT_MIN;
+
+	int rightTopY = INT_MAX;
+	int rightBottomY = INT_MIN;
+
+	int topRowYStart = INT_MAX;
+	int topRowYEnd = INT_MIN;
+
+	for (const auto& pair : iframeDataMap)
+	{
+		const std::string& name = pair.first;
+		const auto& data = pair.second;
+
+		if (name == boundary.bottomPanelName)
+			continue;
+
+		// Track overall top row height span
+		if (data.y < topRowYStart) topRowYStart = data.y;
+		if (data.y + data.height > topRowYEnd) topRowYEnd = data.y + data.height;
+
+		// Left Column panels
+		if (data.x == boundary.minX)
+		{
+			if (data.y < leftTopY) { leftTopY = data.y; boundary.leftTopName = name; }
+			if (data.y > leftBottomY) { leftBottomY = data.y; boundary.leftBottomName = name; }
+		}
+
+		// Right Column panels
+		if (data.x == boundary.maxX)
+		{
+			if (data.y < rightTopY) { rightTopY = data.y; boundary.rightTopName = name; }
+			if (data.y > rightBottomY) { rightBottomY = data.y; boundary.rightBottomName = name; }
+		}
+	}
+
+	// Fallbacks if no side panels exist
+	if (boundary.leftTopName.empty()) boundary.leftTopName = boundary.leftBottomName;
+	if (boundary.rightTopName.empty()) boundary.rightTopName = boundary.rightBottomName;
+
+	// Calculate overall height of the top row (everything except bottom panel)
+	boundary.topRowHeight = (topRowYStart != INT_MAX && topRowYEnd > topRowYStart) ? (topRowYEnd - topRowYStart) : 0;
+	if (boundary.topRowHeight <= 0 && !boundary.leftTopName.empty() && iframeDataMap.count(boundary.leftTopName))
+	{
+		boundary.topRowHeight = iframeDataMap.at(boundary.leftTopName).height;
+	}
+
+	return boundary;
+}
+
+void PanelResizingLogic::Set_App_Borders(App_Border& App_Borders, SDL_Window* window, int borderLeft, int borderTop, int borderWidth, int borderHeight)
+{
+	border_left_ = borderLeft;
+	border_top_ = borderTop;
+	border_width_ = borderWidth;
+	border_height_ = borderHeight;
+
+	std::cout << "[PanelResizingLogic] : App Borders dimensions are " << " width : " << borderWidth << " | height : " << borderHeight  << std::endl;
+
+}
+
+void PanelResizingLogic::Set_Workspace_Render_Borders(int x, int y, int width, int height)
+{
+	workspace_x_ = x;
+	workspace_y_ = y;
+	workspace_width_ = width;
+	workspace_height_ = height;
+
+	if (ui_manager_)
+	{
+		ui_manager_->setWorkSpace(x, y, width, height);
+	}
+}
+
+void PanelResizingLogic::Redraw_Inside_App_Borders(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, bool skipTextureRebuild, SDL_Window* window, int referenceWidth, int referenceHeight)
+{
+	if (!ui_manager_)
+	{
+		return;
+	}
+
+	ui_manager_->setBorders(border_left_, border_top_, border_width_, border_height_);
+
+	if (ui_manager_->isWindowMaximized())
+	{
+		ui_manager_->renderFullScreenUIPanelsInsideBorders(commandBuffer, drawableWidth, drawableHeight, skipTextureRebuild, window);
+	}
+	else
+	{
+		auto panelFrameDataMap = ui_manager_->getUIPanelFrameDatas();
+		ui_manager_->drawReduceScreenUIpanelsInsideBorders(commandBuffer, drawableWidth, drawableHeight,
+			panelFrameDataMap, skipTextureRebuild, window, referenceWidth, referenceHeight);
 	}
 }

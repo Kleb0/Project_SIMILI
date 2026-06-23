@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Layer Menu</title>
+    <style>
+        body {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 10px;
+            box-sizing: border-box;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #1abc9c;
+        }
+        .layers-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .layer-item {
+            background-color: #2d2d2d;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 8px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .layer-item:hover, .layer-item.active {
+            background-color: #353535;
+            border-color: #1abc9c;
+        }
+        .layer-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .layer-visibility {
+            cursor: pointer;
+            color: #888;
+        }
+        .layer-visibility.visible {
+            color: #1abc9c;
+        }
+        .btn-add-layer {
+            background-color: #1abc9c;
+            color: white;
+            border: none;
+            padding: 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+            text-align: center;
+        }
+        .btn-add-layer:hover {
+            background-color: #16a085;
+        }
+    </style>
+</head>
+<body>
+    <h3>Layers</h3>
+    <div class="layers-list">
+        <div class="layer-item active">
+            <div class="layer-info">
+                <span class="layer-visibility visible">👁</span>
+                <span>HUD Layer</span>
+            </div>
+            <span style="opacity: 0.5;">Normal</span>
+        </div>
+        <div class="layer-item">
+            <div class="layer-info">
+                <span class="layer-visibility visible">👁</span>
+                <span>Entities</span>
+            </div>
+            <span style="opacity: 0.5;">Normal</span>
+        </div>
+        <div class="layer-item">
+            <div class="layer-info">
+                <span class="layer-visibility visible">👁</span>
+                <span>Background</span>
+            </div>
+            <span style="opacity: 0.5;">Multiply</span>
+        </div>
+    </div>
+    <button class="btn-add-layer">+ Add New Layer</button>
+</body>
+</html>

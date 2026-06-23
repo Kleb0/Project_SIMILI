@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../FrameDatas/FrameDatas.hpp"
+#include "../FrameDatas/IFrameDatas.hpp"
 #include "../../ThreadSafeIFrameMap.hpp"
 #include "WorkSpace.hpp"
 #include <SDL3/SDL.h>
@@ -93,7 +93,7 @@ namespace SIMILI
 			WorkspaceBottom
 		};
 
-		struct MapData
+		struct dataMap
 		{
 			std::map<std::string, PanelMapEntry>  panels;
 			std::vector<SplitterDefinition> splitters;
@@ -135,12 +135,14 @@ namespace SIMILI
 					int appBorderWidth, int appBorderHeight);
 
 				void clearUIPanels(std::map<std::string, std::unique_ptr<class UIPanel>>& uiPanels);
+				void Clear_Everything();
+				void CreateNewMapFromSwitchCall(const std::map<std::string, IFrameScreenData>& panels);
 
 				void buildMapData(const std::map<std::string, IFrameScreenData>& frameDataMap,
 					std::vector<SplitterDefinition>& splitterList,
 					int currentWindowWidth);
 
-				const MapData& getMapData() const;
+				const dataMap& getMapData() const;
 
 				std::map<std::string, IFrameData> buildIFrameDataMap(const std::map<std::string, IFrameScreenData>& frameDataMap) const;
 
@@ -149,6 +151,7 @@ namespace SIMILI
 					WindowRenderState currentWindowState);
 
 				const WorkSpace& getWorkSpace() const;
+				void setWorkSpace(int x, int y, int width, int height);
 
 				void updateWorkSpaceFromSplitters(const std::vector<SplitterDefinition>& splitterList, int windowWidth, int windowHeight);
 
@@ -188,7 +191,7 @@ namespace SIMILI
 					const std::map<std::string, IFrameScreenData>& frameDataMap,
 					int borderLeft, int borderTop, int borderRight, int borderBottom) const;
 
-				MapData map_data_;
+				dataMap map_data_;
 				WorkSpace workspace_;
 				std::map<std::string, std::string> splitter_id_registry_;
 		};

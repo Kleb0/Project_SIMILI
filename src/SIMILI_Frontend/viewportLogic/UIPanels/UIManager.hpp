@@ -6,7 +6,7 @@
 #include "PanelMapBuilder.hpp"
 #include "Splitter.hpp"
 #include "SplitterMouseMecanic.hpp"
-#include "FrameDatas/FrameDatas.hpp"
+#include "FrameDatas/IFrameDatas.hpp"
 #include "include/cef_browser.h"
 #include <map>
 #include <string>
@@ -54,8 +54,9 @@ namespace SIMILI {
 
 			void initializeDefaultUIPanels();
 			void updateUIPanelIFrames(const std::map<std::string, IFrameData>& iframeDataMap);
-			void cacheUIPanelFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas, const std::map<std::string, IFrameScreenData>& splitterFrameDataMap);
-			void syncFrameDatas(SIMILI::Frontend::FrameDatas* frameDatas, SDL_Window* sdlWindow);
+			void CreateNewMapFromSwitchCall(const std::map<std::string, IFrameData>& panels);
+			void cacheUIPanelFrameDatas(SIMILI::Frontend::IFrameDatas* frameDatas, const std::map<std::string, IFrameScreenData>& splitterFrameDataMap);
+			void syncFrameDatas(SIMILI::Frontend::IFrameDatas* frameDatas, SDL_Window* sdlWindow);
 
 			void prepareUiPanelsForFullscreen(int drawableWidth, int drawableHeight, const std::map<std::string, IFrameScreenData>& panelFrameDataMap, SDL_Window* window, int referenceWindowWidth, int referenceWindowHeight);			
 			void renderFullScreenUIPanelsInsideBorders(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, bool skipTextureRebuild, SDL_Window* window);
@@ -82,12 +83,12 @@ namespace SIMILI {
 			void ScaleDownPanels(int initWidth, int initHeight);
 			
 			void setCEFTextureForAllPanels(VkImageView view, VkSampler sampler, int cefWidth, int cefHeight);
-			void invalidateCEFTexture();
 			bool consumePendingCEFRepaintRequest();
 			void requestPendingCEFRepaint();
 			void refreshPanelTextureLayout(bool requestCEFRepaint = false);
 		
 			void clearUIPanels();
+			void Clear_Everything();
 
 			void forwardMouseEventsToPanels(int mouseX, int mouseY, bool isLeftButtonDown, bool isRightButtonDown, CefRefPtr<CefBrowser> browser);
 
@@ -95,6 +96,7 @@ namespace SIMILI {
 			std::map<std::string, IFrameData> getResolvedUIPanelIFrames() const;
 			std::map<std::string, IFrameScreenData> getUIPanelFrameDatas() const;
 			const WorkSpace& getWorkSpace() const;
+			void setWorkSpace(int x, int y, int width, int height);
 		
 		private:
 			void applyPanelTextureLayout(bool requestCEFRepaint = false);

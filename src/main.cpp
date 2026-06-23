@@ -3,7 +3,7 @@
 #include "include/cef_sandbox_win.h"
 #include "SIMILI_Frontend/viewportLogic/UIPanels/UIManager.hpp"
 #include "SIMILI_Frontend/SDL_ApplicationWindow.hpp"
-#include "SIMILI_Frontend/viewportLogic/FrameDatas/FrameDatas.hpp"
+#include "SIMILI_Frontend/viewportLogic/FrameDatas/IFrameDatas.hpp"
 #include "SIMILI_Frontend/viewportLogic/UIPanels/FrameDataCatcher.hpp"
 #include "SIMILI_Frontend/viewportLogic/UIPanels/DataHolders.hpp"
 #include "SIMILI_Frontend/viewportLogic/UIPanels/PanelResizingLogic.hpp"
@@ -188,7 +188,7 @@ int main(int argc, char* argv[])
 	dataHolders.initPlaceholderValues();
 	std::cout << "[Main] DataHolders created and set " << std::endl;
 
-	auto* frameDatas = new SIMILI::Frontend::FrameDatas(&frameCatcher);
+	auto* frameDatas = new SIMILI::Frontend::IFrameDatas(&frameCatcher);
 	mainWindow.updateFrameDatas(frameDatas);
 	std::cout << "[Main] FrameDatas created and linked to FrameDataCatcher" << std::endl;
 

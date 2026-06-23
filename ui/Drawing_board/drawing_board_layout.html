@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drawing Board Workspace</title>
+    <link rel="stylesheet" href="http://localhost:8080/ui/main_layout.css">
+    <style>
+        /* Layout:
+           Row 1: Top Bar (full width)
+           Row 2: [Left: Drawed Sprites (top) / Color Wheel (bottom)] [Center: 2D Canvas (Vulkan)] [Right: Layer Menu (top) / Tilemap Builder (bottom)]
+           Row 3: Project Viewer (full width)
+        */
+        .top-row {
+            display: flex;
+            flex-direction: row;
+            flex: 1;
+            overflow: hidden;
+        }
+        .left-section {
+            display: flex;
+            flex-direction: column;
+            width: 20%;
+            min-width: 180px;
+        }
+        /* Center section: intentionally empty — Vulkan Render2DDrawingScreen fills this area */
+        .center-section {
+            flex: 1;
+            background-color: transparent;
+            /* No iframe — this gap is the 2D drawing canvas */
+        }
+        .right-section {
+            display: flex;
+            flex-direction: column;
+            width: 25%;
+            min-width: 200px;
+        }
+        .drawed-sprites-panel {
+            flex: 1;
+            background-color: #121212;
+        }
+        .color-wheel-panel {
+            flex: 1;
+        }
+        .layer-menu-panel {
+            flex: 1;
+        }
+        .tilemap-builder-panel {
+            flex: 1.2;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Top Bar -->
+        <div class="top-bar-panel">
+            <iframe src="http://localhost:8080/ui/Top_Bar.html"></iframe>
+        </div>
+
+        <!-- Middle Row: Left | Center canvas | Right -->
+        <div class="top-row">
+            <!-- Left Section: Drawed Sprites (top) + Color Wheel (bottom) -->
+            <div class="left-section">
+                <div class="panel drawed-sprites-panel">
+                    <iframe src="http://localhost:8080/ui/Drawing_board/Drawed_sprites.html"></iframe>
+                </div>
+                <div class="panel color-wheel-panel">
+                    <iframe src="http://localhost:8080/ui/Drawing_board/Color_Wheel.html"></iframe>
+                </div>
+            </div>
+
+            <!-- Center Section: empty gap — filled by Vulkan Render2DDrawingScreen -->
+            <div class="center-section"></div>
+
+            <!-- Right Section: Layer Menu (top) + Tilemap Builder (bottom) -->
+            <div class="right-section">
+                <div class="panel layer-menu-panel">
+                    <iframe src="http://localhost:8080/ui/Drawing_board/Layer_Menu.html"></iframe>
+                </div>
+                <div class="panel tilemap-builder-panel">
+                    <iframe src="http://localhost:8080/ui/Drawing_board/Tilemap_builder.html"></iframe>
+                </div>
+            </div>
+        </div>
+
+        <!-- Project Viewer (full width at bottom) -->
+        <div class="panel project-viewer-panel">
+            <iframe src="http://localhost:8080/ui/project_viewer.html"></iframe>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="http://localhost:8080/ui/layout_resizer.js"></script>
+    <script src="http://localhost:8080/ui/main_layout_manager.js"></script>
+</body>
+</html>

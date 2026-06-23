@@ -716,7 +716,250 @@ namespace SIMILI {
 
 			return resp;
 		}, "Get all UI panel iframes");
-		
+
+		router.post("/api/uipanels/clear", [frameCatcher, uiManager](const Message& msg) -> Response
+		{
+			Response resp;
+			resp.headers["Access-Control-Allow-Origin"] = "*";
+			resp.headers["Content-Type"] = "application/json";
+
+			std::cout << "[RoutesManager] /api/uipanels/clear endpoint called" << std::endl;
+
+			if (frameCatcher)
+			{
+				auto temp = frameCatcher->iframe_data_map_.snapshot();
+				frameCatcher->iframe_data_map_.clear();
+				if (temp.find("project_viewer_panel") != temp.end())
+				{
+					frameCatcher->iframe_data_map_["project_viewer_panel"] = temp["project_viewer_panel"];
+				}
+			}
+			
+			if (FrameDataCatcher* catcher = FrameDataCatcher::getInstance())
+			{
+				auto temp = catcher->iframe_data_map_.snapshot();
+				catcher->iframe_data_map_.clear();
+				if (temp.find("project_viewer_panel") != temp.end())
+				{
+					catcher->iframe_data_map_["project_viewer_panel"] = temp["project_viewer_panel"];
+				}
+			}
+
+			if (uiManager)
+			{
+				uiManager->clearUIPanels();
+			}
+
+			resp.statusCode = 200;
+			resp.statusMessage = "OK";
+			resp.body = "{\"success\": true}";
+			return resp;
+		}, "Clear all UI panels");
+
+		router.post("/api/workspace/set", [frameCatcher, uiManager](const Message& msg) -> Response
+		{
+			Response resp;
+			resp.headers["Access-Control-Allow-Origin"] = "*";
+			resp.headers["Content-Type"] = "application/json";
+
+			std::cout << "[RoutesManager] /api/workspace/set endpoint called: " << msg.body << std::endl;
+
+			try
+			{
+				json requestData = json::parse(msg.body);
+				if (requestData.contains("workspace"))
+				{
+					std::string workspace = requestData["workspace"];
+					bool isDrawing = (workspace == "drawing");
+
+					if (isDrawing)
+					{
+						// Request a deferred clear on the render thread to avoid Vulkan threading violations
+						if (frameCatcher)
+						{
+							frameCatcher->iframe_data_map_.clear();
+						}
+						if (FrameDataCatcher* c = FrameDataCatcher::getInstance())
+						{
+							c->iframe_data_map_.clear();
+						}
+						if (SDL_ApplicationWindow* win = SDL_ApplicationWindow::getInstance())
+						{
+							win->requestWorkspaceClear();
+						}
+					}
+					
+					if (SDL_ApplicationWindow* win = SDL_ApplicationWindow::getInstance())
+					{
+						win->setDrawingBoardActive(isDrawing);
+					}
+				}
+				resp.statusCode = 200;
+				resp.statusMessage = "OK";
+				resp.body = "{\"success\": true}";
+			}
+			catch (const std::exception& e)
+			{
+				resp.statusCode = 500;
+				resp.statusMessage = "Internal Server Error";
+				resp.body = "{\"success\": false, \"error\": \"" + std::string(e.what()) + "\"}";
+			}
+			return resp;
+		}, "Set active workspace");
+
+		router.post("/api/Endpoint/ThreeDScenePanels", [frameCatcher, uiManager](const Message& msg) -> Response
+		{
+			Response resp;
+			resp.headers["Access-Control-Allow-Origin"] = "*";
+			resp.headers["Content-Type"] = "application/json";
+
+			std::cout << "[RoutesManager] /api/Endpoint/ThreeDScenePanels called with " << msg.body.size() << " bytes" << std::endl;
+
+			try
+			{
+				json requestData = json::parse(msg.body);
+				if (!requestData.contains("iframes") || !requestData["iframes"].is_array())
+				{
+					resp.statusCode = 400;
+					resp.statusMessage = "Bad Request";
+					resp.body = "{\"success\": false, \"error\": \"Missing or invalid 'iframes' array\"}";
+					return resp;
+				}
+
+				const int MIN_DIM = 10;
+				for (const auto& iframe : requestData["iframes"])
+				{
+					if (!iframe.contains("name") || !iframe.contains("x") || !iframe.contains("y") ||
+						!iframe.contains("width") || !iframe.contains("height"))
+						continue;
+
+					std::string name = iframe["name"];
+					if (name == "viewport_panel") continue;
+					int w = iframe["width"]; int h = iframe["height"];
+					if (w < MIN_DIM || h < MIN_DIM) continue;
+
+					IFrameData data;
+					data.name = name;
+					data.x = iframe["x"]; data.y = iframe["y"];
+					data.width = w; data.height = h;
+					data.clientX = iframe.contains("clientX") ? iframe["clientX"].get<int>() : data.x;
+					data.clientY = iframe.contains("clientY") ? iframe["clientY"].get<int>() : data.y;
+					data.layoutIndex = iframe.contains("layoutIndex") ? iframe["layoutIndex"].get<int>() : 0;
+
+					if (frameCatcher) frameCatcher->iframe_data_map_[name] = data;
+					if (FrameDataCatcher* c = FrameDataCatcher::getInstance()) c->iframe_data_map_[name] = data;
+				}
+
+				resp.statusCode = 200;
+				resp.statusMessage = "OK";
+				resp.body = "{\"success\": true}";
+			}
+			catch (const std::exception& e)
+			{
+				resp.statusCode = 500;
+				resp.statusMessage = "Internal Server Error";
+				resp.body = std::string("{\"success\": false, \"error\": \"") + e.what() + "\"}";
+			}
+			return resp;
+		}, "Receive 3D scene panel layout from main_layout.html");
+
+		router.post("/api/Endpoint/DrawingScreenPanels", [frameCatcher, uiManager](const Message& msg) -> Response
+		{
+			Response resp;
+			resp.headers["Access-Control-Allow-Origin"] = "*";
+			resp.headers["Content-Type"] = "application/json";
+
+			std::cout << "[RoutesManager] /api/Endpoint/DrawingScreenPanels called with " << msg.body.size() << " bytes" << std::endl;
+
+			try
+			{
+				json requestData = json::parse(msg.body);
+				if (!requestData.contains("iframes") || !requestData["iframes"].is_array())
+				{
+					resp.statusCode = 400;
+					resp.statusMessage = "Bad Request";
+					resp.body = "{\"success\": false, \"error\": \"Missing or invalid 'iframes' array\"}";
+					return resp;
+				}
+
+				// Accept all panels from the drawing workspace
+				std::map<std::string, IFrameData> panelMap;
+				const int MIN_DIM = 10;
+				for (const auto& iframe : requestData["iframes"])
+				{
+					if (!iframe.contains("name") || !iframe.contains("x") || !iframe.contains("y") ||
+						!iframe.contains("width") || !iframe.contains("height"))
+						continue;
+
+					std::string name = iframe["name"];
+					int w = iframe["width"]; int h = iframe["height"];
+					if (w < MIN_DIM || h < MIN_DIM) continue;
+
+					IFrameData data;
+					data.name = name;
+					data.x = iframe["x"]; data.y = iframe["y"];
+					data.width = w; data.height = h;
+					data.clientX = iframe.contains("clientX") ? iframe["clientX"].get<int>() : data.x;
+					data.clientY = iframe.contains("clientY") ? iframe["clientY"].get<int>() : data.y;
+					data.layoutIndex = iframe.contains("layoutIndex") ? iframe["layoutIndex"].get<int>() : 0;
+
+					panelMap[name] = data;
+					if (frameCatcher) frameCatcher->iframe_data_map_[name] = data;
+					if (FrameDataCatcher* c = FrameDataCatcher::getInstance()) c->iframe_data_map_[name] = data;
+				}
+
+				// Build a fresh panel map for the drawing workspace
+				if (uiManager && !panelMap.empty())
+				{
+					uiManager->CreateNewMapFromSwitchCall(panelMap);
+				}
+
+				// Signal render thread to pick up the new frame data
+				if (SDL_ApplicationWindow* win = SDL_ApplicationWindow::getInstance())
+				{
+					win->requestFrameResync();
+				}
+
+				resp.statusCode = 200;
+				resp.statusMessage = "OK";
+				resp.body = "{\"success\": true}";
+			}
+			catch (const std::exception& e)
+			{
+				resp.statusCode = 500;
+				resp.statusMessage = "Internal Server Error";
+				resp.body = std::string("{\"success\": false, \"error\": \"") + e.what() + "\"}";
+			}
+			return resp;
+		}, "Receive drawing workspace panel layout");
+
+		router.post("/api/Endpoint/WorkspaceClear", [frameCatcher, uiManager](const Message& msg) -> Response
+		{
+			Response resp;
+			resp.headers["Access-Control-Allow-Origin"] = "*";
+			resp.headers["Content-Type"] = "application/json";
+
+			std::cout << "[RoutesManager] /api/Endpoint/WorkspaceClear called" << std::endl;
+
+			if (frameCatcher)
+			{
+				frameCatcher->iframe_data_map_.clear();
+			}
+			if (FrameDataCatcher* c = FrameDataCatcher::getInstance())
+			{
+				c->iframe_data_map_.clear();
+			}
+			if (uiManager)
+			{
+				uiManager->Clear_Everything();
+			}
+
+			resp.statusCode = 200;
+			resp.statusMessage = "OK";
+			resp.body = "{\"success\": true}";
+			return resp;
+		}, "Clear all panels and workspace before switching layout");
+
 		std::cout << "[RoutesManager] IFrame routes registered" << std::endl;
 
 			// Route: receive field bounding rects from object_inspector iframe

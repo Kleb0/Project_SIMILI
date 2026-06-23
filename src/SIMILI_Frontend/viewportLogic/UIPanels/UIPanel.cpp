@@ -15,14 +15,10 @@ UIPanel::UIPanel()
 	: red_(0.0f)
 	, green_(0.0f)
 	, blue_(0.0f)
-	, x_(0)
-	, y_(0)
+	, horizontal_position_(0)
+	, vertical_position_(0)
 	, width_(0)
 	, height_(0)
-	, last_frame_x_(-1)
-	, last_frame_y_(-1)
-	, last_frame_width_(-1)
-	, last_frame_height_(-1)
 	, texcoord_left_(0.0f)
 	, texcoord_top_(0.0f)
 	, texcoord_right_(1.0f)
@@ -95,121 +91,10 @@ void UIPanel::shutdown()
 	bound_texture_view_ = VK_NULL_HANDLE;
 	bound_sampler_ = VK_NULL_HANDLE;
 	prevent_window_clipping_ = false;
-	last_frame_x_ = 0;
-	last_frame_y_ = 0;
-	last_frame_width_ = 0;
-	last_frame_height_ = 0;
 	texcoord_left_ = 0.0f;
 	texcoord_top_ = 0.0f;
 	texcoord_right_ = 1.0f;
 	texcoord_bottom_ = 1.0f;
-}
-
-void UIPanel::updateFromFrameData(const SIMILI::Frontend::IFrameScreenData& frameData, SDL_Window* window, bool skipTextureRebuild)
-{
-	if (!window)
-	{
-		has_valid_bounds_ = false;
-		return;
-	}
-
-	int logicalWindowWidth = 0;
-	int logicalWindowHeight = 0;
-	int drawableWidth = 0;
-	int drawableHeight = 0;
-	SDL_GetWindowSize(window, &logicalWindowWidth, &logicalWindowHeight);
-	SDL_GetWindowSizeInPixels(window, &drawableWidth, &drawableHeight);
-
-	if (logicalWindowWidth <= 0 || logicalWindowHeight <= 0 || drawableWidth <= 0 || drawableHeight <= 0)
-	{
-		has_valid_bounds_ = false;
-		return;
-	}
-
-	const int MIN_FRAME_DIMENSION = 10;
-	if (frameData.width < MIN_FRAME_DIMENSION || frameData.height < MIN_FRAME_DIMENSION)
-	{
-		static int skip_count = 0;
-		has_valid_bounds_ = false;
-		return;
-	}
-
-	float scaleX = static_cast<float>(drawableWidth) / static_cast<float>(logicalWindowWidth);
-	float scaleY = static_cast<float>(drawableHeight) / static_cast<float>(logicalWindowHeight);
-
-	x_ = static_cast<int>(std::lround(static_cast<float>(frameData.relativeX) * scaleX));
-	y_ = static_cast<int>(std::lround(static_cast<float>(frameData.relativeY) * scaleY));
-	width_ = static_cast<int>(std::lround(static_cast<float>(frameData.width) * scaleX));
-	height_ = static_cast<int>(std::lround(static_cast<float>(frameData.height) * scaleY));
-
-
-	if (x_ < 0)
-	{
-		width_ += x_;
-		x_ = 0;
-		if (width_ < 1)
-		{
-			width_ = 1;
-		}
-	}
-
-	if (y_ < 0)
-	{
-		height_ += y_;
-		y_ = 0;
-		if (height_ < 1)
-		{
-			height_ = 1;
-		}
-	}
-
-	if (!prevent_window_clipping_ && x_ + width_ > drawableWidth)
-	{
-		width_ = (std::max)(1, drawableWidth - x_);
-	}
-
-	if (!prevent_window_clipping_ && y_ + height_ > drawableHeight)
-	{
-		height_ = (std::max)(1, drawableHeight - y_);
-	}
-
-	has_valid_bounds_ = width_ > 0 && height_ > 0;
-
-	const bool frameGeometryChanged =
-		frameData.relativeX != last_frame_x_ || frameData.relativeY != last_frame_y_ ||
-		frameData.width != last_frame_width_ || frameData.height != last_frame_height_;
-
-	if (frameGeometryChanged)
-	{
-		last_frame_x_ = frameData.relativeX;
-		last_frame_y_ = frameData.relativeY;
-		last_frame_width_ = frameData.width;
-		last_frame_height_ = frameData.height;
-		needs_redraw_ = true;
-	}
-
-	const bool hasNoTexture = (external_texture_view_ == VK_NULL_HANDLE);
-
-	if (!has_valid_bounds_)
-	{
-		drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
-		return;
-	}
-
-	if (!skipTextureRebuild)
-	{
-		if (frameGeometryChanged || hasNoTexture)
-			needs_redraw_ = true;
-	}
-
-	if (has_valid_bounds_ && shared_pipeline_ && vk_vertex_buffer_ != VK_NULL_HANDLE)
-	{
-		if (drawing_state_ == DrawingState::IsNotReadyToBeDrawn)
-		{
-			drawing_state_ = DrawingState::IsReadyToBeDrawn;
-			needs_redraw_ = true;
-		}
-	}
 }
 
 void UIPanel::PreventClippingForReducedandMaxizimizedWindows(WindowRenderState windowState)
@@ -250,11 +135,117 @@ void UIPanel::PreventClippingForReducedandMaxizimizedWindows(WindowRenderState w
 	bound_sampler_ = VK_NULL_HANDLE;
 }
 
-void UIPanel::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight)
+void UIPanel::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, const SIMILI::Frontend::IFrameScreenData& frameData, SDL_Window* window, bool skipTextureRebuild, int appBorderLeft, int appBorderTop)
 {
 	if (commandBuffer == VK_NULL_HANDLE)
 	{
 		return;
+	}
+
+	if (window)
+	{
+		int logicalWindowWidth = 0;
+		int logicalWindowHeight = 0;
+		SDL_GetWindowSize(window, &logicalWindowWidth, &logicalWindowHeight);
+
+		if (logicalWindowWidth > 0 && logicalWindowHeight > 0 && drawableWidth > 0 && drawableHeight > 0)
+		{
+			const int MIN_FRAME_DIMENSION = 10;
+			if (frameData.width < MIN_FRAME_DIMENSION || frameData.height < MIN_FRAME_DIMENSION)
+			{
+				has_valid_bounds_ = false;
+			}
+			else
+			{
+				float scaleX = static_cast<float>(drawableWidth) / static_cast<float>(logicalWindowWidth);
+				float scaleY = static_cast<float>(drawableHeight) / static_cast<float>(logicalWindowHeight);
+
+				int new_h_pos = static_cast<int>(std::lround(static_cast<float>(frameData.relativeX) * scaleX));
+				int new_v_pos = static_cast<int>(std::lround(static_cast<float>(frameData.relativeY) * scaleY));
+				int new_w = static_cast<int>(std::lround(static_cast<float>(frameData.width) * scaleX));
+				int new_h = static_cast<int>(std::lround(static_cast<float>(frameData.height) * scaleY));
+
+				if (new_h_pos < 0)
+				{
+					new_w += new_h_pos;
+					new_h_pos = 0;
+					if (new_w < 1)
+					{
+						new_w = 1;
+					}
+				}
+
+				if (new_v_pos < 0)
+				{
+					new_h += new_v_pos;
+					new_v_pos = 0;
+					if (new_h < 1)
+					{
+						new_h = 1;
+					}
+				}
+
+				if (!prevent_window_clipping_ && new_h_pos + new_w > drawableWidth)
+				{
+					new_w = (std::max)(1, drawableWidth - new_h_pos);
+				}
+
+				if (!prevent_window_clipping_ && new_v_pos + new_h > drawableHeight)
+				{
+					new_h = (std::max)(1, drawableHeight - new_v_pos);
+				}
+
+				const bool frameGeometryChanged =
+					new_h_pos != horizontal_position_ ||
+					new_v_pos != vertical_position_ ||
+					new_w != width_ ||
+					new_h != height_;
+
+				if (frameGeometryChanged)
+				{
+					needs_redraw_ = true;
+				}
+
+				horizontal_position_ = new_h_pos;
+				vertical_position_ = new_v_pos;
+				width_ = new_w;
+				height_ = new_h;
+
+				has_valid_bounds_ = width_ > 0 && height_ > 0;
+
+				const bool hasNoTexture = (external_texture_view_ == VK_NULL_HANDLE);
+
+				if (!has_valid_bounds_)
+				{
+					drawing_state_ = DrawingState::IsNotReadyToBeDrawn;
+				}
+				else
+				{
+					if (!skipTextureRebuild)
+					{
+						if (frameGeometryChanged || hasNoTexture)
+							needs_redraw_ = true;
+					}
+
+					if (shared_pipeline_ && vk_vertex_buffer_ != VK_NULL_HANDLE)
+					{
+						if (drawing_state_ == DrawingState::IsNotReadyToBeDrawn)
+						{
+							drawing_state_ = DrawingState::IsReadyToBeDrawn;
+							needs_redraw_ = true;
+						}
+					}
+				}
+			}
+		}
+		else
+		{
+			has_valid_bounds_ = false;
+		}
+	}
+	else
+	{
+		has_valid_bounds_ = false;
 	}
 	
 	if (drawing_state_ == DrawingState::IsNotReadyToBeDrawn)
@@ -374,6 +365,29 @@ void UIPanel::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawabl
 		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shared_pipeline_->layout, 0, 1, &vk_descriptor_set_, 0, nullptr);
 	}
 
+	// Calculate and set the clip scissor to prevent drawing overflow through splitters
+	int geometryLeft = horizontal_position_;
+	int geometryTop = vertical_position_;
+	int geometryRight = horizontal_position_ + width_;
+	int geometryBottom = vertical_position_ + height_;
+
+	int clippedLeft = (std::max)(0, geometryLeft);
+	int clippedTop = (std::max)(0, geometryTop);
+	int clippedRight = (std::min)(drawableWidth, geometryRight);
+	int clippedBottom = (std::min)(drawableHeight, geometryBottom);
+
+	int scissorX = appBorderLeft + clippedLeft;
+	int scissorY = appBorderTop + clippedTop;
+	int scissorWidth = (std::max)(0, clippedRight - clippedLeft);
+	int scissorHeight = (std::max)(0, clippedBottom - clippedTop);
+
+	VkRect2D scissor = {};
+	scissor.offset.x = scissorX;
+	scissor.offset.y = scissorY;
+	scissor.extent.width = static_cast<uint32_t>(scissorWidth);
+	scissor.extent.height = static_cast<uint32_t>(scissorHeight);
+	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
 	if (vk_vertex_buffer_ != VK_NULL_HANDLE)
 	{
 		if (needs_redraw_ || drawing_state_ == DrawingState::IsReadyToBeDrawn)
@@ -387,7 +401,7 @@ void UIPanel::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawabl
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 		vkCmdDraw(commandBuffer, 6, 1, 0, 0);
 
-		drawDataHolderOverlays(commandBuffer, drawableWidth, drawableHeight);
+		drawDataHolderOverlays(commandBuffer, drawableWidth, drawableHeight, frameData.width, frameData.height);
 
 		if (drawing_state_ == DrawingState::IsReadyToBeDrawn)
 		{
@@ -396,20 +410,40 @@ void UIPanel::draw(VkCommandBuffer commandBuffer, int drawableWidth, int drawabl
 		
 		needs_redraw_ = false;
 	}
+
+	// Restore full-window scissor so we don't leak clipping states
+	int winDrawableWidth = drawableWidth;
+	int winDrawableHeight = drawableHeight;
+	if (SDL_ApplicationWindow* appWin = SDL_ApplicationWindow::getInstance())
+	{
+		SDL_GetWindowSizeInPixels(appWin->getHandle(), &winDrawableWidth, &winDrawableHeight);
+	}
+	VkRect2D fullScissor = {};
+	fullScissor.offset = { 0, 0 };
+	fullScissor.extent = { static_cast<uint32_t>(winDrawableWidth), static_cast<uint32_t>(winDrawableHeight) };
+	vkCmdSetScissor(commandBuffer, 0, 1, &fullScissor);
 }
 
-void UIPanel::drawDataHolderOverlays(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight)
+void UIPanel::drawDataHolderOverlays(VkCommandBuffer commandBuffer, int drawableWidth, int drawableHeight, int logicalW, int logicalH)
 {
 	if (commandBuffer == VK_NULL_HANDLE || !vk_context_ || !has_valid_bounds_) return;
 	if (!vulkan_pipelines_ || vk_render_pass_ == VK_NULL_HANDLE) return;
+
+	if (SDL_ApplicationWindow* appWin = SDL_ApplicationWindow::getInstance())
+	{
+		if (appWin->isDrawingBoardActive())
+		{
+			return; // Disable display but keep active
+		}
+	}
 
 	DataHolders* dh = DataHolders::getInstance();
 	if (!dh) return;
 
 	dh->drawTextData(
 		name_,
-		x_, y_, width_, height_,
-		last_frame_width_, last_frame_height_,
+		horizontal_position_, vertical_position_, width_, height_,
+		logicalW, logicalH,
 		commandBuffer, drawableWidth, drawableHeight,
 		vk_context_, vulkan_pipelines_, vk_render_pass_);
 }
@@ -610,10 +644,10 @@ void UIPanel::updateGeometry(int drawableWidth, int drawableHeight)
 		return;
 	}
 
-	int geometryLeft = x_;
-	int geometryTop = y_;
-	int geometryRight = x_ + width_;
-	int geometryBottom = y_ + height_;
+	int geometryLeft = horizontal_position_;
+	int geometryTop = vertical_position_;
+	int geometryRight = horizontal_position_ + width_;
+	int geometryBottom = vertical_position_ + height_;
 	float uvLeft = texcoord_left_;
 	float uvTop = texcoord_top_;
 	float uvRight = texcoord_right_;
@@ -688,7 +722,6 @@ void UIPanel::updateGeometry(int drawableWidth, int drawableHeight)
 		vkUnmapMemory(device, vk_vertex_buffer_memory_);
 	}
 }
-
 
 
 void UIPanel::setVKContext(VKContext* context)
@@ -767,22 +800,6 @@ void UIPanel::invalidateExternalTexture()
 	}
 }
 
-void UIPanel::RedrawSelfTextureAtCorrectResolution(int width, int height)
-{
-	if (width <= 0 || height <= 0)
-	{
-		return;
-	}
-
-	needs_redraw_ = true;
-	if (external_texture_view_ != VK_NULL_HANDLE && external_sampler_ != VK_NULL_HANDLE)
-	{
-		drawing_state_ = DrawingState::IsReadyToBeDrawn;
-	}
-
-	std::cout << "[UIPanel::RedrawSelfTextureAtCorrectResolution] " << name_ 
-	          << " - Preserving current CEF texture while waiting for repaint at " << width << "x" << height << std::endl;
-}
 
 bool UIPanel::makePanelTextureInteractible(int mouseX, int mouseY, bool isLeftButtonDown, bool isRightButtonDown, CefRefPtr<CefBrowser> browser, int cefTextureWidth, int cefTextureHeight)
 {
@@ -791,7 +808,7 @@ bool UIPanel::makePanelTextureInteractible(int mouseX, int mouseY, bool isLeftBu
 		return false;
 	}
 
-	const bool isInside = (mouseX >= x_ && mouseX < x_ + width_ && mouseY >= y_ && mouseY < y_ + height_);
+	const bool isInside = (mouseX >= horizontal_position_ && mouseX < horizontal_position_ + width_ && mouseY >= vertical_position_ && mouseY < vertical_position_ + height_);
 
 	if (!isInside)
 	{
@@ -809,8 +826,8 @@ bool UIPanel::makePanelTextureInteractible(int mouseX, int mouseY, bool isLeftBu
 		return false;
 	}
 
-	const int localX = mouseX - x_;
-	const int localY = mouseY - y_;
+	const int localX = mouseX - horizontal_position_;
+	const int localY = mouseY - vertical_position_;
 
 	const float uvX = texcoord_left_ + (static_cast<float>(localX) / static_cast<float>(width_)) * (texcoord_right_ - texcoord_left_);
 	const float uvY = texcoord_top_ + (static_cast<float>(localY) / static_cast<float>(height_)) * (texcoord_bottom_ - texcoord_top_);

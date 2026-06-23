@@ -48,7 +48,7 @@ function sendBufferedLogs(targetWindow) {
     }
 }
 
-window.addEventListener('message', (event) => {
+window.addEventListener('message', async (event) => {
     if (event.data.type === 'REQUEST_LOGS') {
         sendBufferedLogs(event.source);
     } else if (event.data.type === 'CLEAR_LOGS') {
@@ -56,6 +56,26 @@ window.addEventListener('message', (event) => {
         lastServerLogCount = 0;
         fetch('http://localhost:8080/console/clear', { method: 'POST' })
             .catch(err => console.error('Failed to clear server logs:', err));
+    } else if (event.data.type === 'SWITCH_WORKSPACE') {
+        const workspace = event.data.workspace;
+        
+        // Notify backend of the active workspace, clear everything, and navigate
+        try {
+            await fetch('http://localhost:8080/api/workspace/set', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ workspace: workspace })
+            });
+            await fetch('http://localhost:8080/api/Endpoint/WorkspaceClear', { method: 'POST' });
+        } catch (e) {
+            console.error('Failed to clear panel map on layout change:', e);
+        }
+
+        if (workspace === 'drawing') {
+            window.location.href = 'http://localhost:8080/ui/Drawing_board/drawing_board_layout.html';
+        } else if (workspace === '3d') {
+            window.location.href = 'http://localhost:8080/ui/main_layout.html';
+        }
     }
 });
 
@@ -181,7 +201,14 @@ function collectUIPanelIFrames() {
 }
 
 function sendUIPanelIFramesToServer() {
-    const iframeData = collectUIPanelIFrames();
+    let iframeData = collectUIPanelIFrames();
+    const isDrawingWorkspace = window.location.href.includes('drawing_board_layout.html');
+    const endpoint = isDrawingWorkspace
+        ? 'http://localhost:8080/api/Endpoint/DrawingScreenPanels'
+        : 'http://localhost:8080/api/Endpoint/ThreeDScenePanels';
+
+    // In Drawing Workspace, send all panels (top_bar + drawing-specific ones)
+    // No filter needed — DrawingScreenPanels route handles all of them
 
     fetch('http://localhost:8080/api/debug/panels-found', { 
         method: 'POST', 
@@ -193,7 +220,7 @@ function sendUIPanelIFramesToServer() {
         return;
     }
 
-    fetch('http://localhost:8080/api/uipanels/update', {
+    fetch(endpoint, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -229,12 +256,41 @@ initializeServerConnection();
 setInterval(pollServerLogs, 1000);
 
 window.addEventListener('load', () => {
-    setTimeout(() => {
-        sendUIPanelIFramesToServer();
-    }, 500);
+    const isDrawingWorkspace = window.location.href.includes('drawing_board_layout.html');
+    const activeWorkspace = isDrawingWorkspace ? 'drawing' : '3d';
+    
+    // Automatically sync initial workspace to C++ server on load
+    fetch('http://localhost:8080/api/workspace/set', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspace: activeWorkspace })
+    }).catch(e => console.error('Failed to sync initial workspace to server:', e));
+
+    if (isDrawingWorkspace) {
+        // Send all drawing workspace panels to the server
+        setTimeout(() => {
+            sendUIPanelIFramesToServer();
+        }, 300);
+    } else {
+        setTimeout(() => {
+            sendUIPanelIFramesToServer();
+        }, 500);
+    }
+
     setTimeout(() => {
         if (typeof sendAllPanelFieldPositions === 'function') sendAllPanelFieldPositions();
     }, 600);
+    
+    // Sync buttons UI status in Top Bar iframe
+    setTimeout(() => {
+        const topBarIframe = document.querySelector('.top-bar-panel iframe');
+        if (topBarIframe && topBarIframe.contentWindow) {
+            topBarIframe.contentWindow.postMessage({
+                type: 'SYNC_WORKSPACE_BUTTONS',
+                workspace: activeWorkspace
+            }, '*');
+        }
+    }, 650);
 });
 
 window.addEventListener('resize', () => {

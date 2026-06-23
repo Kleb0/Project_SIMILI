@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drawed Sprites</title>
+    <style>
+        body {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 10px;
+            box-sizing: border-box;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #e67e22;
+        }
+        .sprites-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(45px, 1fr));
+            gap: 8px;
+            overflow-y: auto;
+            flex: 1;
+            padding-right: 5px;
+        }
+        .sprite-card {
+            background-color: #2d2d2d;
+            border: 1px solid #444;
+            border-radius: 4px;
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .sprite-card:hover {
+            border-color: #e67e22;
+            background-color: #353535;
+        }
+        .pixel-art {
+            width: 32px;
+            height: 32px;
+            image-rendering: pixelated;
+            background-image: linear-gradient(45deg, #111 25%, transparent 25%), linear-gradient(-45deg, #111 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #111 75%), linear-gradient(-45deg, transparent 75%, #111 75%);
+            background-size: 8px 8px;
+            background-position: 0 0, 0 4px, 4px -4px, -4px 0px;
+            border-radius: 2px;
+            position: relative;
+        }
+        .p-player::after {
+            content: '';
+            position: absolute;
+            background-color: #e74c3c;
+            width: 12px;
+            height: 16px;
+            left: 10px;
+            top: 8px;
+            border-radius: 2px;
+            box-shadow: 0 4px #c0392b;
+        }
+        .p-coin::after {
+            content: '';
+            position: absolute;
+            background-color: #f1c40f;
+            width: 12px;
+            height: 12px;
+            left: 10px;
+            top: 10px;
+            border-radius: 50%;
+            box-shadow: 0 2px #d35400;
+        }
+        .p-tree::after {
+            content: '';
+            position: absolute;
+            background-color: #2ecc71;
+            width: 14px;
+            height: 14px;
+            left: 9px;
+            top: 6px;
+            border-radius: 4px;
+            box-shadow: 0 8px #27ae60, 3px 12px #795548;
+        }
+        .p-wall::after {
+            content: '';
+            position: absolute;
+            background-color: #7f8c8d;
+            width: 18px;
+            height: 18px;
+            left: 7px;
+            top: 7px;
+            border-radius: 1px;
+            box-shadow: 0 3px #5d6d7e;
+        }
+    </style>
+</head>
+<body>
+    <h3>Drawed Sprites</h3>
+    <div class="sprites-grid">
+        <div class="sprite-card"><div class="pixel-art p-player"></div></div>
+        <div class="sprite-card"><div class="pixel-art p-coin"></div></div>
+        <div class="sprite-card"><div class="pixel-art p-tree"></div></div>
+        <div class="sprite-card"><div class="pixel-art p-wall"></div></div>
+        <div class="sprite-card"><div class="pixel-art"></div></div>
+        <div class="sprite-card"><div class="pixel-art"></div></div>
+        <div class="sprite-card"><div class="pixel-art"></div></div>
+        <div class="sprite-card"><div class="pixel-art"></div></div>
+    </div>
+</body>
+</html>
